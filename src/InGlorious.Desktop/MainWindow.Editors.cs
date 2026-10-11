@@ -200,13 +200,17 @@ public sealed partial class MainWindow
         }));
         _editor.Children.Add(Button(_previewRunning ? "Vorschau pausieren" : "Vorschau fortsetzen", () => { _previewRunning = !_previewRunning; Build(); }));
     }
-    private void BuildBindingEditor()
+    private Control BuildBindingFileActions()
     {
         var import = AsyncButton("Importieren …", ImportKeyBindingsAsync); import.Name = "ImportKeyBindings";
         var export = AsyncButton("Exportieren …", ExportKeyBindingsAsync); export.Name = "ExportKeyBindings";
         var files = new WrapPanel { Orientation = Orientation.Horizontal };
         import.Margin = new Thickness(0, 0, 7, 5); export.Margin = new Thickness(0, 0, 0, 5);
-        files.Children.Add(import); files.Children.Add(export); _editor.Children.Add(files);
+        files.Children.Add(import); files.Children.Add(export);
+        return new Border { BorderBrush = Brush("#353A40"), BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(16, 12, 16, 7), Child = files };
+    }
+    private void BuildBindingEditor()
+    {
         if (_state.Device.Id == "numpad")
         {
             var keys = AsyncButton("Tasten", () => ShowBindingEditorAsync(false)); keys.Name = "BindingKeysTab";

@@ -458,10 +458,6 @@
 
                             </StackPanel>
                             <StackPanel x:Name="BindingPanel" Visibility="Collapsed">
-                                <UniformGrid Columns="2" Margin="0,0,0,14">
-                                    <Button x:Name="ImportKeyBindingsButton" local:UiIcons.Kind="import" Content="{local:Tr Key='Importieren …'}" Click="ImportKeyBindings_Click" FontSize="11" Padding="7,9" Margin="0,0,3,0" />
-                                    <Button x:Name="ExportKeyBindingsButton" local:UiIcons.Kind="export" Content="{local:Tr Key='Exportieren …'}" Click="ExportKeyBindings_Click" FontSize="11" Padding="7,9" Margin="3,0,0,0" />
-                                </UniformGrid>
                                 <UniformGrid x:Name="BindingTargetButtons" Columns="2" Margin="0,0,0,16" Visibility="Collapsed">
                                     <Button x:Name="KeyBindingsButton" Content="{local:Tr Key='Tasten'}" Click="KeyBindings_Click" Margin="0,0,3,0"/>
                                     <Button x:Name="SliderBindingsButton" Content="{local:Tr Key='Schieberegler'}" Click="SliderBindings_Click" Margin="3,0,0,0"/>
@@ -615,6 +611,12 @@
                             </StackPanel>
                         </Grid>
                     </ScrollViewer>
+                    <Border Grid.Row="3" Visibility="{Binding Visibility, ElementName=BindingPanel}" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,12,0,0">
+                        <UniformGrid Columns="2">
+                            <Button x:Name="ImportKeyBindingsButton" local:UiIcons.Kind="import" Content="{local:Tr Key='Importieren …'}" Click="ImportKeyBindings_Click" FontSize="11" Padding="7,9" Margin="0,0,3,0" />
+                            <Button x:Name="ExportKeyBindingsButton" local:UiIcons.Kind="export" Content="{local:Tr Key='Exportieren …'}" Click="ExportKeyBindings_Click" FontSize="11" Padding="7,9" Margin="3,0,0,0" />
+                        </UniformGrid>
+                    </Border>
                     <Border x:Name="ApplyEffectHost" Grid.Row="3" Visibility="Collapsed" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,12,0,0">
                         <Button local:UiIcons.Kind="check" x:Name="ApplyEffectButton" Content="{local:Tr Key='Effekt übernehmen'}" Click="ApplyEffect_Click" Style="{StaticResource PrimaryButton}" />
                     </Border>

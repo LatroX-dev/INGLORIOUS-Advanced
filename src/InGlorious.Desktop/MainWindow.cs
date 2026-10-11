@@ -202,7 +202,13 @@ public sealed partial class MainWindow : Window
                 case "Gerät": BuildDeviceEditor(); break;
                 default: _editor.Children.Add(Text(L.T("Ein Profil enthält Farben, Belegungen, Ebenen und Makros für ein Gerät."), true)); break;
             }
-            var inspector = new Border { Background = Brush("#1C1F22"), Child = new ScrollViewer { Content = _editor } };
+            var inspectorContent = new Grid { RowDefinitions = new("*,Auto") };
+            inspectorContent.Children.Add(new ScrollViewer { Content = _editor });
+            if (_page == "Tastenbelegung")
+            {
+                var bindingFiles = BuildBindingFileActions(); Grid.SetRow(bindingFiles, 1); inspectorContent.Children.Add(bindingFiles);
+            }
+            var inspector = new Border { Background = Brush("#1C1F22"), Child = inspectorContent };
             Grid.SetColumn(inspector, 2); body.Children.Add(inspector);
             var footer = new Grid { ColumnDefinitions = new("*,Auto"), Margin = new Thickness(16, 7) };
             _statusText = Text(_status, true, 11); _deviceState = Text("", size: 12);
