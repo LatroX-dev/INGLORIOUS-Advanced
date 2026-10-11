@@ -159,6 +159,7 @@ public partial class MainWindow
             TransferWindow.RunOfflineStatusChecks(id, check);
         }
         RunBindingWorkflowChecks(check);
+        RunLayerGuidanceChecks(check);
         ResetWorkflowFixture("pro-iso");
     }
 
@@ -262,12 +263,121 @@ public partial class MainWindow
         BindingSearch.Text = "Strg"; RefreshBindingChoices();
         check(BindingChoice.Items.Cast<BindingOption>().Select(option => option.Code).ToHashSet().SetEquals(new[] { "KC_LCTL", "KC_RCTL" }), "Binding search finds translated visible modifier names");
         BindingCategory.SelectedIndex = 7; BindingSearch.Text = "Ebene 2"; RefreshBindingChoices();
-        check(BindingChoice.Items.Cast<BindingOption>().Select(option => option.Code).ToHashSet().SetEquals(new[] { "MO(2)", "TG(2)" }), "Layer category and text search compose correctly");
+        check(BindingChoice.Items.Cast<BindingOption>().Select(option => option.Code).ToHashSet().SetEquals(new[] { "MO(2)", "TG(2)", "TO(2)" }), "Layer category and text search expose hold, toggle and direct switch");
         BindingSearch.Text = "not-a-binding"; RefreshBindingChoices();
         check(BindingChoice.Items.Count == 0 && BindingChoice.SelectedIndex == -1 && Fingerprint(_project) == before && _undo.Count == history, "Empty search has no stale binding selection or draft mutation");
         SetTab(4);
         UpdateLayout();
         check(!KeyboardWorkspace.IsVisible && DeviceOverview.IsVisible, "Device settings show the device overview without editable key targets or a hidden ancestor");
+    }
+
+    private void RunLayerGuidanceChecks(Action<bool, string> check)
+    {
+        if (!_screenshotMode) throw new InvalidOperationException("Layer guidance checks require offline mode.");
+        var decision = _pendingEditDecisionOverride;
+        try
+        {
+            foreach (var id in new[] { "pro-iso", "numpad" })
+            {
+                ResetWorkflowFixture(id); SetTab(1);
+                var key = Device.Keys.First(key => !key.IsEncoder && key.DefaultBinding != "MO(1)").Id;
+                _selection.Add(key); RefreshInspector();
+                var baseline = ProjectService.Clone(_project);
+                var before = Fingerprint(_project);
+                OpenLayerSwitch_Click(this, new RoutedEventArgs()); UpdateLayout();
+                check(_activeTab == 3 && _selection.SetEquals([key]) && Fingerprint(_project) == before && _undo.Count == 0,
+                    id + ": opening guided layer assignment preserves the selected key and complete draft");
+                check(LayerEditingHelp.IsVisible && LayerEditingHint.Text == LayerGuidance.EditingHint &&
+                    LayerSummaryHint.Text == LayerGuidance.LayerSummary(0) && LayerAssignmentSource.Text.Contains(Device.Keys.First(k => k.Id == key).AccessibleLabel),
+                    id + ": layer guidance separates editor selection from runtime and identifies the assignment key");
+                check(TargetLayer.SelectedIndex == 1 && LayerSwitchMode.SelectedIndex == 0,
+                    id + ": an ordinary base-layer key starts with a hold action to layer one");
+                TargetLayer.SelectedIndex = 3; LayerSwitchMode.SelectedIndex = 1; RefreshInspector();
+                check(TargetLayer.SelectedIndex == 3 && LayerSwitchMode.SelectedIndex == 1 && Fingerprint(_project) == before,
+                    id + ": refreshing the same selection preserves the user's unassigned target and behavior");
+                foreach (var (mode, target, code) in new[] { (0, 3, "MO(3)"), (1, 2, "TG(2)"), (2, 1, "TO(1)") })
+                {
+                    Layer.Keys[key].Binding = code; RefreshInspector();
+                    check(TargetLayer.SelectedIndex == target && LayerSwitchMode.SelectedIndex == mode,
+                        id + ": an existing " + code + " is selected in the guided editor");
+                }
+                var peer = Device.Keys.First(k => !k.IsEncoder && k.Id != key).Id;
+                Layer.Keys[key].Binding = "TO(3)"; Layer.Keys[peer].Binding = "TG(2)"; _selection.Add(peer); RefreshInspector();
+                check(TargetLayer.SelectedIndex == 1 && LayerSwitchMode.SelectedIndex == 0,
+                    id + ": mixed selected functions do not present one key's function as their shared assignment");
+                Layer.Keys[peer].Binding = "TO(3)"; RefreshInspector();
+                check(TargetLayer.SelectedIndex == 3 && LayerSwitchMode.SelectedIndex == 2,
+                    id + ": matching functions on multiple selected keys are recognized together");
+                Layer.Keys[key].Binding = baseline.Layers[0].Keys[key].Binding;
+                Layer.Keys[peer].Binding = baseline.Layers[0].Keys[peer].Binding;
+                _selection.Remove(peer); RefreshInspector();
+                TargetLayer.SelectedIndex = 3; LayerSwitchMode.SelectedIndex = 1;
+                _project = ProjectService.Clone(_project); RefreshInspector();
+                check(TargetLayer.SelectedIndex == 1 && LayerSwitchMode.SelectedIndex == 0 && Fingerprint(_project) == before && _undo.Count == 0,
+                    id + ": replacing the profile refreshes the suggested action without changing profile data");
+                foreach (var (mode, code) in new[] { (0, "MO(2)"), (1, "TG(2)"), (2, "TO(2)") })
+                {
+                    TargetLayer.SelectedIndex = 2; LayerSwitchMode.SelectedIndex = mode;
+                    check(LayerSwitchHint.Text == LayerGuidance.ActionDescription(mode, 0, 2) && AssignLayerSwitchButton.IsEnabled,
+                        id + ": mode " + mode + " displays its explanation before assignment");
+                    AssignLayerSwitch_Click(this, new RoutedEventArgs());
+                    var expected = ProjectService.Clone(baseline); expected.Layers[0].Keys[key].Binding = code;
+                    check(Fingerprint(_project) == Fingerprint(expected) && _undo.Count == 1,
+                        id + ": " + code + " changes only the selected key on the edited layer in one undo step");
+                    Undo_Click(this, new RoutedEventArgs());
+                    check(Fingerprint(_project) == before && _undo.Count == 0,
+                        id + ": undo fully restores the draft after " + code);
+                }
+                SelectLayer(1);
+                var upperBefore = Fingerprint(_project);
+                check(TargetLayer.SelectedIndex == 0 && LayerSwitchMode.SelectedIndex == 2 &&
+                    LayerSwitchHint.Text == LayerGuidance.ActionDescription(2, 1, 0),
+                    id + ": an unassigned higher-layer key suggests returning directly to the base");
+                TargetLayer.SelectedIndex = 3; LayerSwitchMode.SelectedIndex = 0;
+                check(LayerSwitchHint.Text == LayerGuidance.ActionDescription(0, 1, 3),
+                    id + ": changing the target updates guidance for the actual edited and target layers");
+                RefreshInspector();
+                check(TargetLayer.SelectedIndex == 3 && LayerSwitchMode.SelectedIndex == 0,
+                    id + ": a manual higher-layer action remains selected during inspector refresh");
+                TargetLayer.SelectedIndex = 0; LayerSwitchMode.SelectedIndex = 2; AssignLayerSwitch_Click(this, new RoutedEventArgs());
+                check(_project.Layers[1].Keys[key].Binding == "TO(0)" && _project.Layers[0].Keys[key].Binding == Device.Keys.First(k => k.Id == key).DefaultBinding,
+                    id + ": a return-to-base key changes only the current higher layer");
+                Undo_Click(this, new RoutedEventArgs()); check(Fingerprint(_project) == upperBefore, id + ": return key has complete undo");
+                check(AssignTransparentButton.IsEnabled && TransparentBindingHint.Text == LayerGuidance.BindingDescription("KC_TRNS"),
+                    id + ": higher layers explain and allow inherited bindings");
+                SelectLayer(0); check(!AssignTransparentButton.IsEnabled, id + ": base cannot inherit a nonexistent lower layer");
+                _selection.Clear(); RefreshInspector();
+                check(!AssignLayerSwitchButton.IsEnabled, id + ": assigning a layer switch requires a selected key");
+                if (Device.Keys.FirstOrDefault(k => k.IsEncoder) is { } encoder)
+                {
+                    _selection.Add(encoder.Id); RefreshInspector(); TargetLayer.SelectedIndex = 2; LayerSwitchMode.SelectedIndex = 0;
+                    var encoderBefore = Fingerprint(_project); AssignLayerSwitch_Click(this, new RoutedEventArgs());
+                    check(Fingerprint(_project) == encoderBefore && _undo.Count == 0, id + ": encoder rotation cannot receive a hold action");
+                }
+                ResetWorkflowFixture(id); SetTab(1); _selection.Add(key); RefreshInspector();
+                DebounceInput.Text = "13"; _pendingEditDecisionOverride = () => PendingEditChoice.Cancel;
+                before = Fingerprint(_project); OpenLayerSwitch_Click(this, new RoutedEventArgs());
+                check(_activeTab == 1 && HasPendingTiming && Fingerprint(_project) == before,
+                    id + ": canceling pending-input resolution keeps the current binding editor");
+                _pendingEditDecisionOverride = () => PendingEditChoice.Discard;
+                OpenLayerSwitch_Click(this, new RoutedEventArgs());
+                DebounceInput.Text = "13"; _pendingEditDecisionOverride = () => PendingEditChoice.Cancel;
+                TargetLayer.SelectedIndex = 2; LayerSwitchMode.SelectedIndex = 2; AssignLayerSwitch_Click(this, new RoutedEventArgs());
+                check(Fingerprint(_project) == before && _undo.Count == 0 && HasPendingTiming,
+                    id + ": canceled pending input blocks guided assignment without losing the input");
+                DiscardPendingEdits(); _pendingEditDecisionOverride = null;
+                SetTab(1); BindingCategory.SelectedIndex = 0; BindingSearch.Text = "";
+                foreach (var code in new[] { "KC_LCTL", "KC_TRNS", "MO(1)", "TG(2)", "TO(3)" })
+                {
+                    BindingChoice.SelectedValue = code;
+                    check(BindingFunctionHint.Text == LayerGuidance.BindingDescription(code) && BindingFunctionHint.Visibility == Visibility.Visible,
+                        id + ": selected function explains " + code + " without changing bindings");
+                }
+                check(BindingChoice.Items.Cast<BindingOption>().Select(option => option.Code).Distinct().Count() == BindingChoice.Items.Count,
+                    id + ": the function list has no duplicated default Fn entry");
+            }
+        }
+        finally { _pendingEditDecisionOverride = decision; DiscardPendingEdits(); ResetWorkflowFixture("pro-iso"); }
     }
 
     private void RunDeviceSaveStatusChecks(string id, Action<bool, string> check)

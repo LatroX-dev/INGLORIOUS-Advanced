@@ -46,35 +46,56 @@ public sealed class ApplicationInstance : IDisposable
 
     private async Task ServeAsync(NamedPipeServerStream firstPipe, Action openWindow)
     {
-        NamedPipeServerStream? nextPipe = firstPipe;
-        while (!_shutdown.IsCancellationRequested)
+        NamedPipeServerStream? pipe = firstPipe;
+        try
         {
-            try
+            while (!_shutdown.IsCancellationRequested)
             {
-                // CurrentUserOnly checks the peer on Windows and Unix. The stream has
-                // no path, command, or arbitrary payload surface: only activate/ping.
-                using var pipe = nextPipe ?? CreatePipe();
-                nextPipe = null;
-                await pipe.WaitForConnectionAsync(_shutdown.Token).ConfigureAwait(false);
-                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token);
-                deadline.CancelAfter(TimeSpan.FromSeconds(3));
-                await pipe.WriteAsync(BitConverter.GetBytes(Environment.ProcessId), deadline.Token).ConfigureAwait(false);
-                var command = new byte[1];
-                await pipe.ReadExactlyAsync(command, deadline.Token).ConfigureAwait(false);
-                if (command[0] > 1) continue;
-                if (command[0] == 1) openWindow();
-                await pipe.WriteAsync(new byte[] { 6 }, deadline.Token).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { break; }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
-            {
-                // A vanished/invalid peer must not terminate the primary app. A broken
-                // IPC environment never causes a secondary app to open devices instead.
-                try { await Task.Delay(100, _shutdown.Token).ConfigureAwait(false); }
-                catch (OperationCanceledException) { break; }
+                bool connected = false;
+                try
+                {
+                    pipe ??= CreatePipe();
+                    // CurrentUserOnly checks the peer on Windows and Unix. The stream has
+                    // no path, command, or arbitrary payload surface: only activate/ping.
+                    await pipe.WaitForConnectionAsync(_shutdown.Token).ConfigureAwait(false);
+                    connected = true;
+                    using var deadline = CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token);
+                    deadline.CancelAfter(TimeSpan.FromSeconds(3));
+                    await pipe.WriteAsync(BitConverter.GetBytes(Environment.ProcessId), deadline.Token).ConfigureAwait(false);
+                    var command = new byte[1];
+                    await pipe.ReadExactlyAsync(command, deadline.Token).ConfigureAwait(false);
+                    if (command[0] > 1) continue;
+                    if (command[0] == 1) openWindow();
+                    await pipe.WriteAsync(new byte[] { 6 }, deadline.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { break; }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+                {
+                    // A vanished/invalid peer must not terminate the primary app. A broken
+                    // IPC environment never causes a secondary app to open devices instead.
+                    try { await Task.Delay(100, _shutdown.Token).ConfigureAwait(false); }
+                    catch (OperationCanceledException) { break; }
+                }
+                finally
+                {
+                    if (OperatingSystem.IsWindows())
+                    {
+                        // Closing the Windows stream preserves unread replies, unlike
+                        // Disconnect. Keep the existing per-connection lifetime there.
+                        pipe?.Dispose();
+                        pipe = null;
+                    }
+                    else if (connected)
+                    {
+                        // Unix disposal also destroys the listener and drops queued
+                        // clients. Disconnect only its accepted peer. Do this even when
+                        // a failed read marked that connection broken.
+                        pipe!.Disconnect();
+                    }
+                }
             }
         }
-        nextPipe?.Dispose();
+        finally { pipe?.Dispose(); }
     }
 
     public async Task<bool> NotifyExistingAsync(bool openWindow)

@@ -208,6 +208,7 @@ public sealed partial class MainWindow
         }
         Check(PhysicalCode(Avalonia.Input.PhysicalKey.P) == "KC_P", "physical letter distinct from numpad");
         RunSliderNavigationChecks(Check);
+        RunLayerGuidanceChecks(Check);
         RunColorEditorChecks(Check);
         RunLightingPreviewChecks(Check);
         RunStandbyEditorChecks(Check);
@@ -552,6 +553,100 @@ public sealed partial class MainWindow
             _state = current; _macroId = macro; Directory.Delete(folder, recursive: true);
         }
     }
+    private void RunLayerGuidanceChecks(Action<bool, string> check)
+    {
+        T Find<T>(string name) where T : Control => _root.GetLogicalDescendants().OfType<T>().Single(control => control.Name == name);
+        void Click(string name) => Find<Button>(name).RaiseEvent(new RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+        var original = _state; var page = _page; var slider = _editingSlider; var pending = _pendingApply;
+        var choice = _offlinePromptChoice; var busy = _busy; var initialPending = _initialConnectionsPending;
+        try
+        {
+            _busy = _initialConnectionsPending = false; _pendingApply = null;
+            _state = new EditorState("pro-iso"); _state.MarkInitialClean(); _page = "Tastenbelegung"; _editingSlider = false;
+            var fn = _state.Device.Keys.First(key => key.DefaultBinding == "MO(1)").Id;
+            _state.SelectKey(fn, false); Build();
+            var initial = EditorState.Fingerprint(_state.Project);
+            check(Find<StackPanel>("LayerEditorSelector").IsVisible && Find<TextBlock>("LayerEditingHint").Text == LayerGuidance.EditingHint &&
+                Find<TextBlock>("CurrentKeyBindingSummary").Text!.Contains(_state.Project.Layers[1].Name) &&
+                !Find<TextBlock>("CurrentKeyBindingSummary").Text!.Contains("MO("),
+                "binding workspace distinguishes editing from device activation and explains the selected Fn assignment without protocol codes");
+            check(!Find<Button>("UseUnderlyingBinding").IsEnabled, "base-layer bindings cannot be replaced with a transparent action");
+            _layerChoice.SelectedIndex = 2;
+            check(_state.LayerIndex == 2 && EditorState.Fingerprint(_state.Project) == initial && ! _state.CanUndo,
+                "choosing an editor layer changes no device configuration or history");
+            _state.LayerIndex = 0; Build(); OpenLayerBindingEditorAsync().GetAwaiter().GetResult();
+            check(_page == "Ebenen" && _state.SelectedKeys.SetEquals([fn]) && Find<ComboBox>("LayerBindingTarget").SelectedIndex == 1 &&
+                Find<ComboBox>("LayerBindingBehavior").SelectedIndex == 0 && EditorState.Fingerprint(_state.Project) == initial,
+                "Fn entry retains the selected key and reflects its existing target and hold behavior without editing it");
+            check(Find<ComboBox>("LayerBindingTarget").Items.Cast<string>().All(label => _state.Project.Layers.Any(layer => label.EndsWith(layer.Name))),
+                "layer action destinations include the editable layer names");
+            for (var mode = 0; mode < 3; mode++)
+            {
+                Find<ComboBox>("LayerBindingTarget").SelectedIndex = 2;
+                Find<ComboBox>("LayerBindingBehavior").SelectedIndex = mode;
+                check(Find<TextBlock>("LayerBindingDescription").Text == LayerGuidance.ActionDescription(mode), "layer action description follows behavior " + mode);
+                var expected = ProjectService.Clone(_state.Project); expected.Layers[0].Keys[fn].Binding = new[] { "MO(2)", "TG(2)", "TO(2)" }[mode];
+                Click("AssignLayerBinding");
+                check(EditorState.Fingerprint(_state.Project) == EditorState.Fingerprint(expected),
+                    "assigning a layer action changes only the chosen source key and never rewrites its target layer: " + mode);
+                _state.Undo(); Changed(); Build();
+                check(EditorState.Fingerprint(_state.Project) == initial && !_state.CanUndo, "a layer action is exactly one reversible change: " + mode);
+            }
+            _state.LayerIndex = 1; Build();
+            check(Find<ComboBox>("LayerBindingTarget").SelectedIndex == 0 && Find<ComboBox>("LayerBindingBehavior").SelectedIndex == 2 &&
+                EditorState.Fingerprint(_state.Project) == initial && !_state.CanUndo,
+                "an unassigned upper-layer key offers a direct return to the base without changing the draft");
+            Find<ComboBox>("LayerBindingBehavior").SelectedIndex = 0;
+            check(Find<TextBlock>("LayerBindingDescription").Text == LayerGuidance.ActionDescription(0, 1, 0) &&
+                Find<TextBlock>("LayerBindingDescription").Text != LayerGuidance.ActionDescription(0) && Find<Button>("AssignLayerBinding").IsEnabled,
+                "holding a lower layer explains its limitation without removing advanced assignments");
+            Find<ComboBox>("LayerBindingTarget").SelectedIndex = 2;
+            check(Find<ComboBox>("LayerBindingBehavior").SelectedIndex == 0 && Find<TextBlock>("LayerBindingDescription").Text == LayerGuidance.ActionDescription(0),
+                "changing only the destination refreshes the hold explanation without resetting the chosen mode");
+            Find<ComboBox>("LayerBindingTarget").SelectedIndex = 1;
+            check(Find<TextBlock>("LayerBindingDescription").Text == LayerGuidance.ActionDescription(0, 1, 1) &&
+                Find<TextBlock>("LayerBindingDescription").Text != LayerGuidance.ActionDescription(0), "holding the source layer has a contextual explanation");
+            Find<ComboBox>("LayerBindingBehavior").SelectedIndex = 1;
+            check(Find<ComboBox>("LayerBindingTarget").SelectedIndex == 1 && Find<Button>("AssignLayerBinding").IsEnabled &&
+                Find<TextBlock>("LayerBindingDescription").Text == LayerGuidance.ActionDescription(1), "toggling the current upper layer stays available as a return action");
+            foreach (var code in new[] { "TG(2)", "TO(3)", "MO(0)" })
+            {
+                _state.SetBinding(code); var assigned = EditorState.Fingerprint(_state.Project); Build();
+                LayerGuidance.TryLayerAction(code, out var mode, out var target);
+                check(Find<ComboBox>("LayerBindingTarget").SelectedIndex == target && Find<ComboBox>("LayerBindingBehavior").SelectedIndex == mode &&
+                    EditorState.Fingerprint(_state.Project) == assigned, "existing layer actions retain their exact mode and target on reopening: " + code);
+                _state.Undo(); Changed(); Build();
+            }
+            _state.SelectKey(_state.Device.Keys.First(key => !key.IsEncoder && key.Id != fn).Id, true); _state.SetBinding("TG(2)"); Build();
+            check(Find<ComboBox>("LayerBindingTarget").SelectedIndex == 2 && Find<ComboBox>("LayerBindingBehavior").SelectedIndex == 1,
+                "multiple keys sharing one existing layer action keep that action selected");
+            _state.Undo(); Changed(); _state.LayerIndex = 0; _state.SelectKey(fn, false); Build();
+            check(EditorState.Fingerprint(_state.Project) == initial && !_state.CanUndo, "contextual layer guidance leaves the complete original profile intact");
+            _state.SelectedKeys.Clear(); Build(); check(!Find<Button>("AssignLayerBinding").IsEnabled, "layer assignment needs a selected key");
+            _state.SelectKey(_state.Device.Keys.First(key => key.IsEncoder).Id, false); Build();
+            check(!Find<Button>("AssignLayerBinding").IsEnabled, "rotary movement cannot be assigned a held Fn action");
+            Find<ComboBox>("LayerBindingBehavior").SelectedIndex = 1;
+            check(Find<Button>("AssignLayerBinding").IsEnabled, "rotary movement can still toggle a layer");
+            _state.SelectKey(fn, false); _page = "Tastenbelegung"; Build(); Click("ModifierBindings");
+            var modifiers = Find<ListBox>("BindingChoices").Items.Cast<BindingRow>().ToArray();
+            check(modifiers.Length == 8 && modifiers.All(row => IsModifierBinding(row.Code) && !row.Label.Contains("KC_")) &&
+                modifiers.Select(row => row.Label).Distinct().Count() == 8 && Find<TextBlock>("BindingFunctionHint").Text == LayerGuidance.ModifierHint,
+                "modifier shortcut offers eight clearly distinguished actions with an explanation and no raw codes");
+            _state.LayerIndex = 1; Build();
+            check(Find<TextBlock>("BindingFunctionHint").Text == LayerGuidance.BindingDescription("KC_TRNS") && Find<Button>("UseUnderlyingBinding").IsEnabled,
+                "the inherited binding explains its lower-layer behavior");
+            var applied = 0; _pendingApply = () => { applied++; return true; }; _offlinePromptChoice = 0;
+            OpenLayerBindingEditorAsync().GetAwaiter().GetResult();
+            check(_page == "Tastenbelegung" && _pendingApply is not null && applied == 0 && EditorState.Fingerprint(_state.Project) == initial,
+                "canceling pending edits stops Fn navigation without losing input or changing the profile");
+        }
+        finally
+        {
+            _state = original; _page = page; _editingSlider = slider; _offlinePromptChoice = choice;
+            _busy = busy; _initialConnectionsPending = initialPending; Build(); _pendingApply = pending;
+        }
+    }
+
     private void RunSliderNavigationChecks(Action<bool, string> check)
     {
         T? Find<T>(string name) where T : Control => _root.GetLogicalDescendants().OfType<T>().SingleOrDefault(c => c.Name == name);

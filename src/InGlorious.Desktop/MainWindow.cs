@@ -173,7 +173,13 @@ public sealed partial class MainWindow : Window
                 _state.LayerIndex = index; Build();
             };
             _layerChoice.IsVisible = _page is not ("Profile" or "Gerät");
-            Grid.SetColumn(_layerChoice, 1); top.Children.Add(_layerChoice); workspace.Children.Add(top);
+            var layerEditor = Column(Text(L.T("Ebene bearbeiten"), true, 11), _layerChoice);
+            layerEditor.Name = "LayerEditorSelector"; layerEditor.IsVisible = _layerChoice.IsVisible;
+            Grid.SetColumn(layerEditor, 1); top.Children.Add(layerEditor); workspace.Children.Add(top);
+            if (_page is "Tastenbelegung" or "Ebenen")
+            {
+                var editingHint = Text(LayerGuidance.EditingHint, true, 11); editingHint.Name = "LayerEditingHint"; workspace.Children.Add(editingHint);
+            }
             if (_state.Device.IsOfflineOnly)
                 workspace.Children.Add(new TextBlock { Name = "OfflineModelNotice", Text = L.T("Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar."), FontSize = 12, TextWrapping = TextWrapping.Wrap, Foreground = Brush("#A0A7B0") });
             else if (_startupFallbackNotices.TryGetValue(_state.Device.Id, out var startupNotice))
@@ -282,7 +288,7 @@ public sealed partial class MainWindow : Window
             var multiple = false;
             button.PointerPressed += (_, e) => multiple = (e.KeyModifiers & (KeyModifiers.Shift | KeyModifiers.Control)) != 0;
             button.Click += async (_, _) => { if (!await GuardNavigation()) return; _state.SelectKey(key.Id, multiple); SimulateKey(key); _globalEffect = false; _editingSlider = false; Build(); };
-            ToolTip.SetTip(button, key.AccessibleLabel + " · " + BindingCatalog.FunctionLabel(_state.Layer.Keys[key.Id].Binding));
+            ToolTip.SetTip(button, key.AccessibleLabel + " · " + DisplayBinding(_state.Layer.Keys[key.Id].Binding));
             Avalonia.Automation.AutomationProperties.SetName(button, key.AccessibleLabel);
             Canvas.SetLeft(button, edge + (key.X - (key.IsIsoEnter ? .25 : 0)) * unit); Canvas.SetTop(button, topInset + key.Y * unit); _keyboard.Children.Add(button); _keyButtons[key.Id] = button;
         }

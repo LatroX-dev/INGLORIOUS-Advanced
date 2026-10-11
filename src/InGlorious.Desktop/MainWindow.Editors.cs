@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -219,16 +219,32 @@ public sealed partial class MainWindow
             _editor.Children.Add(Row(keys, slider));
             if (_editingSlider) { BuildSliderEditor(); return; }
         }
-        var search = Input("", L.T("Belegung suchen")); var list = new ListBox { Height = 230 };
-        void Filter() { list.ItemsSource = BindingCatalog.All.Where(b => b.Label.Contains(search.Text ?? "", StringComparison.CurrentCultureIgnoreCase) || b.Code.Contains(search.Text ?? "", StringComparison.OrdinalIgnoreCase)).Select(b => new BindingRow(b.Code, b.Label)).ToArray(); }
-        search.TextChanged += (_, _) => Filter(); Filter();
-        _editor.Children.Add(search); _editor.Children.Add(list);
-        _editor.Children.Add(Button("Zuweisen", () => { if (list.SelectedItem is not BindingRow binding) return; _state.SetBinding(binding.Code); Changed(); }, true));
-        _editor.Children.Add(Heading("Ebenenwechsel"));
-        var layer = Choice(Enumerable.Range(0, 4).Select(i => L.F($"Ebene {i}")), 1);
-        var layerMode = Choice(new[] { L.T("Halten"), L.T("Umschalten"), L.T("Wechseln") });
-        _editor.Children.Add(Row(layer, layerMode));
-        _editor.Children.Add(Button("Zuweisen", () => { _state.SetBinding(new[] { "MO", "TG", "TO" }[layerMode.SelectedIndex] + "(" + layer.SelectedIndex + ")"); Changed(); }));
+        var selectedBinding = Text(L.F($"Auf Ebene {_state.LayerIndex}: {SelectedBindingSummary()}"), true); selectedBinding.Name = "CurrentKeyBindingSummary"; _editor.Children.Add(selectedBinding);
+        var layerEntry = AsyncButton("Fn / Ebenenwechsel …", OpenLayerBindingEditorAsync); layerEntry.Name = "OpenLayerBindingEditor"; _editor.Children.Add(layerEntry);
+        var search = Input("", L.T("Belegung suchen")); search.Name = "BindingSearch";
+        var list = new ListBox { Name = "BindingChoices", Height = 230 };
+        var hint = Text("", true, 11); hint.Name = "BindingFunctionHint";
+        var modifiersOnly = false;
+        void UpdateHint()
+        {
+            var code = (list.SelectedItem as BindingRow)?.Code ?? (_state.SelectedKeys.Count == 1 ? _state.Layer.Keys[_state.SelectedKeys.Single()].Binding : "");
+            hint.Text = modifiersOnly ? LayerGuidance.ModifierHint : LayerGuidance.BindingDescription(code);
+            hint.IsVisible = !string.IsNullOrEmpty(hint.Text);
+        }
+        void Filter()
+        {
+            var selected = (list.SelectedItem as BindingRow)?.Code ?? (_state.SelectedKeys.Count == 1 ? _state.Layer.Keys[_state.SelectedKeys.Single()].Binding : null);
+            var rows = BindingCatalog.All.Where(b => (!modifiersOnly || IsModifierBinding(b.Code)) &&
+                (DisplayBinding(b.Code).Contains(search.Text ?? "", StringComparison.CurrentCultureIgnoreCase) || b.Code.Contains(search.Text ?? "", StringComparison.OrdinalIgnoreCase)))
+                .Select(b => new BindingRow(b.Code, DisplayBinding(b.Code))).ToArray();
+            list.ItemsSource = rows; list.SelectedItem = rows.FirstOrDefault(row => row.Code == selected); UpdateHint();
+        }
+        Button modifiers = null!;
+        modifiers = Button("Strg, Shift, Alt …", () => { modifiersOnly = !modifiersOnly; modifiers.BorderBrush = Brush(modifiersOnly ? "#EF646B" : "#424950"); Filter(); }); modifiers.Name = "ModifierBindings";
+        search.TextChanged += (_, _) => Filter(); list.SelectionChanged += (_, _) => UpdateHint(); Filter();
+        _editor.Children.Add(modifiers); _editor.Children.Add(search); _editor.Children.Add(list); _editor.Children.Add(hint);
+        var applyBinding = Button("Zuweisen", () => { if (list.SelectedItem is not BindingRow binding) return; _state.SetBinding(binding.Code); Changed(); Build(); }, true);
+        applyBinding.Name = "AssignKeyBinding"; applyBinding.IsEnabled = _state.Surface == "keys" && _state.SelectedKeys.Count > 0; _editor.Children.Add(applyBinding);
         _editor.Children.Add(Heading("Systemaktionen"));
         var system = Choice(new[] { "Windows", "macOS", "Linux" }, Array.IndexOf(new[] { "windows", "macos", "linux" }, OsActionCatalog.CurrentSystem));
         var layout = Choice(new[] { "QWERTZ · DE", "QWERTY · EN", "AZERTY · FR" });
@@ -238,19 +254,65 @@ public sealed partial class MainWindow
         system.SelectionChanged += (_, _) => Reload(); layout.SelectionChanged += (_, _) => Reload(); Reload();
         _editor.Children.Add(system); _editor.Children.Add(layout); _editor.Children.Add(actionChoice);
         _editor.Children.Add(Button("Zuweisen", () => { _state.AssignOsAction(actions[actionChoice.SelectedIndex]); Changed(); }));
-        _editor.Children.Add(Row(Button("Durchreichen", () => { _state.SetBinding("KC_TRNS"); Changed(); }), Button("Deaktivieren", () => { _state.SetBinding("KC_NO"); Changed(); })));
+        var inherit = Button("Belegung darunter verwenden", () => { _state.SetBinding("KC_TRNS"); Changed(); Build(); });
+        inherit.Name = "UseUnderlyingBinding"; inherit.IsEnabled = _state.LayerIndex > 0 && _state.Surface == "keys" && _state.SelectedKeys.Count > 0; ToolTip.SetTip(inherit, LayerGuidance.BindingDescription("KC_TRNS"));
+        _editor.Children.Add(inherit); _editor.Children.Add(Button("Deaktivieren", () => { _state.SetBinding("KC_NO"); Changed(); Build(); }));
+    }
+    private static bool IsModifierBinding(string code) => code is "KC_LCTL" or "KC_RCTL" or "KC_LSFT" or "KC_RSFT" or "KC_LALT" or "KC_RALT" or "KC_LGUI" or "KC_RGUI";
+    private string DisplayBinding(string binding)
+    {
+        if (binding.StartsWith("MACRO:", StringComparison.Ordinal)) return _state.Project.Macros.FirstOrDefault(macro => macro.Id == binding[6..])?.Name ?? L.T("Makros");
+        var label = BindingCatalog.FunctionLabel(binding);
+        return LayerGuidance.TryLayerAction(binding, out _, out var target) ? label + " · " + _state.Project.Layers[target].Name : label;
+    }
+    private string SelectedBindingSummary()
+    {
+        var keys = _state.Device.Keys.Where(key => _state.Surface == "keys" && _state.SelectedKeys.Contains(key.Id)).ToArray();
+        if (keys.Length == 0) return L.T("Wähle zuerst mindestens eine Taste in der Geräteansicht.");
+        if (keys.Length == 1) return keys[0].AccessibleLabel + " · " + DisplayBinding(_state.Layer.Keys[keys[0].Id].Binding);
+        return L.F($"{keys.Length} Tasten ausgewählt") + " · " + string.Join(", ", keys.Select(key => DisplayBinding(_state.Layer.Keys[key.Id].Binding)).Distinct().Take(3));
+    }
+    private async Task OpenLayerBindingEditorAsync()
+    {
+        if (!await GuardNavigation()) return;
+        _page = "Ebenen"; _editingSlider = false; Build();
     }
     private sealed record BindingRow(string Code, string Label) { public override string ToString() => Label; }
     private void BuildLayerEditor()
     {
+        _editor.Children.Add(Text(LayerGuidance.LayerSummary(_state.LayerIndex), true, 11));
+        _editor.Children.Add(Heading("Ebenenwechsel zuweisen"));
+        _editor.Children.Add(Text(LayerGuidance.SwitchSteps, true, 11));
+        var selected = Text(L.F($"Auf Ebene {_state.LayerIndex}: {SelectedBindingSummary()}"), true, 11); selected.Name = "LayerKeySummary"; _editor.Children.Add(selected);
+        var selectedCodes = _state.Device.Keys.Where(key => _state.Surface == "keys" && _state.SelectedKeys.Contains(key.Id)).Select(key => _state.Layer.Keys[key.Id].Binding).Distinct().ToArray();
+        var hasAction = LayerGuidance.TryLayerAction(selectedCodes.Length == 1 ? selectedCodes[0] : "", out var currentMode, out var currentTarget);
+        var target = Choice(_state.Project.Layers.Select((layer, index) => L.F($"Ebene {index} · {layer.Name}")), hasAction ? currentTarget : _state.LayerIndex == 0 ? 1 : 0); target.Name = "LayerBindingTarget";
+        var behavior = Choice(new[] { L.T("Beim Halten (Fn)"), L.T("Ein-/ausschalten"), L.T("Direkt wechseln") }, hasAction ? currentMode : _state.LayerIndex == 0 ? 0 : 2); behavior.Name = "LayerBindingBehavior";
+        var description = Text("", true, 11); description.Name = "LayerBindingDescription";
+        var assign = AsyncButton("Dieser Taste zuweisen", async () =>
+        {
+            if (!await GuardNavigation()) return;
+            _state.SetBinding(new[] { "MO", "TG", "TO" }[behavior.SelectedIndex] + "(" + target.SelectedIndex + ")"); Changed(); Build();
+        }, true); assign.Name = "AssignLayerBinding";
+        void UpdateBehavior()
+        {
+            var cannotHold = behavior.SelectedIndex == 0 && _state.Device.Keys.Any(key => key.IsEncoder && _state.SelectedKeys.Contains(key.Id));
+            description.Text = cannotHold ? L.T("Drehbewegungen lassen sich nicht gedrückt halten. Wähle für den Drehgeber eine Taste oder „Umschalten“.") : LayerGuidance.ActionDescription(behavior.SelectedIndex, _state.LayerIndex, target.SelectedIndex);
+            assign.IsEnabled = _state.Surface == "keys" && _state.SelectedKeys.Count > 0 && !cannotHold;
+        }
+        behavior.SelectionChanged += (_, _) => UpdateBehavior(); target.SelectionChanged += (_, _) => UpdateBehavior(); UpdateBehavior();
+        _editor.Children.Add(Heading("Zielebene")); _editor.Children.Add(target);
+        _editor.Children.Add(Heading("Verhalten")); _editor.Children.Add(behavior); _editor.Children.Add(description); _editor.Children.Add(assign);
+        if (_preferences.ShowHelp) _editor.Children.Add(Text(LayerGuidance.FnExample, true, 11));
+        _editor.Children.Add(new Separator { Margin = new Thickness(0, 10) });
         var name = Input(_state.Layer.Name);
         bool Rename() { var value = name.Text?.Trim(); if (string.IsNullOrEmpty(value)) throw new InvalidDataException(L.T("Bitte einen Namen eingeben.")); _state.Change(p => p.Layers[_state.LayerIndex].Name = value); return true; }
         Watch(Rename, name); _editor.Children.Add(Heading("Name")); _editor.Children.Add(name); _editor.Children.Add(Button("Übernehmen", () => ApplyEdited(Rename)));
-        var destination = Choice(Enumerable.Range(0, 4).Select(i => L.F($"Ebene {i}")), (_state.LayerIndex + 1) % 4);
+        var destination = Choice(_state.Project.Layers.Select((layer, index) => L.F($"Ebene {index} · {layer.Name}")), (_state.LayerIndex + 1) % 4);
         _editor.Children.Add(Heading("Ebene kopieren")); _editor.Children.Add(destination);
         _editor.Children.Add(AsyncButton("Kopieren", async () => { if (!await GuardNavigation()) return; _state.CopyLayer(destination.SelectedIndex); Changed(); Build(); }));
         _editor.Children.Add(Heading("Ebene vergleichen"));
-        var compare = Choice(Enumerable.Range(0, 4).Select(i => L.F($"Ebene {i}")), (_state.LayerIndex + 1) % 4); var result = Text("", true);
+        var compare = Choice(_state.Project.Layers.Select((layer, index) => L.F($"Ebene {index} · {layer.Name}")), (_state.LayerIndex + 1) % 4); var result = Text("", true);
         void Compare() { var other = _state.Project.Layers[compare.SelectedIndex]; var count = _state.Layer.Keys.Count(k => other.Keys[k.Key].Binding != k.Value.Binding || other.Keys[k.Key].Color != k.Value.Color); result.Text = L.F($"{count} unterschiedliche Tasten"); }
         compare.SelectionChanged += (_, _) => Compare(); Compare(); _editor.Children.Add(compare); _editor.Children.Add(result);
     }

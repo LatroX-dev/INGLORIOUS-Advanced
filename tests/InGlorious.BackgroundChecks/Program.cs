@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Pipes;
 using System.Reflection;
 using InGlorious.Core;
 
@@ -98,10 +99,80 @@ using (var primary = new ApplicationInstance(scope, () => Interlocked.Increment(
     Check(activated == 0, "autostart does not reveal already-running window");
     Check(await secondary.NotifyExistingAsync(true), "normal second start activates existing app");
     Check(activated == 1, "activation is delivered exactly once");
+    for (int i = 0; i < 128; i++)
+    {
+        Check(await secondary.NotifyExistingAsync(i % 2 == 0), "back-to-back launches retain the listener");
+        Check(activated == 2 + i / 2, "each normal launch activates once; background launches remain hidden");
+    }
+    foreach (bool invalidCommand in new[] { false, true })
+    {
+        using (var peer = new NamedPipeClientStream(".", PipeName(primary), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly))
+        {
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            await peer.ConnectAsync(deadline.Token);
+            await peer.ReadExactlyAsync(new byte[4], deadline.Token);
+            if (invalidCommand)
+            {
+                await peer.WriteAsync(new byte[] { 2 }, deadline.Token);
+                Check(await peer.ReadAsync(new byte[1], deadline.Token) == 0, "invalid command closes only its own connection without acknowledgement");
+            }
+        }
+        Check(await secondary.NotifyExistingAsync(false), "a malformed or vanished peer does not stop the primary listener");
+        Check(activated == 65, "malformed and background peers do not activate the window");
+    }
     using var otherUserScope = new ApplicationInstance(NewScope(), () => { });
     Check(otherUserScope.IsPrimary, "separate user scopes do not collide");
 }
 using (var successor = new ApplicationInstance(scope, () => { })) Check(successor.IsPrimary, "normal exit releases pipe and ownership for restart");
+
+foreach (bool waitingForCommand in new[] { false, true })
+{
+    string shutdownScope = NewScope();
+    using var primary = new ApplicationInstance(shutdownScope, () => throw new Exception("shutdown must not activate a window"));
+    using var peer = new NamedPipeClientStream(".", PipeName(primary), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+    using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+    if (waitingForCommand)
+    {
+        await peer.ConnectAsync(deadline.Token);
+        await peer.ReadExactlyAsync(new byte[4], deadline.Token);
+    }
+    await Task.Run(primary.Dispose).WaitAsync(deadline.Token);
+    Check(true, "shutdown cancels an idle listener or connected peer without faulting Dispose");
+    using var successor = new ApplicationInstance(shutdownScope, () => { });
+    Check(successor.IsPrimary, "shutdown releases ownership even with an unfinished client");
+}
+
+if (!OperatingSystem.IsWindows())
+{
+    // Unix accepts a connection into the listener's queue while the previous
+    // activation is still executing. It must survive that client's disconnect.
+    var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    using var primary = new ApplicationInstance(NewScope(), () => { entered.TrySetResult(); release.Task.GetAwaiter().GetResult(); });
+    string pipeName = PipeName(primary);
+    using var first = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+    using var queued = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+    using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+    var owner = new byte[4];
+    try
+    {
+        await first.ConnectAsync(deadline.Token);
+        await first.ReadExactlyAsync(owner, deadline.Token);
+        await first.WriteAsync(new byte[] { 1 }, deadline.Token);
+        await entered.Task.WaitAsync(deadline.Token);
+        await queued.ConnectAsync(deadline.Token);
+        Check(true, "next Unix client is connected before the first activation completes");
+    }
+    finally { release.TrySetResult(); }
+    var ack = new byte[1];
+    await first.ReadExactlyAsync(ack, deadline.Token);
+    Check(ack[0] == 6, "first queued-client fixture receives acknowledgement");
+    await queued.ReadExactlyAsync(owner, deadline.Token);
+    Check(BitConverter.ToInt32(owner) == Environment.ProcessId, "queued client reaches the same primary listener");
+    await queued.WriteAsync(new byte[] { 0 }, deadline.Token);
+    await queued.ReadExactlyAsync(ack, deadline.Token);
+    Check(ack[0] == 6, "queued Unix client survives the previous client's disconnect");
+}
 
 scope = NewScope();
 using (var owner = Start("--owner", scope))
@@ -128,6 +199,7 @@ using (var after = new ApplicationInstance(scope, () => { })) Check(after.IsPrim
 Console.WriteLine($"PASS {checks} background/instance checks; native tray, hardware and user settings were not accessed.");
 return 0;
 
+static string PipeName(ApplicationInstance instance) => (string)(typeof(ApplicationInstance).GetField("_pipeName", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(instance)!);
 static Process Start(string mode, string scope)
 {
     string executable = Environment.ProcessPath ?? throw new InvalidOperationException("No process path.");

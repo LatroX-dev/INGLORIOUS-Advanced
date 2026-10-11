@@ -321,6 +321,48 @@ public static class DeviceCatalog
     }
 }
 
+public static class LayerGuidance
+{
+    public static string EditingHint => L.T("Die Auswahl zeigt, welche Ebene du bearbeitest. Sie schaltet die Tastatur nicht um.");
+    public static string SwitchSteps => L.T("1. Taste in der Vorschau wählen.\n2. Zielebene und Verhalten wählen.\n3. Zuweisen und auf die Tastatur übertragen.");
+    public static string FnExample => L.T("Beispiel: Fn auf Ebene 0 öffnet beim Halten Ebene 1. Dort kannst du einer Taste etwa „Lauter“ zuweisen.");
+    public static string ModifierHint => L.T("Strg, Shift oder Alt hältst du zusammen mit einer anderen Taste gedrückt, etwa Strg+C. Fn öffnet stattdessen eine zusätzliche Belegung auf diesem Gerät.");
+    public static string LayerSummary(int layer) => L.T(layer == 0
+        ? "Basis: Deine normale Tastenbelegung."
+        : "Zusätzliche Belegung: Nutze sie mit Fn oder einer Taste zum Ebenenwechsel.");
+    public static string ActionDescription(int mode) => L.T(mode switch
+    {
+        0 => "Halten aktiviert die Zielebene. Loslassen schaltet sie wieder aus.",
+        1 => "Ein Druck schaltet die Zielebene ein oder aus. Die Taste zum Ebenenwechsel muss auch auf dieser Ebene erreichbar bleiben.",
+        2 => "Wechselt zur Zielebene und schaltet andere Zusatzebenen aus. Lege dort auch eine Taste zum Zurückwechseln an.",
+        _ => ""
+    });
+    public static string ActionDescription(int mode, int sourceLayer, int targetLayer) => ActionDescription(mode)
+        + (mode == 0 && targetLayer <= sourceLayer ? " " + L.T("Zum Öffnen einer zusätzlichen Belegung wähle eine höhere Ebene. Für den Rückweg zur Basis nutze „Direkt wechseln“.") : "");
+    public static string? BindingLabel(string code)
+    {
+        if (code == "KC_TRNS") return L.T("Belegung darunter verwenden");
+        return TryLayerAction(code, out var mode, out var target) ? mode switch
+        {
+            0 => L.F($"Fn · Ebene {target} beim Halten"),
+            1 => L.F($"Ebene {target} ein-/ausschalten"),
+            _ => L.F($"Zu Ebene {target} wechseln")
+        } : null;
+    }
+    public static string BindingDescription(string code) => code == "KC_TRNS"
+        ? L.T("Verwendet die Belegung der nächstniedrigeren eingeschalteten Ebene, sonst die Basis.")
+        : TryLayerAction(code, out var mode, out _) ? ActionDescription(mode)
+        : code is "KC_LCTL" or "KC_RCTL" or "KC_LSFT" or "KC_RSFT" or "KC_LALT" or "KC_RALT" or "KC_LGUI" or "KC_RGUI" ? ModifierHint : "";
+    public static bool TryLayerAction(string code, out int mode, out int target)
+    {
+        mode = -1; target = -1;
+        if (code.Length != 5 || code[2] != '(' || code[4] != ')' || code[3] is < '0' or > '3') return false;
+        mode = code[..2] switch { "MO" => 0, "TG" => 1, "TO" => 2, _ => -1 };
+        target = code[3] - '0';
+        return mode >= 0;
+    }
+}
+
 public static class BindingCatalog
 {
     private static readonly Dictionary<string, string> Labels = new()
@@ -340,7 +382,16 @@ public static class BindingCatalog
         "KC_PSCR" => "PrtSc", _ => KeyLabel(code)
     };
     public static string KeyLabel(string code) => Labels.TryGetValue(code, out var name) ? name : code.StartsWith("KC_P") && code.Length == 5 && char.IsDigit(code[4]) ? code[4].ToString() : code.StartsWith("KC_") ? code[3..] : code;
-    public static string FunctionLabel(string code) => L.T(KeyLabel(code));
+    public static string FunctionLabel(string code)
+    {
+        if (LayerGuidance.BindingLabel(code) is { } action) return action;
+        if (code is "KC_LCTL" or "KC_RCTL" or "KC_LSFT" or "KC_RSFT" or "KC_LALT" or "KC_RALT" or "KC_LGUI" or "KC_RGUI")
+        {
+            var name = code is "KC_LGUI" or "KC_RGUI" ? L.T("Windows / Command") : L.T(KeyLabel(code));
+            return name + " · " + L.T(code[3] == 'L' ? "Links" : "Rechts");
+        }
+        return L.T(KeyLabel(code));
+    }
     private static IReadOnlyList<BindingOption> Create()
     {
         var codes = Enumerable.Range('A', 26).Select(c => "KC_" + (char)c).Concat(Enumerable.Range(0, 10).Select(i => "KC_" + i)).Concat(Enumerable.Range(1, 24).Select(i => "KC_F" + i)).Concat(Enumerable.Range(0, 10).Select(i => "KC_P" + i)).Concat(Labels.Keys).Distinct();

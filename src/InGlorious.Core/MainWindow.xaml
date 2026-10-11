@@ -67,6 +67,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <Grid>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="220" />
@@ -75,7 +76,14 @@
                                 <TextBlock x:Name="WorkspaceHeading" Text="{local:Tr Key='Tastatur'}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
                                 <TextBlock x:Name="ExperimentalDeviceLabel" Text="{local:Tr Key='Experimentell'}" Foreground="#E9B86B" FontSize="11" Margin="0,4,0,0" Visibility="Collapsed" />
                             </StackPanel>
-                            <ComboBox x:Name="CurrentLayerChoice" Grid.Column="1" SelectionChanged="CurrentLayer_SelectionChanged" ToolTip="{local:Tr Key='Ebene bearbeiten'}" />
+                            <StackPanel x:Name="CurrentLayerHost" Grid.Column="1">
+                                <Label Content="{local:Tr Key='Ebene bearbeiten'}" Target="{Binding ElementName=CurrentLayerChoice}" Foreground="{StaticResource Muted}" FontSize="11" Padding="0" Margin="0,0,0,6" />
+                                <ComboBox x:Name="CurrentLayerChoice" SelectionChanged="CurrentLayer_SelectionChanged" ToolTip="{local:Tr Key='Ebene bearbeiten'}" />
+                            </StackPanel>
+                            <StackPanel x:Name="LayerEditingHelp" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0" Visibility="Collapsed">
+                                <TextBlock x:Name="LayerEditingHint" Style="{StaticResource HelpText}" />
+                                <TextBlock x:Name="LayerSummaryHint" Style="{StaticResource HelpText}" Margin="0,4,0,0" />
+                            </StackPanel>
                         </Grid>
                         <StackPanel Grid.Row="1">
                         <StackPanel x:Name="EmptyDeviceSetup" Visibility="Collapsed" Margin="0,14,0,0">
@@ -463,6 +471,7 @@
                                     <Button x:Name="SliderBindingsButton" Content="{local:Tr Key='Schieberegler'}" Click="SliderBindings_Click" Margin="3,0,0,0"/>
                                 </UniformGrid>
                                 <StackPanel x:Name="KeyBindingPanel">
+                                <Button x:Name="OpenLayerSwitchButton" local:UiIcons.Kind="layers" Content="{local:Tr Key='Fn / Ebenenwechsel …'}" Click="OpenLayerSwitch_Click" Margin="0,0,0,8"/>
                                 <Button local:UiIcons.Kind="action" Content="{local:Tr Key='Betriebssystem-Aktion …'}" Click="AssignOsAction_Click" Margin="0,0,0,12"/>
                                 <TextBlock x:Name="CurrentBindingText" Style="{StaticResource HelpText}" Margin="0,0,0,13" />
                                 <ComboBox x:Name="BindingCategory" SelectionChanged="BindingCategory_SelectionChanged" SelectedIndex="0" Margin="0,0,0,10">
@@ -472,7 +481,7 @@
                                     <ComboBoxItem Content="{local:Tr Key='Funktionstasten'}" />
                                     <ComboBoxItem Content="{local:Tr Key='Ziffernblock'}" />
                                     <ComboBoxItem Content="{local:Tr Key='Medien'}" />
-                                    <ComboBoxItem Content="{local:Tr Key='Modifikatortasten'}" />
+                                    <ComboBoxItem Content="{local:Tr Key='Strg, Shift, Alt …'}" />
                                     <ComboBoxItem Content="{local:Tr Key='Ebenen'}" />
                                     <ComboBoxItem Content="{local:Tr Key='Makros'}" />
                                 </ComboBox>
@@ -492,7 +501,8 @@
                                         </TextBlock.Style>
                                     </TextBlock>
                                 </Grid>
-                                <ListBox x:Name="BindingChoice" ItemTemplate="{StaticResource OptionLabelTemplate}" SelectedValuePath="Code" Height="220" />
+                                <ListBox x:Name="BindingChoice" ItemTemplate="{StaticResource OptionLabelTemplate}" SelectedValuePath="Code" Height="220" SelectionChanged="BindingChoice_SelectionChanged" />
+                                <TextBlock x:Name="BindingFunctionHint" Style="{StaticResource HelpText}" Margin="0,9,0,0" Visibility="Collapsed" />
                                 <Button local:UiIcons.Kind="check" x:Name="AssignBindingButton" Content="{local:Tr Key='Belegung zuweisen'}" Click="AssignBinding_Click" Style="{StaticResource PrimaryButton}" Margin="0,11,0,0" />
                                 <UniformGrid Columns="2" Margin="0,8,0,0">
                                     <Button x:Name="ResetBindingButton" Content="{local:Tr Key='Standard'}" Click="ResetBinding_Click" FontSize="11" Margin="0,0,3,0" />
@@ -553,9 +563,32 @@
                                 </StackPanel>
                             </StackPanel>
                             <StackPanel x:Name="LayerPanel" Visibility="Collapsed">
+                                <TextBlock Text="{local:Tr Key='Ebenenwechsel zuweisen'}" Style="{StaticResource SectionTitle}" />
+                                <TextBlock x:Name="LayerSwitchSteps" Style="{StaticResource HelpText}" Margin="0,7,0,14" />
+                                <TextBlock x:Name="LayerAssignmentSource" Style="{StaticResource HelpText}" Foreground="{StaticResource Accent}" Margin="0,0,0,14" />
+                                <Label Content="{local:Tr Key='Zielebene'}" Target="{Binding ElementName=TargetLayer}" Foreground="{StaticResource Text}" Padding="0" Margin="0,0,0,7" />
+                                <ComboBox x:Name="TargetLayer" SelectedIndex="1" SelectionChanged="LayerSwitchMode_SelectionChanged">
+                                    <ComboBoxItem Content="{local:Tr Key='Ebene 0 · Basis'}" />
+                                    <ComboBoxItem Content="{local:Tr Key='Ebene 1'}" />
+                                    <ComboBoxItem Content="{local:Tr Key='Ebene 2'}" />
+                                    <ComboBoxItem Content="{local:Tr Key='Ebene 3'}" />
+                                </ComboBox>
+                                <Label Content="{local:Tr Key='Verhalten'}" Target="{Binding ElementName=LayerSwitchMode}" Foreground="{StaticResource Text}" Padding="0" Margin="0,12,0,7" />
+                                <ComboBox x:Name="LayerSwitchMode" SelectedIndex="0" SelectionChanged="LayerSwitchMode_SelectionChanged">
+                                    <ComboBoxItem Content="{local:Tr Key='Beim Halten (Fn)'}" />
+                                    <ComboBoxItem Content="{local:Tr Key='Ein-/ausschalten'}" />
+                                    <ComboBoxItem Content="{local:Tr Key='Direkt wechseln'}" />
+                                </ComboBox>
+                                <TextBlock x:Name="LayerSwitchHint" Style="{StaticResource HelpText}" Margin="0,9,0,0" />
+                                <Button x:Name="AssignLayerSwitchButton" local:UiIcons.Kind="check" Content="{local:Tr Key='Dieser Taste zuweisen'}" Click="AssignLayerSwitch_Click" Style="{StaticResource PrimaryButton}" Margin="0,14,0,0" />
+                                <TextBlock x:Name="LayerFnExample" Style="{StaticResource OptionalHelp}" Margin="0,10,0,0" />
+                                <Border Style="{StaticResource PanelDivider}" />
+                                <TextBlock Text="{local:Tr Key='Belegung darunter'}" Style="{StaticResource SectionTitle}" />
+                                <TextBlock x:Name="TransparentBindingHint" Style="{StaticResource HelpText}" Margin="0,7,0,12" />
+                                <Button x:Name="AssignTransparentButton" Content="{local:Tr Key='Belegung darunter verwenden'}" Click="AssignTransparent_Click" FontSize="11" />
+                                <Border Style="{StaticResource PanelDivider}" />
                                 <TextBlock Text="{local:Tr Key='Ebene benennen'}" Style="{StaticResource SectionTitle}" />
-                                <TextBlock Text="{local:Tr Key='Die oben gewählte Ebene bearbeiten.'}" Style="{StaticResource OptionalHelp}" Margin="0,7,0,12" />
-                                <TextBox x:Name="LayerName" MaxLength="80" ToolTip="{local:Tr Key='Name der ausgewählten Ebene'}" />
+                                <TextBox x:Name="LayerName" MaxLength="80" ToolTip="{local:Tr Key='Name der ausgewählten Ebene'}" Margin="0,10,0,0" />
                                 <Button Content="{local:Tr Key='Namen übernehmen'}" Click="RenameLayer_Click" FontSize="11" Margin="0,9,0,0" />
                                 <Border Style="{StaticResource PanelDivider}" />
                                 <TextBlock Text="{local:Tr Key='Ebene kopieren'}" Style="{StaticResource SectionTitle}" />
@@ -567,28 +600,6 @@
                                 <TextBlock Text="{local:Tr Key='Ebene vergleichen'}" Style="{StaticResource SectionTitle}" />
                                 <ComboBox x:Name="CompareLayer" SelectionChanged="CompareLayer_SelectionChanged" Margin="0,10,0,0" />
                                 <TextBlock x:Name="LayerComparison" Style="{StaticResource HelpText}" Margin="0,8,0,0" />
-                                <Border Style="{StaticResource PanelDivider}" />
-                                <TextBlock Text="{local:Tr Key='Ebenenwechsel zuweisen'}" Style="{StaticResource SectionTitle}" />
-                                <TextBlock Text="{local:Tr Key='Taste in der Vorschau wählen, dann Zielebene und Verhalten festlegen.'}" Style="{StaticResource HelpText}" Margin="0,7,0,12" />
-                                <ComboBox x:Name="TargetLayer" SelectedIndex="1">
-                                    <ComboBoxItem Content="{local:Tr Key='Ebene 0 · Basis'}" />
-                                    <ComboBoxItem Content="{local:Tr Key='Ebene 1'}" />
-                                    <ComboBoxItem Content="{local:Tr Key='Ebene 2'}" />
-                                    <ComboBoxItem Content="{local:Tr Key='Ebene 3'}" />
-                                </ComboBox>
-                                <Grid Margin="0,10,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button Content="{local:Tr Key='Beim Halten'}" Click="AssignMomentary_Click" FontSize="11" Margin="0,0,4,0" />
-                                    <Button Grid.Column="1" Content="{local:Tr Key='Umschalten'}" Click="AssignToggle_Click" FontSize="11" Margin="4,0,0,0" />
-                                </Grid>
-                                <TextBlock Text="{local:Tr Key='Beim Halten: Die Zielebene gilt, solange die Taste gedrückt ist. Umschalten: Ein weiterer Druck wechselt zurück.'}" Style="{StaticResource OptionalHelp}" Margin="0,12,0,0" />
-                                <Border Style="{StaticResource PanelDivider}" />
-                                <TextBlock Text="{local:Tr Key='Belegung darunter'}" Style="{StaticResource SectionTitle}" />
-                                <TextBlock Text="{local:Tr Key='Auf höheren Ebenen kann eine Taste ihre Belegung aus der darunterliegenden Ebene verwenden.'}" Style="{StaticResource OptionalHelp}" Margin="0,7,0,12" />
-                                <Button Content="{local:Tr Key='Belegung darunter verwenden'}" Click="AssignTransparent_Click" FontSize="11" />
                             </StackPanel>
                             <StackPanel x:Name="MacroPanel" Visibility="Collapsed">
                                 <TextBlock Text="{local:Tr Key='Schritt bearbeiten'}" Style="{StaticResource SectionTitle}" />

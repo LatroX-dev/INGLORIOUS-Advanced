@@ -22,6 +22,7 @@ public static class UserGuide
         new("bindings", "Tastenbelegung", Array.AsReadOnly(new GuideSection[]
         {
             new("Tasten und Drehgeber", "Wähle eine Taste in der Vorschau, suche eine Funktion und übernimm sie. Mehrere ausgewählte Tasten erhalten dieselbe Belegung. Die beiden Drehrichtungen des Drehgebers lassen sich getrennt belegen. Belegungen gelten für die oben ausgewählte Ebene."),
+            new("Fn und Zusatztasten", "Strg, Shift oder Alt hältst du zusammen mit einer anderen Taste gedrückt, etwa Strg+C. Fn öffnet stattdessen eine zusätzliche Belegung auf diesem Gerät."),
             new("Import und Export", "Beim Import und Export wählst du die Ebenen aus. Nur die gewählten Ebenen werden mit ihren Namen, Belegungen und zugewiesenen Makros übernommen; ihre Nummern bleiben gleich. Farben und Effekte bleiben erhalten. Den Schieberegler kannst du separat einbeziehen. Importiere auf demselben Gerätemodell und speichere danach mit „Auf Tastatur übertragen“."),
             new("Betriebssystemaktionen", "Unter „Betriebssystem-Aktion …“ wählst du Betriebssystem und Tastaturlayout. Die Aktion verwendet passende Tastenfolgen; ihre Wirkung hängt vom System und der geöffneten Anwendung ab. Prüfe die Auswahl, bevor du sie einer Taste zuweist.")
         })),
@@ -33,8 +34,11 @@ public static class UserGuide
         })),
         new("layers", "Ebenen", Array.AsReadOnly(new GuideSection[]
         {
-            new("Vier Belegungen", "Ebene 0 ist die Basis, Ebenen 1 bis 3 bieten weitere Belegungen und Beleuchtungen. Die Auswahl oben ändert nur, welche Ebene du bearbeitest. Unter „Ebenen“ kannst du sie benennen, vergleichen oder in eine andere Ebene kopieren. Kopieren ersetzt deren Einstellungen."),
-            new("Auf der Tastatur wechseln", "Wähle eine Taste und unter „Ebenenwechsel zuweisen“ das Ziel. „Beim Halten“ aktiviert es solange die Taste gedrückt ist. „Umschalten“ schaltet es mit erneutem Druck zurück. „Belegung darunter verwenden“ übernimmt auf höheren Ebenen die darunterliegende Tastenfunktion.")
+            new("Vier Belegungen", "Ebene 0 ist deine normale Belegung. Ebenen 1 bis 3 bieten zusätzliche Funktionen und Beleuchtungen. „Ebene bearbeiten“ ändert nur die Ansicht in der App. Auf der Tastatur brauchst du eine Taste, die die gewünschte Ebene einschaltet."),
+            new("Fn-Taste einrichten", "Bearbeite Ebene 0 und wähle eine Taste in der Vorschau. Öffne „Fn / Ebenenwechsel …“, wähle Ebene 1 und „Beim Halten (Fn)“. Klicke auf „Dieser Taste zuweisen“. Bearbeite danach Ebene 1 und belege dort die gewünschten Tasten. Speichere mit „Auf Tastatur übertragen“. Nun hältst du deine Fn-Taste, um diese Funktionen zu nutzen."),
+            new("Ein-/ausschalten", "Ein Druck schaltet die Zielebene ein oder aus. Die Taste zum Ebenenwechsel muss auch auf dieser Ebene erreichbar bleiben."),
+            new("Direkt wechseln", "Wechselt zur Zielebene und schaltet andere Zusatzebenen aus. Lege dort auch eine Taste zum Zurückwechseln an."),
+            new("Belegung darunter verwenden", "Verwendet die Belegung der nächstniedrigeren eingeschalteten Ebene, sonst die Basis.")
         })),
         new("profiles", "Profile", Array.AsReadOnly(new GuideSection[]
         {

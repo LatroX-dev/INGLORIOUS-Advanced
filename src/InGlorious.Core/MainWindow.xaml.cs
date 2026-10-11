@@ -43,6 +43,9 @@ public partial class MainWindow : Window
     private bool _wholeSideSelection;
     private bool _macroAssigning;
     private bool _refreshingLayerTools;
+    private bool _refreshingLayerGuidance;
+    private LayerProfile? _layerGuidanceLayer;
+    private (string Id, string Binding)[] _layerGuidanceSelection = [];
     private bool _refreshingEffects;
     private enum LightingTarget { Keys, Left, Right, Both, SelectedLeds, Badge }
     private LightingTarget _lightingTarget;
@@ -584,9 +587,7 @@ public partial class MainWindow : Window
     private string BindingLabel(string binding)
     {
         if (binding.StartsWith("MACRO:", StringComparison.Ordinal)) return L.F($"Makro: {_project.Macros.FirstOrDefault(m => m.Id == binding[6..])?.Name ?? L.T("fehlt")}");
-        if (binding.StartsWith("MO(", StringComparison.Ordinal)) return L.F($"Ebene {binding[3..].TrimEnd(')')} halten");
-        if (binding.StartsWith("TG(", StringComparison.Ordinal)) return L.F($"Ebene {binding[3..].TrimEnd(')')} umschalten");
-        return BindingCatalog.FunctionLabel(binding);
+        return LayerGuidance.BindingLabel(binding) ?? BindingCatalog.FunctionLabel(binding);
     }
 
     private static string ShortBinding(string binding) => binding.StartsWith("MACRO:", StringComparison.Ordinal) ? L.T("MAKRO") : binding.Replace("KC_", "", StringComparison.Ordinal);
@@ -640,6 +641,8 @@ public partial class MainWindow : Window
         AssignMacroButton.Content = _macroAssigning ? L.T("Makro zuweisen") : L.T("Taste auswählen …");
         AssignMacroButton.IsEnabled = CurrentMacro?.Steps.Count > 0 && (!_macroAssigning || keys.Count > 0);
         AssignBindingButton.IsEnabled = ResetBindingButton.IsEnabled = DisableBindingButton.IsEnabled = keys.Count > 0;
+        RefreshLayerGuidance();
+        RefreshBindingFunctionHint();
         ApplyColorButton.IsEnabled = SelectedEffectLeds().Length > 0;
         ApplyEffectHost.Visibility = _activeTab == 0 && _showLightingEffects ? Visibility.Visible : Visibility.Collapsed;
         RefreshStandbySurface();
@@ -1194,9 +1197,63 @@ public partial class MainWindow : Window
         if (BindingChoice.SelectedItem is BindingOption choice) ApplyBinding(choice.Code);
         else Status(L.T("Wähle zuerst eine Taste oder Funktion aus der Liste."));
     }
-    private void AssignMomentary_Click(object sender, RoutedEventArgs e) => ApplyBinding($"MO({Math.Max(0, TargetLayer.SelectedIndex)})");
-    private void AssignToggle_Click(object sender, RoutedEventArgs e) => ApplyBinding($"TG({Math.Max(0, TargetLayer.SelectedIndex)})");
-    private void AssignTransparent_Click(object sender, RoutedEventArgs e) => ApplyBinding("KC_TRNS");
+    private void OpenLayerSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_readingDevice || _startupLoading || _startupFinishing) return;
+        SetTab(3);
+        if (_activeTab == 3) LayerPanel.BringIntoView();
+    }
+    private void AssignLayerSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_readingDevice || _startupLoading || _startupFinishing || !ResolvePendingEdits()) return;
+        if (TargetLayer.SelectedIndex is < 0 or > 3 || LayerSwitchMode.SelectedIndex is < 0 or > 2) return;
+        var operation = LayerSwitchMode.SelectedIndex switch { 0 => "MO", 1 => "TG", _ => "TO" };
+        ApplyBinding($"{operation}({TargetLayer.SelectedIndex})");
+    }
+    private void AssignTransparent_Click(object sender, RoutedEventArgs e)
+    {
+        if (_readingDevice || _startupLoading || _startupFinishing || !ResolvePendingEdits()) return;
+        ApplyBinding("KC_TRNS");
+    }
+    private void LayerSwitchMode_SelectionChanged(object sender, SelectionChangedEventArgs e) => RefreshLayerGuidance();
+    private void BindingChoice_SelectionChanged(object sender, SelectionChangedEventArgs e) => RefreshBindingFunctionHint();
+    private void RefreshBindingFunctionHint()
+    {
+        if (BindingFunctionHint is null) return;
+        var code = (BindingChoice.SelectedItem as BindingOption)?.Code;
+        var description = code is null ? "" : LayerGuidance.BindingDescription(code);
+        BindingFunctionHint.Text = description;
+        BindingFunctionHint.Visibility = description.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+    private void RefreshLayerGuidance()
+    {
+        if (_refreshingLayerGuidance || LayerSwitchHint is null || AssignLayerSwitchButton is null || TransparentBindingHint is null || AssignTransparentButton is null) return;
+        var selected = Device.Keys.Where(key => _selection.Contains(key.Id)).ToArray();
+        var selection = selected.Select(key => (key.Id, Assignment(key.Id).Binding)).ToArray();
+        if (!ReferenceEquals(_layerGuidanceLayer, Layer) || !_layerGuidanceSelection.SequenceEqual(selection))
+        {
+            _layerGuidanceLayer = Layer;
+            _layerGuidanceSelection = selection;
+            var mode = _layerIndex == 0 ? 0 : 2;
+            var target = _layerIndex == 0 ? 1 : 0;
+            var bindings = selection.Select(item => item.Binding).Distinct(StringComparer.Ordinal).ToArray();
+            if (bindings.Length == 1 && LayerGuidance.TryLayerAction(bindings[0], out var assignedMode, out var assignedTarget))
+                (mode, target) = (assignedMode, assignedTarget);
+            _refreshingLayerGuidance = true;
+            try { TargetLayer.SelectedIndex = target; LayerSwitchMode.SelectedIndex = mode; }
+            finally { _refreshingLayerGuidance = false; }
+        }
+        LayerEditingHint.Text = LayerGuidance.EditingHint;
+        LayerSummaryHint.Text = LayerGuidance.LayerSummary(_layerIndex);
+        LayerSwitchSteps.Text = LayerGuidance.SwitchSteps;
+        LayerFnExample.Text = LayerGuidance.FnExample;
+        LayerSwitchHint.Text = LayerGuidance.ActionDescription(LayerSwitchMode.SelectedIndex, _layerIndex, TargetLayer.SelectedIndex);
+        var selectionLabel = selected.Length switch { 0 => L.T("Taste auswählen"), 1 => selected[0].AccessibleLabel, _ => L.F($"{selected.Length} Tasten ausgewählt") };
+        LayerAssignmentSource.Text = L.F($"Auf Ebene {_layerIndex}: {selectionLabel}");
+        TransparentBindingHint.Text = LayerGuidance.BindingDescription("KC_TRNS");
+        AssignLayerSwitchButton.IsEnabled = selected.Length > 0 && TargetLayer.SelectedIndex is >= 0 and <= 3 && LayerSwitchMode.SelectedIndex is >= 0 and <= 2;
+        AssignTransparentButton.IsEnabled = selected.Length > 0 && _layerIndex > 0;
+    }
     private void SelectAll_Click(object sender, RoutedEventArgs e) { if (!ResolvePendingEdits()) return; _lightingTarget = LightingTarget.Keys; foreach (var key in Device.Keys) _selection.Add(key.Id); RenderKeyboard(); RefreshInspector(); }
     private void ClearSelection_Click(object sender, RoutedEventArgs e) { if (!ResolvePendingEdits()) return; _selection.Clear(); _selectedSideLeds.Clear(); _lightingTarget = LightingTarget.Keys; RenderKeyboard(); RefreshInspector(); }
     private void BindingSearch_TextChanged(object sender, TextChangedEventArgs e)
@@ -1207,7 +1264,7 @@ public partial class MainWindow : Window
     private static int BindingCategoryId(string code)
     {
         if (code.StartsWith("MACRO:")) return 8;
-        if (code.StartsWith("MO(") || code.StartsWith("TG(") || code.StartsWith("TO(")) return 7;
+        if (code == "KC_TRNS" || code.StartsWith("MO(") || code.StartsWith("TG(") || code.StartsWith("TO(")) return 7;
         if (code is "KC_LCTL" or "KC_RCTL" or "KC_LSFT" or "KC_RSFT" or "KC_LALT" or "KC_RALT" or "KC_LGUI" or "KC_RGUI") return 6;
         if (code is "KC_VOLU" or "KC_VOLD" or "KC_MUTE" or "KC_MPLY" or "KC_MSTP" or "KC_MNXT" or "KC_MPRV" or "KC_CALC") return 5;
         if (code == "KC_NUM" || code.StartsWith("KC_P") && code is not ("KC_PSCR" or "KC_PGUP" or "KC_PGDN" or "KC_PAUS" or "KC_P")) return 4;
@@ -1220,12 +1277,15 @@ public partial class MainWindow : Window
         var previous = (BindingChoice.SelectedItem as BindingOption)?.Code;
         var query = BindingSearch.Text.Trim(); var group = BindingCategory.SelectedIndex;
         var options = BindingCatalog.All.Where(b => !b.Code.StartsWith("RM_", StringComparison.Ordinal)).Select(b => new BindingOption(b.Code, BindingCatalog.FunctionLabel(b.Code)))
-            .Concat(Enumerable.Range(0, 4).SelectMany(i => new[] { new BindingOption($"MO({i})", L.F($"Ebene {i} halten")), new BindingOption($"TG({i})", L.F($"Ebene {i} umschalten")) }))
+            .Concat(Enumerable.Range(0, 4).SelectMany(i => new[] { "MO", "TG", "TO" }.Select(operation =>
+                new BindingOption($"{operation}({i})", LayerGuidance.BindingLabel($"{operation}({i})")!))))
             .Concat(_project.Macros.Select(m => new BindingOption("MACRO:" + m.Id, L.T("Makro · ") + m.Name)))
+            .DistinctBy(option => option.Code)
             .Where(b => (group <= 0 || BindingCategoryId(b.Code) == group) && (b.Label.Contains(query, StringComparison.OrdinalIgnoreCase) || b.Code.Contains(query, StringComparison.OrdinalIgnoreCase))).ToList();
         BindingChoice.ItemsSource = options;
         BindingChoice.SelectedValue = previous;
         if (BindingChoice.SelectedIndex < 0 && options.Count > 0) BindingChoice.SelectedIndex = 0;
+        RefreshBindingFunctionHint();
     }
     private void ResetBinding_Click(object sender, RoutedEventArgs e)
     {
@@ -1276,6 +1336,8 @@ public partial class MainWindow : Window
         KeyboardWorkspace.Visibility = MacroWorkspace.Visibility == Visibility.Visible || _activeTab >= 4 ? Visibility.Collapsed : Visibility.Visible;
         var editingSlider = _activeTab == 1 && _editingSlider && Device.Id == "numpad";
         CurrentLayerChoice.Visibility = editingSlider || _activeTab >= 4 || (_activeTab == 2 && !_macroAssigning) || (_activeTab == 0 && _showLightingStandby) ? Visibility.Collapsed : Visibility.Visible;
+        CurrentLayerHost.Visibility = CurrentLayerChoice.Visibility;
+        LayerEditingHelp.Visibility = !editingSlider && (_activeTab is 1 or 3) ? Visibility.Visible : Visibility.Collapsed;
         SelectionBar.Visibility = editingSlider || _activeTab == 0 && (_showLightingStandby || _showLightingEffects && !_effectForSelection) ? Visibility.Collapsed : KeyboardWorkspace.Visibility;
         LayerOverview.Visibility = Visibility.Collapsed;
         BackToMacroButton.Visibility = _activeTab == 2 && _macroAssigning ? Visibility.Visible : Visibility.Collapsed;

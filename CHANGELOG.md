@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Easier layer and Fn key setup.
+- Fixed the app sometimes failing to reopen on Linux.
 - Import and export key bindings for selected layers, including assigned macros.
 - Removed repeated messages during firmware installation, updates and recovery.
 
