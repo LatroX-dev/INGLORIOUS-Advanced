@@ -16,6 +16,7 @@ public sealed partial class DeviceSetupWindow
         var device = new SetupDevice("offline-fixture", DeviceCatalog.Get(id).Name, runtime ? [id] : stock.CandidateDeviceIds,
             runtime ? BoardDescriptorRegistry.RuntimeVendorId : stock.VendorId, runtime ? board.RuntimeProductId : stock.ProductId, [], runtime);
         _session = null; _progress = null; _writeAttempted = _outcomeUncertain = false; _busy = _observing = _readingVersion = _error = false;
+        _installSequence = new();
         _returnedUsbInstanceId = null; _lightingRunning = false; _lightingStatus.Text = ""; _typingTest.Clear();
         ApplyDevices([device]);
         _runtimeVersion = runtime ? new(id, new(0, 0, 1), 1) : null; // Synthetic older report; no hardware identity or data.
@@ -36,7 +37,7 @@ public sealed partial class DeviceSetupWindow
             _writeAttempted = value is SetupStage.Reconnect or SetupStage.Complete;
             if (value == SetupStage.Complete && _operation != SetupOperation.Restore)
                 _returnedUsbInstanceId = $@"USB\VID_FEED&PID_{board.RuntimeProductId:X4}\OFFLINE";
-            ApplyProgress(new(value, L.T("Offline-Vorschau"), _session.DeviceId));
+            ApplyProgress(new(value, L.T(value == SetupStage.Reconnect ? "Verbinde das Gerät ohne gedrückte Tasten neu." : "Offline-Vorschau"), _session.DeviceId));
         }
         else Render();
     }
@@ -87,11 +88,13 @@ public sealed partial class DeviceSetupWindow
         }
         ShowOfflineStep("backup"); _modelConfirmation.IsChecked = true;
         check(ActionReady && !CanAct, "Setup: model confirmation permits only the separately requested capture action");
+        check(_operation != SetupOperation.Install || _action.Content?.ToString() == L.T("Sichern und installieren") && _writeConfirmation.Visibility == Visibility.Collapsed,
+            "Setup: original firmware has one clear combined action after model confirmation");
         _session!.DeviceId = "foreign-device"; Render();
         check(!ActionReady, "Setup: a model outside the selected physical device candidates cannot proceed");
         ShowOfflineStep("confirm");
         _writeConfirmation.IsChecked = true;
-        check(ActionReady && !CanAct, "Setup: a verified backup still requires the final write confirmation");
+        check(ActionReady == (_operation != SetupOperation.Install) && !CanAct, "Setup: installation never exposes a separate write action after the combined backup step");
         _busy = true; Render(); _activity.ApplyTemplate(); var closing = new CancelEventArgs(); WindowClosing(this, closing);
         check(_activity.Visibility == Visibility.Visible && _activity.Foreground == FindResource("Accent") &&
             _activity.Template.FindName("Pulse", _activity) is Border { Visibility: Visibility.Visible },
@@ -115,6 +118,15 @@ public sealed partial class DeviceSetupWindow
         check(_driverHelp.Visibility == Visibility.Collapsed, "Setup: driver instructions disappear after the condition changes");
         foreach (var model in DeviceCatalog.All)
         {
+            ShowOfflineStep("reconnect", model.Id);
+            check(_heading.Text == L.T("Jetzt normal neu verbinden") && _deviceName.Text == "\"" + model.Name + "\"" &&
+                _description.Text == L.Format("Trenne \"{0}\" einmal vom USB-Kabel und stecke es ohne gedrückte Tasten wieder ein.", model.Name) &&
+                _status.Text == L.T("Nach dem Wiederanschließen geht es automatisch weiter.") && _activity.Visibility == Visibility.Visible &&
+                _activity.Margin == new Thickness(0, 0, 0, 18) && _status.Margin == new Thickness(0, 0, 0, 14),
+                "Setup: " + model.Id + " reconnect matches the update instructions and visible automatic observation");
+            var warning = L.T("Die USB-Verbindung konnte nicht geprüft werden. Die App versucht es erneut.");
+            ApplyProgress(new(SetupStage.Reconnect, warning, model.Id));
+            check(_status.Text == warning && !Completed, "Setup: reconnect guidance never hides a failed verification or invents completion");
             ShowOfflineStep("connect", model.Id);
             var instruction = BootInstruction(SelectedDevice);
             check(model.Id == "numpad" ? instruction.Contains("Plus", StringComparison.Ordinal) : _operation == SetupOperation.Install && model.Id.StartsWith("gmmk3-", StringComparison.Ordinal) ? instruction.Contains("Esc", StringComparison.Ordinal) : instruction.Contains("Leertaste", StringComparison.Ordinal), "Setup: " + model.Id + " " + _operation + " uses its reviewed firmware-specific boot gesture");

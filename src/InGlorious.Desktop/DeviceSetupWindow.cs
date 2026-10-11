@@ -27,6 +27,7 @@ public sealed partial class DeviceSetupWindow : Window
     private int _revision, _versionRevision;
     private bool _readingVersion;
     private OnboardFirmwareVersion? _runtimeVersion;
+    private DeviceSetupInstallSequence _installSequence = new();
     private readonly List<Window> _owners = [];
     private readonly ComboBox _devices = new() { Name = "SetupDevices", MinHeight = 36, Margin = new(0, 10, 0, 12) };
     private readonly TextBlock _flowTitle = Text(24), _deviceName = Text(13), _version = Text(13), _step = Text(13), _heading = Text(22), _description = Text(13), _status = Text(13), _experimental = Text(12), _backup = Text(13);
@@ -123,10 +124,10 @@ public sealed partial class DeviceSetupWindow : Window
         (_runtimeVersion is { } report && SelectedDevice?.CandidateDeviceIds.Contains(report.DeviceId) == true &&
          FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var target) && report.Version < target &&
          (_session?.InstalledFirmwareVersion is not { } captured || FirmwareSemanticVersion.TryParse(captured, out var version) && version == report.Version));
-    private bool ActionReady => !_busy && !_readingVersion && !_observing && !_closed && !_error && !_outcomeUncertain && UpdateVersionReady && (_session is null
+    private bool ActionReady => !_busy && !_readingVersion && !_observing && !_closed && !_error && !_outcomeUncertain && !_installSequence.Started && UpdateVersionReady && (_session is null
         ? SelectedDevice is not null
         : HasResolvedModel && (_progress is { CanCapture: true } && _modelConfirmation.IsChecked == true
-          || _progress is { CanInstall: true } && _writeConfirmation.IsChecked == true && !_writeAttempted));
+          || _operation != SetupOperation.Install && _progress is { CanInstall: true } && _writeConfirmation.IsChecked == true && !_writeAttempted));
     private bool HasResolvedModel => _session?.DeviceId is { } id && _session.Device.CandidateDeviceIds.Contains(id) && _progress?.DeviceId == id;
 
     private void ApplyDevices(IReadOnlyList<SetupDevice> devices)
@@ -232,6 +233,29 @@ public sealed partial class DeviceSetupWindow : Window
             }
             else if (_progress is { CanCapture: true } && _modelConfirmation.IsChecked == true)
             {
+                if (_operation == SetupOperation.Install)
+                {
+                    var session = _session;
+                    var deviceId = session.DeviceId!;
+                    var revision = _revision;
+                    var result = await _installSequence.RunAsync(session, deviceId, explicitlyConfirmed: true,
+                        () => !_closed && _busy && revision == _revision && ReferenceEquals(session, _session),
+                        async () =>
+                        {
+                            _status.Text = L.T("Die Original-Firmware wird gesichert und geprüft …"); Render();
+                            return await _service.CaptureAsync(session, Log());
+                        },
+                        verified => { ApplyProgress(verified); },
+                        async () =>
+                        {
+                            _status.Text = L.T("Firmware wird installiert …"); Render();
+                            return await _service.InstallAsync(session, explicitlyConfirmed: true, log: Log());
+                        });
+                    ApplyProgress(result);
+                    _writeAttempted = session.WriteAttempted;
+                    _outcomeUncertain = session.OutcomeUncertain;
+                    return;
+                }
                 _status.Text = L.T(_operation == SetupOperation.Install ? "Die Original-Firmware wird gesichert und geprüft …" : "Der aktuelle Zustand und die Original-Sicherung werden geprüft …");
                 ApplyProgress(await _service.CaptureAsync(_session, Log()));
                 if (!UpdateVersionReady)
@@ -240,13 +264,12 @@ public sealed partial class DeviceSetupWindow : Window
                     throw new SetupException(L.T("Die Firmware-Version hat sich geändert. Starte das Update erneut."));
                 }
             }
-            else if (_progress is { CanInstall: true } && _writeConfirmation.IsChecked == true && !_writeAttempted)
+            else if (_operation != SetupOperation.Install && _progress is { CanInstall: true } && _writeConfirmation.IsChecked == true && !_writeAttempted)
             {
                 _writeConfirmation.IsChecked = false;
                 _status.Text = L.T(_operation == SetupOperation.Update ? "Firmware wird aktualisiert …" : "Firmware wird installiert …");
                 ApplyProgress(_operation switch
                 {
-                    SetupOperation.Install => await _service.InstallAsync(_session, explicitlyConfirmed: true, log: Log()),
                     SetupOperation.Update => await _service.UpdateAsync(_session, explicitlyConfirmed: true, log: Log()),
                     _ => await _service.RestoreAsync(_session, explicitlyConfirmed: true, log: Log())
                 });
@@ -259,7 +282,7 @@ public sealed partial class DeviceSetupWindow : Window
             _writeAttempted = _session?.WriteAttempted == true;
             _outcomeUncertain = _session?.OutcomeUncertain == true;
             ShowError(ex);
-            if (_writeAttempted || _outcomeUncertain || _session?.Stage == SetupStage.Blocked) { _progress = new(SetupStage.Blocked, _status.Text ?? "", _session?.DeviceId); _timer.Stop(); }
+            if (_installSequence.Started || _writeAttempted || _outcomeUncertain || _session?.Stage == SetupStage.Blocked) { _progress = new(SetupStage.Blocked, _status.Text ?? "", _session?.DeviceId); _timer.Stop(); }
         }
         finally { _busy = false; if (!_closed) Render(); }
     }
@@ -273,7 +296,9 @@ public sealed partial class DeviceSetupWindow : Window
     private void ApplyProgress(SetupProgress progress)
     {
         if (_progress?.Stage != progress.Stage) { _modelConfirmation.IsChecked = false; _writeConfirmation.IsChecked = false; }
-        _progress = progress; _error = false; _status.Text = progress.Message;
+        _progress = progress; _error = false;
+        _status.Text = progress.Stage == SetupStage.Reconnect && progress.Message == L.T("Verbinde das Gerät ohne gedrückte Tasten neu.")
+            ? L.T("Nach dem Wiederanschließen geht es automatisch weiter.") : progress.Message;
         if (progress.Stage is SetupStage.Complete or SetupStage.Blocked) _timer.Stop();
         Render();
     }
@@ -290,8 +315,8 @@ public sealed partial class DeviceSetupWindow : Window
         _heading.Text = stage switch
         {
             SetupStage.Disconnect => L.T("USB-Kabel trennen"), SetupStage.ConnectBootloader => L.T("Im Update-Modus verbinden"),
-            SetupStage.ReadyToBackup => L.T("Modell prüfen und sichern"), SetupStage.ReadyToInstall => L.T(_operation switch { SetupOperation.Install => "Installation bestätigen", SetupOperation.Update => "Update bestätigen", _ => "Wiederherstellung bestätigen" }),
-            SetupStage.Reconnect => L.T("Gerät wieder verbinden"), SetupStage.Complete => L.T(_operation == SetupOperation.Update ? "Update abgeschlossen" : "Einrichtung abgeschlossen"),
+            SetupStage.ReadyToBackup => L.T(_operation == SetupOperation.Install ? "Installation bestätigen" : "Modell prüfen und sichern"), SetupStage.ReadyToInstall => L.T(_operation switch { SetupOperation.Install => "Installation bestätigen", SetupOperation.Update => "Update bestätigen", _ => "Wiederherstellung bestätigen" }),
+            SetupStage.Reconnect => L.T("Jetzt normal neu verbinden"), SetupStage.Complete => L.T(_operation == SetupOperation.Update ? "Update abgeschlossen" : "Einrichtung abgeschlossen"),
             SetupStage.Blocked => L.T(_operation == SetupOperation.Update ? "Update angehalten" : "Einrichtung angehalten"),
             _ => L.T(_operation switch { SetupOperation.Install => "Deine Tastatur mit INGLORIOUS nutzen", SetupOperation.Update => "Update verfügbar", _ => "Zurück zu Glorious CORE" })
         };
@@ -321,6 +346,7 @@ public sealed partial class DeviceSetupWindow : Window
             null => L.T("Verbinde das Gerät normal per USB."),
             SetupStage.Disconnect => L.Format("Trenne nur \"{0}\" vom USB-Kabel. Andere Geräte bleiben angeschlossen.", device?.Name ?? ""),
             SetupStage.ConnectBootloader => L.T("Halte die unten angezeigte Tastenkombination gedrückt und stecke das USB-Kabel am selben Anschluss wieder ein. Lass die Tasten nach etwa 3 Sekunden los."),
+            SetupStage.ReadyToBackup when _operation == SetupOperation.Install => L.T("Die App sichert zuerst deine Original-Firmware und installiert danach INGLORIOUS.") + "\n" + L.T("INGLORIOUS ersetzt die Original-Firmware und startet mit Standardwerten. Übertrage danach dein Profil."),
             SetupStage.ReadyToBackup => L.T("Prüfe den Modellnamen. Danach liest die App die Firmware zweimal und vergleicht die Sicherungen."),
             SetupStage.ReadyToInstall => _operation switch
             {
@@ -328,7 +354,7 @@ public sealed partial class DeviceSetupWindow : Window
                 SetupOperation.Update => L.T("Deine Einstellungen bleiben erhalten. Die App sichert den aktuellen Zustand vor dem Update."),
                 _ => L.T("Die Original-Firmware ersetzt INGLORIOUS und seine Einstellungen.")
             },
-            SetupStage.Reconnect => L.T("Verbinde das Gerät ohne gedrückte Tasten neu."),
+            SetupStage.Reconnect => L.Format("Trenne \"{0}\" einmal vom USB-Kabel und stecke es ohne gedrückte Tasten wieder ein.", productName ?? L.T("Gerät")),
             SetupStage.Complete => L.T("Prüfe jetzt die Tasten und die Beleuchtung."),
             _ => L.T("Es wird nichts automatisch wiederholt.")
         };
@@ -341,7 +367,7 @@ public sealed partial class DeviceSetupWindow : Window
         _version.IsVisible = string.IsNullOrEmpty(_version.Text) ? false : true;
         _summary.IsVisible = _backup.IsVisible;
         _modelConfirmation.IsVisible = stage == SetupStage.ReadyToBackup ? true : false;
-        _writeConfirmation.IsVisible = stage == SetupStage.ReadyToInstall ? true : false;
+        _writeConfirmation.IsVisible = _operation != SetupOperation.Install && stage == SetupStage.ReadyToInstall;
         _modelConfirmation.IsEnabled = _writeConfirmation.IsEnabled = !_busy && !_offlinePreview;
         _devices.IsEnabled = !_busy && _session is null;
         _devices.IsVisible = _session is null && _devices.Items.Count > 1 ? true : false;
@@ -352,14 +378,23 @@ public sealed partial class DeviceSetupWindow : Window
             SetupStage.Disconnect => L.T("Warte auf USB-Trennung …"),
             SetupStage.ConnectBootloader => L.T("Warte auf Gerät …"),
             SetupStage.Reconnect => L.T("Warte auf die USB-Verbindung …"),
-            SetupStage.ReadyToBackup => L.T("Sicherung erstellen"),
+            SetupStage.ReadyToBackup => L.T(_operation == SetupOperation.Install ? "Sichern und installieren" : "Sicherung erstellen"),
             SetupStage.ReadyToInstall => L.T(_operation switch { SetupOperation.Install => "INGLORIOUS jetzt installieren", SetupOperation.Update => "Jetzt aktualisieren", _ => "Original jetzt wiederherstellen" }),
             _ => L.T(_operation == SetupOperation.Update ? "Update vorbereiten" : "Einrichtung starten")
         };
         _action.IsVisible = stage is SetupStage.Complete or SetupStage.Blocked ? false : true;
         _action.IsEnabled = CanAct;
         _close.IsEnabled = !_busy && !_lightingRunning; _close.Content = L.T(stage == SetupStage.Complete ? "Fertig" : "Schließen");
-        _activity.IsVisible = _busy || _readingVersion ? true : false;
+        _activity.IsVisible = _busy || _readingVersion || stage == SetupStage.Reconnect;
+        _activity.Margin = stage == SetupStage.Reconnect ? new(0, 0, 0, 18) : new(0, 12, 0, 0);
+        _status.Margin = stage == SetupStage.Reconnect ? new(0, 0, 0, 14) : new(0, 14, 0, 14);
+        if (_busy && _installSequence.Started && stage is SetupStage.ReadyToBackup or SetupStage.ReadyToInstall)
+        {
+            _heading.Text = L.T(stage == SetupStage.ReadyToBackup ? "Die Original-Firmware wird gesichert und geprüft …" : "Firmware wird installiert …");
+            _description.Text = L.T("USB angeschlossen und INGLORIOUS Advanced geöffnet lassen.");
+            _summary.IsVisible = _modelConfirmation.IsVisible = _writeConfirmation.IsVisible = false;
+            _action.Content = _heading.Text;
+        }
         _driverHelp.IsVisible = _status.Text == L.T("Für den Update-Modus fehlt der USB-Treiber.") ? true : false;
         _keepOpen.IsVisible = stage is not (SetupStage.Complete or SetupStage.Blocked) ? true : false;
         _status.Foreground = Palette(_error ? "Accent" : "Muted");

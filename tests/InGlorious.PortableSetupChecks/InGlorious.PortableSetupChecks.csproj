@@ -12,6 +12,7 @@
     <Compile Include="../InGlorious.SetupChecks/IdentityChecks.cs" Link="IdentityChecks.cs" />
     <Compile Include="../InGlorious.SetupChecks/StockFirmwareChecks.cs" Link="StockFirmwareChecks.cs" />
     <Compile Include="../InGlorious.SetupChecks/CoordinatorChecks.cs" Link="CoordinatorChecks.cs" />
+    <Compile Include="../InGlorious.SetupChecks/InstallSequenceChecks.cs" Link="InstallSequenceChecks.cs" />
     <Compile Include="../InGlorious.SetupChecks/PortableUsbChecks.cs" Link="PortableUsbChecks.cs" />
   </ItemGroup>
 </Project>

@@ -59,6 +59,25 @@ if($IsMacOS){
 if($IsLinux){Invoke-Checked 'xvfb-run' @('-a',(Join-Path $publish 'INGLORIOUS Advanced'),'--smoke')}else{Invoke-Checked (Join-Path $publish 'INGLORIOUS Advanced') @('--smoke')}
 [xml]$project=Get-Content -LiteralPath (Join-Path $root 'src/InGlorious.Desktop/InGlorious.Desktop.csproj')
 $version=[string]$project.Project.PropertyGroup.Version
+# Capture the app on this native host. Screenshot mode uses only synthetic
+# profiles and connection fixtures, never user settings or attached hardware.
+$screenshots=Join-Path $output 'screenshots'
+New-Item -ItemType Directory -Path $screenshots|Out-Null
+$screenshotRecords=@()
+foreach($device in @('pro-ansi','numpad')){
+ $image=Join-Path $screenshots ($device+'-lighting.png')
+ $captureArguments=@('--screenshot',$image,'--language','en','--device',$device,'--connected-devices',$device,'--preset')
+ if($IsLinux){Invoke-Checked 'xvfb-run' (@('-a',(Join-Path $publish 'INGLORIOUS Advanced'))+$captureArguments)}
+ else{Invoke-Checked (Join-Path $publish 'INGLORIOUS Advanced') $captureArguments}
+ if(-not(Test-Path -LiteralPath $image -PathType Leaf)){throw ('Native screenshot was not created: '+$device)}
+ $bytes=[IO.File]::ReadAllBytes($image)
+ if($bytes.Length-lt24-or[Convert]::ToHexString($bytes[0..7])-cne'89504E470D0A1A0A'){throw ('Native screenshot is not a PNG: '+$device)}
+ $screenshotRecords += [ordered]@{file=[IO.Path]::GetFileName($image);deviceId=$device;view='lighting';language='en';bytes=$bytes.Length;sha256=(Get-FileHash -LiteralPath $image).Hash}
+}
+[ordered]@{
+ schema=1;operatingSystem=$(if($IsMacOS){'macOS'}else{'Linux'});runtime=$Runtime;appVersion=$version
+ synthetic=$true;hardwareAccess=$false;userSettingsAccess=$false;images=$screenshotRecords
+}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $screenshots 'provenance.json') -Encoding utf8
 $package=Join-Path $output ('INGLORIOUS-Advanced-'+$version+'-'+$Runtime)
 & (Join-Path $PSScriptRoot 'New-DesktopPackage.ps1') -PublishDirectory $publish -Destination $package -Runtime $Runtime -ExpectedVersion $version -ToolCatalogPath $toolCatalog
 & (Join-Path $PSScriptRoot 'Test-DesktopPackage.ps1') -PublishDirectory $publish -PackageDirectory $package -Runtime $Runtime -ExpectedVersion $version -ToolCatalogPath $toolCatalog|Out-Host

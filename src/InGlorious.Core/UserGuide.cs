@@ -45,7 +45,7 @@ public static class UserGuide
         {
             new("Regler und USB", "Wähle beim GMMK Numpad den Schieberegler in der Vorschau. Er kann Lautstärke, Helligkeit oder MIDI steuern. Unter „Gerät“ findest du USB-Abfragerate und Entprellzeit. Diese gelten für alle Ebenen."),
             new("Gemeinsames Dimmen", "Mit „Beleuchtung dimmen“ steuert der GMMK Numpad-Regler sein eigenes Licht ohne App. Soll er auch die GMMK PRO ISO dimmen, aktiviere das gemeinsame Dimmen und lasse INGLORIOUS Advanced im Hintergrund geöffnet."),
-            new("Firmware und Rückkehr", "Die Windows-App bietet unter „Gerät“ Einrichtung, Updates und „Original-Firmware wiederherstellen“. Vor der Ersteinrichtung wird das Original automatisch gesichert; die Sicherung für den Rückwechsel bleibt auf dem Computer. Lasse die App währenddessen geöffnet. Die plattformübergreifende Vorschau bietet diesen Ablauf nicht."),
+            new("Firmware und Rückkehr", "Über das Zahnrad richtest du ein Gerät ein. Unter „Gerät“ kannst du die Firmware aktualisieren oder das Original wiederherstellen. Wähle bei der Ersteinrichtung „Sichern und installieren“: Die App sichert und prüft zuerst das Original und installiert danach INGLORIOUS. Lasse App und USB-Verbindung aktiv, bis du zum erneuten Verbinden aufgefordert wirst."),
         })),
         new("standby", "Standby", Array.AsReadOnly(new GuideSection[]
         {

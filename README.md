@@ -4,7 +4,7 @@ Configure Glorious keyboards with per-key lighting, effects, key assignments, ma
 
 I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
 
-**Source preview · App 0.6.41 · Firmware 0.11.0**
+**Source preview · App 0.6.42 · Firmware 0.11.0**
 
 Public downloads are not available yet. Release and hardware checks are still in progress.
 
@@ -42,7 +42,17 @@ GMMK 3 PRO is not automatically treated as a supported GMMK 3. GMMK HE, GMBK, GM
 
 ![GMMK 3 75% ISO lighting layout with separate logo lighting](docs/images/experimental-layout.png)
 
-Both screenshots show the Windows editor with offline demo data. They do not demonstrate a hardware test.
+### ANSI layouts
+
+**GMMK PRO ANSI — key bindings**
+
+![GMMK PRO ANSI key-binding editor with a horizontal Enter key and separate side lighting](docs/images/pro-ansi.png)
+
+**GMMK 3 100% ANSI — key bindings**
+
+![GMMK 3 100% ANSI key-binding editor with a full number pad and separate logo lighting](docs/images/gmmk3-100-ansi.png)
+
+These screenshots show the Windows editor with offline demo data. They do not demonstrate a hardware test.
 
 ## Features
 
@@ -84,6 +94,10 @@ Use the firmware for your exact model, layout and hardware revision. For GMMK 3 
 | Linux x64 | Avalonia app with configuration and guided firmware management; native validation pending |
 
 Native package and hardware checks for macOS and Linux are still pending. Windows packages are unsigned; macOS packages use ad-hoc signing and are not Apple notarized.
+
+### macOS and Linux — Early Alpha
+
+Native builds are in progress. The build jobs capture lighting views on macOS and Linux with synthetic profiles. Those screenshots will appear here after visual review; the images above show the Windows app.
 
 ## Build and contribute
 

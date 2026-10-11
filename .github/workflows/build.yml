@@ -139,6 +139,15 @@ jobs:
           NATIVE_RUNTIME: ${{ matrix.runtime }}
         run: |
           ./scripts/Build-DesktopRelease.ps1 -Runtime $env:NATIVE_RUNTIME -FirmwareDirectory artifacts/reviewed-firmware
+      - name: Keep native offline screenshots for visual review
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-screenshots-${{ matrix.runtime }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            artifacts/desktop-release/screenshots/*.png
+            artifacts/desktop-release/screenshots/provenance.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-${{ matrix.runtime }}

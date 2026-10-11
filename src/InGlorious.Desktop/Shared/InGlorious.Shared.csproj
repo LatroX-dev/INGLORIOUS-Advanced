@@ -32,6 +32,7 @@
     <Compile Include="../../InGlorious.Core/InstallationIdentity.cs" Link="InstallationIdentity.cs" />
     <Compile Include="../../InGlorious.Core/KnownFirmwareImages.cs" Link="KnownFirmwareImages.cs" />
     <Compile Include="../../InGlorious.Core/DeviceSetupService.cs" Link="DeviceSetupService.cs" />
+    <Compile Include="../../InGlorious.Core/DeviceSetupInstallSequence.cs" Link="DeviceSetupInstallSequence.cs" />
     <Compile Include="../../InGlorious.Core/DeviceSetupService.Storage.cs" Link="DeviceSetupService.Storage.cs" />
     <Compile Include="../../InGlorious.Core/WindowsDeviceSetupEnvironment.cs" Link="WindowsDeviceSetupEnvironment.cs" />
     <Compile Include="../../InGlorious.Core/PosixDeviceSetupEnvironment.cs" Link="PosixDeviceSetupEnvironment.cs" />

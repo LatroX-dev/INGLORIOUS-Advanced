@@ -27,7 +27,7 @@ if (-not (Get-Item -LiteralPath $root).PSIsContainer) { throw 'SourceRoot must b
 
 # Exact relative paths only. New files never enter this list through recursion or a glob.
 $app = @(
-    'FirmwareAdapterProcess.cs','PosixDeviceSetupEnvironment.cs','PlatformUsbIdentity.cs','AppAutostart.cs','AppAutostartEditor.cs','WindowsInstallationGuard.cs','BackgroundApplicationSession.cs','WindowsTrayIcon.cs','MainWindow.Background.cs','ApplicationInstance.cs',
+    'FirmwareAdapterProcess.cs','PosixDeviceSetupEnvironment.cs','PlatformUsbIdentity.cs','AppAutostart.cs','AppAutostartEditor.cs','WindowsInstallationGuard.cs','BackgroundApplicationSession.cs','WindowsTrayIcon.cs','MainWindow.Background.cs','ApplicationInstance.cs','DeviceSetupInstallSequence.cs',
     'App.xaml','App.xaml.cs','AppPreferences.cs','AppSettingsWindow.xaml','AppSettingsWindow.xaml.cs','BackupService.cs','ColorPaletteStore.cs','ColorPickerWindow.cs',
     'DeviceScanner.cs','StockDeviceCatalog.cs','StockFirmwareInspector.cs','InstallationIdentity.cs','KnownFirmwareImages.cs','DeviceSetupService.cs','DeviceSetupService.Storage.cs','WindowsDeviceSetupEnvironment.cs','DeviceSetupWindow.cs','DeviceSetupWindow.Checks.cs','DeviceSetupWindow.Completion.cs','MainWindow.Setup.cs','InGlorious.Core.csproj','MainWindow.xaml','MainWindow.xaml.cs','Models.cs','UserGuide.cs','HelpWindow.cs','MainWindow.Help.cs',
     'MainWindow.Startup.cs','MainWindow.StartupChecks.cs','MainWindow.Connections.cs','MainWindow.ConnectionChecks.cs','StartupDeviceLoader.cs','MainWindow.WorkflowChecks.cs','MainWindow.PendingEdits.cs','MainWindow.PendingEditsChecks.cs','PendingEditDecisionPolicy.cs',
@@ -66,7 +66,7 @@ foreach($name in $adapterFiles){$allow.Add('tools/InGlorious.FirmwareAdapter/'+$
 foreach($suite in @('InGlorious.DiscoveryChecks','InGlorious.SetupChecks')){
  $allow.Add('tests/'+$suite+'/'+$suite+'.csproj');$allow.Add('tests/'+$suite+'/Program.cs')
 }
-foreach($name in @('CoordinatorChecks.cs','IdentityChecks.cs','StockFirmwareChecks.cs','PortableUsbChecks.cs')){$allow.Add('tests/InGlorious.SetupChecks/'+$name)}
+foreach($name in @('CoordinatorChecks.cs','IdentityChecks.cs','StockFirmwareChecks.cs','PortableUsbChecks.cs','InstallSequenceChecks.cs')){$allow.Add('tests/InGlorious.SetupChecks/'+$name)}
 $allow.Add('tests/InGlorious.PortableSetupChecks/InGlorious.PortableSetupChecks.csproj')
 foreach ($name in @('desktop.json','dialogs.json','favorites.json','firmware.json','firmware-service.json','firmware-guide-simple.json','firmware-wizard-simple.json','firmware-routing.json','firmware-details.json','firmware-log.json','firmware-source.json','lighting-presets.json','macros.json','main-status.json','main.json','models.json','operations.json','preferences-profiles.json','sequences.json','standby.json','transfer-simple.json','startup.json','guide.json','slider-editor.json','model-support.json','connections.json','firmware-models.json')) { $allow.Add('src/InGlorious.Core/Locales/'+$name) }
 $desktop = @('App.axaml','App.axaml.cs','EditorState.cs','InGlorious.Desktop.csproj','MainWindow.Actions.cs','MainWindow.Checks.cs','MainWindow.cs','MainWindow.Editors.cs','MainWindow.Icons.cs','MainWindow.Macros.cs','MainWindow.Presets.cs','MainWindow.Settings.cs','MainWindow.Startup.cs','MainWindow.StartupChecks.cs','MainWindow.Connections.cs','MainWindow.ConnectionsChecks.cs','MainWindow.Help.cs','MainWindow.HelpChecks.cs','MainWindow.Setup.cs','DeviceSetupWindow.cs','DeviceSetupWindow.Checks.cs','DeviceSetupWindow.Completion.cs','Program.cs','README.md','DesktopTrayIcon.cs','MainWindow.Background.cs','Shared/AssemblyInfo.cs','Shared/InGlorious.Shared.csproj','Shared/OnboardHidTransport.cs','Shared/PlatformDeviceService.cs')
@@ -120,7 +120,7 @@ foreach ($name in @('effect_oracle.c','Run-PreviewChecks.ps1')) { $allow.Add('te
 foreach ($name in @('sequence_oracle.c','Run-ColorSequenceChecks.ps1')) { $allow.Add('tests/InGlorious.ColorSequenceChecks/'+$name) }
 foreach ($name in @('.gitignore','.gitattributes','AGENTS.md','docs/public-release.md','docs/model-support.md','scripts/Test-ModelReferences.ps1','scripts/Export-PublicSource.ps1','scripts/Build-BrandIcon.ps1','scripts/Install-InGlorious.ps1','scripts/New-WindowsPackage.ps1','scripts/Test-WindowsInstaller.ps1')) { $allow.Add($name) }
 foreach ($name in @('README.md','LICENSE','COPYRIGHT.md','THIRD-PARTY-NOTICES.md','CONTRIBUTING.md','SECURITY.md','CHANGELOG.md','global.json','NuGet.Config',
-    'docs/getting-started.md','docs/hardware-acceptance.md','docs/license-audit.md','docs/images/windows-lighting.png','docs/images/experimental-layout.png',
+    'docs/getting-started.md','docs/hardware-acceptance.md','docs/license-audit.md','docs/images/windows-lighting.png','docs/images/experimental-layout.png','docs/images/pro-ansi.png','docs/images/gmmk3-100-ansi.png',
     'scripts/Initialize-BuildDependencies.ps1','scripts/build-dependencies.json','scripts/Build-PublicRelease.ps1','scripts/Test-PublicSourceExport.ps1','scripts/Copy-RuntimeNotices.ps1',
     '.github/workflows/build.yml','.github/ISSUE_TEMPLATE/bug_report.yml','.github/ISSUE_TEMPLATE/config.yml','.github/ISSUE_TEMPLATE/device_support.yml','.github/ISSUE_TEMPLATE/feature_request.yml',
     'src/InGlorious.Desktop/packages.lock.json','src/InGlorious.Desktop/Shared/packages.lock.json',

@@ -414,5 +414,31 @@
     "ja": "USBドライバーを設定（Zadig）",
     "ko": "USB 드라이버 설정 (Zadig)",
     "zh-Hans": "设置 USB 驱动程序 (Zadig)"
+  },
+  "Sichern und installieren": {
+    "en": "Back up and install",
+    "es": "Guardar copia e instalar",
+    "fr": "Sauvegarder et installer",
+    "it": "Esegui backup e installa",
+    "pt-BR": "Fazer backup e instalar",
+    "pl": "Utwórz kopię i zainstaluj",
+    "tr": "Yedekle ve yükle",
+    "ru": "Сохранить копию и установить",
+    "ja": "バックアップしてインストール",
+    "ko": "백업 후 설치",
+    "zh-Hans": "备份并安装"
+  },
+  "Die App sichert zuerst deine Original-Firmware und installiert danach INGLORIOUS.": {
+    "en": "The app first backs up your original firmware, then installs INGLORIOUS.",
+    "es": "La aplicación primero guarda una copia del firmware original y después instala INGLORIOUS.",
+    "fr": "L’application sauvegarde d’abord votre firmware d’origine, puis installe INGLORIOUS.",
+    "it": "L’app esegue prima il backup del firmware originale, poi installa INGLORIOUS.",
+    "pt-BR": "O aplicativo primeiro faz backup do firmware original e depois instala o INGLORIOUS.",
+    "pl": "Aplikacja najpierw tworzy kopię oryginalnego oprogramowania sprzętowego, a następnie instaluje INGLORIOUS.",
+    "tr": "Uygulama önce orijinal aygıt yazılımınızı yedekler, ardından INGLORIOUS’ı yükler.",
+    "ru": "Приложение сначала сохраняет копию оригинальной прошивки, затем устанавливает INGLORIOUS.",
+    "ja": "最初に元のファームウェアをバックアップし、その後 INGLORIOUS をインストールします。",
+    "ko": "앱이 먼저 원래 펌웨어를 백업한 다음 INGLORIOUS를 설치합니다.",
+    "zh-Hans": "应用会先备份原厂固件，然后安装 INGLORIOUS。"
   }
 }

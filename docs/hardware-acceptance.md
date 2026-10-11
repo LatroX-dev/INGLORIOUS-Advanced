@@ -31,4 +31,4 @@ An ambiguous model, changed connection, missing matching archive, disagreement b
 
 ## Current status
 
-The GMMK PRO revision 1 ISO and GMMK Numpad have historical physical-use evidence. The general setup workflow in app 0.6.41 still needs the above acceptance run. The other 13 variants remain experimental. Native macOS/Linux package, device, layout and permission testing is also pending. Automated checks and successful builds are reported separately.
+The GMMK PRO revision 1 ISO and GMMK Numpad have historical physical-use evidence. On Windows, the Numpad lighting sequence and typing test passed after first installation with app 0.6.41. The revised combined backup/install workflow in app 0.6.42 still needs the above acceptance run. The other 13 variants remain experimental. Native macOS/Linux package, device, layout and permission testing is also pending. Automated checks and successful builds are reported separately.

@@ -31,7 +31,7 @@ Full removal also deletes the original-firmware backups in the app's data folder
 1. Connect your keyboard by USB and open **Settings → Set up device**.
 2. Choose the detected keyboard if more than one is connected. Check the full model name and layout. Experimental models are marked.
 3. Follow the displayed instructions to disconnect it and reconnect with the shown keys held.
-4. Select **Create backup** and wait while the app saves the original firmware. Confirm installation when ready.
+4. Confirm the detected model and select **Back up and install**. The app saves and checks the original firmware, then installs INGLORIOUS. If the backup cannot be verified, installation stops before anything is written to the keyboard.
 5. Keep the app open and USB connected until it asks you to reconnect normally.
 6. Select **Test lighting** for the approximately 21-second light sequence. Do not press keys during it. Then type **INGLORIOUS** in the test box, in any letter case, or **1234567890** on the Numpad. This finishes the guide; you can also select **Done**.
 

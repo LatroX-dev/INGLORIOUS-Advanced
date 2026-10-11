@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.42
+
+- Back up and install firmware in one guided step.
+- Clearer reconnect instructions during device setup.
+
 ## 0.6.41
 
 - Windows installer with an optional background start at login.

@@ -1,6 +1,6 @@
 # Device setup and recovery
 
-App 0.6.41 includes first installation, updates and original-firmware restoration on Windows, macOS and Linux without developer-device serials, fixed ports, workspace paths or pre-existing private backups. The entry points are App Settings and the connected device page. Firmware changes require a separate explicit confirmation. The native macOS/Linux package checks and physical-device acceptance runs are still pending; implementation is not evidence of a completed hardware test.
+App 0.6.42 includes first installation, updates and original-firmware restoration on Windows, macOS and Linux without developer-device serials, fixed ports, workspace paths or pre-existing private backups. The entry points are App Settings and the connected device page. Firmware changes require a separate explicit confirmation. The native macOS/Linux package checks and physical-device acceptance runs are still pending; implementation is not evidence of a completed hardware test.
 
 ## Recognition and backup
 
@@ -8,7 +8,7 @@ The normal USB VID/PID is matched against the manufacturer catalog in `reference
 
 The wizard observes disconnection, then requires exactly one supported bootloader at the same complete physical USB location. Windows uses device-location paths; Linux and macOS use the USB bus and full physical port chain. Runtime HID endpoints are resolved through the operating system's device hierarchy, not matched by name or serial alone. Its libusb selection and independently checked fingerprint must match the transport, port, VID/PID, serial where available, interface and model geometry. Missing USB access, conflicting devices, unknown variants, protection or failed reads prevent installation. The app does not install drivers, elevate privileges or detach kernel drivers automatically.
 
-Before confirmation, the adapter reads the entire internal flash twice. Both files must be complete and byte-identical. A structured USB descriptor inside the original image must agree with the originally observed stock VID/PID and selected model. This is a consistency check, not cryptographic proof of a manufacturer's firmware or physical board identity.
+For first installation, **Back up and install** authorizes one combined operation for the displayed device. The adapter reads the entire internal flash twice before writing. Both files must be complete and byte-identical. A structured USB descriptor inside the original image must agree with the originally observed stock VID/PID and selected model. This is a consistency check, not cryptographic proof of a manufacturer's firmware or physical board identity. Only a successfully verified and saved backup allows the same operation to continue to installation. A failure stops the operation without an automatic retry.
 
 There are no user-specific identifiers in the distributed code or tool bundle. Each platform's app package includes the same reviewed firmware for 15 model/layout variants and a native adapter. The 13 additional variants remain visibly experimental; offline tests do not establish physical compatibility for untested revisions.
 
