@@ -30,7 +30,7 @@ internal static partial class Program
         CheckIdentity();
         CheckStockFirmwareInspector();
         await CheckCoordinator();
-        await CheckInstallSequence();
+        await CheckFirmwareSequence();
         CheckPortableUsb();
         await CheckPortableRoundTrips();
         Console.WriteLine($"PASS: {_checks} setup checks; fake discovery/adapter and isolated files only. No device access.");

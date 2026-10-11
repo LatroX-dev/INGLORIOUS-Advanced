@@ -47,7 +47,7 @@ public sealed partial class DeviceSetupService
                 session.OriginalSha256 = currentHash;
                 session.BackupPath = capturePath;
                 session.BundlePath = PrepareBundle(session);
-                // Durable recovery association exists before the user can authorize a write.
+                // The original recovery archive is durable before any authorized write begins.
                 var record = new RecoveryRecord(1, session.DeviceId!, session.Installation.InstallationId, currentHash,
                     Path.GetRelativePath(session.Directory, capturePath), Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(capturePath))),
                     session.Device.VendorId, session.Device.ProductId);

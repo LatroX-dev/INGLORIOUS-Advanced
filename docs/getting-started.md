@@ -63,7 +63,7 @@ Use the **?** button next to Settings for help in your language. Language follow
 
 ## Update INGLORIOUS firmware
 
-Every app package includes the matching firmware for all supported models. The app compares the version reported by the keyboard with this included firmware. An update is offered only when an older supported version is recognized. Installing a newer app does not flash the keyboard automatically. Open an available firmware update from the device's firmware area and follow the guided reconnect steps.
+Every app package includes the matching firmware for all supported models. The app compares the version reported by the keyboard with this included firmware. An update is offered only when an older supported version is recognized. Installing a newer app does not flash the keyboard automatically. Open an available firmware update from the device's firmware area and follow the guided reconnect steps. Confirm the displayed device and select **Back up and update**. The backup, checks and update then run together.
 
 An ordinary update preserves the stored INGLORIOUS configuration. Save a profile copy before updating. Do not disconnect the keyboard or close INGLORIOUS Advanced while the write is running. An unknown version is not treated as outdated.
 
@@ -73,7 +73,7 @@ After reconnecting, use **Test lighting** and the typing test described above, o
 
 1. Save any INGLORIOUS profiles you want to keep.
 2. Open **Settings → Restore original firmware** and select the keyboard if asked.
-3. Follow the reconnect instructions and confirm restoration.
+3. Follow the reconnect instructions. Confirm the displayed device and select **Back up and restore**. The app checks the current firmware and matching original backup, then restores it without another confirmation.
 4. Reconnect normally when asked, then test typing and lighting.
 
 Restoring replaces INGLORIOUS and its stored configuration. It requires that keyboard's matching original backup. Keep a separate copy of the complete backup folder before replacing or reinstalling your system. The [backup locations](device-setup.md#backup-locations) are listed for each platform.

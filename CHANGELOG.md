@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.43
+
+- Simpler firmware updates and original-firmware recovery.
+- Fixed firmware buttons sometimes ignoring clicks.
+
 ## 0.6.42
 
 - Back up and install firmware in one guided step.

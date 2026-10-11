@@ -16,7 +16,7 @@ public sealed partial class DeviceSetupWindow
         var device = new SetupDevice("offline-fixture", DeviceCatalog.Get(id).Name, runtime ? [id] : stock.CandidateDeviceIds,
             runtime ? BoardDescriptorRegistry.RuntimeVendorId : stock.VendorId, runtime ? board.RuntimeProductId : stock.ProductId, [], runtime);
         _session = null; _progress = null; _writeAttempted = _outcomeUncertain = false; _busy = _observing = _readingVersion = _error = false;
-        _installSequence = new();
+        _firmwareSequence = new();
         _returnedHidPath = null; _lightingRunning = false; _lightingStatus.Text = ""; _typingTest.Clear();
         ApplyDevices([device]);
         _runtimeVersion = runtime ? new(id, new(0, 0, 1), 1) : null; // Synthetic older report; no hardware identity or data.
@@ -70,7 +70,7 @@ public sealed partial class DeviceSetupWindow
             check(!ActionReady, "Update: the installed target version is already current");
             _runtimeVersion = new(device.CandidateDeviceIds[0], new(ushort.MaxValue, 0, 0), 1); Render();
             check(!ActionReady, "Update: newer firmware is never offered a downgrade");
-            ShowOfflineStep("confirm"); _writeConfirmation.IsChecked = true;
+            ShowOfflineStep("backup"); _modelConfirmation.IsChecked = true;
             _session!.InstalledFirmwareVersion = DeviceSetupService.TargetFirmwareVersion;
             check(!ActionReady, "Update: firmware captured in boot mode must match the earlier actual runtime report");
             ShowOfflineStep("select"); _readingVersion = true;
@@ -80,6 +80,8 @@ public sealed partial class DeviceSetupWindow
         foreach (var step in new[] { "disconnect", "connect", "backup", "confirm", "reconnect", "complete", "blocked" })
         {
             ShowOfflineStep(step);
+            check(NeedsObservation == (step is "disconnect" or "connect" or "reconnect"),
+                "Setup: only USB transition stages need periodic observation: " + step);
             check(!CanAct && !_action.IsEnabled && !_timer.IsEnabled, "Setup: offline " + step + " has no executable device action");
             check(!ActionReady, "Setup: " + step + " never authorizes capture or writing without an explicit confirmation");
             if (step is "disconnect" or "connect" or "reconnect")
@@ -87,20 +89,30 @@ public sealed partial class DeviceSetupWindow
             check((_keyPanel.IsVisible == true) == (step == "connect"), "Setup: boot keys appear only during the bootloader connection step");
         }
         ShowOfflineStep("backup"); _modelConfirmation.IsChecked = true;
-        check(ActionReady && !CanAct, "Setup: model confirmation permits only the separately requested capture action");
-        check(_operation != SetupOperation.Install || _action.Content?.ToString() == L.T("Sichern und installieren") && !_writeConfirmation.IsVisible,
-            "Setup: original firmware has one clear combined action after model confirmation");
+        check(ActionReady && !CanAct, "Setup: explicit model and firmware consent permits the combined action");
+        check(_action.Content?.ToString() == CombinedAction &&
+            ((TextBlock)_modelConfirmation.Content!).Text!.Contains(L.T("Das erkannte Modell stimmt mit meinem Gerät überein."), StringComparison.Ordinal),
+            "Setup: every operation has one clear combined action and an explicit model confirmation");
+        check(!NeedsObservation && !_observing && ActionReady,
+            "Setup: stable confirmation cannot start a background scan that silently ignores the first click");
+        for (var tick = 0; tick < 10; tick++)
+        {
+            Render();
+            check(!NeedsObservation && ActionReady && _action.Content?.ToString() == CombinedAction,
+                "Setup: repeated timer/render cycles keep the combined action stable");
+        }
         _session!.DeviceId = "foreign-device"; Render();
         check(!ActionReady, "Setup: a model outside the selected physical device candidates cannot proceed");
         ShowOfflineStep("confirm");
-        _writeConfirmation.IsChecked = true;
-        check(ActionReady == (_operation != SetupOperation.Install) && !CanAct, "Setup: installation never exposes a separate write action after the combined backup step");
+        _modelConfirmation.IsChecked = true;
+        check(!ActionReady && !CanAct && !NeedsObservation, "Setup: no operation exposes a second write action or starts a scan after backup");
         _busy = true; Render(); var closing = new System.ComponentModel.CancelEventArgs(); WindowClosing(this, closing);
         check(_activity.IsVisible == true && _activity.Foreground?.ToString() == Palette("Accent").ToString() && _activity.IsIndeterminate,
             "Setup: capture and write activity use the flat accent progress template");
         check(closing.Cancel && !ActionReady, "Setup: capture or write blocks closing and reentry without cancellation");
         _busy = false; closing = new(); WindowClosing(this, closing);
         check(!closing.Cancel, "Setup: a waiting wizard can be closed");
+        ShowOfflineStep("backup"); _modelConfirmation.IsChecked = true;
         _observing = true; check(!ActionReady, "Setup: observation and button actions cannot overlap"); _observing = false;
         _error = true; check(!ActionReady, "Setup: a failed device check cannot authorize writing"); _error = false;
         _writeAttempted = true; check(!ActionReady, "Setup: an attempted firmware write is never silently retried");
@@ -110,7 +122,25 @@ public sealed partial class DeviceSetupWindow
         ShowError(new SetupException("CORE fixture", recoverable: true));
         check(_session!.Stage == SetupStage.ReadyToBackup && !ActionReady, "Setup: a recoverable preflight error holds the current stage and blocks writing");
         ApplyProgress(new(SetupStage.ReadyToBackup, "Checked fixture", _session.DeviceId));
-        check(ActionReady && !DeviceStateMayHaveChanged, "Setup: a fresh successful observation releases a recoverable preflight error");
+        check(ActionReady && !DeviceStateMayHaveChanged, "Setup: a fresh successful result releases a recoverable preflight error");
+        var restart = L.T("Schließe diesen Dialog, verbinde das Gerät ohne gedrückte Tasten neu und starte den Vorgang erneut.");
+        try
+        {
+            _firmwareSequence.RunAsync(_session!, _operation, _session!.DeviceId!, true, () => true,
+                () => Task.FromException<SetupProgress>(new SetupException("CORE fixture", recoverable: true)), _ => { },
+                () => throw new InvalidOperationException("No offline write delegate may run.")).GetAwaiter().GetResult();
+        }
+        catch (SetupException exception) { ShowError(exception); }
+        check(_firmwareSequence.Started && !ActionReady && _status.Text!.Contains(restart, StringComparison.Ordinal),
+            "Setup: a stopped prewrite attempt explains how to start a fresh wizard instead of offering a consumed action");
+        _writeAttempted = true;
+        ShowError(new System.IO.IOException("Write fixture"));
+        check(!_status.Text!.Contains(restart, StringComparison.Ordinal), "Setup: an attempted write never receives prewrite restart guidance");
+        _outcomeUncertain = true;
+        ShowError(new System.IO.IOException("Uncertain fixture"));
+        check(_status.Text == FirmwareMessages.ForExecutionFailure() && !_status.Text.Contains(restart, StringComparison.Ordinal),
+            "Setup: uncertain firmware results never suggest reconnecting or retrying");
+        ShowOfflineStep("connect");
         ApplyProgress(new(SetupStage.ConnectBootloader, L.T("Für den Update-Modus fehlt der USB-Treiber."), _session.DeviceId));
         check(_driverHelp.IsVisible == true, "Setup: driver instructions appear only with a detected missing driver");
         ApplyProgress(new(SetupStage.ConnectBootloader, "Waiting fixture", _session.DeviceId));

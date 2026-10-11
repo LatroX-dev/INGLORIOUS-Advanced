@@ -13,17 +13,17 @@ Run the checklist separately on Windows, Linux and macOS. On Linux, include acce
 1. Save profiles and keep another keyboard available. Start with the Numpad when it is available.
 2. Run original-firmware recovery through the app if a matching original backup exists. Stop if it does not.
 3. Reconnect normally. Verify the guide detects the original device automatically. Check typing and lighting.
-4. Run first installation. Confirm the displayed model. Verify the guide waits for a real disconnect, detects the correct update-mode device and creates an original backup before asking to write.
+4. Run first installation. Confirm the displayed model. Verify the guide waits for a real disconnect and detects the correct update-mode device. Select **Back up and install** once; the guide must create and verify the original backup before writing, without another confirmation.
 5. Complete installation, reconnect normally and verify that the guide advances automatically.
 6. Test every physical key, knob direction and knob press. On the Numpad, test the slider with its configured function.
 7. Test per-key colors, each side segment, synchronized sides and logo lighting where present. Check the full lighting sequence without pressing keys.
 8. Transfer a profile with a harmless macro, another layer and standby enabled. Close the app, reconnect and verify the settings still work.
-9. Restore original firmware again through the app. Confirm normal recognition, typing and lighting. Record which original settings return and which do not.
+9. Restore original firmware again through the app. Confirm the displayed device and select **Back up and restore** once. The checks and restoration must run without another confirmation. Confirm normal recognition, typing and lighting. Record which original settings return and which do not.
 10. Reinstall INGLORIOUS if desired, then load the saved profile.
 
 ## Update
 
-Use a supported older INGLORIOUS version and a saved profile. Confirm the app displays the actual installed and included versions, offers only a newer version and preserves the configuration after the update. Close/reopen the app and reconnect the keyboard to check persistence. Test the current/equal/newer-version cases without writing: no pending update should be invented.
+Use a supported older INGLORIOUS version and a saved profile. Confirm the app displays the actual installed and included versions and offers only a newer version. Select **Back up and update** once; backup and update must run together and preserve the configuration. Close/reopen the app and reconnect the keyboard to check persistence. Test the current/equal/newer-version cases without writing: no pending update should be invented.
 
 ## Stop conditions
 
@@ -31,4 +31,4 @@ An ambiguous model, changed connection, missing matching archive, disagreement b
 
 ## Current status
 
-The GMMK PRO revision 1 ISO and GMMK Numpad have historical physical-use evidence. On Windows, the Numpad lighting sequence and typing test passed after first installation with app 0.6.41. The revised combined backup/install workflow in app 0.6.42 still needs the above acceptance run. The other 13 variants remain experimental. Native macOS/Linux package, device, layout and permission testing is also pending. Automated checks and successful builds are reported separately.
+The GMMK PRO revision 1 ISO and GMMK Numpad have historical physical-use evidence. On Windows, the Numpad lighting sequence and typing test passed after first installation with app 0.6.41. The unified installation, update and restoration workflow in app 0.6.43 still needs the above acceptance run. The other 13 variants remain experimental. Native macOS/Linux package, device, layout and permission testing is also pending. Automated checks and successful builds are reported separately.

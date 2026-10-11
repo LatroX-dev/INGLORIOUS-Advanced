@@ -251,10 +251,7 @@ public sealed partial class DeviceSetupService
         SetupStage.ReadyToBackup => session.Operation == SetupOperation.Install
             ? "Gerät erkannt. Die Original-Firmware kann jetzt gesichert werden."
             : "Gerät erkannt. Die installierte Firmware kann jetzt geprüft werden.",
-        SetupStage.ReadyToInstall => session.Operation == SetupOperation.Update
-            ? "Die Sicherung ist geprüft. Du kannst das Update jetzt bestätigen."
-            : session.Operation == SetupOperation.Restore ? "Die Sicherung ist geprüft. Du kannst die Wiederherstellung jetzt bestätigen."
-            : "Die Sicherung ist geprüft. Du kannst die Installation jetzt bestätigen.",
+        SetupStage.ReadyToInstall => "Die Sicherung ist geprüft. Der Vorgang wird fortgesetzt.",
         SetupStage.Reconnect => "Verbinde das Gerät ohne gedrückte Tasten neu.",
         SetupStage.Complete => "Firmware übertragen und Gerät wieder erkannt.",
         _ => "Der Vorgang wurde angehalten."
