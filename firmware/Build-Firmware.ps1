@@ -57,7 +57,8 @@ foreach($target in $targets) {
  $limit=$target.flashBytes-$targetManifest.storageBytes
  $qmkMsys=((& $bash --noprofile --norc -c ('/usr/bin/cygpath -u '+"'"+$qmk.Replace("'","'\''")+"'")).Trim())
  if ($LASTEXITCODE -ne 0) { throw 'Could not resolve QMK source path.' }
- $command='export PATH=/opt/qmk/bin:/opt/uv/tools/bin:/mingw64/bin:/usr/bin:/bin; export PYTHONUTF8=1 MSYSTEM=MINGW64 QMK_DISTRIB_DIR=/opt/qmk; cd '+"'"+$qmkMsys.Replace("'","'\''")+"'"+'; qmk compile -j 8 -kb '+$target.qmk+' -km inglorious; rc=$?; arm-none-eabi-size -A .build/'+$stem+'.elf; exit $rc'
+ # MILC invokes a shell from native Windows Python, so resolve the pinned Bash to a Windows path.
+ $command='export PATH=/opt/qmk/bin:/opt/uv/tools/bin:/mingw64/bin:/usr/bin:/bin; export PYTHONUTF8=1 MSYSTEM=MINGW64 QMK_DISTRIB_DIR=/opt/qmk; export SHELL="$(/usr/bin/cygpath -m /usr/bin/bash.exe)"; cd '+"'"+$qmkMsys.Replace("'","'\''")+"'"+'; qmk compile -j 8 -kb '+$target.qmk+' -km inglorious; rc=$?; arm-none-eabi-size -A .build/'+$stem+'.elf; exit $rc'
  & $bash --noprofile --norc -c $command *> (Join-Path $output ($target.name+'-build.log'))
  if ($LASTEXITCODE -ne 0) {
    Get-Content -LiteralPath (Join-Path $output ($target.name+'-build.log')) -Tail 60 | Write-Host
