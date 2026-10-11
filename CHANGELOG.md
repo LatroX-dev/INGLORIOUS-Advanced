@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Removed repeated messages during firmware installation, updates and recovery.
+
 ## 0.6.49
 
 - Clearer uninstall confirmation.

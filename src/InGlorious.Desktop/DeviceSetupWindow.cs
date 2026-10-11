@@ -279,8 +279,21 @@ public sealed partial class DeviceSetupWindow : Window
     private IProgress<string> Log()
     {
         var revision = _revision;
-        return new Progress<string>(message => { if (!_closed && _busy && revision == _revision) _status.Text = message; });
+        return new Progress<string>(message =>
+        {
+            if (!_closed && _busy && revision == _revision)
+            {
+                _status.Text = message;
+                UpdateStatusVisibility();
+            }
+        });
     }
+
+    private bool IsFirmwareOperationRunning => _busy && _firmwareSequence.Started &&
+        _progress?.Stage is SetupStage.ReadyToBackup or SetupStage.ReadyToInstall;
+
+    private void UpdateStatusVisibility() => _status.IsVisible = !IsFirmwareOperationRunning || _error ||
+        (_status.Text != _description.Text && _status.Text != _heading.Text && _status.Text != _keepOpen.Text);
 
     private void ApplyProgress(SetupProgress progress)
     {
@@ -390,7 +403,7 @@ public sealed partial class DeviceSetupWindow : Window
         _activity.IsVisible = _busy || _readingVersion || stage == SetupStage.Reconnect;
         _activity.Margin = stage == SetupStage.Reconnect ? new(0, 0, 0, 18) : new(0, 12, 0, 0);
         _status.Margin = stage == SetupStage.Reconnect ? new(0, 0, 0, 14) : new(0, 14, 0, 14);
-        if (_busy && _firmwareSequence.Started && stage is SetupStage.ReadyToBackup or SetupStage.ReadyToInstall)
+        if (IsFirmwareOperationRunning)
         {
             _heading.Text = stage == SetupStage.ReadyToBackup ? BackupActivity : WriteActivity;
             _description.Text = L.T("USB angeschlossen und INGLORIOUS Advanced geöffnet lassen.");
@@ -398,8 +411,9 @@ public sealed partial class DeviceSetupWindow : Window
             _action.Content = L.T("Bitte warten …");
         }
         _driverHelp.IsVisible = _status.Text == L.T("Für den Update-Modus fehlt der USB-Treiber.") ? true : false;
-        _keepOpen.IsVisible = stage is not (SetupStage.Complete or SetupStage.Blocked) ? true : false;
+        _keepOpen.IsVisible = !IsFirmwareOperationRunning && stage is not (SetupStage.Complete or SetupStage.Blocked);
         _status.Foreground = Palette(_error ? "Accent" : "Muted");
+        UpdateStatusVisibility();
         RenderCompletion();
     }
 
@@ -445,6 +459,11 @@ public sealed partial class DeviceSetupWindow : Window
 
     private void WindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (_busy || _lightingRunning) { e.Cancel = true; _status.Text = L.T("INGLORIOUS Advanced nicht schließen."); }
+        if (_busy || _lightingRunning)
+        {
+            e.Cancel = true;
+            _status.Text = L.T("INGLORIOUS Advanced nicht schließen.");
+            UpdateStatusVisibility();
+        }
     }
 }
