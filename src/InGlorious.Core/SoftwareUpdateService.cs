@@ -275,7 +275,7 @@ public sealed class SoftwareUpdateService : IDisposable
 
     internal static string PackageName(string version, SoftwareUpdatePlatform platform) => platform switch
     {
-        SoftwareUpdatePlatform.WindowsX64 => $"INGLORIOUS-Advanced-{version}-Setup.exe",
+        SoftwareUpdatePlatform.WindowsX64 => $"INGLORIOUS-Advanced-{version}-win-x64-Setup.exe",
         SoftwareUpdatePlatform.MacX64 => $"INGLORIOUS-Advanced-{version}-osx-x64.tar.gz",
         SoftwareUpdatePlatform.MacArm64 => $"INGLORIOUS-Advanced-{version}-osx-arm64.tar.gz",
         SoftwareUpdatePlatform.LinuxX64 => $"INGLORIOUS-Advanced-{version}-linux-x64.tar.gz",

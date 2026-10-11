@@ -96,8 +96,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           path: |
-            artifacts/public-build/installer/INGLORIOUS-Advanced-*-Setup.exe
-            artifacts/public-build/installer/INGLORIOUS-Advanced-*-Setup.exe.sha256
+            artifacts/public-build/installer/INGLORIOUS-Advanced-*-win-x64-Setup.exe
+            artifacts/public-build/installer/INGLORIOUS-Advanced-*-win-x64-Setup.exe.sha256
             artifacts/INGLORIOUS-Advanced-*-Source.zip
             artifacts/INGLORIOUS-Advanced-*-Source.zip.sha256
 
@@ -205,7 +205,6 @@ jobs:
           for path in sorted(Path('release-ready').iterdir()):
               if not path.is_file() or path.name == 'release-notes.md':
                   continue
-              label = '#Windows (win-x64) — Setup' if path.name.endswith('-Setup.exe') else ''
-              assets.append(str(path) + label)
+              assets.append(str(path))
           subprocess.run(['gh', 'release', 'upload', os.environ['RELEASE_TAG'], '--', *assets], check=True)
           PY

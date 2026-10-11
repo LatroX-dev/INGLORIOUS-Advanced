@@ -24,7 +24,7 @@ class ReleaseAssetsChecks(unittest.TestCase):
             path.parent.mkdir(parents=True)
             path.write_text("<Project><PropertyGroup><Version>1.2.3</Version></PropertyGroup></Project>")
         (self.repo / "CHANGELOG.md").write_text("# Changelog\n\n## 1.2.3\n\n- Test release.\n\n## 1.2.2\n\n- Old release.\n")
-        self.names = [f"INGLORIOUS-Advanced-1.2.3-{suffix}" for suffix in ("Setup.exe", "Source.zip", "linux-x64.tar.gz", "osx-x64.tar.gz", "osx-arm64.tar.gz")]
+        self.names = [f"INGLORIOUS-Advanced-1.2.3-{suffix}" for suffix in ("win-x64-Setup.exe", "Source.zip", "linux-x64.tar.gz", "osx-x64.tar.gz", "osx-arm64.tar.gz")]
         for name in self.names:
             data = ("Synthetic package " + name).encode()
             (self.source / name).write_bytes(data)
@@ -37,15 +37,56 @@ class ReleaseAssetsChecks(unittest.TestCase):
         return module.stage(self.source, self.target, "1.2.3", self.repo)
 
     def test_exact_files_and_notes(self):
-        self.assertEqual(len(self.stage()), 10)
+        staged = self.stage()
+        self.assertEqual(len(staged), 10)
+        self.assertEqual({path.name for path in staged}, set(self.names + [name + ".sha256" for name in self.names]))
         notes = (self.target / "release-notes.md").read_text()
         self.assertTrue(notes.startswith("- Test release.\n"))
         self.assertEqual(notes.count("Early Alpha"), 1)
         self.assertIn("macOS and Linux are **Early Alpha**.", notes)
-        self.assertIn("Windows (win-x64)", notes)
+        self.assertIn("INGLORIOUS-Advanced-1.2.3-win-x64-Setup.exe", notes)
+        self.assertNotIn("Windows (win-x64)", notes)
         self.assertIn("USB only", notes)
         self.assertIn("- Test release.", notes)
         self.assertNotIn("- Old release.", notes)
+
+    def test_windows_package_migration_note_is_only_in_0_6_49(self):
+        notice = "Windows 0.6.48 and earlier: download and run the installer once to switch to the new package names. Your profiles and backups are kept."
+        for version in ("0.6.48", "0.6.49", "0.6.50"):
+            with self.subTest(version=version):
+                source = self.root / ("input-" + version)
+                source.mkdir()
+                for name in self.names:
+                    versioned_name = name.replace("1.2.3", version)
+                    data = (self.source / name).read_bytes()
+                    (source / versioned_name).write_bytes(data)
+                    (source / (versioned_name + ".sha256")).write_text(hashlib.sha256(data).hexdigest() + "  " + versioned_name + "\n")
+                for project in ("Core", "Desktop"):
+                    path = self.repo / f"src/InGlorious.{project}/InGlorious.{project}.csproj"
+                    path.write_text(f"<Project><PropertyGroup><Version>{version}</Version></PropertyGroup></Project>")
+                (self.repo / "CHANGELOG.md").write_text(f"# Changelog\n\n## {version}\n\n- Test release.\n")
+                destination = self.root / ("staged-" + version)
+                module.stage(source, destination, version, self.repo)
+                notes = (destination / "release-notes.md").read_text()
+                self.assertEqual(notes.count(notice), 1 if version == "0.6.49" else 0)
+
+    def test_windows_installer_requires_the_architecture_in_its_name(self):
+        expected = self.names[0]
+        for suffix in ("Setup.exe", "win-arm64-Setup.exe"):
+            with self.subTest(suffix=suffix):
+                alias = "INGLORIOUS-Advanced-1.2.3-" + suffix
+                package = self.source / expected
+                checksum = self.source / (expected + ".sha256")
+                package.rename(self.source / alias)
+                checksum.rename(self.source / (alias + ".sha256"))
+                (self.source / (alias + ".sha256")).write_text(hashlib.sha256((self.source / alias).read_bytes()).hexdigest() + "  " + alias + "\n")
+                try:
+                    with self.assertRaises(ValueError): self.stage()
+                    self.assertFalse(self.target.exists())
+                finally:
+                    (self.source / alias).rename(package)
+                    (self.source / (alias + ".sha256")).rename(checksum)
+                    checksum.write_text(hashlib.sha256(package.read_bytes()).hexdigest() + "  " + expected + "\n")
 
     def test_wrong_hash_preserves_output(self):
         (self.source / self.names[0]).write_bytes(b"changed")

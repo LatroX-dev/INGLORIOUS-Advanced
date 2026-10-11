@@ -109,7 +109,7 @@ public partial class MainWindow
         var pending = _pendingSoftwareInstallation; var launch = _softwareInstallerStartOverride;
         bool reading = _readingDevice, guide = _checkingFirmwareGuide, loading = _startupLoading, finishing = _startupFinishing, closed = _startupClosed;
         int launches = 0;
-        var update = new SoftwareUpdateInfo("1.0.0", "Synthetic update", true, "INGLORIOUS-Advanced-1.0.0-Setup.exe", 1, new string('0', 64));
+        var update = new SoftwareUpdateInfo("1.0.0", "Synthetic update", true, "INGLORIOUS-Advanced-1.0.0-win-x64-Setup.exe", 1, new string('0', 64));
         CancelEventHandler veto = (_, e) => e.Cancel = true;
         Window? dialog = null;
         try

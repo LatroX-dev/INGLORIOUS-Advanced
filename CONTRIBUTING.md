@@ -10,7 +10,7 @@ Dependencies and native binaries are pinned. Do not silently update a dependency
 
 Package restore audits direct and transitive NuGet dependencies. Known vulnerabilities fail the build; CI also fails if the advisory feed cannot be checked. Investigate and fix an advisory instead of suppressing it to complete a release.
 
-The product name is **INGLORIOUS Advanced**. Internal project directories and .NET namespaces, such as `InGlorious.Core`, retain their technical identifiers; the paths below are the actual source paths. The Windows application is `INGLORIOUS Advanced.exe`, its installer is `INGLORIOUS-Advanced-<version>-Setup.exe`, and the matching source archive is `INGLORIOUS-Advanced-<version>-Source.zip`.
+The product name is **INGLORIOUS Advanced**. Internal project directories and .NET namespaces, such as `InGlorious.Core`, retain their technical identifiers; the paths below are the actual source paths. The Windows application is `INGLORIOUS Advanced.exe`, its installer is `INGLORIOUS-Advanced-<version>-win-x64-Setup.exe`, and the matching source archive is `INGLORIOUS-Advanced-<version>-Source.zip`.
 
 ## Test
 

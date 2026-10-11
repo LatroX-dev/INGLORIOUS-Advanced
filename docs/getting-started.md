@@ -4,7 +4,7 @@
 
 Choose the package for your computer from the [Releases page](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases). To build from source, see the [build instructions](public-release.md).
 
-- **Windows x64:** run **INGLORIOUS-Advanced-\<version\>-Setup.exe** and follow the installation guide. Open **INGLORIOUS Advanced** from the Start menu. No command script or separate .NET installation is needed.
+- **Windows x64:** run **INGLORIOUS-Advanced-\<version\>-win-x64-Setup.exe** and follow the installation guide. Open **INGLORIOUS Advanced** from the Start menu. No command script or separate .NET installation is needed.
 - **macOS:** extract the archive and drag **INGLORIOUS Advanced.app** to Applications. Choose `osx-arm64` for Apple silicon or `osx-x64` for an Intel Mac. These builds are not Apple-notarized; macOS may ask you to approve the app in **Privacy & Security**.
 - **Linux x64:** extract the archive and run **application/INGLORIOUS Advanced**. If USB access is blocked, follow the Linux USB instructions below.
 

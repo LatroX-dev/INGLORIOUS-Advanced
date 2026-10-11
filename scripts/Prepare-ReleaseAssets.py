@@ -31,7 +31,7 @@ def stage(source: Path, destination: Path, version: str, repository: Path) -> li
     if destination.exists() or destination.is_symlink():
         raise ValueError("Use a new release staging directory.")
     expected = [f"INGLORIOUS-Advanced-{version}-{suffix}" for suffix in (
-        "Setup.exe", "linux-x64.tar.gz", "osx-x64.tar.gz", "osx-arm64.tar.gz", "Source.zip")]
+        "win-x64-Setup.exe", "linux-x64.tar.gz", "osx-x64.tar.gz", "osx-arm64.tar.gz", "Source.zip")]
     files = [p for p in source.rglob("*") if p.is_file()]
     if any(p.is_symlink() for p in source.rglob("*")):
         raise ValueError("Linked release artifacts are not accepted.")
@@ -66,8 +66,10 @@ def stage(source: Path, destination: Path, version: str, repository: Path) -> li
         shutil.copyfile(path, destination / path.name)
         if file_digest(destination / path.name) != digests[path.name]:
             raise ValueError("Release copy verification failed.")
-    notes = (section[1].strip() + "\n\n"
-             "Choose **Windows (win-x64) — Setup** for Windows, **osx-arm64** for Apple silicon, **osx-x64** for Intel Macs, "
+    migration_note = ("Windows 0.6.48 and earlier: download and run the installer once to switch to the new package names. "
+                      "Your profiles and backups are kept.\n\n") if version == "0.6.49" else ""
+    notes = (section[1].strip() + "\n\n" + migration_note +
+             f"Choose **INGLORIOUS-Advanced-{version}-win-x64-Setup.exe** for Windows, **osx-arm64** for Apple silicon, **osx-x64** for Intel Macs, "
              "or **linux-x64** for Linux. Each app package includes firmware and its USB tools.\n\n"
              "macOS and Linux are **Early Alpha**. Native builds and offline checks do not replace physical-device testing. "
              "Windows packages are unsigned; macOS packages are not notarized.\n\n"

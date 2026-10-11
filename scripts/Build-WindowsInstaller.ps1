@@ -62,7 +62,7 @@ $arguments=@('/Qp',('/O'+$output),('/DAppVersion='+$version),('/DFileList='+$inc
 if($TestInstaller){$arguments+=@('/DApplicationId={D5748319-8891-40CE-9DB9-9FA2D1B189B8}','/DApplicationMutex=INGLORIOUS.Advanced.InstallerTest.Running','/DInstallationMutex=INGLORIOUS.Advanced.InstallerTest.Setup','/DStartupValueName=INGLORIOUS Advanced Installer Test','/DStartupRegistryKey=Software\INGLORIOUS-Installer-Checks\Run','/DStartupApprovalKey=Software\INGLORIOUS-Installer-Checks\StartupApproved\Run','/DTestInstallerMode=1',('/DUserDataDirectory='+(Join-Path $output 'fake-user-data')))}
 & $compiler.compiler @arguments (Join-Path $root 'packaging/windows/INGLORIOUS-Advanced.iss') *> (Join-Path $output 'compile.log')
 if($LASTEXITCODE-ne0){Get-Content -LiteralPath (Join-Path $output 'compile.log') -Tail 30|Out-Host;throw 'Native installer compilation failed.'}
-$setup=Join-Path $output ('INGLORIOUS-Advanced-'+$version+'-Setup.exe')
+$setup=Join-Path $output ('INGLORIOUS-Advanced-'+$version+'-win-x64-Setup.exe')
 if(-not(Test-Path -LiteralPath $setup)-or(Get-Item -LiteralPath $setup).VersionInfo.ProductVersion.Trim()-cne$version){throw 'Unexpected installer output version.'}
 [IO.File]::WriteAllText(($setup+'.sha256'),((Get-FileHash -LiteralPath $setup).Hash.ToLowerInvariant()+'  '+[IO.Path]::GetFileName($setup)+"`n"),[Text.UTF8Encoding]::new($false))
 [pscustomobject]@{installer=$setup;version=$version;files=$validated.verifiedFiles.Count+1;testInstaller=[bool]$TestInstaller;compilerVerified=$true;installerSigned=$false;hardwareAccess=$false}

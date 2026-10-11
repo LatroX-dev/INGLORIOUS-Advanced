@@ -259,7 +259,7 @@ public partial class MainWindow : Window
         if (screenshotIndex >= 0 && screenshotIndex + 1 < args.Length && args.Contains("--software-update"))
         {
             var preview = new SoftwareUpdateInfo("1.0.0", "- Software update notifications.\n- Dark tray menu.", true,
-                "INGLORIOUS-Advanced-1.0.0-Setup.exe", 1, new string('0', 64));
+                "INGLORIOUS-Advanced-1.0.0-win-x64-Setup.exe", 1, new string('0', 64));
             var dialog = new SoftwareUpdateWindow(preview, offlinePreview: true) { Owner = this };
             dialog.Loaded += async (_, _) =>
             {

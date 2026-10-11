@@ -21,7 +21,7 @@ The app checks published releases from this repository. Releases are regular rel
 
 Firmware stays bundled with each app package. Updating the app does not flash connected keyboards. The device guide offers applicable firmware updates from the included catalog.
 
-The Windows build produces `INGLORIOUS-Advanced-<version>-Setup.exe` with the pinned Inno Setup compiler. It installs for the current user, adds a Start menu entry and registers the uninstaller in Windows Settings. The installer checks for a running app or firmware operation before replacing files. Test installation, upgrades, default background startup and both data-retention choices with `scripts/Test-NativeWindowsInstaller.ps1`. Its test build uses a separate application identity and synthetic data directory. The intermediate Windows ZIP is for build verification, not an end-user download.
+The Windows build produces `INGLORIOUS-Advanced-<version>-win-x64-Setup.exe` with the pinned Inno Setup compiler. It installs for the current user, adds a Start menu entry and registers the uninstaller in Windows Settings. The installer checks for a running app or firmware operation before replacing files. Test installation, upgrades, default background startup and both data-retention choices with `scripts/Test-NativeWindowsInstaller.ps1`. Its test build uses a separate application identity and synthetic data directory. The intermediate Windows ZIP is for build verification, not an end-user download.
 
 ## Source export
 
@@ -38,7 +38,7 @@ The exporter uses an exact reviewed allowlist, checks content for private local 
 pwsh -NoProfile -File scripts/New-CorrespondingSource.ps1 `
   -PublicSourceDirectory <reviewed-public-folder> `
   -QmkDirectory firmware/qmk_firmware `
-  -Destination artifacts/INGLORIOUS-Advanced-0.6.48-Source `
+  -Destination artifacts/INGLORIOUS-Advanced-0.6.49-Source `
   -Download
 ```
 
@@ -61,7 +61,7 @@ pwsh -NoProfile -File scripts/Build-DesktopRelease.ps1 `
 
 Use `osx-x64` or `osx-arm64` on the corresponding Mac. The script rejects a mismatched host architecture or firmware catalog. It builds pinned libusb 1.0.30 and dfu-util 0.11 sources, generates a native-tool catalog, publishes the adapter, prepares the setup assets and runs offline checks before packaging. All builds and tests in this script avoid device I/O.
 
-Packages are named `INGLORIOUS-Advanced-0.6.48-<runtime>.tar.gz` and have matching SHA-256 files. macOS packages contain `INGLORIOUS Advanced.app`; Linux packages contain `application/INGLORIOUS Advanced` plus a USB-permission helper. macOS builds use ad-hoc signatures and are not notarized. Sign native tools before generating their catalog and the adapter before generating the setup-tool catalog; do not recursively re-sign pinned files afterward.
+Packages are named `INGLORIOUS-Advanced-0.6.49-<runtime>.tar.gz` and have matching SHA-256 files. macOS packages contain `INGLORIOUS Advanced.app`; Linux packages contain `application/INGLORIOUS Advanced` plus a USB-permission helper. macOS builds use ad-hoc signatures and are not notarized. Sign native tools before generating their catalog and the adapter before generating the setup-tool catalog; do not recursively re-sign pinned files afterward.
 
 `Licenses/Desktop-ThirdParty.txt` preserves the locked desktop dependencies' license texts and notices. `reference/desktop-license-inventory.json` records their versions and provenance. After a deliberate dependency change, restore the locked packages, run `Collect-DesktopLicenses.ps1`, review the changes and rebuild the package. Runtime licenses must be retained in self-contained output.
 
@@ -73,7 +73,7 @@ Linux x64 and both macOS architectures have passed their native build, package a
 2. Run offline verification and package tests. Keep their results outside the normal user interface.
 3. Complete and record the [hardware acceptance run](hardware-acceptance.md). Additional variants remain marked experimental until individually tested.
 4. Create a version tag and a regular release, with short English notes from `CHANGELOG.md`. Keep it as a draft until its packages have been reviewed. Mark only the macOS and Linux packages as **Early Alpha**. Do not claim unperformed hardware or native-platform tests.
-5. Attach `INGLORIOUS-Advanced-<version>-Setup.exe`, validated native macOS/Linux archives, `INGLORIOUS-Advanced-<version>-Source.zip` and their checksums. Do not attach the internal Windows verification ZIP. State the tested platforms and remaining hardware limitations in the release notes.
+5. Attach `INGLORIOUS-Advanced-<version>-win-x64-Setup.exe`, validated native macOS/Linux archives, `INGLORIOUS-Advanced-<version>-Source.zip` and their checksums. Do not attach the internal Windows verification ZIP. State the tested platforms and remaining hardware limitations in the release notes.
 6. Enable private vulnerability reporting and keep issue templates available.
 7. Download the release assets again and check their hashes before announcing the release.
 

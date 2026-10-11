@@ -28,6 +28,10 @@ foreach($case in @('empty','missing-firmware','extra','duplicate','wrong-hash','
  if(-not$rejected-or(Test-Path -LiteralPath $negativeOutput)){throw ('Invalid manifest reached the compiler: '+$case)};$checks++
 }
 $built=& (Join-Path $PSScriptRoot 'Build-WindowsInstaller.ps1') -PackageDirectory $PackageDirectory -ToolCatalogPath $ToolCatalogPath -OutputDirectory (Join-Path $output 'build') -TestInstaller -Offline:$Offline
+$expectedName='INGLORIOUS-Advanced-'+$built.version+'-win-x64-Setup.exe'
+if([IO.Path]::GetFileName($built.installer)-cne$expectedName){throw 'The Windows installer filename must identify its platform and architecture.'};$checks++
+$expectedChecksum=(Get-FileHash -LiteralPath $built.installer).Hash.ToLowerInvariant()+'  '+$expectedName+"`n"
+if([IO.File]::ReadAllText($built.installer+'.sha256')-cne$expectedChecksum){throw 'The installer checksum must name the exact Windows release asset.'};$checks++
 $install=Join-Path $output 'installed'
 $key='HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{D5748319-8891-40CE-9DB9-9FA2D1B189B8}_is1'
 if(Test-Path -LiteralPath $key){throw 'An earlier isolated installer test is still registered.'}
@@ -80,6 +84,7 @@ try{
 }finally{$mutex.Dispose()}
 $exitCode=Run-Installer $built.installer ($common+@('/LANG=english',('/LOG='+(Join-Path $output 'install.log'))))
 if($exitCode-ne0){throw ('Isolated installation failed: '+$exitCode)}
+if(-not(Get-Content -LiteralPath (Join-Path $output 'install.log') -Raw).Contains('Test uninstall confirmation: Uninstall %1?',[StringComparison]::Ordinal)){throw 'The compiled English uninstall confirmation does not describe app removal.'};$checks++
 $source=Get-Content -LiteralPath (Join-Path $PackageDirectory 'package-manifest.json') -Raw|ConvertFrom-Json
 foreach($file in $source.files){if((Get-FileHash -LiteralPath (Join-Path $install $file.path)).Hash-cne$file.sha256){throw 'Installed file differs.'};$checks++}
 $registration=Get-ItemProperty -LiteralPath $key
@@ -95,6 +100,7 @@ New-ItemProperty -LiteralPath $runKey -Name $runName -Value $ownedCommand -Prope
 $ownedCommand+=' --background'
 $exitCode=Run-Installer $built.installer ($common+@('/LANG=german',('/LOG='+(Join-Path $output 'update.log'))))
 if($exitCode-ne0-or(Get-FileHash -LiteralPath $sentinel).Hash-cne$sentinelHash){throw 'Reinstallation changed a user-owned file.'};$checks++
+if(-not(Get-Content -LiteralPath (Join-Path $output 'update.log') -Raw).Contains('Test uninstall confirmation: Möchtest du %1 deinstallieren?',[StringComparison]::Ordinal)){throw 'The compiled German uninstall confirmation does not describe app removal.'};$checks++
 if((Read-StartupValue)-cne$ownedCommand){throw 'Upgrade lost the current enabled autostart setting.'};$checks++
 if([Convert]::ToHexString([byte[]](Read-StartupApproval))-cne$approvalHex){throw 'Upgrade changed Windows startup approval.'};$checks++
 foreach($file in $source.files){if((Get-FileHash -LiteralPath (Join-Path $install $file.path)).Hash-cne$file.sha256){throw 'Updated file differs.'};$checks++}

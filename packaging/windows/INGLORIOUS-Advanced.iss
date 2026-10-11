@@ -50,7 +50,7 @@ VersionInfoProductName=INGLORIOUS Advanced
 VersionInfoDescription=INGLORIOUS Advanced Setup
 VersionInfoVersion={#AppVersion}
 VersionInfoCompany=INGLORIOUS Advanced contributors
-OutputBaseFilename=INGLORIOUS-Advanced-{#AppVersion}-Setup
+OutputBaseFilename=INGLORIOUS-Advanced-{#AppVersion}-win-x64-Setup
 Compression=lzma2/normal
 SolidCompression=yes
 CloseApplications=no
@@ -69,6 +69,10 @@ UninstallLogging=yes
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
+
+[Messages]
+english.ConfirmUninstall=Uninstall %1?
+german.ConfirmUninstall=Möchtest du %1 deinstallieren?
 
 [CustomMessages]
 english.NoticeTitle=Before you install
@@ -328,6 +332,9 @@ procedure InitializeWizard;
 var Notice: TOutputMsgWizardPage;
 begin
   PreviousApplicationPath := GetPreviousData('ApplicationPath', '');
+  #ifdef TestInstallerMode
+    Log('Test uninstall confirmation: ' + SetupMessage(msgConfirmUninstall));
+  #endif
   Notice := CreateOutputMsgPage(wpWelcome, CustomMessage('NoticeTitle'),
     CustomMessage('NoticeDescription'), CustomMessage('NoticeText'));
 end;

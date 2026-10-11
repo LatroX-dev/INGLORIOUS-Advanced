@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.49
+
+- Clearer uninstall confirmation.
+- Consistent Windows installer names, including win-x64.
+
 ## 0.6.48
 
 - Updated security components.

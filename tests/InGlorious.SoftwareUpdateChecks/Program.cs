@@ -18,17 +18,26 @@ async Task Canceled(Func<Task> action, string reason)
     catch (OperationCanceledException) { checks++; return; }
     throw new InvalidOperationException(reason);
 }
-const string TestVersion = "0.6.46";
+const string TestVersion = "0.6.49";
 byte[] payload = Encoding.UTF8.GetBytes("Synthetic software update test package. No executable content.");
 string digest = Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
 string root = Path.Combine(Path.GetTempPath(), "INGLORIOUS-SoftwareUpdateChecks-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(root);
 
+// Release fixtures spell out the published asset contract independently of the production selector.
+string ExpectedPackageName(string version, SoftwareUpdatePlatform platform) => platform switch
+{
+    SoftwareUpdatePlatform.WindowsX64 => $"INGLORIOUS-Advanced-{version}-win-x64-Setup.exe",
+    SoftwareUpdatePlatform.MacX64 => $"INGLORIOUS-Advanced-{version}-osx-x64.tar.gz",
+    SoftwareUpdatePlatform.MacArm64 => $"INGLORIOUS-Advanced-{version}-osx-arm64.tar.gz",
+    SoftwareUpdatePlatform.LinuxX64 => $"INGLORIOUS-Advanced-{version}-linux-x64.tar.gz",
+    _ => throw new ArgumentOutOfRangeException(nameof(platform))
+};
 Dictionary<string, object?> Asset(string version = TestVersion, SoftwareUpdatePlatform platform = SoftwareUpdatePlatform.WindowsX64) => new()
 {
-    ["name"] = SoftwareUpdateService.PackageName(version, platform), ["state"] = "uploaded", ["size"] = payload.Length,
+    ["name"] = ExpectedPackageName(version, platform), ["state"] = "uploaded", ["size"] = payload.Length,
     ["digest"] = "sha256:" + digest,
-    ["browser_download_url"] = $"{SoftwareUpdateService.RepositoryUrl}/releases/download/v{version}/{SoftwareUpdateService.PackageName(version, platform)}"
+    ["browser_download_url"] = $"{SoftwareUpdateService.RepositoryUrl}/releases/download/v{version}/{ExpectedPackageName(version, platform)}"
 };
 Dictionary<string, object?> Release(string version = TestVersion, SoftwareUpdatePlatform platform = SoftwareUpdatePlatform.WindowsX64) => new()
 {
@@ -69,8 +78,29 @@ try
     foreach (var platform in Enum.GetValues<SoftwareUpdatePlatform>())
     {
         var result = await Inspect([Release(platform: platform)], platform);
-        Check(result.Update?.AssetName == SoftwareUpdateService.PackageName(TestVersion, platform), "platform selects exactly its installer or native archive");
+        Check(result.Update?.AssetName == ExpectedPackageName(TestVersion, platform), "platform selects exactly its canonical installer or native archive");
     }
+    string windowsPackage = ExpectedPackageName(TestVersion, SoftwareUpdatePlatform.WindowsX64);
+    string legacyPackage = $"INGLORIOUS-Advanced-{TestVersion}-Setup.exe";
+    foreach (string alias in new[] { legacyPackage, $"INGLORIOUS-Advanced-{TestVersion}-win-arm64-Setup.exe", windowsPackage.ToLowerInvariant(), "Windows x64 installer.exe" })
+    {
+        var wrongName = Asset();
+        wrongName["name"] = alias;
+        wrongName["label"] = windowsPackage;
+        wrongName["browser_download_url"] = $"{SoftwareUpdateService.RepositoryUrl}/releases/download/v{TestVersion}/{alias}";
+        await Unavailable(wrongName, "display labels, old names and other architectures never replace the exact Windows x64 asset name");
+        using var handler = new FakeHandler((_, _) => throw new InvalidOperationException("An invalid asset must not start a download."));
+        using var service = Service(handler);
+        await Reject(() => service.DownloadAsync(new SoftwareUpdateInfo(TestVersion, "", true, alias, payload.Length, digest)), "download validation also rejects noncanonical package names");
+        Check(handler.Requests.Count == 0 && !Directory.Exists(Path.Combine(root, "Updates")), "invalid names produce neither requests nor cache files");
+    }
+    var mislabeled = Asset(); mislabeled["label"] = "Windows x64";
+    var labeledRelease = Release(); labeledRelease["assets"] = new[] { mislabeled };
+    Check((await Inspect([labeledRelease])).Update?.AssetName == windowsPackage, "a display label does not change the canonical download filename");
+    var oldAsset = Asset(); oldAsset["name"] = legacyPackage;
+    oldAsset["browser_download_url"] = $"{SoftwareUpdateService.RepositoryUrl}/releases/download/v{TestVersion}/{legacyPackage}";
+    var mixedRelease = Release(); mixedRelease["assets"] = new[] { oldAsset, Asset() };
+    Check((await Inspect([mixedRelease])).Update?.AssetName == windowsPackage, "only the exact canonical package is selected when a legacy asset is also present");
     Check((await Inspect([Release()], SoftwareUpdatePlatform.MacArm64)).Status == SoftwareUpdateStatus.PackageUnavailable, "missing architecture never offers a different package");
     Check((await Inspect([Release(), Release()])).Status == SoftwareUpdateStatus.PackageUnavailable, "duplicate newest releases are ambiguous");
     var draft = Release("9.0.0"); draft["draft"] = true;
@@ -84,7 +114,8 @@ try
     {
         ("digest", null), ("digest", "sha1:" + digest), ("digest", "sha256:12"), ("digest", "sha256:" + new string('z',64)),
         ("size", 0), ("size", -1), ("size", SoftwareUpdateService.MaximumPackageBytes + 1), ("size", "1024"),
-        ("state", "new"), ("name", "../INGLORIOUS-Advanced-" + TestVersion + "-Setup.exe"),
+        ("state", "new"), ("name", "../" + windowsPackage),
+        ("browser_download_url", $"{SoftwareUpdateService.RepositoryUrl}/releases/download/v{TestVersion}/{legacyPackage}"),
         ("browser_download_url", "https://evil.example/package.exe"),
         ("browser_download_url", SoftwareUpdateService.RepositoryUrl.Replace("https:", "http:") + "/releases/download/v" + TestVersion + "/" + SoftwareUpdateService.PackageName(TestVersion, SoftwareUpdatePlatform.WindowsX64)),
         ("browser_download_url", SoftwareUpdateService.RepositoryUrl + "/releases/download/v" + TestVersion + "/" + SoftwareUpdateService.PackageName(TestVersion, SoftwareUpdatePlatform.WindowsX64) + "?redirect=evil")
@@ -141,6 +172,7 @@ try
             var progress = new List<double>();
             string path = await service.DownloadAsync(update, new InlineProgress(progress.Add));
             service.VerifyDownloadedFile(update, path);
+            Check(Path.GetFileName(path) == windowsPackage && handler.Requests[1].Uri == $"{SoftwareUpdateService.RepositoryUrl}/releases/download/v{TestVersion}/{windowsPackage}", "download requests and saved files use the canonical Windows x64 name");
             Check(File.ReadAllBytes(path).SequenceEqual(payload) && !Directory.EnumerateFiles(attemptRoot, "*.partial", SearchOption.AllDirectories).Any(), reason);
             Check(progress.Count >= 2 && progress[0] == 0 && progress[^1] == 1 && progress.All(p => p is >= 0 and <= 1), "download progress is bounded and finishes only on verification");
             File.WriteAllBytes(path, Encoding.UTF8.GetBytes(new string('x', payload.Length)));

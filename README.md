@@ -4,7 +4,7 @@ Configure Glorious keyboards with per-key lighting, effects, key assignments, ma
 
 I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
 
-**App 0.6.48 · Firmware 0.11.1**
+**App 0.6.49 · Firmware 0.11.1**
 
 Get installers and packages from the [Releases page](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases). macOS and Linux builds are Early Alpha; physical-device testing is still limited.
 
@@ -15,7 +15,7 @@ INGLORIOUS Advanced is an independent project. It is not affiliated with or endo
 ## Get started
 
 1. Download the installer or package for your operating system from this repository's Releases page.
-2. On Windows, run **INGLORIOUS-Advanced-\<version\>-Setup.exe**. On macOS, extract the package and move **INGLORIOUS Advanced.app** to Applications. On Linux, extract the package and open **application/INGLORIOUS Advanced**; the [setup guide](docs/getting-started.md) explains USB permissions.
+2. On Windows, run **INGLORIOUS-Advanced-\<version\>-win-x64-Setup.exe**. On macOS, extract the package and move **INGLORIOUS Advanced.app** to Applications. On Linux, extract the package and open **application/INGLORIOUS Advanced**; the [setup guide](docs/getting-started.md) explains USB permissions.
 3. Connect a supported keyboard by USB. The app loads an existing INGLORIOUS configuration automatically. For original firmware, open **Settings → Devices & data → Set up device** and follow the guide.
 4. Make your changes and select **Send to keyboard** at the bottom.
 
