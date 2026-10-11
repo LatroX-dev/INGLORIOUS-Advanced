@@ -13,6 +13,7 @@ public partial class AppSettingsWindow : Window
     public AppPreferences Preferences { get; private set; }
     public Func<Task>? SetupAction { get; set; }
     public Func<Task>? RestoreSetupAction { get; set; }
+    internal SoftwareUpdateInstallation? RequestedSoftwareUpdate { get; private set; }
     private bool _openingSetup;
 
     public AppSettingsWindow(AppPreferences current, bool offlinePreview = false, IReadOnlyList<DeviceDefinition>? connectedDevices = null)
@@ -31,9 +32,10 @@ public partial class AppSettingsWindow : Window
         StartDeviceChoice.SelectedValue = current.StartDevice;
         RememberSizeCheck.IsChecked = current.RememberWindowSize;
         ShowHelpCheck.IsChecked = current.ShowHelp;
+        SoftwareUpdateCheck.IsChecked = current.CheckForSoftwareUpdates;
+        SoftwareUpdateButton.IsEnabled = !offlinePreview;
         AutostartDescriptionText.Text = AppAutostartEditor.Description;
         RefreshAutostartControl();
-        ProjectFolderText.Text = Paths.DataRoot;
         var assembly = typeof(AppSettingsWindow).Assembly;
         var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
             ?? assembly.GetName().Version?.ToString(3) ?? L.T("unbekannt");
@@ -64,7 +66,8 @@ public partial class AppSettingsWindow : Window
             Language = LanguageChoice.SelectedValue as string ?? L.SystemLanguage,
             StartDevice = StartDeviceChoice.SelectedValue as string ?? Preferences.StartDevice,
             RememberWindowSize = RememberSizeCheck.IsChecked == true,
-            ShowHelp = ShowHelpCheck.IsChecked == true
+            ShowHelp = ShowHelpCheck.IsChecked == true,
+            CheckForSoftwareUpdates = SoftwareUpdateCheck.IsChecked == true
         };
         try
         {
@@ -112,6 +115,17 @@ public partial class AppSettingsWindow : Window
     }
 
     private async void SetupDevice_Click(object sender, RoutedEventArgs e) => await OpenSetupAsync(SetupOperation.Install);
+    private void SoftwareUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        if (_offlinePreview || _openingSetup) return;
+        var dialog = new SoftwareUpdateWindow { Owner = this };
+        dialog.ShowDialog();
+        if (dialog.Installation is null) return;
+        // Persist the choices visible in Settings through the existing conflict-safe save.
+        RequestedSoftwareUpdate = dialog.Installation;
+        Save_Click(sender, e);
+        if (IsVisible) RequestedSoftwareUpdate = null;
+    }
     private async void RestoreDevice_Click(object sender, RoutedEventArgs e) => await OpenSetupAsync(SetupOperation.Restore);
     private async Task OpenSetupAsync(SetupOperation operation)
     {

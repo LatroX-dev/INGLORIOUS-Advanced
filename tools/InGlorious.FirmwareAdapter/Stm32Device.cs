@@ -68,7 +68,9 @@ internal sealed class Stm32Device : IDevice
     }
     internal static void ValidateMap(string map)
     {
-        var match = Regex.Match(map, "^@Internal Flash /0x08000000/([0-9]+)\\*([0-9]+)([KBM])g$", RegexOptions.CultureInvariant);
+        // Bootloader labels may pad the space before the address. Accept only ASCII
+        // spaces there; the address, geometry, permissions and full input stay bound.
+        var match = Regex.Match(map, "\\A@Internal Flash[ ]+/0x08000000/([0-9]+)\\*([0-9]+)([KBM])g\\z", RegexOptions.CultureInvariant);
         if (!match.Success || !uint.TryParse(match.Groups[1].Value, out uint count) || !uint.TryParse(match.Groups[2].Value, out uint size)) throw new InvalidDataException("STM_MEMORY_MAP_UNSUPPORTED");
         uint unit = match.Groups[3].Value switch { "B" => 1, "K" => 1024, "M" => 1048576, _ => 0 };
         if (count != 128 || (ulong)size * unit != 2048 || (ulong)count * size * unit != 262144) throw new InvalidDataException("STM_MEMORY_MAP_UNSUPPORTED");

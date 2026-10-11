@@ -41,9 +41,25 @@ $extract=Join-Path $testRoot 'extracted';New-Item -ItemType Directory -Path $ext
 if($LASTEXITCODE-ne0){throw 'Package cannot be extracted.'}
 $extractedPackage=Join-Path $extract ([IO.Path]::GetFileName($package))
 foreach($entry in $manifest.files){if((Get-FileHash -LiteralPath (Join-Path $extractedPackage $entry.path)).Hash-cne$entry.sha256){throw 'Archive contents differ.'};$checked++}
-$appRoot=if($Runtime.StartsWith('osx-')){Join-Path $extractedPackage 'INGLORIOUS Advanced.app/Contents/MacOS'}else{Join-Path $extractedPackage 'application'}
+$appRoot=if($Runtime.StartsWith('osx-')){Join-Path $extractedPackage 'INGLORIOUS Advanced.app/Contents/Resources/application'}else{Join-Path $extractedPackage 'application'}
 foreach($entry in @('INGLORIOUS Advanced','Tools/FirmwareAdapter/InGlorious.FirmwareAdapter','Tools/FirmwareAdapter/native/dfu-util')){
  if(([IO.File]::GetUnixFileMode((Join-Path $appRoot $entry))-band[IO.UnixFileMode]::UserExecute)-eq0){throw 'An executable lost its execute permission.'};$checked++
+}
+if($Runtime.StartsWith('osx-')){
+ $bundle=Join-Path $extractedPackage 'INGLORIOUS Advanced.app'
+ $launcher=Join-Path $bundle 'Contents/MacOS/INGLORIOUS Advanced'
+ if(([IO.File]::GetUnixFileMode($launcher)-band[IO.UnixFileMode]::UserExecute)-eq0){throw 'Application launcher lost its execute permission.'};$checked++
+ & codesign --verify --deep --strict $bundle
+ if($LASTEXITCODE-ne0){throw 'Extracted application bundle signature verification failed.'};$checked++
+ foreach($entry in @('INGLORIOUS Advanced','Tools/FirmwareAdapter/InGlorious.FirmwareAdapter','Tools/FirmwareAdapter/native/dfu-util','Tools/FirmwareAdapter/native/libusb-1.0.dylib')){
+  & codesign --verify --strict (Join-Path $appRoot $entry)
+  if($LASTEXITCODE-ne0){throw ('Extracted native signature verification failed: '+$entry)};$checked++
+ }
+ # The relocated, extracted bundle must forward every offline argument. This
+ # also exercises payload lookup and resources without opening any HID device.
+ $smoke=Join-Path $testRoot 'extracted-bundle-smoke.txt'
+ & $launcher --smoke $smoke --language en
+ if($LASTEXITCODE-ne0-or-not(Test-Path -LiteralPath $smoke)-or(Get-Content -LiteralPath $smoke -Raw)-notmatch'^PASS \d+ offline desktop checks;'){throw 'Extracted application bundle smoke failed.'};$checked++
 }
 # Rules must grant access only to the reviewed stock/runtime pairs and two update interfaces.
 $rules=Get-Content -LiteralPath (Join-Path $PSScriptRoot '70-inglorious.rules')

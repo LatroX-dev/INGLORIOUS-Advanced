@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
+using System.Windows.Markup;
 using System.Windows.Threading;
 
 namespace InGlorious.Core;
@@ -12,7 +13,7 @@ internal sealed class WindowsTrayIcon : IDisposable
 {
     private const int CallbackMessage = 0x8001;
     private readonly HwndSource _messages;
-    private readonly ContextMenu _menu = new();
+    private readonly ContextMenu _menu = CreateMenu();
     private readonly Action _open, _unavailable;
     private readonly Action _updateLanguage;
     private readonly DispatcherTimer _availability = new() { Interval = TimeSpan.FromSeconds(10) };
@@ -33,7 +34,7 @@ internal sealed class WindowsTrayIcon : IDisposable
             Flags = 1 | 2 | 4 | 0x80, CallbackMessage = CallbackMessage,
             Tip = "INGLORIOUS Advanced", Info = "", InfoTitle = ""
         };
-        var title = new MenuItem { Header = "INGLORIOUS Advanced", IsEnabled = false };
+        var title = new MenuItem { Header = "INGLORIOUS Advanced", IsEnabled = false, FontWeight = FontWeights.SemiBold };
         var show = new MenuItem { Header = L.T("Öffnen") }; show.Click += (_, _) => open();
         var exit = new MenuItem { Header = L.T("Beenden") }; exit.Click += (_, _) => close();
         _menu.Items.Add(title); _menu.Items.Add(new Separator()); _menu.Items.Add(show); _menu.Items.Add(exit);
@@ -45,6 +46,68 @@ internal sealed class WindowsTrayIcon : IDisposable
             if (FindWindow("Shell_TrayWnd", null) == IntPtr.Zero || !ShellNotifyIcon(1, ref _data)) LostTray();
         };
     }
+
+    // A tray popup has no Window from which to inherit our colors. Override its
+    // templates as well as the brushes, so Windows does not draw a light gutter.
+    private static ContextMenu CreateMenu() => (ContextMenu)XamlReader.Parse("""
+        <ContextMenu xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     Background="{DynamicResource Surface}" Foreground="{DynamicResource Text}"
+                     BorderBrush="{DynamicResource Stroke}" BorderThickness="1" Padding="5"
+                     FontFamily="Segoe UI" FontSize="12" MinWidth="224" UseLayoutRounding="True"
+                     SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display">
+          <ContextMenu.Resources>
+            <Style TargetType="MenuItem">
+              <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+              <Setter Property="Background" Value="Transparent"/>
+              <Setter Property="BorderBrush" Value="Transparent"/>
+              <Setter Property="BorderThickness" Value="1"/>
+              <Setter Property="Padding" Value="10,8"/>
+              <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+              <Setter Property="VerticalContentAlignment" Value="Center"/>
+              <Setter Property="Template"><Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                  <Border x:Name="Row" Background="{TemplateBinding Background}"
+                          BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                          CornerRadius="3" Padding="{TemplateBinding Padding}">
+                    <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
+                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                  </Border>
+                  <ControlTemplate.Triggers>
+                    <Trigger Property="IsHighlighted" Value="True">
+                      <Setter TargetName="Row" Property="Background" Value="{DynamicResource SurfaceRaised}"/>
+                    </Trigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True">
+                      <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+                      <Setter TargetName="Row" Property="Background" Value="Transparent"/>
+                      <Setter TargetName="Row" Property="BorderBrush" Value="Transparent"/>
+                    </Trigger>
+                  </ControlTemplate.Triggers>
+                </ControlTemplate>
+              </Setter.Value></Setter>
+            </Style>
+            <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="Separator">
+              <Setter Property="Height" Value="1"/>
+              <Setter Property="Margin" Value="10,4"/>
+              <Setter Property="Template"><Setter.Value>
+                <ControlTemplate TargetType="Separator"><Border Background="{DynamicResource Stroke}"/></ControlTemplate>
+              </Setter.Value></Setter>
+            </Style>
+          </ContextMenu.Resources>
+          <ContextMenu.Template>
+            <ControlTemplate TargetType="ContextMenu">
+              <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                <ItemsPresenter/>
+              </Border>
+            </ControlTemplate>
+          </ContextMenu.Template>
+        </ContextMenu>
+        """);
 
     internal static WindowsTrayIcon? TryCreate(Action open, Action close, Action unavailable)
     {

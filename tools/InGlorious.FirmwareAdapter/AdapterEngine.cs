@@ -91,14 +91,22 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
             }
             else
             {
-                identity = InstallationIdentity.Read(before) ?? throw new InvalidDataException("DEVICE_RECOVERY_ID_MISSING");
+                if (request.MigrateLegacy)
+                {
+                    LegacyFirmwareMigration.ValidateImage(before, model.DeviceId);
+                    LegacyFirmwareMigration.ValidateFingerprint(JsonSerializer.SerializeToElement(capture.Fingerprint, Json.Options), fingerprint.Serial);
+                    LegacyFirmwareMigration.ValidateFingerprint(JsonSerializer.SerializeToElement(fingerprint, Json.Options), fingerprint.Serial);
+                    LegacyFirmwareMigration.ValidateOriginal(originalBytes!, model.DeviceId);
+                    identity = InstallationIdentity.Read(image)!;
+                }
+                else identity = InstallationIdentity.Read(before) ?? throw new InvalidDataException("DEVICE_RECOVERY_ID_MISSING");
                 ValidateInstallationIdentity(identity, request, model);
                 if (fingerprint.Transport == "stm32-dfuse" && capture.Fingerprint.Serial != fingerprint.Serial) throw new InvalidDataException("RESTORE_USB_SERIAL_MISMATCH");
                 if (before.AsSpan(InstallationIdentity.Offset(model.FlashBytes) + 64, 192).ContainsAnyExcept((byte)0xFF)) throw new InvalidDataException("RECOVERY_ID_PAGE_MISMATCH");
                 if (request.Operation == "update")
                 {
                     if (Files.Hash(before) != request.ExpectedCurrentSha256) throw new InvalidDataException("CURRENT_CHANGED_SINCE_CAPTURE");
-                    string currentVersion = KnownFirmwareImages.Validate(before, model.DeviceId, (byte)model.BoardId);
+                    string currentVersion = request.MigrateLegacy ? LegacyFirmwareMigration.Version : KnownFirmwareImages.Validate(before, model.DeviceId, (byte)model.BoardId);
                     if (Version.Parse(currentVersion) > Version.Parse(targetVersion!)) throw new InvalidDataException("FIRMWARE_DOWNGRADE_NOT_ALLOWED");
                     if (InstallationIdentity.Read(image) != identity) throw new InvalidDataException("UPDATE_RECOVERY_ID_CHANGED");
                     if (!before.AsSpan(model.FlashBytes - InstallationIdentity.StorageBytes).SequenceEqual(image.AsSpan(model.FlashBytes - InstallationIdentity.StorageBytes)))
@@ -179,6 +187,7 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
         if (write && (request.BackupPath == null || request.ExpectedBackupSha256 == null || request.ExpectedFingerprintSha256 == null || request.ExpectedInstallationId is null || request.ExpectedInstallationId == Guid.Empty)) throw new InvalidDataException("WRITE_BINDING_REQUIRED");
         if (request.Operation is "install" or "update" && request.BundlePath == null) throw new InvalidDataException("BUNDLE_REQUIRED");
         if ((request.Operation == "update") != (request.ExpectedCurrentSha256 is not null)) throw new InvalidDataException("CURRENT_IMAGE_BINDING_REQUIRED");
+        if (request.MigrateLegacy && (request.Operation != "update" || request.DeviceId != "pro-iso")) throw new InvalidDataException("LEGACY_OPERATION_NOT_APPROVED");
         foreach (string? hash in new[] { request.ExpectedBackupSha256, request.ExpectedFingerprintSha256, request.ExpectedCurrentSha256 })
             if (hash != null && (hash.Length != 64 || hash.Any(c => !char.IsAsciiHexDigit(c)) || hash != hash.ToUpperInvariant())) throw new InvalidDataException("SHA256_INVALID");
     }

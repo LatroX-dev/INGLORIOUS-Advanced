@@ -43,6 +43,7 @@ public sealed class SetupSession
     internal string? FingerprintSha256, BackupPath, OriginalSha256, BundlePath, CurrentSha256;
     internal InstallationIdentity? Installation;
     internal bool Consumed;
+    internal bool MigrateLegacy;
     internal ushort OriginalVendor, OriginalProduct;
 }
 public sealed record SetupUsbNode(string InstanceId, ushort VendorId, ushort ProductId, string Name,
@@ -274,6 +275,7 @@ public sealed partial class DeviceSetupService
             request["expectedInstallationId"] = session.Installation!.InstallationId.ToString();
             if (operation is "install" or "update") request["bundlePath"] = session.BundlePath;
             if (operation == "update") request["expectedCurrentSha256"] = session.CurrentSha256;
+            if (session.MigrateLegacy) request["migrateLegacy"] = true;
         }
         return await _environment.InvokeAdapterAsync(request, session.Directory);
     }

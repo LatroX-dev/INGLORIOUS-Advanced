@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Security.Cryptography;
 using System.Text.Json;
 
@@ -56,26 +56,34 @@ public sealed partial class DeviceSetupService
             else
             {
                 var identity = InstallationIdentity.Read(current);
-                if (identity is null || identity.BoardId != BoardDescriptorRegistry.Get(session.DeviceId!).BoardId)
-                    throw Error("Für diese Installation wurde keine passende Original-Sicherung gefunden.");
-                var recordPath = FindRecovery(identity, session.DeviceId!);
-                var record = ReadRecovery(recordPath);
-                var archiveDirectory = Path.GetDirectoryName(recordPath)!;
-                var originalManifest = ContainedFile(archiveDirectory, record.BackupManifest);
-                if (!HashEquals(File.ReadAllBytes(originalManifest), record.BackupManifestSha256))
-                    throw Error("Die Original-Sicherung wurde verändert. Die Wiederherstellung wurde angehalten.");
-                session.Installation = identity;
-                session.OriginalSha256 = record.OriginalSha256;
-                session.BackupPath = originalManifest;
-                session.OriginalVendor = record.OriginalVendor;
-                session.OriginalProduct = record.OriginalProduct;
-                if (session.Operation == SetupOperation.Update)
+                if (identity is null && session.Operation == SetupOperation.Update)
                 {
-                    try { session.InstalledFirmwareVersion = KnownFirmwareImages.Validate(current, session.DeviceId!, identity.BoardId); }
-                    catch (InvalidDataException) { throw Error("Die installierte Firmware ist nicht bekannt. Das Update wurde angehalten."); }
-                    if (Version.Parse(session.InstalledFirmwareVersion) > Version.Parse(TargetFirmwareVersion))
-                        throw Error("Die installierte Firmware ist neuer als das verfügbare Update.");
+                    PrepareLegacyMigration(session, current);
                     session.BundlePath = PrepareBundle(session, current);
+                }
+                else
+                {
+                    if (identity is null || identity.BoardId != BoardDescriptorRegistry.Get(session.DeviceId!).BoardId)
+                        throw Error("Für diese Installation wurde keine passende Original-Sicherung gefunden.");
+                    var recordPath = FindRecovery(identity, session.DeviceId!);
+                    var record = ReadRecovery(recordPath);
+                    var archiveDirectory = Path.GetDirectoryName(recordPath)!;
+                    var originalManifest = ContainedFile(archiveDirectory, record.BackupManifest);
+                    if (!HashEquals(File.ReadAllBytes(originalManifest), record.BackupManifestSha256))
+                        throw Error("Die Original-Sicherung wurde verändert. Die Wiederherstellung wurde angehalten.");
+                    session.Installation = identity;
+                    session.OriginalSha256 = record.OriginalSha256;
+                    session.BackupPath = originalManifest;
+                    session.OriginalVendor = record.OriginalVendor;
+                    session.OriginalProduct = record.OriginalProduct;
+                    if (session.Operation == SetupOperation.Update)
+                    {
+                        try { session.InstalledFirmwareVersion = KnownFirmwareImages.Validate(current, session.DeviceId!, identity.BoardId); }
+                        catch (InvalidDataException) { throw Error("Die installierte Firmware ist nicht bekannt. Das Update wurde angehalten."); }
+                        if (Version.Parse(session.InstalledFirmwareVersion) > Version.Parse(TargetFirmwareVersion))
+                            throw Error("Die installierte Firmware ist neuer als das verfügbare Update.");
+                        session.BundlePath = PrepareBundle(session, current);
+                    }
                 }
             }
             session.Stage = SetupStage.ReadyToInstall;
@@ -204,7 +212,8 @@ public sealed partial class DeviceSetupService
         var full = InstallationIdentity.CreateImage(bytes, target.FlashBytes, session.Installation!);
         if (current is not null)
         {
-            if (current.Length != target.FlashBytes || InstallationIdentity.Read(current) != session.Installation)
+            if (session.MigrateLegacy) LegacyFirmwareMigration.ValidateImage(current, target.DeviceId);
+            if (current.Length != target.FlashBytes || (!session.MigrateLegacy && InstallationIdentity.Read(current) != session.Installation))
                 throw Error("Das Firmware-Paket passt nicht zu diesem Modell.");
             current.AsSpan(current.Length - InstallationIdentity.StorageBytes).CopyTo(full.AsSpan(full.Length - InstallationIdentity.StorageBytes));
         }

@@ -29,6 +29,7 @@ internal static partial class Program
     {
         CheckIdentity();
         CheckStockFirmwareInspector();
+        await CheckLegacyMigration();
         await CheckCoordinator();
         await CheckFirmwareSequence();
         CheckPortableUsb();

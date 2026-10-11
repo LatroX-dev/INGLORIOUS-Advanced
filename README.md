@@ -4,9 +4,9 @@ Configure Glorious keyboards with per-key lighting, effects, key assignments, ma
 
 I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
 
-**Source preview · App 0.6.45 · Firmware 0.11.0**
+**Early Alpha · App 0.6.46 · Firmware 0.11.0**
 
-Public downloads are not available yet. Release and hardware checks are still in progress.
+Get installers and packages from the [Releases page](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases). macOS and Linux builds are Early Alpha; physical-device testing is still limited.
 
 INGLORIOUS Advanced is an independent project. It is not affiliated with or endorsed by Glorious. Product names identify compatible hardware.
 
@@ -14,11 +14,9 @@ INGLORIOUS Advanced is an independent project. It is not affiliated with or endo
 
 ## Get started
 
-For now, use the [source build instructions](docs/public-release.md). Once downloads are available:
-
 1. Download the installer or package for your operating system from this repository's Releases page.
 2. On Windows, run **INGLORIOUS-Advanced-\<version\>-Setup.exe**. On macOS, extract the package and move **INGLORIOUS Advanced.app** to Applications. On Linux, extract the package and open **application/INGLORIOUS Advanced**; the [setup guide](docs/getting-started.md) explains USB permissions.
-3. Connect a supported keyboard by USB. The app loads an existing INGLORIOUS configuration automatically. For original firmware, open **Settings → Set up device** and follow the guide.
+3. Connect a supported keyboard by USB. The app loads an existing INGLORIOUS configuration automatically. For original firmware, open **Settings → Devices & data → Set up device** and follow the guide.
 4. Make your changes and select **Send to keyboard** at the bottom.
 
 The packages include the runtime and the matching firmware for all supported models; you do not need to install .NET separately or download firmware files. Firmware installation is a separate, explicitly confirmed step. Keep the cable connected and INGLORIOUS Advanced open while firmware is being written.
@@ -64,10 +62,17 @@ These screenshots show the Windows editor with offline demo data. They do not de
 - Standby lighting and an optional INGLORIOUS screensaver.
 - Numpad slider: disabled, lighting brightness, relative volume or MIDI control.
 - Guided firmware setup, update and original-firmware recovery on Windows, macOS and Linux.
+- Software update notifications and verified downloads from GitHub.
 
 Ordinary configuration changes do not require a firmware update. Shared dimming between devices is optional and needs the app running. The Numpad's own dimmer works without the app. Lighting colors are previews, not calibrated measurements of the LEDs.
 
 The app follows the system language by default, with English as fallback. It includes German, English, Spanish, French, Italian, Brazilian Portuguese, Polish, Turkish, Russian, Japanese, Korean and Simplified Chinese.
+
+### App updates
+
+Open **Settings → Updates** to check for a new version or turn automatic checks on or off. Automatic checks run at startup and every twelve hours. Downloading and installing an update always requires your action. On Windows, the app opens the normal installer after handling unsaved changes. On macOS and Linux, it downloads the package and shows how to replace the app. Profiles and original-firmware backups are kept.
+
+New firmware comes with app updates when available. Updating the app does not flash a keyboard; the device guide handles firmware changes separately.
 
 ## Custom firmware built on QMK
 
@@ -83,7 +88,7 @@ The desktop app is developed as part of INGLORIOUS Advanced. See the [firmware d
 
 **Use this software and its firmware at your own risk.** Firmware changes can cause data loss or leave a device unusable. Keep a separate copy of your original-firmware backups.
 
-Before first installation, the app creates and checks two copies of the keyboard's internal original firmware. Keep the backup folder: it is needed to return to the original firmware through **Settings → Restore original firmware**.
+Before first installation, the app creates and checks two copies of the keyboard's internal original firmware. Keep the backup folder: it is needed to return to the original firmware through **Settings → Devices & data → Restore original firmware**.
 
 This backup does not include external profile memory, wireless modules or protection settings. Original application settings are therefore not guaranteed to return exactly as before. A disconnected cable or loss of power during a firmware write can require separate recovery. The app stops if it cannot identify the device or verify a backup.
 
@@ -102,13 +107,17 @@ Use the firmware for your exact model, layout and hardware revision. For GMMK 3 
 | Windows x64 | Main WPF app, configuration and guided firmware management |
 | Windows 11 ARM64 | No native package; the x64 build has not been tested under emulation |
 | macOS, Intel and Apple Silicon | Avalonia app with configuration and guided firmware management; native validation pending |
-| Linux x64 | Avalonia app with configuration and guided firmware management; native validation pending |
+| Linux x64 | Early Alpha; native build, package and offline checks passed; physical-device testing pending |
 
-Native package and hardware checks for macOS and Linux are still pending. Windows packages are unsigned; macOS packages use ad-hoc signing and are not Apple notarized.
+Physical-device checks for macOS and Linux are still pending. Windows packages are unsigned; macOS packages use ad-hoc signing and are not Apple notarized.
 
 ### macOS and Linux — Early Alpha
 
-Native builds are in progress. The build jobs capture lighting views on macOS and Linux with synthetic profiles. Those screenshots will appear here after visual review; the images above show the Windows app.
+**Linux — GMMK Numpad**
+
+![Linux lighting editor with a GMMK Numpad](docs/images/linux-numpad.png)
+
+This screenshot was captured on a native Linux runner using synthetic profiles. It shows the app, not a physical-device test. macOS screenshots will be added after its package passes native validation. [Capture details](docs/images/native-provenance.json).
 
 ## Build and contribute
 

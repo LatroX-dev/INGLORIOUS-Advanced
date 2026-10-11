@@ -86,7 +86,7 @@ $records=@(Get-ChildItem -LiteralPath $source -File -Recurse -Force|Where-Object
 if($ValidateOnly){[pscustomobject]@{files=$records.Count;runtime=$Runtime;hardwareAccess=$false};return}
 if($IsWindows-or($Runtime.StartsWith('osx-')-and-not$IsMacOS)-or($Runtime-eq'linux-x64'-and-not$IsLinux)){throw 'Create this package on its matching native host.'}
 New-Item -ItemType Directory -Path $target|Out-Null
-$appRoot=if($IsMacOS){Join-Path $target 'INGLORIOUS Advanced.app/Contents/MacOS'}else{Join-Path $target 'application'}
+$appRoot=if($IsMacOS){Join-Path $target 'INGLORIOUS Advanced.app/Contents/Resources/application'}else{Join-Path $target 'application'}
 New-Item -ItemType Directory -Path $appRoot -Force|Out-Null
 foreach($record in $records){
  $from=Join-Path $source $record.path;$to=Join-Path $appRoot $record.path
@@ -97,13 +97,20 @@ foreach($record in $records){
 }
 if($IsMacOS){
  $contents=Join-Path $target 'INGLORIOUS Advanced.app/Contents'
+ $macos=Join-Path $contents 'MacOS'
+ New-Item -ItemType Directory -Path $macos|Out-Null
+ $launcher=Join-Path $macos 'INGLORIOUS Advanced'
+ $architecture=if($Runtime-eq'osx-arm64'){'arm64'}else{'x86_64'}
+ & clang -std=c11 -Wall -Wextra -Werror -O2 -arch $architecture -mmacosx-version-min=12.0 (Join-Path $PSScriptRoot 'macos-launcher.c') -o $launcher
+ if($LASTEXITCODE-ne0){throw 'Application launcher compilation failed.'}
  $plist=@"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict><key>CFBundleExecutable</key><string>INGLORIOUS Advanced</string><key>CFBundleIdentifier</key><string>org.inglorious.advanced</string><key>CFBundleName</key><string>INGLORIOUS Advanced</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>$ExpectedVersion</string><key>CFBundleVersion</key><string>$ExpectedVersion</string><key>LSMinimumSystemVersion</key><string>12.0</string><key>NSHighResolutionCapable</key><true/></dict></plist>
 "@
  [IO.File]::WriteAllText((Join-Path $contents 'Info.plist'),$plist,[Text.UTF8Encoding]::new($false))
- # Only the main app is signed here; never recursively re-sign the pinned adapter/native tools.
+ # Sign the native launcher and seal the unchanged .NET payload as resources.
+ # Never recursively re-sign the pinned adapter/native tools.
  & codesign --force --sign - --timestamp=none --entitlements (Join-Path $PSScriptRoot 'macos-entitlements.plist') (Join-Path $target 'INGLORIOUS Advanced.app')
  if($LASTEXITCODE-ne0){throw 'Application bundle signing failed.'}
  & codesign --verify --strict (Join-Path $target 'INGLORIOUS Advanced.app')

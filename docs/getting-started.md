@@ -2,9 +2,7 @@
 
 ## Install the app
 
-Public downloads are not available yet. To build the source preview, see the [build instructions](public-release.md).
-
-Choose the package for your computer when downloads become available:
+Choose the package for your computer from the [Releases page](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases). To build from source, see the [build instructions](public-release.md).
 
 - **Windows x64:** run **INGLORIOUS-Advanced-\<version\>-Setup.exe** and follow the installation guide. Open **INGLORIOUS Advanced** from the Start menu. No command script or separate .NET installation is needed.
 - **macOS:** extract the archive and drag **INGLORIOUS Advanced.app** to Applications. Choose `osx-arm64` for Apple silicon or `osx-x64` for an Intel Mac. These builds are not Apple-notarized; macOS may ask you to approve the app in **Privacy & Security**.
@@ -26,9 +24,17 @@ Open Windows **Settings → Apps → Installed apps → INGLORIOUS Advanced → 
 
 Full removal also deletes the original-firmware backups in the app's data folder. Keep a separate copy if you want to return to the original firmware later. Files you exported to other folders are not removed. Uninstalling the app does not change the keyboard's firmware.
 
+### Update the app
+
+Open **Settings → Updates → Check for updates**. Automatic checks are enabled by default and can be turned off there. Select **Download update** to see the new version's changes and download its package.
+
+On Windows, select **Install now** when the download is ready. Save any changes when prompted; the app closes and the normal installer opens. On macOS or Linux, open the download folder and follow the displayed replacement instructions. Profiles and original-firmware backups remain in the app's separate data folder.
+
+The app verifies the downloaded package automatically. If verification or downloading fails, try again; an incomplete download is never installed. App updates include new firmware when available, but do not install it on your keyboard automatically.
+
 ## Install INGLORIOUS firmware
 
-1. Connect your keyboard by USB and open **Settings → Set up device**.
+1. Connect your keyboard by USB and open **Settings → Devices & data → Set up device**.
 2. Choose the detected keyboard if more than one is connected. Check the full model name and layout. Experimental models are marked.
 3. Follow the displayed instructions to disconnect it and reconnect with the shown keys held.
 4. Confirm the detected model and select **Back up and install**. The app saves and checks the original firmware, then installs INGLORIOUS. If the backup cannot be verified, installation stops before anything is written to the keyboard.
@@ -72,7 +78,7 @@ After reconnecting, use **Test lighting** and the typing test described above, o
 ## Return to original firmware
 
 1. Save any INGLORIOUS profiles you want to keep.
-2. Open **Settings → Restore original firmware** and select the keyboard if asked.
+2. Open **Settings → Devices & data → Restore original firmware** and select the keyboard if asked.
 3. Follow the reconnect instructions. Confirm the displayed device and select **Back up and restore**. The app checks the current firmware and matching original backup, then restores it without another confirmation.
 4. Reconnect normally when asked, then test typing and lighting.
 

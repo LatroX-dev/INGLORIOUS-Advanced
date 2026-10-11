@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "images": [
+    {
+      "file": "linux-numpad.png",
+      "operatingSystem": "Linux",
+      "runtime": "linux-x64",
+      "appVersion": "0.6.45",
+      "deviceId": "numpad",
+      "language": "en",
+      "synthetic": true,
+      "hardwareAccess": false,
+      "userSettingsAccess": false,
+      "bytes": 111736,
+      "sha256": "992E03BEBAEA0475BC991E7A32F80F3148C9E335BE39AD10986B2641E0D43D68",
+      "commit": "4fa01ebb81d826d2365dd22214affec4ddf1d7e7",
+      "workflowRun": "https://github.com/LatroX-dev/INGLORIOUS-Advanced/actions/runs/38143156297",
+      "artifactId": 11704229908
+    }
+  ]
+}

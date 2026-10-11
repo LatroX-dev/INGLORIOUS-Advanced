@@ -19,7 +19,7 @@ internal sealed record AdapterRequest(int Schema, string Operation, string Sessi
     string? DeviceId = null, Selection? Selection = null, string? ExpectedFingerprintSha256 = null,
     string? BundlePath = null, string? BackupPath = null, bool ConfirmWrite = false,
     string? ExpectedBackupSha256 = null, Guid? ExpectedInstallationId = null,
-    string? ExpectedCurrentSha256 = null);
+    string? ExpectedCurrentSha256 = null, bool MigrateLegacy = false);
 internal sealed record Fingerprint(string Transport, ushort Vid, ushort Pid, byte Bus, string PortPath,
     string Serial, byte Configuration, byte Interface, byte Alternate, ushort DeviceVersion,
     uint? ChipId, byte? BootVersion, uint FlashBase, int FlashBytes, int SramBytes, string? MemoryMap,

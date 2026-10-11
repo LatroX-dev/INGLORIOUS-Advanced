@@ -10,6 +10,7 @@
     <Compile Include="../../InGlorious.Core/Localization.cs" Link="Localization.cs" />
     <Compile Include="../../InGlorious.Core/UserGuide.cs" Link="UserGuide.cs" />
     <Compile Include="../../InGlorious.Core/AppPreferences.cs" Link="AppPreferences.cs" />
+    <Compile Include="../../InGlorious.Core/SoftwareUpdateService.cs" Link="SoftwareUpdateService.cs" />
     <Compile Include="../../InGlorious.Core/AppAutostart.cs" Link="AppAutostart.cs" />
     <Compile Include="../../InGlorious.Core/AppAutostartEditor.cs" Link="AppAutostartEditor.cs" />
     <Compile Include="../../InGlorious.Core/WindowsInstallationGuard.cs" Link="WindowsInstallationGuard.cs" />
@@ -31,6 +32,8 @@
     <Compile Include="../../InGlorious.Core/StockFirmwareInspector.cs" Link="StockFirmwareInspector.cs" />
     <Compile Include="../../InGlorious.Core/InstallationIdentity.cs" Link="InstallationIdentity.cs" />
     <Compile Include="../../InGlorious.Core/KnownFirmwareImages.cs" Link="KnownFirmwareImages.cs" />
+    <Compile Include="../../InGlorious.Core/LegacyFirmwareMigration.cs" Link="LegacyFirmwareMigration.cs" />
+    <Compile Include="../../InGlorious.Core/DeviceSetupService.Legacy.cs" Link="DeviceSetupService.Legacy.cs" />
     <Compile Include="../../InGlorious.Core/DeviceSetupService.cs" Link="DeviceSetupService.cs" />
     <Compile Include="../../InGlorious.Core/DeviceSetupFirmwareSequence.cs" Link="DeviceSetupFirmwareSequence.cs" />
     <Compile Include="../../InGlorious.Core/DeviceSetupService.Storage.cs" Link="DeviceSetupService.Storage.cs" />

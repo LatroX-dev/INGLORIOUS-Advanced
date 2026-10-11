@@ -377,8 +377,8 @@ internal static partial class Program
             Nodes=[Normal];Current=Enumerable.Repeat((byte)0xFF,_size).ToArray();
             BinaryPrimitives.WriteUInt32LittleEndian(Current,0x20001000);BinaryPrimitives.WriteUInt32LittleEndian(Current.AsSpan(4),0x08000101);
             UsbDescriptor(match.VendorId,match.ProductId).CopyTo(Current,113);
-            _selection=JsonSerializer.SerializeToElement(new{vid=Boot.VendorId,pid=Boot.ProductId,bus=1,portPath="1.2",serial=_stm?"FAKE-ONLY":"",transport=_stm?"stm32-dfuse":"wb32-dfu"});
-            _fingerprint=JsonSerializer.SerializeToElement(new{transport=_stm?"stm32-dfuse":"wb32-dfu",vid=Boot.VendorId,pid=Boot.ProductId,bus=1,portPath="1.2",serial=_stm?"FAKE-ONLY":"",configuration=1,@interface=0,alternate=0,deviceVersion=0x0100,chipId=_stm?(uint?)null:0x3A502980,bootVersion=_stm?(byte?)null:3,flashBase=0x08000000,flashBytes=_size,sramBytes=_stm?40960:28672,memoryMap=_stm?"@Internal Flash /0x08000000/128*0002Kg":null,uniqueId=(string?)null,identityStrength=_stm?"usb-serial-and-port":"transport-session"});
+            _selection=JsonSerializer.SerializeToElement(new{vid=Boot.VendorId,pid=Boot.ProductId,bus=1,portPath="1.2",serial=_stm?"0123456789AB":"",transport=_stm?"stm32-dfuse":"wb32-dfu"});
+            _fingerprint=JsonSerializer.SerializeToElement(new{transport=_stm?"stm32-dfuse":"wb32-dfu",vid=Boot.VendorId,pid=Boot.ProductId,bus=1,portPath="1.2",serial=_stm?"0123456789AB":"",configuration=1,@interface=0,alternate=0,deviceVersion=0x0100,chipId=_stm?(uint?)null:0x3A502980,bootVersion=_stm?(byte?)null:3,flashBase=0x08000000,flashBytes=_size,sramBytes=_stm?40960:28672,memoryMap=_stm?"@Internal Flash /0x08000000/128*0002Kg":null,uniqueId=(string?)null,identityStrength=_stm?"usb-serial-and-port":"transport-session"});
             _fingerprintHash=Hash(JsonSerializer.SerializeToUtf8Bytes(_fingerprint,new JsonSerializerOptions{WriteIndented=true}));
         }
         public Task<IReadOnlyList<SetupUsbNode>> ScanAsync()=>ThrowScan?Task.FromException<IReadOnlyList<SetupUsbNode>>(new IOException("fake scan failure")):Task.FromResult(Nodes);

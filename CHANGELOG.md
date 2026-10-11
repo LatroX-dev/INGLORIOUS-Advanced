@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.46
+
+- Software update notifications and downloads.
+- Clearer app settings.
+- Dark notification-area menu on Windows.
+- Fixed GMMK PRO firmware detection.
+
 ## 0.6.45
 
 - Fixed app startup.

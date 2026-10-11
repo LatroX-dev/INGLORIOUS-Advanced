@@ -62,7 +62,7 @@ public sealed partial class MainWindow : Window
         InitializeOfflineConnections();
         Build();
         _animation.Tick += (_, _) => Animate(); _animation.Start();
-        Closing += OnClosing; Closed += (_, _) => { _startupWindowClosed = true; _startupCancellation?.Cancel(); _animation.Stop(); StopConnections(); SaveWindowPreferences(); };
+        Closing += OnClosing; Closed += (_, _) => { _startupWindowClosed = true; _startupCancellation?.Cancel(); StopSoftwareUpdates(); _animation.Stop(); StopConnections(); SaveWindowPreferences(); };
         KeyDown += OnKeyDown;
         Opened += (_, _) => InitializeWindowOnce();
     }
@@ -134,7 +134,7 @@ public sealed partial class MainWindow : Window
             var help = AsyncButton("?", OpenHelpAsync); help.Name = "HelpButton"; help.FontSize = 22; help.FontWeight = FontWeight.SemiBold; help.Width = 40;
             ToolTip.SetTip(help, L.T("Anleitung")); Avalonia.Automation.AutomationProperties.SetName(help, L.T("Anleitung"));
             var settings = AsyncButton("⚙", OpenSettingsAsync); settings.FontSize = 22; ToolTip.SetTip(settings, L.T("Einstellungen")); Avalonia.Automation.AutomationProperties.SetName(settings, L.T("Einstellungen"));
-            var utilities = Row(help, settings); Grid.SetColumn(utilities, 2); header.Children.Add(utilities);
+            var utilities = Row(BuildSoftwareUpdateHint(), help, settings); Grid.SetColumn(utilities, 2); header.Children.Add(utilities);
             _root.Children.Add(header);
 
             var body = new Grid { ColumnDefinitions = new("176,*,320") }; Grid.SetRow(body, 1); _root.Children.Add(body);

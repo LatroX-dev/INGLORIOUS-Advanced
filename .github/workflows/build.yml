@@ -39,6 +39,8 @@ jobs:
       - name: Check source without firmware assets or hardware
         shell: pwsh
         run: ./scripts/Build-PublicRelease.ps1 -Mode SourceChecks
+      - name: Check public release asset selection
+        run: python tests/ReleaseAssetsChecks/check_release_assets.py
 
   windows:
     needs: source-checks
@@ -169,28 +171,31 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          path: release-files
-          merge-multiple: true
+          name: windows-and-source
+          path: release-files/windows
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-linux-x64
+          path: release-files/linux
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-osx-x64
+          path: release-files/macos-intel
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-osx-arm64
+          path: release-files/macos-arm
       - name: Create an unpublished alpha release for review
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           python - <<'PY'
-          import os, re
-          from pathlib import Path
-          from xml.etree import ElementTree
-          version = re.fullmatch(r'v(\d+\.\d+\.\d+)(?:-[A-Za-z0-9.-]+)?', os.environ['RELEASE_TAG'])
+          import os, re, subprocess
+          version = re.fullmatch(r'v(\d+\.\d+\.\d+)', os.environ['RELEASE_TAG'])
           if not version:
               raise SystemExit('Unsupported release tag')
-          app_version = ElementTree.parse('src/InGlorious.Core/InGlorious.Core.csproj').findtext('PropertyGroup/Version')
-          if version[1] != app_version:
-              raise SystemExit('Release tag does not match the application version')
-          text = Path('CHANGELOG.md').read_text(encoding='utf-8')
-          section = re.search(r'^## ' + re.escape(version[1]) + r'\s*\n(.*?)(?=^## |\Z)', text, re.M | re.S)
-          if not section:
-              raise SystemExit('This version has no changelog entry')
-          Path('release-notes.md').write_text(section[1].strip() + '\n', encoding='utf-8')
+          subprocess.run(['python', 'scripts/Prepare-ReleaseAssets.py', '--input', 'release-files', '--output', 'release-ready', '--version', version[1]], check=True)
           PY
-          gh release create "$RELEASE_TAG" --verify-tag --draft --prerelease --title "INGLORIOUS Advanced $RELEASE_TAG" --notes-file release-notes.md
-          find release-files -type f \( -name '*.zip' -o -name '*-Setup.exe' -o -name '*.sha256' -o -name '*.tar.gz' \) -print0 | xargs -0 gh release upload "$RELEASE_TAG" --
+          gh release create "$RELEASE_TAG" --verify-tag --draft --prerelease --title "INGLORIOUS Advanced $RELEASE_TAG" --notes-file release-ready/release-notes.md
+          find release-ready -maxdepth 1 -type f ! -name 'release-notes.md' -print0 | xargs -0 gh release upload "$RELEASE_TAG" --

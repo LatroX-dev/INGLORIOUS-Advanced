@@ -8,6 +8,9 @@
     <None Update="Licenses\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Compile Include="..\..\src\InGlorious.Core\InstallationIdentity.cs" Link="InstallationIdentity.cs" />
     <Compile Include="..\..\src\InGlorious.Core\KnownFirmwareImages.cs" Link="KnownFirmwareImages.cs" />
+    <Compile Include="..\..\src\InGlorious.Core\LegacyFirmwareMigration.cs" Link="LegacyFirmwareMigration.cs" />
+    <Compile Include="..\..\src\InGlorious.Core\StockDeviceCatalog.cs" Link="StockDeviceCatalog.cs" />
+    <Compile Include="..\..\src\InGlorious.Core\StockFirmwareInspector.cs" Link="StockFirmwareInspector.cs" />
     <EmbeddedResource Include="..\..\src\InGlorious.Core\KnownFirmwareCatalog.json" Link="KnownFirmwareCatalog.json" LogicalName="InGlorious.FirmwareAdapter.KnownFirmwareCatalog.json" />
     <EmbeddedResource Include="$(NativeToolCatalogPath)" Link="NativeToolCatalog.json" LogicalName="InGlorious.FirmwareAdapter.NativeToolCatalog.json" Condition="'$(NativeToolCatalogPath)' != ''" />
     <None Include="$(NativeAssetDirectory)\libusb-1.0.dll" Link="native\libusb-1.0.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(NativeAssetDirectory)\libusb-1.0.dll')" />

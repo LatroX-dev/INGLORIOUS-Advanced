@@ -12,6 +12,7 @@ public sealed record AppPreferences
     public string Language { get; init; } = L.SystemLanguage;
     public bool RememberWindowSize { get; init; } = true;
     public bool ShowHelp { get; init; } = true;
+    public bool CheckForSoftwareUpdates { get; init; } = true;
     public bool SharedBrightness { get; init; }
     public bool SharedBrightnessNoticeDismissed { get; init; }
     public double WindowWidth { get; init; } = 1536;

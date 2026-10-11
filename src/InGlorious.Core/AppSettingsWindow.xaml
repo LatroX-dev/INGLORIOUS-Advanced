@@ -1,40 +1,72 @@
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="InGlorious.Core.AppSettingsWindow" Title="{local:Tr Key='App-Einstellungen · INGLORIOUS Advanced'}" Width="580" Height="630" MinWidth="520" MinHeight="580" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="{StaticResource WindowBackground}" Foreground="{StaticResource Text}" FontFamily="Segoe UI" FontSize="13" UseLayoutRounding="True" xmlns:local="clr-namespace:InGlorious.Core">
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:InGlorious.Core"
+        x:Class="InGlorious.Core.AppSettingsWindow" Title="{local:Tr Key='App-Einstellungen · INGLORIOUS Advanced'}"
+        Width="960" Height="740" MinWidth="800" MinHeight="640" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{StaticResource WindowBackground}" Foreground="{StaticResource Text}" FontFamily="Segoe UI" FontSize="13" UseLayoutRounding="True">
+    <Window.Resources>
+        <Style x:Key="SettingsSwitch" TargetType="CheckBox" BasedOn="{StaticResource SwitchToggle}">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="MinHeight" Value="38" />
+            <Setter Property="ContentTemplate"><Setter.Value><DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap" /></DataTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="SettingsHeading" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,15" />
+        </Style>
+    </Window.Resources>
     <Border Background="{StaticResource WindowBackground}">
-        <Grid Margin="22">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-            <TextBlock Text="{local:Tr Key='App-Einstellungen'}" FontSize="21" FontWeight="SemiBold" Margin="0,0,0,22" />
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,0">
-                <StackPanel>
-                    <Label Content="{local:Tr Key=Sprache}" Target="{Binding ElementName=LanguageChoice}" Foreground="{StaticResource Text}" Padding="0" Margin="0,0,0,6" />
-                    <ComboBox x:Name="LanguageChoice" SelectedValuePath="Code" MinHeight="36" Margin="0,0,0,20">
-                        <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding NativeName}" /></DataTemplate></ComboBox.ItemTemplate>
-                    </ComboBox>
-                    <Label Content="{local:Tr Key='Startgerät'}" Target="{Binding ElementName=StartDeviceChoice}" Foreground="{StaticResource Text}" Padding="0" Margin="0,0,0,6" />
-                    <ComboBox x:Name="StartDeviceChoice" SelectedValuePath="Tag" MinHeight="36" />
-                    <CheckBox x:Name="RememberSizeCheck" Content="{local:Tr Key='Fenstergröße merken'}" Foreground="{StaticResource Text}" Margin="0,22,0,16" />
-                    <CheckBox x:Name="ShowHelpCheck" Content="{local:Tr Key='Bedienhilfen anzeigen'}" Foreground="{StaticResource Text}" />
-                    <CheckBox x:Name="AutostartCheck" Content="{local:Tr Key='Beim Systemstart öffnen'}" Foreground="{StaticResource Text}" Margin="0,16,0,0" />
-                    <TextBlock x:Name="AutostartDescriptionText" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="22,5,0,0" />
-                    <TextBlock x:Name="AutostartStatusText" TextWrapping="Wrap" Foreground="{StaticResource Accent}" Margin="22,5,0,0" />
-                    <Border Height="1" Background="{StaticResource Stroke}" Margin="0,23" />
-                    <Button x:Name="SetupDeviceButton" Content="{local:Tr Key='Gerät einrichten'}" HorizontalAlignment="Left" Click="SetupDevice_Click" />
-                    <Button x:Name="RestoreDeviceButton" Content="{local:Tr Key='Original-Firmware wiederherstellen'}" HorizontalAlignment="Left" Click="RestoreDevice_Click" Margin="0,10,0,0" />
-                    <Border Height="1" Background="{StaticResource Stroke}" Margin="0,23" />
-                    <TextBlock Text="{local:Tr Key='Profilordner'}" FontWeight="SemiBold" Margin="0,0,0,6" />
-                    <TextBlock x:Name="ProjectFolderText" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
-                    <Button x:Name="OpenFolderButton" Content="{local:Tr Key='Ordner öffnen'}" HorizontalAlignment="Left" Click="OpenFolder_Click" />
-                    <TextBlock x:Name="VersionText" Foreground="{StaticResource Muted}" Margin="0,24,0,0" />
-                    <TextBlock x:Name="StatusText" TextWrapping="Wrap" Foreground="{StaticResource Accent}" Margin="0,16,0,0" />
-                </StackPanel>
+        <Grid Margin="24,22">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+            <TextBlock Text="{local:Tr Key='App-Einstellungen'}" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,22" />
+            <ScrollViewer x:Name="SettingsScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,4" Focusable="False">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="{local:Tr Key='Allgemein'}" Style="{StaticResource SettingsHeading}" />
+                        <Label Content="{local:Tr Key=Sprache}" Target="{Binding ElementName=LanguageChoice}" Foreground="{StaticResource Text}" Padding="0" Margin="0,0,0,7" />
+                        <ComboBox x:Name="LanguageChoice" SelectedValuePath="Code" MinHeight="36" Margin="0,0,0,12">
+                            <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding NativeName}" /></DataTemplate></ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <CheckBox x:Name="AutostartCheck" Content="{local:Tr Key='Beim Systemstart öffnen'}" Style="{StaticResource SettingsSwitch}" />
+                        <TextBlock x:Name="AutostartDescriptionText" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,44,14" />
+                        <TextBlock x:Name="AutostartStatusText" TextWrapping="Wrap" Foreground="{StaticResource Accent}" Margin="0,0,44,12" />
+                        <CheckBox x:Name="RememberSizeCheck" Content="{local:Tr Key='Fenstergröße merken'}" Style="{StaticResource SettingsSwitch}" />
+                        <CheckBox x:Name="ShowHelpCheck" Content="{local:Tr Key='Bedienhilfen anzeigen'}" Style="{StaticResource SettingsSwitch}" />
+                    </StackPanel>
+                    <Border Grid.Column="1" Width="1" Background="{StaticResource Stroke}" HorizontalAlignment="Center" />
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="{local:Tr Key='Updates'}" Style="{StaticResource SettingsHeading}" />
+                        <TextBlock x:Name="VersionText" TextWrapping="Wrap" Margin="0,0,0,8" />
+                        <TextBlock Text="{local:Tr Key='Updates für die App. Die Firmware deiner Tastatur wird separat unter „Gerät“ aktualisiert.'}" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,16" />
+                        <CheckBox x:Name="SoftwareUpdateCheck" Content="{local:Tr Key='Automatisch nach Updates suchen'}" Style="{StaticResource SettingsSwitch}" Margin="0,0,0,14" />
+                        <Button x:Name="SoftwareUpdateButton" Content="{local:Tr Key='Nach Updates suchen'}" HorizontalAlignment="Left" Click="SoftwareUpdate_Click" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
+                        <Border Height="1" Background="{StaticResource Stroke}" Margin="0,22,0,18" />
+                        <TextBlock Text="{local:Tr Key='Geräte &amp; Daten'}" Style="{StaticResource SettingsHeading}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <Label Content="{local:Tr Key='Startgerät'}" Target="{Binding ElementName=StartDeviceChoice}" Foreground="{StaticResource Text}" Padding="0" Margin="0,0,0,7" />
+                                <ComboBox x:Name="StartDeviceChoice" SelectedValuePath="Tag" MinHeight="36" />
+                                <Button x:Name="OpenFolderButton" Content="{local:Tr Key='Profilordner öffnen'}" HorizontalAlignment="Left" Click="OpenFolder_Click" Margin="0,16,0,0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <Button x:Name="SetupDeviceButton" Content="{local:Tr Key='Gerät einrichten'}" HorizontalAlignment="Left" Click="SetupDevice_Click" />
+                                <Button x:Name="RestoreDeviceButton" Content="{local:Tr Key='Original-Firmware wiederherstellen'}" HorizontalAlignment="Left" Click="RestoreDevice_Click" Margin="0,10,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
             </ScrollViewer>
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
-                <Button Content="{local:Tr Key='Abbrechen'}" IsCancel="True" MinWidth="100" Margin="0,0,10,0" />
-                <Button x:Name="SaveButton" Content="{local:Tr Key='Speichern'}" IsDefault="True" MinWidth="100" Style="{StaticResource PrimaryButton}" Click="Save_Click" />
-            </StackPanel>
+            <TextBlock x:Name="StatusText" Grid.Row="2" TextWrapping="Wrap" Foreground="{StaticResource Accent}" Margin="0,10,0,0" />
+            <Border Grid.Row="3" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" Margin="0,14,0,0" Padding="0,16,0,0">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="{local:Tr Key='Abbrechen'}" IsCancel="True" MinWidth="100" Margin="0,0,10,0" />
+                    <Button x:Name="SaveButton" Content="{local:Tr Key='Speichern'}" IsDefault="True" MinWidth="100" Style="{StaticResource PrimaryButton}" Click="Save_Click" />
+                </StackPanel>
+            </Border>
         </Grid>
     </Border>
 </Window>

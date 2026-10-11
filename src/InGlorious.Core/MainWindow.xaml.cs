@@ -172,6 +172,7 @@ public partial class MainWindow : Window
                 if (!_startupClosed) EditorSurface.IsEnabled = true;
                 StartSharedBrightnessIfReady();
                 StartConnectionMonitor();
+                _ = CheckSoftwareUpdateOnStartupAsync();
             }
         }
         if (_defaultLoadError is not null) Status(_defaultLoadError);
@@ -283,6 +284,20 @@ public partial class MainWindow : Window
             {
                 await Task.Delay(180);
                 try { SaveVisualScreenshot((FrameworkElement)dialog.Content, Path.GetFullPath(args[screenshotIndex + 1])); }
+                catch (Exception ex) { File.WriteAllText(Path.Combine(Paths.DataRoot, "screenshot-error.txt"), ex.ToString()); Environment.ExitCode = 1; }
+                dialog.Close();
+            };
+            dialog.ShowDialog(); Close(); return;
+        }
+        if (screenshotIndex >= 0 && screenshotIndex + 1 < args.Length && args.Contains("--software-update"))
+        {
+            var preview = new SoftwareUpdateInfo("1.0.0", "- Software update notifications.\n- Dark tray menu.", true,
+                "INGLORIOUS-Advanced-1.0.0-Setup.exe", 1, new string('0', 64));
+            var dialog = new SoftwareUpdateWindow(preview, offlinePreview: true) { Owner = this };
+            dialog.Loaded += async (_, _) =>
+            {
+                await Task.Delay(180);
+                try { SaveVisualScreenshot((FrameworkElement)VisualTreeHelper.GetChild(dialog, 0), Path.GetFullPath(args[screenshotIndex + 1])); }
                 catch (Exception ex) { File.WriteAllText(Path.Combine(Paths.DataRoot, "screenshot-error.txt"), ex.ToString()); Environment.ExitCode = 1; }
                 dialog.Close();
             };
@@ -1875,15 +1890,19 @@ public partial class MainWindow : Window
         settings.SetupAction = () => OpenDeviceSetupAsync(owner: settings);
         settings.RestoreSetupAction = () => OpenDeviceSetupAsync(operation: SetupOperation.Restore, owner: settings);
         if (settings.ShowDialog() != true) return;
+        bool enableSoftwareUpdates = !_preferences.CheckForSoftwareUpdates && settings.Preferences.CheckForSoftwareUpdates;
         _preferences = settings.Preferences;
         Resources["HelpVisibility"] = _preferences.ShowHelp ? Visibility.Visible : Visibility.Collapsed;
         ApplyUiLanguage(_preferences.Language);
         Status(L.T("App-Einstellungen gespeichert"));
+        if (enableSoftwareUpdates) _ = CheckSoftwareUpdateInBackgroundAsync();
+        if (settings.RequestedSoftwareUpdate is { } installation) InstallSoftwareUpdate(installation);
     }
 
     private async void Window_Closed(object? sender, EventArgs e)
     {
         _startupClosed = true;
+        _softwareUpdateCancellation.Cancel();
         StopConnectionMonitor();
         _startupCancellation.Cancel();
         StopLightingPreview();
@@ -2086,6 +2105,7 @@ public partial class MainWindow : Window
         RunHelpChecks(Check);
         RunDeviceSetupChecks(Check);
         RunBackgroundWindowChecks(Check);
+        RunSoftwareUpdateChecks(Check);
         AppSettingsWindow.RunOfflineChecks(Check);
         await RunStartupChecksAsync(Check);
         await RunConnectionChecksAsync(Check);

@@ -17,7 +17,9 @@ Use new output directories. The full Windows build obtains the pinned dependenci
 
 `Initialize-BuildDependencies.ps1 -Scope Native`, `-Scope Firmware` or `-Scope All` can prepare dependencies separately. Public builds do not require a private device, original backup or machine-specific path. Configuration files and generated tool catalogs belong to the build output.
 
-The application uses the firmware included in its app package. GitHub release creation does not make an online app updater; runtime firmware version filtering remains local to the included catalog.
+The app checks published releases from this repository, including Early Alpha prereleases. **Settings → Updates** controls automatic checks and provides a manual check. Downloads require a matching platform asset with a GitHub SHA-256 digest; the app verifies its size and digest before offering installation. No profile, backup or device data is sent. Windows opens the normal installer after the existing unsaved-change and firmware guards. macOS and Linux provide the verified package and replacement instructions. There is no silent installation or downgrade.
+
+Firmware stays bundled with each app package. Updating the app does not flash connected keyboards. The device guide offers applicable firmware updates from the included catalog.
 
 The Windows build produces `INGLORIOUS-Advanced-<version>-Setup.exe` with the pinned Inno Setup compiler. It installs for the current user, adds a Start menu entry and registers the uninstaller in Windows Settings. The installer checks for a running app or firmware operation before replacing files. Test installation, upgrades, default background startup and both data-retention choices with `scripts/Test-NativeWindowsInstaller.ps1`. Its test build uses a separate application identity and synthetic data directory. The intermediate Windows ZIP is for build verification, not an end-user download.
 
@@ -36,7 +38,7 @@ The exporter uses an exact reviewed allowlist, checks content for private local 
 pwsh -NoProfile -File scripts/New-CorrespondingSource.ps1 `
   -PublicSourceDirectory <reviewed-public-folder> `
   -QmkDirectory firmware/qmk_firmware `
-  -Destination artifacts/INGLORIOUS-Advanced-0.6.45-Source `
+  -Destination artifacts/INGLORIOUS-Advanced-0.6.46-Source `
   -Download
 ```
 
@@ -59,11 +61,11 @@ pwsh -NoProfile -File scripts/Build-DesktopRelease.ps1 `
 
 Use `osx-x64` or `osx-arm64` on the corresponding Mac. The script rejects a mismatched host architecture or firmware catalog. It builds pinned libusb 1.0.29 and dfu-util 0.11 sources, generates a native-tool catalog, publishes the adapter, prepares the setup assets and runs offline checks before packaging. All builds and tests in this script avoid device I/O.
 
-Packages are named `INGLORIOUS-Advanced-0.6.45-<runtime>.tar.gz` and have matching SHA-256 files. macOS packages contain `INGLORIOUS Advanced.app`; Linux packages contain `application/INGLORIOUS Advanced` plus a USB-permission helper. macOS builds use ad-hoc signatures and are not notarized. Sign native tools before generating their catalog and the adapter before generating the setup-tool catalog; do not recursively re-sign pinned files afterward.
+Packages are named `INGLORIOUS-Advanced-0.6.46-<runtime>.tar.gz` and have matching SHA-256 files. macOS packages contain `INGLORIOUS Advanced.app`; Linux packages contain `application/INGLORIOUS Advanced` plus a USB-permission helper. macOS builds use ad-hoc signatures and are not notarized. Sign native tools before generating their catalog and the adapter before generating the setup-tool catalog; do not recursively re-sign pinned files afterward.
 
 `Licenses/Desktop-ThirdParty.txt` preserves the locked desktop dependencies' license texts and notices. `reference/desktop-license-inventory.json` records their versions and provenance. After a deliberate dependency change, restore the locked packages, run `Collect-DesktopLicenses.ps1`, review the changes and rebuild the package. Runtime licenses must be retained in self-contained output.
 
-The native package pipeline and its physical USB workflows still require validation. A cross-published executable, screenshot or simulated test does not establish behavior on the target operating system. Record native build results separately from [physical acceptance](hardware-acceptance.md).
+Linux x64 has passed its native build, package and offline checks in CI. macOS packaging is still undergoing native validation. Physical USB workflows remain untested on both platforms. A cross-published executable, screenshot or simulated test does not establish physical-device behavior. Record native build results separately from [physical acceptance](hardware-acceptance.md).
 
 ## Publishing checklist
 

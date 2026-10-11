@@ -27,8 +27,8 @@ if (-not (Get-Item -LiteralPath $root).PSIsContainer) { throw 'SourceRoot must b
 
 # Exact relative paths only. New files never enter this list through recursion or a glob.
 $app = @(
-    'FirmwareAdapterProcess.cs','PosixDeviceSetupEnvironment.cs','PlatformUsbIdentity.cs','AppAutostart.cs','AppAutostartEditor.cs','WindowsInstallationGuard.cs','BackgroundApplicationSession.cs','WindowsTrayIcon.cs','MainWindow.Background.cs','ApplicationInstance.cs','DeviceSetupFirmwareSequence.cs',
-    'App.xaml','App.xaml.cs','AppPreferences.cs','AppSettingsWindow.xaml','AppSettingsWindow.xaml.cs','BackupService.cs','ColorPaletteStore.cs','ColorPickerWindow.cs',
+    'FirmwareAdapterProcess.cs','PosixDeviceSetupEnvironment.cs','PlatformUsbIdentity.cs','AppAutostart.cs','AppAutostartEditor.cs','WindowsInstallationGuard.cs','BackgroundApplicationSession.cs','WindowsTrayIcon.cs','MainWindow.Background.cs','ApplicationInstance.cs','DeviceSetupFirmwareSequence.cs','LegacyFirmwareMigration.cs','DeviceSetupService.Legacy.cs',
+    'App.xaml','App.xaml.cs','AppPreferences.cs','AppSettingsWindow.xaml','AppSettingsWindow.xaml.cs','SoftwareUpdateService.cs','SoftwareUpdateWindow.cs','MainWindow.SoftwareUpdate.cs','BackupService.cs','ColorPaletteStore.cs','ColorPickerWindow.cs',
     'DeviceScanner.cs','StockDeviceCatalog.cs','StockFirmwareInspector.cs','InstallationIdentity.cs','KnownFirmwareImages.cs','DeviceSetupService.cs','DeviceSetupService.Storage.cs','WindowsDeviceSetupEnvironment.cs','DeviceSetupWindow.cs','DeviceSetupWindow.Checks.cs','DeviceSetupWindow.Completion.cs','MainWindow.Setup.cs','InGlorious.Core.csproj','MainWindow.xaml','MainWindow.xaml.cs','Models.cs','UserGuide.cs','HelpWindow.cs','MainWindow.Help.cs',
     'MainWindow.Startup.cs','MainWindow.StartupChecks.cs','MainWindow.Connections.cs','MainWindow.ConnectionChecks.cs','StartupDeviceLoader.cs','MainWindow.WorkflowChecks.cs','MainWindow.PendingEdits.cs','MainWindow.PendingEditsChecks.cs','PendingEditDecisionPolicy.cs',
     'MainWindow.NavigationChecks.cs','MainWindow.Animation.cs','MainWindow.AnimationChecks.cs','LightingPreviewEngine.cs',
@@ -49,20 +49,24 @@ $allow.Add('src/InGlorious.Core/Locales/device-setup-ui.json')
 $allow.Add('src/InGlorious.Core/Locales/device-setup-service.json')
 $allow.Add('src/InGlorious.Core/Locales/device-update.json')
 $allow.Add('src/InGlorious.Core/Locales/startup-settings.json')
+$allow.Add('src/InGlorious.Core/Locales/software-updates.json')
 $allow.Add('reference/glorious-stock-devices.json')
 $allow.Add('docs/setup-boot-gestures.md')
 $allow.Add('docs/device-setup.md')
 $allow.Add('scripts/Prepare-SetupAssets.ps1')
-foreach ($name in @('Build-PosixNativeTools.ps1','build-posix-native.sh','posix-native-dependencies.json','Build-DesktopRelease.ps1','New-DesktopPackage.ps1','Test-DesktopPackage.ps1','macos-entitlements.plist','70-inglorious.rules','Install-UsbPermissions.sh')) { $allow.Add('scripts/'+$name) }
+foreach ($name in @('Build-PosixNativeTools.ps1','build-posix-native.sh','posix-native-dependencies.json','Build-DesktopRelease.ps1','New-DesktopPackage.ps1','Test-DesktopPackage.ps1','macos-entitlements.plist','macos-launcher.c','70-inglorious.rules','Install-UsbPermissions.sh')) { $allow.Add('scripts/'+$name) }
 foreach ($name in @('Build-WindowsInstaller.ps1','Initialize-InstallerCompiler.ps1','Test-NativeWindowsInstaller.ps1','installer-dependencies.json')) { $allow.Add('scripts/'+$name) }
 $allow.Add('packaging/windows/INGLORIOUS-Advanced.iss')
-foreach ($suite in @('InGlorious.AutostartChecks','InGlorious.StartupGuardChecks','InGlorious.BackgroundChecks','InGlorious.AppStartupChecks','InGlorious.AdapterFileChecks')) {
+foreach ($suite in @('InGlorious.AutostartChecks','InGlorious.StartupGuardChecks','InGlorious.BackgroundChecks','InGlorious.AppStartupChecks','InGlorious.AdapterFileChecks','InGlorious.SoftwareUpdateChecks')) {
     $allow.Add('tests/'+$suite+'/'+$suite+'.csproj'); $allow.Add('tests/'+$suite+'/Program.cs')
 }
 $allow.Add('tests/InGlorious.BackgroundChecks/Paths.cs')
 $allow.Add('tests/InGlorious.AppStartupChecks/StartupDoubles.cs')
 $allow.Add('tests/PosixNativeChecks/check-dependency.sh')
-$adapterFiles=@('AdapterEngine.cs','Contracts.cs','Files.cs','InGlorious.FirmwareAdapter.csproj','NativeUsb.cs','NativeToolCatalog.cs','Program.cs','README.md','SelfTests.cs','Stm32Device.cs','WbProtocol.cs',
+$allow.Add('scripts/Prepare-ReleaseAssets.py')
+$allow.Add('tests/ReleaseAssetsChecks/check_release_assets.py')
+$allow.Add('tests/InGlorious.SetupChecks/LegacyMigrationChecks.cs')
+$adapterFiles=@('AdapterEngine.cs','Contracts.cs','Files.cs','InGlorious.FirmwareAdapter.csproj','NativeUsb.cs','NativeToolCatalog.cs','Program.cs','README.md','SelfTests.cs','SelfTests.Legacy.cs','Stm32Device.cs','WbProtocol.cs',
  'Licenses/dfu-util-binary-provenance.txt','Licenses/dfu-util-GPL-2.0.txt','Licenses/dotnet-MIT.txt','Licenses/dotnet-THIRD-PARTY-NOTICES.txt','Licenses/libusb-LGPL-2.1.txt','Licenses/README.txt','Licenses/Westberry-Apache-2.0.txt')
 foreach($name in $adapterFiles){$allow.Add('tools/InGlorious.FirmwareAdapter/'+$name)}
 foreach($suite in @('InGlorious.DiscoveryChecks','InGlorious.SetupChecks')){
@@ -71,7 +75,7 @@ foreach($suite in @('InGlorious.DiscoveryChecks','InGlorious.SetupChecks')){
 foreach($name in @('CoordinatorChecks.cs','IdentityChecks.cs','StockFirmwareChecks.cs','PortableUsbChecks.cs','FirmwareSequenceChecks.cs')){$allow.Add('tests/InGlorious.SetupChecks/'+$name)}
 $allow.Add('tests/InGlorious.PortableSetupChecks/InGlorious.PortableSetupChecks.csproj')
 foreach ($name in @('desktop.json','dialogs.json','favorites.json','firmware.json','firmware-service.json','firmware-guide-simple.json','firmware-wizard-simple.json','firmware-routing.json','firmware-details.json','firmware-log.json','firmware-source.json','lighting-presets.json','macros.json','main-status.json','main.json','models.json','operations.json','preferences-profiles.json','sequences.json','standby.json','transfer-simple.json','startup.json','guide.json','slider-editor.json','model-support.json','connections.json','firmware-models.json')) { $allow.Add('src/InGlorious.Core/Locales/'+$name) }
-$desktop = @('App.axaml','App.axaml.cs','EditorState.cs','InGlorious.Desktop.csproj','MainWindow.Actions.cs','MainWindow.Checks.cs','MainWindow.cs','MainWindow.Editors.cs','MainWindow.Icons.cs','MainWindow.Macros.cs','MainWindow.Presets.cs','MainWindow.Settings.cs','MainWindow.Startup.cs','MainWindow.StartupChecks.cs','MainWindow.Connections.cs','MainWindow.ConnectionsChecks.cs','MainWindow.Help.cs','MainWindow.HelpChecks.cs','MainWindow.Setup.cs','DeviceSetupWindow.cs','DeviceSetupWindow.Checks.cs','DeviceSetupWindow.Completion.cs','Program.cs','README.md','DesktopTrayIcon.cs','MainWindow.Background.cs','Shared/AssemblyInfo.cs','Shared/InGlorious.Shared.csproj','Shared/OnboardHidTransport.cs','Shared/PlatformDeviceService.cs')
+$desktop = @('App.axaml','App.axaml.cs','EditorState.cs','InGlorious.Desktop.csproj','MainWindow.Actions.cs','MainWindow.Checks.cs','MainWindow.cs','MainWindow.Editors.cs','MainWindow.Icons.cs','MainWindow.Macros.cs','MainWindow.Presets.cs','MainWindow.Settings.cs','MainWindow.SoftwareUpdate.cs','MainWindow.Startup.cs','MainWindow.StartupChecks.cs','MainWindow.Connections.cs','MainWindow.ConnectionsChecks.cs','MainWindow.Help.cs','MainWindow.HelpChecks.cs','MainWindow.Setup.cs','DeviceSetupWindow.cs','DeviceSetupWindow.Checks.cs','DeviceSetupWindow.Completion.cs','Program.cs','README.md','DesktopTrayIcon.cs','MainWindow.Background.cs','Shared/AssemblyInfo.cs','Shared/InGlorious.Shared.csproj','Shared/OnboardHidTransport.cs','Shared/PlatformDeviceService.cs')
 foreach ($name in $desktop) { $allow.Add('src/InGlorious.Desktop/'+$name) }
 foreach ($name in @('inglorious-mark.png','inglorious.ico')) { $allow.Add('src/InGlorious.Core/Assets/'+$name) }
 foreach ($name in @('INGLORIOUS-Oxanium-SemiBold.ttf','Oxanium-OFL.txt','Oxanium-source.json')) { $allow.Add('src/InGlorious.Core/Assets/Fonts/'+$name) }
@@ -122,7 +126,7 @@ foreach ($name in @('effect_oracle.c','Run-PreviewChecks.ps1')) { $allow.Add('te
 foreach ($name in @('sequence_oracle.c','Run-ColorSequenceChecks.ps1')) { $allow.Add('tests/InGlorious.ColorSequenceChecks/'+$name) }
 foreach ($name in @('.gitignore','.gitattributes','docs/public-release.md','docs/model-support.md','scripts/Test-ModelReferences.ps1','scripts/Export-PublicSource.ps1','scripts/Build-BrandIcon.ps1','scripts/Install-InGlorious.ps1','scripts/New-WindowsPackage.ps1','scripts/Test-WindowsInstaller.ps1')) { $allow.Add($name) }
 foreach ($name in @('README.md','LICENSE','COPYRIGHT.md','THIRD-PARTY-NOTICES.md','CONTRIBUTING.md','SECURITY.md','CHANGELOG.md','global.json','NuGet.Config',
-    'docs/getting-started.md','docs/hardware-acceptance.md','docs/license-audit.md','docs/images/windows-lighting.png','docs/images/experimental-layout.png','docs/images/pro-ansi.png','docs/images/gmmk3-100-ansi.png',
+    'docs/getting-started.md','docs/hardware-acceptance.md','docs/license-audit.md','docs/images/windows-lighting.png','docs/images/experimental-layout.png','docs/images/pro-ansi.png','docs/images/gmmk3-100-ansi.png','docs/images/linux-numpad.png','docs/images/native-provenance.json',
     'scripts/Initialize-BuildDependencies.ps1','scripts/build-dependencies.json','scripts/Build-PublicRelease.ps1','scripts/Test-PublicSourceExport.ps1','scripts/Copy-RuntimeNotices.ps1',
     '.github/workflows/build.yml','.github/ISSUE_TEMPLATE/bug_report.yml','.github/ISSUE_TEMPLATE/config.yml','.github/ISSUE_TEMPLATE/device_support.yml','.github/ISSUE_TEMPLATE/feature_request.yml',
     'src/InGlorious.Desktop/packages.lock.json','src/InGlorious.Desktop/Shared/packages.lock.json',
@@ -173,6 +177,8 @@ function Assert-NoPrivateText([string]$Relative,[byte[]]$Bytes) {
         # owner segment is exempt; usernames elsewhere remain private.
         $publicOwnerUrl = 'https://github.com/LatroX-dev'
         $scan = $text -replace ([regex]::Escape($publicOwnerUrl)+'(?=[/\s)"''#?]|$)'), 'https://github.com/REPOSITORY_OWNER'
+        $publicApiUrl = 'https://api.github.com/repos/LatroX-dev/INGLORIOUS-Advanced'
+        $scan = $scan -replace ([regex]::Escape($publicApiUrl)+'(?=[/\s)"''#?]|$)'), 'https://api.github.com/repos/REPOSITORY_OWNER/INGLORIOUS-Advanced'
         foreach ($value in $private) {
             if ($scan.Contains($value,[StringComparison]::OrdinalIgnoreCase)) { throw ('Private local identifier detected in allowlisted file: '+$Relative) }
         }

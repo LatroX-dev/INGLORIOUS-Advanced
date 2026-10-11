@@ -344,7 +344,7 @@ public sealed partial class MainWindow
                         var prompt = Program.Arguments.Contains("--help") ? CreateUserGuide(helpTopic >= 0 && helpTopic + 1 < Program.Arguments.Length ? Program.Arguments[helpTopic + 1] : CurrentGuideTopic())
                             : Program.Arguments.Contains("--settings") ? CreateSettingsWindow(_preferences, offlinePreview: true)
                             : Program.Arguments.Contains("--device-setup") ? CreateOfflineSetupPreview() : Program.Arguments.Contains("--picker") ? CreateColorPicker("#EF646B") : CreatePrompt("Ungespeichertes Profil", L.F($"Änderungen an „{_state.Project.Name}“ zuerst speichern?"), "Abbrechen", "Profil speichern", "Verwerfen");
-                        if (Program.Arguments.Contains("--help") && Program.Arguments.Contains("--minimum")) { prompt.Width = prompt.MinWidth; prompt.Height = prompt.MinHeight; }
+                        if ((Program.Arguments.Contains("--help") || Program.Arguments.Contains("--settings")) && Program.Arguments.Contains("--minimum")) { prompt.Width = prompt.MinWidth; prompt.Height = prompt.MinHeight; }
                         prompt.Opened += async (_, _) =>
                         {
                             try { await Task.Delay(200); using var captured = new RenderTargetBitmap(new PixelSize((int)prompt.ClientSize.Width, (int)prompt.ClientSize.Height), new Vector(96, 96)); captured.Render(prompt); captured.Save(Program.Arguments[shot + 1], PngBitmapEncoderOptions.Default); }
@@ -393,6 +393,7 @@ public sealed partial class MainWindow
         }
         _sharedBrightness.StatusChanged += value => Dispatcher.UIThread.Post(() => { if (!_busy && value.Length > 0) Status(value); });
         await UpdateBrightnessService();
+        _ = CheckSoftwareUpdateOnStartupAsync();
         if (IsVisible) await CheckFirmwareSetupAsync();
     }
     private void SaveWindowPreferences()

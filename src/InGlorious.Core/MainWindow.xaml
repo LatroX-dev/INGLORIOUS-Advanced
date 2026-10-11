@@ -25,6 +25,7 @@
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="SoftwareUpdateNotice" Content="{local:Tr Key='Update verfügbar'}" Visibility="Collapsed" Margin="0,0,16,0" Click="SoftwareUpdate_Click" Style="{StaticResource QuietButton}" Foreground="{StaticResource Accent}" />
                     <Button x:Name="UndoButton" Content="↶" FontSize="22" Width="35" Padding="0" Margin="0,0,3,0" Click="Undo_Click" ToolTip="{local:Tr Key='Rückgängig · Strg+Z'}" Style="{StaticResource QuietButton}" />
                     <Button x:Name="RedoButton" Content="↷" FontSize="22" Width="35" Padding="0" Margin="0,0,14,0" Click="Redo_Click" ToolTip="{local:Tr Key='Wiederholen · Strg+Y'}" Style="{StaticResource QuietButton}" />
                     <Button x:Name="HelpButton" Content="?" FontSize="20" FontWeight="SemiBold" Width="38" Height="36" Padding="0" Margin="0,0,3,0" Click="Help_Click" ToolTip="{local:Tr Key='Anleitung'}" AutomationProperties.Name="{local:Tr Key='Anleitung'}" Style="{StaticResource QuietButton}" />

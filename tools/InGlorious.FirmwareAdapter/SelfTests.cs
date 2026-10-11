@@ -3,7 +3,7 @@ using InGlorious.Core;
 
 namespace InGlorious.FirmwareAdapter;
 
-internal static class SelfTests
+internal static partial class SelfTests
 {
     private static int checks;
     private static string? firmwareDirectory;
@@ -23,6 +23,7 @@ internal static class SelfTests
             PacketChecks(); PageWriteChecks(); FileChecks(root); RequestChecks(root); StmChecks();
             string[] ids = ["pro-iso", "numpad", "pro-ansi", "pro-rev2-ansi", "pro-rev2-iso", "gmmk2-65-ansi", "gmmk2-65-iso", "gmmk2-96-ansi", "gmmk2-96-iso", "gmmk3-65-ansi", "gmmk3-65-iso", "gmmk3-75-ansi", "gmmk3-75-iso", "gmmk3-100-ansi", "gmmk3-100-iso"];
             foreach (string id in ids) EngineChecks(root, id);
+            LegacyChecks(root);
             Console.WriteLine(System.Text.Encoding.UTF8.GetString(Json.Bytes(new { passed = checks, hardwareAccess = false, nativeLibraryLoaded = false, toolProcessesStarted = false })));
             return 0;
         }
@@ -133,11 +134,37 @@ internal static class SelfTests
         string listing = "Found DFU: [0483:df11] ver=2200, devnum=4, cfg=1, intf=0, path=\"1-6.2\", alt=0, name=\"@Internal Flash /0x08000000/128*0002Kg\", serial=\"0123456789AB\"";
         var parsed = Stm32Device.ParseListing(listing, selection, Model.Get("pro-iso"));
         Check(parsed.FlashBytes == 262144 && parsed.Serial == selection.Serial, "STM serial/port/map");
+        foreach (string id in new[] { "pro-iso", "pro-ansi" })
+        foreach (string padding in new[] { " ", "  ", "    " })
+        {
+            string map = "@Internal Flash" + padding + "/0x08000000/128*0002Kg";
+            var padded = Stm32Device.ParseListing(listing.Replace("@Internal Flash /0x08000000/128*0002Kg", map), selection, Model.Get(id));
+            Check(padded.FlashBase == Model.FlashBase && padded.FlashBytes == 262144 && padded.SramBytes == 40960,
+                id + " STM ASCII label padding preserves exact geometry");
+            Check(padded.MemoryMap == map && padded.Serial == selection.Serial && padded.PortPath == selection.PortPath,
+                id + " STM label padding retains raw descriptor and selected identity");
+        }
         foreach (string old in new[] { "1-6.2", "0123456789AB", "cfg=1", "intf=0", "alt=0", "128*0002Kg" })
             Reject(() => Stm32Device.ParseListing(listing.Replace(old, "wrong"), selection, Model.Get("pro-iso")), "STM selector " + old);
         Reject(() => Stm32Device.ParseListing(listing + "\n" + listing, selection, Model.Get("pro-iso")), "STM duplicate");
-        foreach (string bad in new[] { "@Option Bytes /0x1FFFF800/01*016 e", "@Internal Flash /0x08000000/128*0002Ke", "@Internal Flash /0x08000000/64*0002Kg", "@Internal Flash /0x08000000/128*0002Kg:unprotect" })
+        Reject(() => Stm32Device.ParseListing(listing + "\n" + listing.Replace("@Internal Flash /", "@Internal Flash  /"), selection, Model.Get("pro-iso")), "STM padded duplicate still rejected");
+        foreach (string bad in new[]
+        {
+            "@Option Bytes /0x1FFFF800/01*016 e", "@Internal Flash /0x08000000/128*0002Ke",
+            "@Internal Flash /0x08000000/64*0002Kg", "@Internal Flash /0x08000000/128*0002Kg:unprotect",
+            "@Internal Flash/0x08000000/128*0002Kg", "@Internal Flash\t/0x08000000/128*0002Kg",
+            "@Internal Flash \n/0x08000000/128*0002Kg", "@Internal Flash\u00A0/0x08000000/128*0002Kg",
+            "@Internal Flash  /0x08000001/128*0002Kg", "@Internal Flash  /0x08000000/256*0001Kg",
+            "@Internal Flash  /0x08000000/128*0001Kg", "@Internal Flash  /0x08000000/128*0004Kg",
+            "@Internal Flash  /0x08000000/4294967296*0002Kg", "@Internal Flash  /0x08000000/128*4294967296Kg",
+            "@Internal Flash  /0x08000000/128*0002Kg,1*0002Kg", "@Internal Flash  /0x08000000/128*0002Kg\n",
+            "@Internal Flash  /0x08000000/128*0002Kg\r\n", "@Internal Flash  /0x08000000/128*0002Kg "
+        })
+        {
             Reject(() => Stm32Device.ValidateMap(bad), "STM map permissions and bound");
+            Reject(() => Stm32Device.ParseListing(listing.Replace("@Internal Flash /0x08000000/128*0002Kg", bad), selection, Model.Get("pro-iso")),
+                "STM listing rejects invalid map without relaxing selector binding");
+        }
     }
     private static void EngineChecks(string root, string id)
     {

@@ -44,11 +44,12 @@ try
     Check(initial.Preferences.Language == L.SystemLanguage && new AppPreferences().Language == L.SystemLanguage, "missing preferences default to system language");
     Check(initial.Warning is null && initial.Preferences.StartDevice == "last" && initial.Preferences.LastDeviceId == "pro-iso", "default start device");
     Check(initial.Preferences.RememberWindowSize && initial.Preferences.ShowHelp, "window memory and help on by default");
+    Check(initial.Preferences.CheckForSoftwareUpdates, "software update checks are enabled by default");
     Check(initial.Preferences.ResolveStartDevice() == "pro-iso", "last-device fallback is deterministic");
     var session = AppPreferencesStore.BeginEdit(initial.Preferences, path);
     Check(!Directory.Exists(root), "read and edit session create no files or directories");
     Check(!ReferenceEquals(session.Preferences, initial.Preferences) && session.Preferences == initial.Preferences, "edit session owns an immutable copy");
-    var saved = initial.Preferences with { StartDevice = "numpad", LastDeviceId = "numpad", RememberWindowSize = false, ShowHelp = true };
+    var saved = initial.Preferences with { StartDevice = "numpad", LastDeviceId = "numpad", RememberWindowSize = false, ShowHelp = true, CheckForSoftwareUpdates = false };
     AppPreferencesStore.Save(session, saved);
     Check(AppPreferencesStore.Load(path).Preferences == saved, "explicit edit save roundtrips all preferences");
     using (var savedJson = JsonDocument.Parse(File.ReadAllBytes(path)))
