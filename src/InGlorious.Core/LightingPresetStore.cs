@@ -163,7 +163,8 @@ public static class LightingPresetStore
             throw new InvalidDataException(L.T("Die INGLORIOUS-Standardvorlage kann nicht gelöscht werden."));
         var root = Path.GetFullPath(folder ?? DefaultFolder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var full = Path.GetFullPath(entry.Path);
-        if (!string.Equals(Path.GetDirectoryName(full), root, StringComparison.OrdinalIgnoreCase) || !full.EndsWith(".lighting.json", StringComparison.OrdinalIgnoreCase)) throw Invalid();
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!string.Equals(Path.GetDirectoryName(full), root, comparison) || !full.EndsWith(".lighting.json", StringComparison.OrdinalIgnoreCase)) throw Invalid();
         // Verify the chosen file still represents the same preset before deleting it.
         if (!JsonSerializer.Serialize(Load(full), Options).Equals(JsonSerializer.Serialize(entry.Preset, Options), StringComparison.Ordinal))
             throw new IOException(L.T("Die Beleuchtungsvorlage wurde inzwischen geändert. Bitte die Liste neu öffnen."));

@@ -17,7 +17,7 @@ internal sealed class NativeUsb : IDisposable
     private readonly List<(nint Pointer, DeviceDescriptor Descriptor, DeviceIdentity Identity)> matching = [];
     internal IReadOnlyList<DeviceIdentity> Devices => matching.Select(x => x.Identity).ToArray();
     internal NativeLibraryEvidence Library { get; }
-    internal const string DllSha256 = "3C3C1F47C8040D841A940218874BCF88A47E24F58A115A6BAFF0869D2532FB8E";
+    internal const string DllSha256 = "7C4531E5369A763B1DAE7AEDD9152406587D52F65C3935479CCFC9C84F983AAC";
 
     internal NativeUsb(bool inventoryOnly = false)
     {

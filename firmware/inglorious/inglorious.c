@@ -610,7 +610,11 @@ static void slider_task(void) {
 }
 #endif
 void housekeeping_task_user(void) {
-    (void)light_test_remaining(timer_read32()); // Stops even if rendering is idle or the host disappears.
+    uint32_t now = timer_read32();
+    (void)light_test_remaining(now); // Stops even if rendering is idle or the host disappears.
+    // Newest first. Drop expired input history permanently so it cannot become
+    // recent again after the 32-bit timer wraps during a long-running session.
+    while (effect_hit_count && (uint32_t)(now - effect_hits[effect_hit_count - 1].time) >= IG_EFFECT_MAX_HIT_AGE_MS) --effect_hit_count;
     if (lighting_suspended) return;
     if (any_keys_pressed()) lighting_activity(); // A held physical key is not inactivity.
     macro_task();

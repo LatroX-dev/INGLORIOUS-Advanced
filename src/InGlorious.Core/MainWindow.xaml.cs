@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -218,21 +218,6 @@ public partial class MainWindow : Window
             };
             picker.ShowDialog(); Close(); return;
         }
-        if (screenshotIndex >= 0 && screenshotIndex + 1 < args.Length && args.Contains("--firmware-guide"))
-        {
-            var guidePreview = new FirmwareGuideDevice(Device.Id, FirmwareGuideState.UpdateRequired, args.Contains("--changelog"));
-            if (args.Contains("--changelog")) guidePreview = guidePreview with { RuntimeVersion = new(new(Device.Id, new(0, 8, 0), 0x00080001), "USB\\VID_FEED&PID_" + (Device.Id == "pro-iso" ? "1C01" : "1C02") + "\\fixture", DateTimeOffset.UtcNow) };
-            var guide = new FirmwareGuideWindow([guidePreview], Device.Id) { Owner = this };
-            if (args.Contains("--guide-minimum")) { guide.Width = guide.MinWidth; guide.Height = guide.MinHeight; }
-            guide.ContentRendered += async (_, _) =>
-            {
-                await Task.Delay(150);
-                try { SaveVisualScreenshot((FrameworkElement)guide.Content, Path.GetFullPath(args[screenshotIndex + 1])); }
-                catch (Exception ex) { File.WriteAllText(Path.Combine(Paths.DataRoot, "screenshot-error.txt"), ex.ToString()); Environment.ExitCode = 1; }
-                finally { guide.Close(); }
-            };
-            guide.ShowDialog(); Close(); return;
-        }
         if (screenshotIndex >= 0 && screenshotIndex + 1 < args.Length && args.Contains("--device-setup"))
         {
             var stepIndex = Array.IndexOf(args, "--setup-step");
@@ -246,24 +231,6 @@ public partial class MainWindow : Window
                 setup.Close();
             };
             setup.ShowDialog(); Close(); return;
-        }
-        if (screenshotIndex >= 0 && screenshotIndex + 1 < args.Length && args.Contains("--firmware"))
-        {
-            var operation = args.Contains("--firmware-install") ? FirmwareOperation.InstallFromOriginal : args.Contains("--firmware-restore") ? FirmwareOperation.RestoreOriginal : FirmwareOperation.Update;
-            var manager = new FirmwareWindow(Device.Id, offlinePreview: true, initialOperation: operation) { Owner = this };
-            if (args.Contains("--firmware-minimum")) { manager.Width = manager.MinWidth; manager.Height = manager.MinHeight; }
-            manager.ShowOfflineStep(args.Contains("--firmware-confirm") ? "ready" : args.Contains("--firmware-connect") ? "connect" : args.Contains("--firmware-unplug") ? "unplug" : args.Contains("--firmware-reconnect") ? "reconnect" : args.Contains("--firmware-running") ? "running" : args.Contains("--firmware-complete") ? "complete" : "overview");
-            if (args.Contains("--changelog")) manager.SetRuntimeVersionHint(new(new(Device.Id, new(0, 8, 0), 0x00080001), "USB\\VID_FEED&PID_" + (Device.Id == "pro-iso" ? "1C01" : "1C02") + "\\fixture", DateTimeOffset.UtcNow));
-            if (args.Contains("--firmware-core-running")) manager.ShowOfflineCoreStatus(true);
-            if (args.Contains("--firmware-error")) manager.ShowOfflineProtocolError();
-            manager.Loaded += async (_, _) =>
-            {
-                await Task.Delay(180);
-                try { SaveVisualScreenshot((FrameworkElement)manager.Content, Path.GetFullPath(args[screenshotIndex + 1])); }
-                catch (Exception ex) { File.WriteAllText(Path.Combine(Paths.DataRoot, "screenshot-error.txt"), ex.ToString()); Environment.ExitCode = 1; }
-                manager.Close();
-            };
-            manager.ShowDialog(); Close(); return;
         }
         if (screenshotIndex >= 0 && screenshotIndex + 1 < args.Length && args.Contains("--recorder"))
         {

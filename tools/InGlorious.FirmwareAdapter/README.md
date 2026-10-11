@@ -69,7 +69,9 @@ image when it is supplied as the archived *original* for a write.
 `backupPath` identifies the existing original `capture.json`; `expectedBackupSha256` is the
 uppercase SHA-256 of **both identical original flash images**, not of that JSON file.
 Both originals, the manifest, the bundle and the exact write image are rechecked and held with
-read-sharing-only file locks for the write. Fresh before-images are also locked before writing.
+file locks for the write (Windows read sharing; POSIX exclusive advisory locks). Fresh
+before-images are also locked. On POSIX the verified STM32 image is streamed to dfu-util's
+standard input so renaming a pathname cannot replace the bytes it writes.
 
 ## Bundle and installation identity
 
@@ -163,10 +165,12 @@ only these local files, fake transports and disposable temporary directories.
 
 The tool has no third-party NuGet dependency. Copy its apphost, DLL, deps/runtimeconfig files
 and `native/` together under `Tools/FirmwareAdapter/`, or publish self-contained for the target runtime.
-Windows native assets come from the verified official dfu-util archive. Linux x64 and macOS
-x64/arm64 packages build libusb and dfu-util from pinned official source archives. The adapter
-embeds a `NativeToolCatalog.json` for its exact runtime, with the byte size and SHA-256 of both
-native files; a missing, changed or wrong-runtime catalog blocks native access. Tools are loaded
+All native assets are built from pinned official libusb 1.0.30 and dfu-util 0.11 source archives.
+The Windows builder uses pinned QMK-MSYS 1.12.0 / GCC 15.2.0 and verifies reproducible native
+hashes against `build-dependencies.json`; the adapter also embeds those reviewed Windows hashes.
+Linux x64 and macOS x64/arm64 builds embed a `NativeToolCatalog.json` for their exact runtime,
+with the byte size and SHA-256 of both native files. A missing, changed or wrong-runtime
+catalog blocks POSIX native access. Tools are loaded
 only from the package's `native` directory, never from PATH or a system-installed fallback.
 Keep upstream licenses with any distributed package. None of the synthetic checks demonstrates physical acceptance of the
 thirteen experimental board models.
@@ -180,6 +184,6 @@ No automatic privilege escalation, kernel-driver detachment or protection unlock
 
 USB namespace references:
 [libusb device handling](https://libusb.sourceforge.io/api-1.0/group__libusb__dev.html),
-[libusb Darwin backend](https://github.com/libusb/libusb/blob/v1.0.29/libusb/os/darwin_usb.c),
+[libusb Darwin backend](https://github.com/libusb/libusb/blob/v1.0.30/libusb/os/darwin_usb.c),
 [HidSharp macOS device paths](https://github.com/IntergatedCircuits/HidSharp/blob/master/HidSharp/Platform/MacOS/MacHidDevice.cs),
 [HidSharp Linux device paths](https://github.com/IntergatedCircuits/HidSharp/blob/master/HidSharp/Platform/Linux/LinuxHidDevice.cs).

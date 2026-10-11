@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -174,7 +174,7 @@ public sealed partial class DeviceSetupWindow : Window
         {
             var report = await Task.Run(async () =>
             {
-                if (FirmwareService.IsGloriousCoreRunning() is not false)
+                if (DeviceSetupService.IsGloriousCoreRunning() is not false)
                     throw new SetupException(L.T("Schließe Glorious CORE, bevor du fortfährst."), recoverable: true);
                 var matches = OnboardClient.FindDevices().Where(device => selected.CandidateDeviceIds.Contains(device.DeviceId) &&
                     string.Equals(device.UsbInstanceId, selected.InstanceId, StringComparison.OrdinalIgnoreCase)).ToArray();

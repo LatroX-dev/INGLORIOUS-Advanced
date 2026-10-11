@@ -1,6 +1,6 @@
 # License and source-distribution record
 
-Updated for app 0.6.47 and included firmware 0.11.0. This is developer release documentation; it is not UI text or a guarantee that future dependencies have the same terms. Final native package and corresponding-source checks remain release requirements.
+Updated for app 0.6.48 and included firmware 0.11.1. This is developer release documentation; it is not UI text or a guarantee that future dependencies have the same terms. Final native package and corresponding-source checks remain release requirements.
 
 ## Project license
 
@@ -15,21 +15,22 @@ The source package is created with `scripts/New-CorrespondingSource.ps1` from an
 - The complete reviewed application, adapter, firmware overlays, patch/build scripts and tests.
 - The exact QMK base and the four submodules used by these targets: ChibiOS, ChibiOS-Contrib, LUFA and printf.
 - dfu-util 0.11's original source tarball.
-- The libusb commit identified by the official dfu-util 0.11 binary README, `1a906274a66dd58bf81836db1306902d4a7dc185`.
-- The libusb 1.0.29 source archive used by the native macOS and Linux packages.
+- The libusb 1.0.30 source archive used by all three operating systems, including the statically linked Windows dfu-util.
 - The upstream WB32 updater reference, retained for its protocol provenance and Apache notices.
 
 Archives generated from Git include tracked content at the exact commit, not the developer checkout's working files or `.git` directory. Original project modifications are included separately in the reviewed public source. QMK patches check their source hashes before applying. Compiler tools are not bundled into the application.
 
 The Windows installer is built with Inno Setup 6.7.3. `scripts/installer-dependencies.json` pins the official compiler distribution, verified publisher and compiler hash. The generated installer retains Inno Setup's notices and installs its unmodified license as `Licenses/Inno-Setup.txt`. The compiler is a separate build tool, not an application dependency. Its license is distinct from the app's GPL license.
 
-The Windows dfu-util binary provenance is `tools/InGlorious.FirmwareAdapter/Licenses/dfu-util-binary-provenance.txt`. Its build used MinGW on Ubuntu 20.04, dfu-util 0.11 and libusb `v1.0.24-66-g1a90627`. The project's primary [build instructions](https://dfu-util.sourceforge.net/build.html) explain MinGW cross-compilation and static linking. Native macOS/Linux tools are built from the source archives pinned in `scripts/posix-native-dependencies.json`. Use the versions in this repository's source-distribution manifests instead of substituting newer examples.
+All self-contained application and adapter packages use .NET runtime 9.0.20, built with SDK 9.0.318. The shared runtime pin and package checks reject older runtime packs. Runtime license texts come from the matching Microsoft packages; WindowsDesktop satellite resources are also checked against the reviewed official package hash.
+
+The Windows native provenance is `tools/InGlorious.FirmwareAdapter/Licenses/dfu-util-binary-provenance.txt`. The build uses the pinned QMK-MSYS 1.12.0 distribution, MinGW GCC 15.2.0, dfu-util 0.11 and libusb 1.0.30. `Windows-runtime-notices.txt` retains the MinGW, pthread and GCC Runtime Library Exception texts from that compiler distribution. The project's primary [build instructions](https://dfu-util.sourceforge.net/build.html) explain MinGW cross-compilation and static linking. All platforms use the source archives pinned in `scripts/native-source-dependencies.json`.
 
 ## Rebuilding modified native tools
 
-Extract the accompanying dfu-util and libusb sources. Generate libusb's configure files with `./autogen.sh`, then build libusb and dfu-util for `x86_64-w64-mingw32` using the upstream configure/make instructions. The static dfu-util executable can be built with `make LDFLAGS=-static`. Keep notices with the rebuilt files.
+On Windows, `Initialize-BuildDependencies.ps1 -Scope Native` downloads and verifies the source archives and compiler, then runs `Build-WindowsNativeTools.ps1` and `build-windows-native.sh`. The builder uses the release archives' configure scripts, creates a shared libusb DLL and statically links libusb into dfu-util. It removes build paths and timestamps, strips debugging information, checks x64 architecture and rejects external runtime DLL dependencies. The upstream configure/make build requires an output path without spaces. Keep notices with rebuilt files.
 
-For macOS and Linux, `Build-PosixNativeTools.ps1` builds the pinned source archives on the matching host and records the resulting library and dfu-util hashes in `NativeToolCatalog.json`. `Build-DesktopRelease.ps1` publishes the adapter against that catalog and regenerates `SetupToolCatalog.json` before rebuilding the app. Modified native sources and their pins must be reviewed before rebuilding. Windows builds retain their separately reviewed native binaries and hashes.
+For macOS and Linux, `Build-PosixNativeTools.ps1` builds the pinned source archives on the matching host and records the resulting library and dfu-util hashes in `NativeToolCatalog.json`. `Build-DesktopRelease.ps1` publishes the adapter against that catalog and regenerates `SetupToolCatalog.json` before rebuilding the app. Modified native sources and their pins must be reviewed before rebuilding. Windows builds require the reproducible output to match the reviewed hashes in `build-dependencies.json` and the adapter's integrity constants.
 
 The app checks native binary hashes because those programs can write device firmware. Replacing a bundled library alone is rejected; regenerate the matching catalogs and rebuild the adapter and app together. All required source and build scripts are supplied; no private signing key or developer device is needed. The matching source archive must contain the exact native source versions used by every package in the release.
 

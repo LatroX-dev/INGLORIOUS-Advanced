@@ -1,44 +1,46 @@
-# Offline runtime checks
+# Offline firmware checks
 
-## Additional model ports and real storage driver
+These tests compile the actual INGLORIOUS C runtime and its helpers with mocked hardware interfaces. They do not discover, open, update or flash a physical device. The native compiler is the existing QMK-MSYS GCC; the runners do not install tools or modify the system PATH.
 
-For the0.10.0 candidate, `Run-PortChecks.ps1` compiles the actual common runtime for all seven additional layouts. Run `tests/InGlorious.OnboardChecks` first to generate its21 synthetic serializer fixtures. The harness independently derives physical matrix positions, LED geometry, recovery keys and INGLORIOUS letter keys from hash-checked QMK references. It checks volatile upload/abort, complete commit/readback/reboot, malformed payloads, persistence-phase faults and the21-second light test. The mock supplies base keycodes from the serializer fixture; `Verify-CandidateBuild.py` separately compares the actual linked ARM base keymap and LED data against independent sources.
+## Prepare fixtures
 
-`Run-StorageChecks.ps1` includes the real, hash-guarded patched QMK wear-leveling source. Prepare/build the overlay first. It tests both2-byte and8-byte backing writes, forced payload logging despite cache equality, full logs and consolidation, write/erase/init exclusion during staging, read-only abort, backing read failures, and dirty-cache recovery. The old two-board runtime tests also assert that staging is a pointer into the inactive cache slot, that reads of the active configuration remain unchanged during staging, and that abort preserves backing bytes.
+The runtime checks consume synthetic configurations emitted by the desktop serializer. From the repository root:
 
-`Run-BulkChecks.ps1` compiles every supported WB32 board-ID variant and rejects incompatible boards/geometries. `Verify-CandidateBuild.py` checks all nine actual ARM images and records static memory/compiler-frame evidence. None of these tools flashes a device or provides a physical power-loss/stack-high-water guarantee.
+```powershell
+dotnet run --project tests/InGlorious.OnboardChecks -c Release
+dotnet run --project tests/InGlorious.OnboardChecks -c Release -- --port-fixtures artifacts/port-fixtures
+dotnet run --project tests/InGlorious.OnboardChecks -c Release -- --gmmk3-fixtures artifacts/gmmk3-port-fixtures
+pwsh -NoProfile -File tests/InGlorious.ColorSequenceChecks/Run-ColorSequenceChecks.ps1
+```
 
-## Existing runtime suites
+For the storage-driver checks, prepare the pinned QMK checkout and apply the overlay first, using the build instructions in [the firmware README](../README.md). `Run-StorageChecks.ps1` verifies the expected patched source before compiling it.
 
-Run `firmware/tests/Run-RuntimeChecks.ps1` from PowerShell. It uses the already-extracted QMK-MSYS native GCC, builds both board variants with `-Wall -Wextra -Werror`, and runs `artifacts/firmware-runtime-tests-numpad.exe` and `firmware-runtime-tests-pro.exe`. It does not install a compiler or change the global PATH. There are no hardware calls in these executables.
+## Run checks
 
-The harness includes the actual `firmware/inglorious/inglorious.c`. QMK, matrix input, report output, timer and EEPROM interfaces are mocked. EEPROM has separate cache and backing arrays; writes update the cache before simulated I/O, matching the important QMK failure characteristic. This is not a reimplementation of QMK's physical wear-level algorithm or flash controller.
+```powershell
+pwsh -NoProfile -File firmware/tests/Run-RuntimeChecks.ps1
+pwsh -NoProfile -File firmware/tests/Run-PortChecks.ps1
+pwsh -NoProfile -File firmware/tests/Run-StorageChecks.ps1
+pwsh -NoProfile -File firmware/tests/Run-BulkChecks.ps1
+pwsh -NoProfile -File firmware/tests/Run-EffectsChecks.ps1
+pwsh -NoProfile -File tests/TimingChecks/Run-TimingChecks.ps1
+```
 
-Covered behaviors include raw-report framing and padding, address bounds, sequential upload, idempotent/conflicting duplicates, CRC and semantic rejection, key/macro busy checks, persistence-phase errors, failure after a valid marker reached backing storage, dirty-cache recovery, storage fault latching, restart loading, simulated total backing loss, and encoder-triggered macro collisions with held physical keys. Macro scheduling and cancellation use the actual runtime's functions. Physical boot recovery is checked for its exclusive two-key selection and 50+500ms timing; a third key or early release prevents entry. The bootloader function only increments a mock counter. Numpad checks also cover external-flash CS initialization order and bounded relative volume behavior with no startup volume event.
+- **Runtime:** PRO ISO and Numpad RAW-HID framing, lengths, padding, upload ordering, duplicate chunks, generation/CRC/semantic validation, malformed macros, busy guards, independent cache/backing failures, configuration reload, release reporting, recovery chord, slider filtering, brightness, standby and the complete 21-second lighting test.
+- **Model ports:** the other thirteen layouts use the same production runtime with independently derived matrix, LED, recovery-key and lighting-test coordinates. Real serializer payloads pass upload, commit and full readback checks. All fifteen models check permanent reactive-history expiry across timer wrap.
+- **Storage:** the actual hash-guarded QMK wear-leveling implementation, with both 2-byte and 8-byte backing writes and both slot geometries. Cases cover cache borrowing, abort without writes, phase failures, full logs, consolidation, dirty-cache recovery, backing read failures and invalid geometry. The physical flash interface is simulated.
+- **WB32 bulk writer:** every supported WB32 board ID, scalar and full-page writes, erase polarity, alignment, bounds, first/middle/final failures, unchanged surrounding bytes and rejected unsupported compile configurations.
+- **Effects and color sequences:** all 21 modes, brightness, reactive lifetimes, timing wrap and independent C#/C sequence-pixel comparison. The output-transfer tests compare the integer sRGB table with a separate floating-point reference.
+- **Timing:** bounded polling intervals, deferred debounce, safe delayed USB reconnection, timer wrap and descriptor-patch guards.
 
-The tests load both real desktop serializer fixtures (`default` and `configured`) for each board from `artifacts/protocol-fixtures`. They check semantic acceptance, upload through the firmware's RAW HID handler, commit against mock backing storage and complete byte-for-byte readback. If absent, generate the fixtures with `dotnet run --project tests/InGlorious.OnboardChecks` from the workspace root. Its default mode uses fake transports and does not access hardware.
+Runtime, port, storage and bulk runners accept `-ReportPath` and create a new JSON report with source hashes and assertion counts. Counts include repeated per-byte, per-pixel and packet assertions; they are not counts of independent scenarios.
 
-Firmware0.5 passes **28,658 assertions for Numpad and39,997 for PRO** with GCC15.2.0. Source hashes are recorded in the frozen release manifest. Actual matrix-coordinate checks cover held Fn plus physical/encoder macro triggers, rejection with Fn+Ctrl, release, changed mappings and suspend. New schema3 checks cover canonical color pools, reduced macro bounds, unchanged staging RAM, C#-generated fixtures through COMMIT/readback, write-free reboot, invalid migration and all persistence-phase failures. Runtime brightness tests verify commands9/10, strict lengths/padding, stage/reconnect exclusion and unchanged EEPROM/generation/CRC. Many assertions are individual request/response and upload-chunk checks, not thousands of independent scenarios. Earlier exact releases remain archived.
+## Verify compiled ARM artifacts
 
-`tests/InGlorious.ColorSequenceChecks/Run-ColorSequenceChecks.ps1` compares131,072 sequence pixels against the actual C helper, checks serializer/decoder roundtrips and old-firmware capability rejection, and generates both boards' schema3 fixtures. It also exercises runtime-brightness client calls against a fake transport. Run it before the runtime harness when generating fixtures from scratch. Existing hue/effect tests remain unchanged and pass968,222 assertions; the existing desktop preview oracle passes40,813 checks.
+```powershell
+python firmware/Verify-CandidateBuild.py firmware/build
+```
 
-These tests prove behavior in the stated model. They do not establish physical flash reliability, power-loss safety, USB behavior, memory headroom on MCU, restoration, or that external SPI storage is untouched in a real device. Static link evidence is recorded in `docs/firmware-audit.md`; later hardware evidence is separately recorded in `docs/hardware-status.md`.
+The read-only audit checks all fifteen build outputs against their source manifest, reserved flash region, actual USB descriptors, base keymaps, physical-key masks, LED coordinates/channels, linker memory reservations and compiler stack frames.
 
-## Standby0.6 checks
-
-The actual C-runtime harness passes81,111 Numpad and116,566 PRO assertions with schema4 standby. It verifies all whole-second timeout values10..3600, dim percentages1..100, deadline edges, timer wrap/latching, held keys, physical/encoder wake without consuming actions, disabled-slider wake with noise rejection, suspend/resume, unchanged RAW9/10 brightness values, write-free runtime transitions and byte-preserving legacy boots. The real C# schema4 fixtures from `artifacts/onboard-fixtures` cover standby with and without color sequences through native COMMIT and full readback. Standby does not enlarge the staging buffer. These are deterministic offline tests, not device acceptance or suspend-current measurements.
-
-## WB32 bulk consolidation checks
-
-Run `firmware/tests/Run-BulkChecks.ps1` for the separate native harness. It includes the actual `firmware/inglorious/wb32_bulk.c` with mock EFL/scalar interfaces, models the pinned driver's erase/program/RMW semantics, and compares every byte of the complete 128KiB array against the expected result. It does not call a real flash controller.
-
-The reviewed source SHA256 is `6521660847FC35B8E34D88CA7EAC6257A2C603C9D836F461EC00720D2286559D`. **290,243 assertions pass**, including page-boundary sweeps at every eight-byte offset, lengths through the full32KiB backing range, both erase-polarity conversions, unchanged source buffers and surrounding bytes, invalid null/alignment/overflow/descriptor inputs, and abort immediately on first/middle/scalar failures. Counts include assertions inside each mocked transport call, not hundreds of thousands of independent scenarios. The actual16KiB consolidation call produces64 full-page EFL calls and zero scalar calls, compared with2048 scalar calls from the unoptimized weak implementation.
-
-Eight deliberately unsafe compilation configurations are rejected: no-erase mode, wrong board, explicit first sector, omitted last sector, wrong sector/write width and wrong flash/backing capacities. This proves the override's data/guard/control-flow behavior under the mock. It does not measure hardware speed, establish power-loss safety or authorize deployment.
-# Autonomous lighting test (0.7)
-
-`lighting_test_checks.h`, included by the existing runtime harness, drives the actual RAW11/12 handlers and renderer. It checks every millisecond of the ten physical-key steps, dark gaps and final all-LED red frame, including split frame batches, timer wrap, automatic expiry, stop, key/encoder/slider cancellation and USB suspend. Separate cache/backing snapshots and counters verify that all success/failure/cancellation paths leave persistent bytes, generation, CRC, dimmer and input reports unchanged. These are offline mocked checks, not hardware light-output acceptance.
-
-## Explicit release reporting (0.8.0)
-
-`version_reporting_checks.h` exercises the actual RAW13 handler for both boards. It validates all16 response bytes, zero padding, every nonempty request length, each padding position, invalid envelope fields and initialization gating. Across64 combinations of staging, macros, USB suspend, pending reconnect, storage availability and lighting-test state, the query remains readable and leaves those states unchanged. Snapshots check staged bytes, active configuration, EEPROM cache/backing, generation/CRC and output counters. INFO and GET_EXTENSIONS remain byte-exact. The complete harness currently passes215,461 Numpad and540,616 PRO assertions; counts include existing per-pixel/upload tests and are not a count of independent scenarios.
+These results do not establish physical flash reliability, atomic power-loss recovery, USB behavior on every host, LED color calibration or maximum runtime stack use. Hardware acceptance is recorded separately in [the model overview](../../docs/model-support.md).

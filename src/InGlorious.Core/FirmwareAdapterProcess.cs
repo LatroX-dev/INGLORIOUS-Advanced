@@ -33,11 +33,9 @@ internal static class FirmwareAdapterProcess
             foreach (var item in manifest.RootElement.GetProperty("files").EnumerateArray())
             {
                 var path = DeviceSetupService.ContainedFile(root, item.GetProperty("path").GetString()!);
-                var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                locks.Add(file);
-                if (file.Length != item.GetProperty("bytes").GetInt64() ||
-                    Convert.ToHexString(SHA256.HashData(file)) != item.GetProperty("sha256").GetString())
-                    throw new SetupException(L.T("Die Firmware-Werkzeuge sind beschädigt. Installiere die App erneut."));
+                bool nativeTool = item.GetProperty("path").GetString() is "native/dfu-util" or "native/libusb-1.0.so.0" or "native/libusb-1.0.dylib";
+                var file = VerifyToolFile(path, item.GetProperty("bytes").GetInt64(), item.GetProperty("sha256").GetString()!, nativeTool);
+                if (file is not null) locks.Add(file);
             }
             if ((string)request["operation"]! == "discover") return await DiscoverCoreAsync(root);
             var callId = Guid.NewGuid().ToString("N");
@@ -67,6 +65,23 @@ internal static class FirmwareAdapterProcess
             return response.RootElement.Clone();
         }
         finally { foreach (var item in locks) item.Dispose(); }
+    }
+
+    internal static FileStream? VerifyToolFile(string path, long expectedBytes, string expectedHash, bool adapterOwnsNativeLock)
+    {
+        DeviceSetupService.AssertNoLinks(path);
+        var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        try
+        {
+            if (file.Length != expectedBytes || Convert.ToHexString(SHA256.HashData(file)) != expectedHash)
+                throw new SetupException(L.T("Die Firmware-Werkzeuge sind beschädigt. Installiere die App erneut."));
+            // On POSIX this read handle holds LOCK_SH, which conflicts with the
+            // adapter's mandatory LOCK_EX. The adapter independently rechecks its
+            // embedded native-tool pins and owns that lock before loading/running.
+            if (!OperatingSystem.IsWindows() && adapterOwnsNativeLock) { file.Dispose(); return null; }
+            return file;
+        }
+        catch { file.Dispose(); throw; }
     }
 
     private static async Task<JsonElement> DiscoverCoreAsync(string root)

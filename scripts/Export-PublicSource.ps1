@@ -38,7 +38,7 @@ $app = @(
     'LightingPresetStore.cs','LightPresetsWindow.cs','MainWindow.LightingPresets.cs','MainWindow.NewFeaturesChecks.cs',
     'BoardDescriptorRegistry.cs','OnboardClient.cs','OnboardHidTransport.cs','OnboardProtocol.cs','StockHidContract.cs','StockProtocol.cs','TransferWindow.cs','TransferWindow.StatusChecks.cs',
     'MacroRecorderWindow.xaml','MacroRecorderWindow.xaml.cs','MacroRecording.cs',
-    'FirmwareWindow.xaml','FirmwareWindow.xaml.cs','FirmwareWindow.Log.cs','FirmwareWindow.Version.cs','FirmwareWindow.Reconnect.cs','FirmwareService.cs','FirmwareRelease.cs','FirmwareChangelog.cs','FirmwareChangelogPanel.cs','FirmwareMessages.cs','FirmwareEvidenceStore.cs','FirmwareLightingTestService.cs','FirmwareGuideWindow.cs','MainWindow.Onboarding.cs','MainWindow.Standby.cs','UnsavedChangesWindow.cs','UiIcons.cs'
+    'FirmwareRelease.cs','FirmwareChangelog.cs','FirmwareMessages.cs','FirmwareLightingTestService.cs','MainWindow.Onboarding.cs','MainWindow.Standby.cs','UnsavedChangesWindow.cs','UiIcons.cs'
 )
 $allow = [Collections.Generic.List[string]]::new()
 foreach ($name in $app) { $allow.Add('src/InGlorious.Core/'+$name) }
@@ -54,7 +54,7 @@ $allow.Add('reference/glorious-stock-devices.json')
 $allow.Add('docs/setup-boot-gestures.md')
 $allow.Add('docs/device-setup.md')
 $allow.Add('scripts/Prepare-SetupAssets.ps1')
-foreach ($name in @('Build-PosixNativeTools.ps1','build-posix-native.sh','posix-native-dependencies.json','Build-DesktopRelease.ps1','New-DesktopPackage.ps1','Test-DesktopPackage.ps1','macos-entitlements.plist','macos-launcher.c','70-inglorious.rules','Install-UsbPermissions.sh')) { $allow.Add('scripts/'+$name) }
+foreach ($name in @('Build-PosixNativeTools.ps1','build-posix-native.sh','Build-WindowsNativeTools.ps1','build-windows-native.sh','native-source-dependencies.json','Build-DesktopRelease.ps1','New-DesktopPackage.ps1','Test-DesktopPackage.ps1','macos-entitlements.plist','macos-launcher.c','70-inglorious.rules','Install-UsbPermissions.sh')) { $allow.Add('scripts/'+$name) }
 foreach ($name in @('Build-WindowsInstaller.ps1','Initialize-InstallerCompiler.ps1','Test-NativeWindowsInstaller.ps1','installer-dependencies.json')) { $allow.Add('scripts/'+$name) }
 $allow.Add('packaging/windows/INGLORIOUS-Advanced.iss')
 foreach ($suite in @('InGlorious.AutostartChecks','InGlorious.StartupGuardChecks','InGlorious.BackgroundChecks','InGlorious.AppStartupChecks','InGlorious.AdapterFileChecks','InGlorious.SoftwareUpdateChecks')) {
@@ -67,7 +67,7 @@ $allow.Add('scripts/Prepare-ReleaseAssets.py')
 $allow.Add('tests/ReleaseAssetsChecks/check_release_assets.py')
 $allow.Add('tests/InGlorious.SetupChecks/LegacyMigrationChecks.cs')
 $adapterFiles=@('AdapterEngine.cs','Contracts.cs','Files.cs','InGlorious.FirmwareAdapter.csproj','NativeUsb.cs','NativeToolCatalog.cs','Program.cs','README.md','SelfTests.cs','SelfTests.Legacy.cs','Stm32Device.cs','WbProtocol.cs',
- 'Licenses/dfu-util-binary-provenance.txt','Licenses/dfu-util-GPL-2.0.txt','Licenses/dotnet-MIT.txt','Licenses/dotnet-THIRD-PARTY-NOTICES.txt','Licenses/libusb-LGPL-2.1.txt','Licenses/README.txt','Licenses/Westberry-Apache-2.0.txt')
+ 'Licenses/dfu-util-binary-provenance.txt','Licenses/dfu-util-GPL-2.0.txt','Licenses/dotnet-MIT.txt','Licenses/dotnet-THIRD-PARTY-NOTICES.txt','Licenses/libusb-LGPL-2.1.txt','Licenses/README.txt','Licenses/Westberry-Apache-2.0.txt','Licenses/Windows-runtime-notices.txt')
 foreach($name in $adapterFiles){$allow.Add('tools/InGlorious.FirmwareAdapter/'+$name)}
 foreach($suite in @('InGlorious.DiscoveryChecks','InGlorious.SetupChecks')){
  $allow.Add('tests/'+$suite+'/'+$suite+'.csproj');$allow.Add('tests/'+$suite+'/Program.cs')
@@ -87,7 +87,7 @@ foreach ($name in @('port_checks.c','port_mock.h','raw_hid.h','eeprom.h','wear_l
 foreach ($name in @('runtime_tests.c','version_reporting_checks.h','color_sequences_checks.h','color_output_checks.h','standby_checks.h','lighting_test_checks.h','effects_tests.c','bulk_tests.c','qmk_mock.h','analog.h','bootloader.h','eeprom.h','ig_physical.h','keymap_introspection.h','qmk_midi.h','raw_hid.h','wait.h','wear_leveling.h','Run-RuntimeChecks.ps1','Run-EffectsChecks.ps1','Run-BulkChecks.ps1','README.md')) { $allow.Add('firmware/tests/'+$name) }
 foreach ($name in @('hal.h','wear_leveling_efl_config.h','wear_leveling_internal.h','wear_leveling.h')) { $allow.Add('firmware/tests/bulk_mocks/'+$name) }
 foreach ($name in @('debounce.h','action.h','qmk_mock.h','usb_main.h','timer.h','timing_tests.c','Run-TimingChecks.ps1','Test-DescriptorPatch.ps1')) { $allow.Add('tests/TimingChecks/'+$name) }
-foreach ($suite in @('InGlorious.Checks','InGlorious.OnboardChecks','InGlorious.StockChecks','InGlorious.RecordingChecks','InGlorious.FirmwareChecks','InGlorious.EvidenceChecks','InGlorious.LightingTestChecks','InGlorious.PendingChecks','InGlorious.PreferencesChecks','InGlorious.PreviewChecks','InGlorious.ColorSequenceChecks','InGlorious.MacroLibraryChecks','InGlorious.IntegrationChecks','InGlorious.LightingPresetChecks','InGlorious.BoardRegistryChecks','InGlorious.ModelChecks')) {
+foreach ($suite in @('InGlorious.Checks','InGlorious.OnboardChecks','InGlorious.StockChecks','InGlorious.RecordingChecks','InGlorious.LightingTestChecks','InGlorious.PendingChecks','InGlorious.PreferencesChecks','InGlorious.PreviewChecks','InGlorious.ColorSequenceChecks','InGlorious.MacroLibraryChecks','InGlorious.IntegrationChecks','InGlorious.LightingPresetChecks','InGlorious.BoardRegistryChecks','InGlorious.ModelChecks')) {
     $allow.Add('tests/'+$suite+'/'+$suite+'.csproj'); $allow.Add('tests/'+$suite+'/Program.cs')
 }
 $allow.Add('tests/InGlorious.Checks/ColorPaletteChecks.cs')
@@ -125,7 +125,7 @@ $allow.Add('tests/InGlorious.OnboardChecks/StartupDeviceChecks.cs')
 foreach ($name in @('effect_oracle.c','Run-PreviewChecks.ps1')) { $allow.Add('tests/InGlorious.PreviewChecks/'+$name) }
 foreach ($name in @('sequence_oracle.c','Run-ColorSequenceChecks.ps1')) { $allow.Add('tests/InGlorious.ColorSequenceChecks/'+$name) }
 foreach ($name in @('.gitignore','.gitattributes','docs/public-release.md','docs/model-support.md','scripts/Test-ModelReferences.ps1','scripts/Export-PublicSource.ps1','scripts/Build-BrandIcon.ps1','scripts/Install-InGlorious.ps1','scripts/New-WindowsPackage.ps1','scripts/Test-WindowsInstaller.ps1')) { $allow.Add($name) }
-foreach ($name in @('README.md','LICENSE','COPYRIGHT.md','THIRD-PARTY-NOTICES.md','CONTRIBUTING.md','SECURITY.md','CHANGELOG.md','global.json','NuGet.Config',
+foreach ($name in @('README.md','LICENSE','COPYRIGHT.md','THIRD-PARTY-NOTICES.md','CONTRIBUTING.md','SECURITY.md','CHANGELOG.md','global.json','NuGet.Config','Directory.Build.props',
     'docs/getting-started.md','docs/hardware-acceptance.md','docs/license-audit.md','docs/images/windows-lighting.png','docs/images/experimental-layout.png','docs/images/pro-ansi.png','docs/images/gmmk3-100-ansi.png','docs/images/linux-numpad.png','docs/images/macos-pro-ansi.png','docs/images/native-provenance.json',
     'scripts/Initialize-BuildDependencies.ps1','scripts/build-dependencies.json','scripts/Build-PublicRelease.ps1','scripts/Test-PublicSourceExport.ps1','scripts/Copy-RuntimeNotices.ps1',
     '.github/workflows/build.yml','.github/ISSUE_TEMPLATE/bug_report.yml','.github/ISSUE_TEMPLATE/config.yml','.github/ISSUE_TEMPLATE/device_support.yml','.github/ISSUE_TEMPLATE/feature_request.yml',

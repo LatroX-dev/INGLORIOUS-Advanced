@@ -7,6 +7,7 @@
 typedef struct { uint8_t r, g, b; } ig_rgb_t;
 typedef struct { uint32_t time; uint8_t x, y, led; } ig_effect_hit_t;
 #define IG_EFFECT_HITS 8
+#define IG_EFFECT_MAX_HIT_AGE_MS 4000UL
 
 static uint8_t ig_effect_scale(uint8_t value, uint8_t scale) { return (uint16_t)value * scale / 255; }
 static uint8_t ig_effect_triangle(uint8_t phase) { return phase < 128 ? phase * 2 : (255 - phase) * 2; }
@@ -77,7 +78,7 @@ static ig_rgb_t ig_effect_pixel(const uint8_t config[8], ig_rgb_t base, uint8_t 
         case 15:
         case 20: {
             level = 0;
-            uint32_t lifetime = 4000UL - (uint32_t)config[1] * 3600UL / 255;
+            uint32_t lifetime = IG_EFFECT_MAX_HIT_AGE_MS - (uint32_t)config[1] * 3600UL / 255;
             if (hit_count > IG_EFFECT_HITS) hit_count = IG_EFFECT_HITS;
             for (uint8_t i = 0; i < hit_count; ++i) {
                 uint32_t age = now - hits[i].time;

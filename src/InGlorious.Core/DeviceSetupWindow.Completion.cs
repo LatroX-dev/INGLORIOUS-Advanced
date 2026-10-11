@@ -45,7 +45,7 @@ public sealed partial class DeviceSetupWindow
     {
         if (_offlinePreview || _service is null || session.DeviceId is not { } id || _operation == SetupOperation.Restore)
             throw new InvalidOperationException("A completed INGLORIOUS setup session is required.");
-        if (FirmwareService.IsGloriousCoreRunning() is not false)
+        if (DeviceSetupService.IsGloriousCoreRunning() is not false)
             throw new SetupException(L.T("Schließe Glorious CORE, bevor du fortfährst."), recoverable: true);
         var devices = await _service.ListDevicesAsync();
         var normal = SelectReturnedDevice(devices, session.Device, id);
@@ -60,7 +60,7 @@ public sealed partial class DeviceSetupWindow
         var version = await client.GetFirmwareVersionAsync(timeout.Token);
         if (!IsExpectedReturnedRuntime(id, info, extensions, version))
             throw new SetupException(L.T("Die erwartete Firmware-Version wurde noch nicht bestätigt."));
-        if (FirmwareService.IsGloriousCoreRunning() is not false)
+        if (DeviceSetupService.IsGloriousCoreRunning() is not false)
             throw new SetupException(L.T("Schließe Glorious CORE, bevor du fortfährst."), recoverable: true);
         _runtimeVersion = version;
         return normal.InstanceId;
@@ -93,7 +93,7 @@ public sealed partial class DeviceSetupWindow
             // MainWindow keeps shared brightness paused for the entire modal firmware flow.
             var root = await ReadVerifiedReturnedRuntimeAsync(session);
             await new FirmwareLightingTestService().BlinkAsync(session.DeviceId!, root,
-                () => Task.FromResult(FirmwareService.IsGloriousCoreRunning()), CancellationToken.None);
+                () => Task.FromResult(DeviceSetupService.IsGloriousCoreRunning()), CancellationToken.None);
             if (!_closed) _lightingStatus.Text = L.T("Prüfe, ob die Tasten und Seitenleisten aufgeleuchtet haben.");
         }
         catch (Exception exception)

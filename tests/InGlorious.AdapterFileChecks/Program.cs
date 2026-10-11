@@ -8,12 +8,82 @@ if (args is ["--try-write", var childPath])
     try { File.WriteAllBytes(childPath, Encoding.UTF8.GetBytes("changed")); return 0; }
     catch (IOException) { return 23; }
 }
+if (args is ["--try-operation"])
+{
+    try { using var operation = Files.AcquireDeviceOperation(); return 0; }
+    catch (IOException) { return 23; }
+}
+if (args is ["--hold-operation"])
+{
+    using var operation = Files.AcquireDeviceOperation();
+    Console.WriteLine("held"); Console.Out.Flush();
+    Thread.Sleep(Timeout.Infinite);
+    return 0;
+}
+if (args is ["--hash-input"])
+{
+    using var input = Console.OpenStandardInput();
+    using var received = new MemoryStream();
+    input.CopyTo(received);
+    Console.WriteLine(received.Length + ":" + Files.Hash(received.ToArray()));
+    return 0;
+}
 
 string root = Path.Combine(Path.GetTempPath(), "inglorious-file-checks-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(root);
 int checks = 0;
 try
 {
+    using (Files.AcquireDeviceOperation())
+        Check(OperationChild() == 23, "A second process cannot enter an active device transaction.");
+    Check(OperationChild() == 0, "A completed transaction releases the process-wide device lock.");
+    try { using var operation = Files.AcquireDeviceOperation(); throw new IOException("synthetic failure"); }
+    catch (IOException) { }
+    Check(OperationChild() == 0, "A failed transaction releases the process-wide device lock.");
+    using (var child = Process.Start(OperationStart("--hold-operation")) ?? throw new IOException("Test child process did not start."))
+    {
+        try
+        {
+            string? ready = child.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+            Check(ready == "held", "The separate process holds the device lock before the crash test.");
+            Reject(() => Files.AcquireDeviceOperation(), "The parent cannot overlap a child transaction.");
+        }
+        finally
+        {
+            if (!child.HasExited) child.Kill(true);
+            child.WaitForExit();
+        }
+    }
+    Check(OperationChild() == 0, "An exited owner does not leave the device transaction locked.");
+    var payload = Enumerable.Range(0, 262144).Select(i => (byte)(i * 17 + 23)).ToArray();
+    var payloadFile = Files.New(root, "pipe-source.bin", payload, "synthetic-test");
+    string payloadPath = Files.Child(root, payloadFile.Path);
+    var verified = Files.Lock(payloadPath, payloadFile.Bytes, payloadFile.Sha256);
+    using (verified.Stream)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            // POSIX permits renaming a locked inode. The pipe must use retained
+            // bytes, even when the original pathname now contains other data.
+            File.Move(payloadPath, Files.Child(root, "renamed-source.bin"));
+            File.WriteAllBytes(payloadPath, [1, 2, 3]);
+        }
+        var start = OperationStart("--hash-input"); start.RedirectStandardInput = true;
+        using var child = Process.Start(start) ?? throw new IOException("Test child process did not start.");
+        var output = child.StandardOutput.ReadToEndAsync();
+        var input = Files.WriteProcessInputAsync(child.StandardInput.BaseStream, verified.Bytes);
+        try
+        {
+            if (!child.WaitForExit(10000)) throw new TimeoutException("Pipe test child did not finish.");
+            input.GetAwaiter().GetResult();
+            Check(child.ExitCode == 0 && output.GetAwaiter().GetResult().Trim() == "262144:" + payloadFile.Sha256,
+                "The child receives the full verified binary image and EOF, independently of its pathname.");
+        }
+        finally
+        {
+            if (!child.HasExited) { child.Kill(true); child.WaitForExit(); }
+        }
+    }
     byte[] original = Encoding.UTF8.GetBytes("verified input");
     Artifact artifact = Files.New(root, "input.bin", original, "synthetic-test");
     string path = Files.Child(root, artifact.Path);
@@ -82,6 +152,16 @@ int Writer(string path)
         start.ArgumentList.Add(Assembly.GetExecutingAssembly().Location);
     start.ArgumentList.Add("--try-write"); start.ArgumentList.Add(path);
     return Run(start).ExitCode;
+}
+int OperationChild()
+    => Run(OperationStart("--try-operation")).ExitCode;
+ProcessStartInfo OperationStart(string argument)
+{
+    string host = Environment.ProcessPath ?? throw new IOException("Test process path is unavailable.");
+    var start = new ProcessStartInfo(host) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+    if (Path.GetFileNameWithoutExtension(host).Equals("dotnet", StringComparison.OrdinalIgnoreCase)) start.ArgumentList.Add(Assembly.GetExecutingAssembly().Location);
+    start.ArgumentList.Add(argument);
+    return start;
 }
 (int ExitCode, string Output) Run(ProcessStartInfo start)
 {

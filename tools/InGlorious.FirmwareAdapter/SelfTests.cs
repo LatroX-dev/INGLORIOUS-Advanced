@@ -20,7 +20,7 @@ internal static partial class SelfTests
             var dfu = NativeToolCatalog.Verify(NativeToolCatalog.DfuName);
             using (Files.Lock(dfu.Path, dfu.Bytes, dfu.Sha256).Stream) checks++;
             NativeCatalogChecks();
-            PacketChecks(); PageWriteChecks(); FileChecks(root); RequestChecks(root); StmChecks();
+            PacketChecks(); PageWriteChecks(); FileChecks(root); RequestChecks(root); OperationLockChecks(root); StmChecks();
             string[] ids = ["pro-iso", "numpad", "pro-ansi", "pro-rev2-ansi", "pro-rev2-iso", "gmmk2-65-ansi", "gmmk2-65-iso", "gmmk2-96-ansi", "gmmk2-96-iso", "gmmk3-65-ansi", "gmmk3-65-iso", "gmmk3-75-ansi", "gmmk3-75-iso", "gmmk3-100-ansi", "gmmk3-100-iso"];
             foreach (string id in ids) EngineChecks(root, id);
             LegacyChecks(root);
@@ -128,9 +128,38 @@ internal static partial class SelfTests
         Reject(() => JsonSerializerRead("{\"schema\":1,\"operation\":\"list\",\"sessionDirectory\":\"x\",\"execute\":true}"), "unknown JSON property");
     }
     private static AdapterRequest? JsonSerializerRead(string json) => System.Text.Json.JsonSerializer.Deserialize<AdapterRequest>(json, Json.Options);
+    private static void OperationLockChecks(string root)
+    {
+        var device = new FakeDevice(Model.Get("numpad"));
+        var selection = new Selection(0x342D, 0xDFA0, 1, "6.7", "", "wb32-dfu");
+        int opened = 0;
+        var engine = new AdapterEngine(() => { opened++; return new FakeBackend(device, selection); });
+        var request = new AdapterRequest(1, "probe", Path.Combine(root, "busy-operation"), "numpad", selection);
+        AdapterResponse? refused = null;
+        Exception? error = null;
+        using (Files.AcquireDeviceOperation())
+        {
+            var concurrent = new Thread(() => { try { refused = engine.Run(request); } catch (Exception ex) { error = ex; } });
+            concurrent.Start();
+            Check(concurrent.Join(10000), "competing transaction is refused without waiting");
+            Check(error is null && refused is { Status: "blocked", ErrorCode: "DEVICE_OPERATION_BUSY", WriteAttempted: false, Verified: false }, "competing transaction returns a no-write refusal");
+            Check(opened == 0 && device.Reads == 0 && device.Writes == 0, "busy transaction cannot create a USB backend");
+        }
+        var resumed = engine.Run(request with { SessionDirectory = Path.Combine(root, "released-operation") });
+        Check(resumed.Status == "ok" && opened == 1, "new explicit transaction can enter after release");
+        var failure = new AdapterEngine(() => throw new IOException("synthetic backend failure"));
+        Check(failure.Run(request with { SessionDirectory = Path.Combine(root, "failed-operation") }).Status == "blocked", "backend failure is reported");
+        Check(engine.Run(request with { SessionDirectory = Path.Combine(root, "after-failed-operation") }).Status == "ok", "backend failure releases the transaction lock");
+    }
     private static void StmChecks()
     {
         var selection = new Selection(0x0483, 0xDF11, 1, "6.2", "0123456789AB", "stm32-dfuse");
+        string[] selectors = ["-d", "0483:df11", "-S", "0123456789AB", "-p", "1-6.2", "-c", "1", "-i", "0", "-a", "0"];
+        Check(Stm32Device.Arguments(selection, "write", "-").SequenceEqual([.. selectors, "-s", "0x08000000", "-D", "-"]), "stdin write keeps all STM identity selectors and the fixed flash base");
+        Check(Stm32Device.Arguments(selection, "write", "fixture.bin").SequenceEqual([.. selectors, "-s", "0x08000000", "-D", "fixture.bin"]), "Windows file write keeps the same bounded STM command");
+        Check(Stm32Device.Arguments(selection, "read", "fixture.bin").SequenceEqual([.. selectors, "-s", "0x08000000:262144", "-U", "fixture.bin"]), "STM backup still reads the exact whole flash range");
+        Reject(() => Stm32Device.Arguments(selection, "write"), "no write without an input");
+        Reject(() => Stm32Device.Arguments(selection, "unprotect", "-"), "stdin does not authorize additional commands");
         string listing = "Found DFU: [0483:df11] ver=2200, devnum=4, cfg=1, intf=0, path=\"1-6.2\", alt=0, name=\"@Internal Flash /0x08000000/128*0002Kg\", serial=\"0123456789AB\"";
         var parsed = Stm32Device.ParseListing(listing, selection, Model.Get("pro-iso"));
         Check(parsed.FlashBytes == 262144 && parsed.Serial == selection.Serial, "STM serial/port/map");
@@ -268,7 +297,7 @@ internal static partial class SelfTests
         string filename = (id == "pro-iso" ? "pro" : id) + ".bin";
         if (firmwareDirectory is not null) return Files.ReadBounded(Path.Combine(firmwareDirectory, filename), 262144);
         for (var parent = new DirectoryInfo(AppContext.BaseDirectory); parent is not null; parent = parent.Parent)
-            foreach (var relative in new[] { "Firmware", Path.Combine("firmware", "candidates", "0.11.0-gmmk3", "build") })
+            foreach (var relative in new[] { "Firmware", Path.Combine("firmware", "build") })
             {
                 string file = Path.Combine(parent.FullName, relative, filename);
                 if (File.Exists(file)) return Files.ReadBounded(file, 262144);

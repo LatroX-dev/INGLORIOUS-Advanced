@@ -1,16 +1,23 @@
-dfu-util 0.11 binaries
+Windows native source-build provenance (INGLORIOUS Advanced)
 
-The Windows binaries were built using MinGW on Ubuntu 20.04
-and the instructions on http://dfu-util.sourceforge.net/build.html
+These are project-built binaries, not the old upstream Windows binary archive.
+Both the separate libusb DLL and statically linked dfu-util use libusb 1.0.30.
 
-The macOS (darwin) binaries were built on macOS 10.13.6
+dfu-util 0.11 official source:
+https://dfu-util.sourceforge.net/releases/dfu-util-0.11.tar.gz
+SHA256 B4B53BA21A82EF7E3D4C47DF2952ADF5FA494F499B6B0B57C58C5D04AE8FF19E
 
-The Linux dfu-util-static has libusb statically linked.
+libusb 1.0.30 official source:
+https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.tar.bz2
+SHA256 FEA36F34F9156400209595E300840767AB1A385EDE1DC7EE893015AEA9C6DBAF
 
-The dfu-util source was from the 0.11 release tarball.
+Build toolchain: QMK-MSYS 1.12.0, MinGW GCC 15.2.0.
+The compiler distribution is pinned in scripts/build-dependencies.json.
+Build scripts: scripts/Build-WindowsNativeTools.ps1 and scripts/build-windows-native.sh.
+Both source archives and these build scripts accompany the release.
+The produced Windows x64 binaries use only KERNEL32.dll and msvcrt.dll imports.
+GCC/MinGW runtime licenses and exceptions are in Windows-runtime-notices.txt.
 
-The libusb source was from latest git 2021-09-05 (pre-1.0.25)
-commit v1.0.24-66-g1a90627
-
-The lsusb utility was built from usbutils v014
-with the patch lsusb_build_on_mingw.patch applied.
+The application pins reviewed native file hashes. For a modified rebuild, review
+and update both build-dependencies.json and the adapter's native integrity
+constants, then regenerate the application tool catalog. No private key is needed.

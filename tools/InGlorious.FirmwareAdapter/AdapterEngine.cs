@@ -16,9 +16,11 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
         bool attempted = false, verified = false; Guid? installationId = null;
         IDevice? device = null;
         IBackend? backend = null;
+        IDisposable? operationLock = null;
         try
         {
             Files.New(directory, "request.json", Json.Bytes(request), "request");
+            operationLock = Files.AcquireDeviceOperation();
             backend = createBackend();
             if (request.Operation == "list")
                 return Save(new(1, request.Operation, sessionId, "ok", null, request.DeviceId, null, null, false, false, false, false, false, directory, [], backend.List()));
@@ -164,7 +166,15 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
         finally
         {
             try { if (device != null) { FlushDeviceLog(); device.Dispose(); } }
-            finally { backend?.Dispose(); foreach (IDisposable item in locks.AsEnumerable().Reverse()) item.Dispose(); }
+            finally
+            {
+                try { backend?.Dispose(); }
+                finally
+                {
+                    try { foreach (IDisposable item in locks.AsEnumerable().Reverse()) item.Dispose(); }
+                    finally { operationLock?.Dispose(); }
+                }
+            }
         }
         void FlushDeviceLog()
         {

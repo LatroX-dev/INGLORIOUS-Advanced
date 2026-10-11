@@ -1,6 +1,6 @@
 # INGLORIOUS onboard firmware
 
-The current included firmware is **0.11.0**, build `0x000B0001`, for the 15 model/layout variants in `targets.json`. Thirteen variants remain experimental. Model support and physical acceptance are listed in [the model overview](../docs/model-support.md).
+The current included firmware is **0.11.1**, build `0x000B0101`, for the 15 model/layout variants in `targets.json`. Thirteen variants remain experimental. Model support and physical acceptance are listed in [the model overview](../docs/model-support.md).
 
 ## Behavior
 

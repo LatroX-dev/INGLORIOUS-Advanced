@@ -1286,6 +1286,19 @@
     "ko": "프로필 파일이 비어 있습니다.",
     "zh-Hans": "配置文件为空。"
   },
+  "Die Datei ist ungültig. Bitte wähle eine andere Datei.": {
+    "en": "This file is invalid. Please choose another file.",
+    "es": "El archivo no es válido. Elige otro archivo.",
+    "fr": "Ce fichier est invalide. Choisissez un autre fichier.",
+    "it": "Il file non è valido. Scegli un altro file.",
+    "pt-BR": "O arquivo é inválido. Escolha outro arquivo.",
+    "pl": "Plik jest nieprawidłowy. Wybierz inny plik.",
+    "tr": "Bu dosya geçersiz. Lütfen başka bir dosya seçin.",
+    "ru": "Файл недействителен. Выберите другой файл.",
+    "ja": "このファイルは無効です。別のファイルを選択してください。",
+    "ko": "올바르지 않은 파일입니다. 다른 파일을 선택해 주세요.",
+    "zh-Hans": "此文件无效。请选择其他文件。"
+  },
   "Basis": {
     "en": "Base",
     "es": "Base",

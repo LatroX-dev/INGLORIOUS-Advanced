@@ -15,7 +15,7 @@ case "$runtime" in
   *) printf '%s\n' 'Unsupported native runtime.' >&2; exit 1 ;;
 esac
 
-cd "$root/libusb-1.0.29"
+cd "$root/libusb-1.0.30"
 options=(--prefix="$prefix" --disable-static --disable-dependency-tracking)
 if [[ "$runtime" == linux-* ]]; then options+=(--disable-udev); fi
 ./configure "${options[@]}"

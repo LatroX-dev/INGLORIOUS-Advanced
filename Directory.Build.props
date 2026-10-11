@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <!-- Keep every self-contained app and firmware adapter on the reviewed security patch. -->
+    <RuntimeFrameworkVersion>9.0.20</RuntimeFrameworkVersion>
+    <!-- Audit direct and transitive dependencies on every restore. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>
+    <!-- A release must not silently skip the advisory feed. Local offline builds
+         can still use the last downloaded advisory database. -->
+    <WarningsAsErrors Condition="'$(CI)' == 'true'">$(WarningsAsErrors);NU1900;NU1905</WarningsAsErrors>
+  </PropertyGroup>
+</Project>

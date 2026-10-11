@@ -115,7 +115,7 @@ public sealed partial class MainWindow
         {
             var selected = list.SelectedItems?.Cast<MacroRow>().Select(r => r.Value).ToArray() ?? []; if (selected.Length == 0) return;
             var file = await dialog.StorageProvider.SaveFilePickerAsync(new() { Title = L.T("Makros exportieren"), SuggestedFileName = "macros.inglorious.json", ShowOverwritePrompt = true });
-            if (file?.TryGetLocalPath() is { } path) SharedMacroLibrary.ExportFile(path, selected, true);
+            if (file?.TryGetLocalPath() is { } path) SharedMacroLibrary.ExportFile(path, selected, overwrite: true, library: snapshot);
         });
         var delete = LocalButton("Entfernen", () => { var selected = list.SelectedItems?.Cast<MacroRow>().Select(r => r.Value).ToHashSet() ?? []; snapshot = SharedMacroLibrary.Save(snapshot, snapshot.Macros.Where(m => !selected.Contains(m))); Refresh(); });
         dialog.Content = new Border { Padding = new Thickness(22), Child = Column(list, feedback, Row(importFile, export, delete), Row(save, add, Button("Schließen", () => dialog.Close()))) };

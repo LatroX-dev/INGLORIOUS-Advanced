@@ -1,6 +1,6 @@
 # INGLORIOUS firmware protocol 1 / configuration schemas 1, 2, 3 and 4
 
-This is the implementation contract for the **0.11.0 firmware candidate**, assigned build ID `0x000B0001`, and app **0.6.37**, dated 2026-10-11. The approved local updater still targets frozen release 0.9.2; the candidate is not a hardware release. All multi-byte integers are little-endian. No packet enters a bootloader, resets the MCU, writes firmware, changes protection, or exposes arbitrary memory. Command 8 explicitly schedules a USB re-enumeration to apply a saved keyboard polling interval.
+This is the implementation contract for **firmware 0.11.1**, assigned build ID `0x000B0101`. The installation and update catalog supplies this release for all 15 model/layout variants; hardware validation is tracked separately in [the model overview](../docs/model-support.md). All multi-byte integers are little-endian. No packet enters a bootloader, resets the MCU, writes firmware, changes protection, or exposes arbitrary memory. Command 8 explicitly schedules a USB re-enumeration to apply a saved keyboard polling interval.
 
 ## Identity and transport
 

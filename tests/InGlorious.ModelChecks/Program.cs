@@ -33,6 +33,7 @@ foreach (var language in L.SupportedLanguages)
 L.SetLanguage("de");
 try
 {
+    RunProfileImportChecks(temp, Check);
     (string Id, int Keys, int Leds, int Sides, bool Encoder)[] expected = [
         ("pro-iso",84,99,16,true), ("numpad",18,31,14,true),
         ("pro-ansi",83,98,16,true), ("pro-rev2-ansi",83,98,16,true), ("pro-rev2-iso",84,99,16,true),
@@ -202,6 +203,84 @@ finally
     var full = Path.GetFullPath(temp); var parent = Path.GetFullPath(tempParent) + Path.DirectorySeparatorChar;
     if (!full.StartsWith(parent, StringComparison.OrdinalIgnoreCase) || Path.GetFileName(full).Length != 32) throw new Exception("Unsafe temporary cleanup path");
     if (Directory.Exists(full)) Directory.Delete(full, true);
+}
+
+static void RunProfileImportChecks(string root, Action<bool, string> check)
+{
+    var folder = Path.Combine(root, "profile-imports"); Directory.CreateDirectory(folder);
+    var path = Path.Combine(folder, "profile.json");
+    var project = ProjectService.Create("numpad");
+    var valid = JsonSerializer.Serialize(project, ProjectService.JsonOptions);
+    void RejectFile(string body)
+    {
+        File.WriteAllText(path, body); var before = File.ReadAllBytes(path); var rejected = false;
+        try { ProjectService.Load(path); }
+        catch (Exception ex) when (ex is InvalidDataException or JsonException) { rejected = true; }
+        check(rejected && before.AsSpan().SequenceEqual(File.ReadAllBytes(path)), "ambiguous or oversized profile import is rejected without modifying its file");
+    }
+    RejectFile(valid.Replace("\"deviceId\": \"numpad\"", "\"deviceId\": \"pro-iso\", \"deviceId\": \"numpad\""));
+    RejectFile(valid.Replace("\"binding\": \"MO(1)\"", "\"binding\": \"KC_A\", \"binding\": \"MO(1)\""));
+    RejectFile(valid.Replace("\"schemaVersion\": 1", "\"schemaVersion\": 99, \"schema\\u0056ersion\": 1"));
+    RejectFile(new string(' ', ProjectService.MaximumFileBytes + 1));
+    RejectFile(new string('[', 17) + "0" + new string(']', 17));
+    foreach (var encoding in new System.Text.Encoding[] { new System.Text.UTF8Encoding(false), new System.Text.UTF8Encoding(true), System.Text.Encoding.Unicode })
+    {
+        File.WriteAllText(path, valid, encoding);
+        check(JsonSerializer.Serialize(ProjectService.Load(path), ProjectService.JsonOptions) == valid, "existing valid JSON encoding preserves the whole profile");
+    }
+    var library = new ProfileLibrary(folder);
+    File.WriteAllText(path, valid + new string(' ', 1_100_000));
+    check(library.Discover(out var warning).Count == 1 && warning is null, "profile discovery accepts the same bounded file size as explicit opening");
+    ProjectService.Save(path, project); var saved = File.ReadAllBytes(path);
+    // Delay keys are unused payload text: even an otherwise valid model cannot produce an unreadable file.
+    project.Macros.Add(new() { Steps = [new() { Kind = "delay", DelayMs = 1, Key = new string('x', ProjectService.MaximumFileBytes) }] });
+    var refused = false;
+    try { ProjectService.Save(path, project); } catch (InvalidDataException) { refused = true; }
+    check(refused && saved.AsSpan().SequenceEqual(File.ReadAllBytes(path)), "oversized save preserves the previous readable profile");
+    check(!Directory.EnumerateFiles(folder, "*.tmp").Any(), "rejected save leaves no temporary files");
+    var index = Path.Combine(folder, "profiles-index.json");
+    foreach (var malformed in new[] { "{\"Version\":2,\"Version\":1,\"Recent\":[],\"Active\":{}}", new string(' ', 262145) })
+    {
+        File.WriteAllText(index, malformed); var indexBefore = File.ReadAllBytes(index);
+        check(library.Discover(out warning).Count == 1 && warning is not null, "damaged recent-file list is reported while valid local profiles remain visible");
+        refused = false;
+        try { library.Remember(path, "numpad"); } catch (Exception ex) when (ex is JsonException or InvalidDataException) { refused = true; }
+        check(refused && indexBefore.AsSpan().SequenceEqual(File.ReadAllBytes(index)), "remember never overwrites a damaged or ambiguous recent-file list");
+    }
+    // Every component fits common filesystem limits, while the complete recent list
+    // can exceed the index's byte limit before reaching its 100-entry limit.
+    var recent = new List<string>();
+    var active = new Dictionary<string, string> { ["numpad"] = path, ["pro-iso"] = Path.Combine(folder, "pro.json") };
+    byte[] IndexBytes() => JsonSerializer.SerializeToUtf8Bytes(new { Version = 1, Recent = recent, Active = active });
+    string LongPath(int number) => Path.Combine([folder, .. Enumerable.Repeat(new string('x', 200), 13), "profile-" + number + ".json"]);
+    byte[] indexBeforeLimit;
+    string nextPath;
+    while (true)
+    {
+        indexBeforeLimit = IndexBytes(); nextPath = LongPath(recent.Count);
+        recent.Add(nextPath);
+        if (IndexBytes().Length > 262144) { recent.RemoveAt(recent.Count - 1); break; }
+    }
+    check(recent.Count < 100 && Path.GetFullPath(nextPath) == nextPath, "valid long profile paths reach the byte limit before the recent-entry cap");
+    File.WriteAllBytes(index, indexBeforeLimit);
+    check(library.ActivePath("numpad") == path && library.ActivePath("pro-iso") == active["pro-iso"], "large but bounded index remains readable");
+    refused = false;
+    try { library.Remember(nextPath, "numpad"); } catch (InvalidDataException) { refused = true; }
+    check(refused && indexBeforeLimit.AsSpan().SequenceEqual(File.ReadAllBytes(index)), "oversized recent-list update preserves its previous readable bytes");
+    check(library.ActivePath("numpad") == path && library.ActivePath("pro-iso") == active["pro-iso"], "rejected recent-list update retains every active profile");
+    check(!Directory.EnumerateFiles(folder, "*.tmp-*").Any(), "rejected recent-list update leaves no temporary file");
+    if (!OperatingSystem.IsWindows())
+    {
+        var upper = Path.Combine(root, "PresetLibrary"); var lower = Path.Combine(root, "presetlibrary");
+        Directory.CreateDirectory(upper);
+        if (!Directory.Exists(lower))
+        {
+            var entry = LightingPresetStore.SaveToLibrary(LightingPresetStore.CreateInGlorious("numpad"), lower);
+            var original = File.ReadAllBytes(entry.Path); refused = false;
+            try { LightingPresetStore.Delete(entry, upper); } catch (InvalidDataException) { refused = true; }
+            check(refused && original.AsSpan().SequenceEqual(File.ReadAllBytes(entry.Path)), "case-sensitive sibling preset library is outside the deletion boundary");
+        }
+    }
 }
 
 static List<string> BaseArguments(string source, string layout)

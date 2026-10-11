@@ -86,15 +86,27 @@ public sealed partial class MainWindow
         if (!await GuardNavigation()) return;
         try
         {
-            var project = ProjectService.Load(path); var prior = OpenSession(project.DeviceId);
-            if (!await MayReplace(prior)) return;
-            project = ProjectService.Load(path); // A save prompt may have changed this exact file.
-            _sessions[project.DeviceId] = _state = new EditorState(project, path); _macroId = null;
-            _startupNotices.Remove(project.DeviceId);
-            if (!Program.Offline) _profiles.Remember(path, project.DeviceId);
-            Build(); Status(L.F($"Profil „{project.Name}“ geöffnet"));
+            if (!await LoadProfileCoreAsync(path, MayReplace)) return;
+            Build(); Status(L.F($"Profil „{_state.Project.Name}“ geöffnet"));
+            // A damaged recent-file index must not leave the new session behind the old UI.
+            if (!Program.Offline)
+                try { _profiles.Remember(path, _state.Device.Id); }
+                catch (Exception ex) { Status(L.T("Die Profilliste konnte nicht gespeichert werden: ") + ex.Message); }
         }
         catch (Exception ex) { Status(ex.Message); }
+    }
+    private async Task<bool> LoadProfileCoreAsync(string path, Func<EditorState, Task<bool>> confirmReplace)
+    {
+        var first = ProjectService.Load(path);
+        var prior = OpenSession(first.DeviceId);
+        if (!await confirmReplace(prior)) return false;
+        // The save dialog can change this file. Confirmation covers only that device's draft.
+        var project = ProjectService.Load(path);
+        if (project.DeviceId != first.DeviceId)
+            throw new InvalidDataException(L.T("Die Profildatei wurde während des Öffnens geändert. Bitte erneut öffnen."));
+        _sessions[project.DeviceId] = _state = new EditorState(project, path); _macroId = null;
+        _startupNotices.Remove(project.DeviceId);
+        return true;
     }
     private Control BuildProfilesWorkspace()
     {

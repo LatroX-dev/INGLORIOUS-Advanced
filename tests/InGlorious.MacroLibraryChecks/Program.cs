@@ -34,6 +34,29 @@ try
     var portableText = File.ReadAllText(export);
     Check(!portableText.Contains("deviceId") && !portableText.Contains("binding") && !portableText.Contains("\"id\"") && !portableText.Contains(root), "Portable file omits device, bindings, IDs and paths");
     Check(SharedMacroLibrary.ImportFile(export).Count == 2, "Portable roundtrip");
+    var libraryBeforeExport = File.ReadAllBytes(path);
+    foreach (var destination in new[] { path, Path.Combine(root, ".", Path.GetFileName(path)) })
+    {
+        Reject(() => SharedMacroLibrary.ExportFile(destination, [second], overwrite: true, library: fresh), "Subset export cannot overwrite its source library");
+        Check(libraryBeforeExport.AsSpan().SequenceEqual(File.ReadAllBytes(path)), "Rejected subset export preserves every library macro");
+    }
+    if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+    {
+        Reject(() => SharedMacroLibrary.ExportFile(path.ToUpperInvariant(), [second], overwrite: true, library: fresh), "Case variant cannot replace the central library");
+        Check(libraryBeforeExport.AsSpan().SequenceEqual(File.ReadAllBytes(path)), "Case-variant rejection preserves all macros");
+    }
+    if (!OperatingSystem.IsWindows())
+    {
+        var linkedFolder = Path.Combine(root, "library-link");
+        Directory.CreateSymbolicLink(linkedFolder, root);
+        try
+        {
+            Reject(() => SharedMacroLibrary.ExportFile(Path.Combine(linkedFolder, Path.GetFileName(path)), [second], overwrite: true, library: fresh), "Linked folder cannot bypass library protection");
+            Check(libraryBeforeExport.AsSpan().SequenceEqual(File.ReadAllBytes(path)), "Linked export preserves the full source library");
+        }
+        finally { Directory.Delete(linkedFolder); }
+    }
+    Reject(() => SharedMacroLibrary.ExportFile(SharedMacroLibrary.DefaultPath, [second], overwrite: true), "Default central library is protected without a dialog snapshot");
     Reject(() => SharedMacroLibrary.ExportFile(export, [second]), "Export overwrite requires opt-in");
     Check(SharedMacroLibrary.ImportFile(export).Count == 2, "Rejected export preserves bytes");
     SharedMacroLibrary.ExportFile(export, [second], overwrite: true);
@@ -105,6 +128,21 @@ try
     Reject(() => SharedMacroLibrary.Save(fresh, []), "Corrupt library never overwritten"); Check(File.ReadAllText(path) == "not json", "Corrupt bytes retained"); File.WriteAllBytes(path, corrupt);
     using (var large = new FileStream(Path.Combine(root, "too-large.json"), FileMode.CreateNew)) large.SetLength(SharedMacroLibrary.MaximumFileBytes + 1L);
     Reject(() => SharedMacroLibrary.ImportFile(Path.Combine(root, "too-large.json")), "Bounded file read");
+    var oversized = Enumerable.Range(0, SharedMacroLibrary.MaximumMacros).Select(i => new SharedMacro
+    {
+        Name = "Large " + i,
+        Steps = Enumerable.Range(0, 128).Select(_ => new MacroStep { Kind = "delay", Key = new string('\u4E00', 64), DelayMs = 1 }).ToList()
+    }).ToList();
+    SharedMacroLibrary.Validate(oversized); checks++;
+    Check(Encoding.UTF8.GetByteCount(Serialize(new SharedMacroDocument { Macros = oversized })) > SharedMacroLibrary.MaximumFileBytes,
+        "A valid collection can exceed the byte limit when Unicode step text is escaped");
+    var beforeLargeSave = File.ReadAllBytes(path); var beforeLargeExport = File.ReadAllBytes(export);
+    Reject(() => SharedMacroLibrary.Save(SharedMacroLibrary.Load(path), oversized), "Oversized library save rejected before replacement");
+    Check(beforeLargeSave.AsSpan().SequenceEqual(File.ReadAllBytes(path)) && SharedMacroLibrary.Load(path).Macros.Count == 2,
+        "Rejected oversized save preserves the complete readable library");
+    Reject(() => SharedMacroLibrary.ExportFile(export, oversized, overwrite: true), "Oversized portable export rejected before replacement");
+    Check(beforeLargeExport.AsSpan().SequenceEqual(File.ReadAllBytes(export)) && SharedMacroLibrary.ImportFile(export).Count == 1,
+        "Rejected oversized export preserves its previous readable file");
     Check(!Directory.EnumerateFiles(root, "*.tmp-*").Any(), "No leftover temporary files");
     Console.WriteLine($"PASS {checks} macro-library checks; no device access.");
 }

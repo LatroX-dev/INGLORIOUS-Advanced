@@ -150,6 +150,19 @@ static void check_lighting(void) {
     }
     now=light_test_started+21000; check(light_test_remaining(now)==0 && !light_test_active,"lighting overlay expires");
 }
+static void check_reactive_expiry(void) {
+    boot(false);
+    keyrecord_t key={.event={.pressed=true,.type=1,.key={reference_letters[0][0],reference_letters[0][1]}}};
+    uint32_t first=UINT32_MAX-1000U;
+    now=first; process_record_user(4,&key);
+    check(effect_hit_count==1,"physical key creates reactive history");
+    now=first+3999U; housekeeping_task_user();
+    check(effect_hit_count==1,"reactive history survives until its last supported lifetime");
+    now++; housekeeping_task_user();
+    check(!effect_hit_count,"reactive history expires across timer wrap");
+    now=first; housekeeping_task_user();
+    check(!effect_hit_count && !writes,"expired history does not return after a complete timer cycle or alter storage");
+}
 int main(int argc,char **argv) {
     check(argc==4,"three serializer fixtures supplied"); uint16_t default_length=load(argv[1],defaults); check(default_length==IG_SIZE,"schema1 default");
     check(sizeof(staging)==sizeof(uint8_t *),"no full duplicate staging allocation");
@@ -157,7 +170,7 @@ int main(int argc,char **argv) {
     boot(true);
     for(uint16_t i=IG_KEYS_OFFSET;i<IG_ENCODER_OFFSET;i++) check(default_byte(i)==defaults[i],"all four default keymap layers");
     check(command(1,NULL,0)==0 && response[8]==IG_BOARD && response[9]==MATRIX_ROWS && response[10]==MATRIX_COLS && response[12]==RGB_MATRIX_LED_COUNT,"board identity and dimensions");
-    check(command(13,NULL,0)==0 && response[10]==IG_BOARD && u16(response+14)==11 && u32(response+20)==0x000B0001,"candidate version identity");
+    check(command(13,NULL,0)==0 && response[10]==IG_BOARD && u16(response+14)==11 && u16(response+16)==1 && u32(response+20)==0x000B0101,"candidate version identity");
     uint8_t config[IG_MAX_SIZE], before[sizeof(backing)];
     for(int fixture=1;fixture<argc;fixture++) {
         uint16_t length=load(argv[fixture],config); check(validate_config(config,length),"desktop payload semantically accepted");
@@ -177,6 +190,6 @@ int main(int argc,char **argv) {
         }
         boot(false);
     }
-    check_recovery(); check_lighting();
+    check_recovery(); check_lighting(); check_reactive_expiry();
     printf("PASS board%d: %u native port checks; no hardware access.\n",IG_BOARD,checks); return 0;
 }

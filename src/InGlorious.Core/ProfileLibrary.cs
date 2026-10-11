@@ -9,6 +9,7 @@ public sealed record ProfileEntry(string Path, string Name, string DeviceId, Dat
 /// <summary>Local discovery and recent paths; reading the library never changes profile files.</summary>
 public sealed class ProfileLibrary(string root)
 {
+    private const int MaximumIndexBytes = 262144;
     private readonly string _root = System.IO.Path.GetFullPath(root);
     // Unix volumes may be case-sensitive, including APFS. Never merge distinct names there.
     private static StringComparer PathComparer => OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
@@ -29,8 +30,8 @@ public sealed class ProfileLibrary(string root)
     private Index ReadIndex()
     {
         if (!File.Exists(IndexPath)) return new();
-        if (new FileInfo(IndexPath).Length > 262144) throw new InvalidDataException(L.T("Die Profilliste ist ungültig."));
-        var index = JsonSerializer.Deserialize<Index>(File.ReadAllBytes(IndexPath));
+        using var document = ProjectService.ReadJsonFile(IndexPath, MaximumIndexBytes, L.T("Die Profilliste ist ungültig."));
+        var index = document.Deserialize<Index>();
         if (index is null || index.Version != 1 || index.Recent is null || index.Active is null || index.Recent.Count > 1000)
             throw new InvalidDataException(L.T("Die Profilliste ist ungültig."));
         return index;
@@ -59,12 +60,11 @@ public sealed class ProfileLibrary(string root)
             try
             {
                 var file = new FileInfo(path);
-                if (!file.Exists || file.Length > 1_048_576) continue;
+                if (!file.Exists || file.Length > ProjectService.MaximumFileBytes) continue;
                 // Avoid normalizing unrelated JSON documents as profiles.
-                using var json = JsonDocument.Parse(File.ReadAllBytes(path));
+                using var json = ProjectService.ReadProfileDocument(path);
                 if (json.RootElement.ValueKind != JsonValueKind.Object || !json.RootElement.TryGetProperty("deviceId", out _) || !json.RootElement.TryGetProperty("layers", out _)) continue;
-                var project = ProjectService.Load(path);
-                if (ProjectService.Validate(project).Count != 0) continue;
+                var project = ProjectService.Load(json);
                 entries.Add(new(file.FullName, project.Name, project.DeviceId, file.LastWriteTime, project.Layers.Count, project.Macros.Count));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException or ArgumentException) { }
@@ -86,11 +86,13 @@ public sealed class ProfileLibrary(string root)
         index.Recent.Insert(0, path);
         index.Recent = index.Recent.Take(100).ToList();
         if (activate) index.Active[deviceId] = path;
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(index);
+        if (bytes.Length > MaximumIndexBytes) throw new InvalidDataException(L.T("Die Profilliste ist ungültig."));
         var temp = IndexPath + ".tmp-" + Guid.NewGuid().ToString("N");
         try
         {
             using (var file = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            { JsonSerializer.Serialize(file, index); file.Flush(true); }
+            { file.Write(bytes); file.Flush(true); }
             if (File.Exists(IndexPath)) File.Replace(temp, IndexPath, null); else File.Move(temp, IndexPath);
         }
         finally { if (File.Exists(temp)) File.Delete(temp); }

@@ -30,13 +30,5 @@ public readonly record struct FirmwareSemanticVersion(ushort Major, ushort Minor
     public static bool operator >=(FirmwareSemanticVersion left, FirmwareSemanticVersion right) => left.CompareTo(right) >= 0;
 }
 
-public static class FirmwareRelease
-{
-    public static FirmwareSemanticVersion CurrentVersion { get; } = new(0, 9, 2);
-    public static string DisplayVersion => "INGLORIOUS " + CurrentVersion;
-    public const string ReleaseId = "0.9.2-color-output";
-    public const uint CurrentBuildId = 0x00090201;
-}
-
 public sealed record OnboardFirmwareVersion(string DeviceId, FirmwareSemanticVersion Version, uint BuildId);
 public sealed record FirmwareRuntimeVersion(OnboardFirmwareVersion Report, string UsbInstanceId, DateTimeOffset ObservedAt);

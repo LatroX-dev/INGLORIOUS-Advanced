@@ -115,9 +115,7 @@ public sealed class MacroLibraryWindow : Window
         if (selected.Count == 0) return;
         var dialog = new SaveFileDialog { Title = L.T("Makros exportieren"), Filter = L.T("INGLORIOUS-Makros (*.macros.json)|*.macros.json"), FileName = "Macros.macros.json", AddExtension = true, DefaultExt = ".macros.json", OverwritePrompt = true };
         if (dialog.ShowDialog(this) != true) return;
-        if (string.Equals(Path.GetFullPath(dialog.FileName), _snapshot.Path, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException(L.T("Wähle für den Export eine andere Datei als die zentrale Bibliothek."));
-        SharedMacroLibrary.ExportFile(dialog.FileName, selected, overwrite: true);
+        SharedMacroLibrary.ExportFile(dialog.FileName, selected, overwrite: true, library: _snapshot);
         _status.Text = L.F($"{selected.Count} Makros exportiert.");
     }
     private void Remove()

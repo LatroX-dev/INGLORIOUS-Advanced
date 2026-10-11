@@ -15,7 +15,7 @@ public partial class MainWindow
         try
         {
             RunLightingPresetDialogChecks(folder, check);
-            RunFirmwareGuideChecks(check);
+            RunOnboardingIdentityChecks(check);
             foreach (var origin in new[] { "pro-iso", "numpad" })
             {
                 ResetWorkflowFixture(origin);
@@ -115,131 +115,18 @@ public partial class MainWindow
             finally { dialog.Close(); }
         }
     }
-    private void RunFirmwareGuideChecks(Action<bool, string> check)
+    private void RunOnboardingIdentityChecks(Action<bool, string> check)
     {
-        check(SelectFirmwareGuideTarget([], manual: false) is null && SelectFirmwareGuideTarget([], manual: true) is null,
-            "Empty firmware assessments cannot open a workflow");
-        var unsupported = new FirmwareGuideDevice("unknown", FirmwareGuideState.Original, true);
-        check(SelectFirmwareGuideTarget([unsupported], manual: false) is null && SelectFirmwareGuideTarget([unsupported], manual: true) is null,
-            "An unsupported identity never becomes a setup target");
-        foreach (var proState in Enum.GetValues<FirmwareGuideState>())
-        foreach (var padState in Enum.GetValues<FirmwareGuideState>())
+        foreach (var board in BoardDescriptorRegistry.ProtocolBoards)
         {
-            FirmwareGuideDevice[] reports = [new("pro-iso", proState, true), new("numpad", padState, true)];
-            var needsAction = reports.Any(report => report.State is FirmwareGuideState.Original or FirmwareGuideState.UpdateRequired);
-            var automatic = SelectFirmwareGuideTarget(reports, manual: false);
-            check((automatic is not null) == needsAction,
-                $"{proState}/{padState}: automatic workflow exists only for confirmed installation or update needs");
-            check(automatic is null || automatic.State is FirmwareGuideState.Original or FirmwareGuideState.UpdateRequired,
-                $"{proState}/{padState}: ready and unverified devices never cause an automatic introduction");
-            foreach (var report in reports)
-            {
-                var manual = SelectFirmwareGuideTarget(reports, manual: true, requestedDeviceId: report.DeviceId);
-                check(ReferenceEquals(manual, report),
-                    $"{proState}/{padState}: manual status requests preserve the selected device even when no action is available");
-                var selectedAutomatic = SelectFirmwareGuideTarget(reports, manual: false, requestedDeviceId: report.DeviceId);
-                if (report.State is FirmwareGuideState.Original or FirmwareGuideState.UpdateRequired)
-                {
-                    check(ReferenceEquals(selectedAutomatic, report),
-                        $"{proState}/{padState}: an explicitly requested actionable device selects its own workflow");
-                    check(selectedAutomatic!.Operation == (report.State == FirmwareGuideState.Original
-                        ? FirmwareOperation.InstallFromOriginal : FirmwareOperation.Update),
-                        $"{proState}/{padState}: existing INGLORIOUS firmware routes to update, never installation");
-                }
-                else
-                    check(!ReferenceEquals(selectedAutomatic, report),
-                        $"{proState}/{padState}: automatic routing cannot select a ready or unverified device");
-            }
-        }
-        foreach (var state in new[] { FirmwareGuideState.Original, FirmwareGuideState.UpdateRequired })
-        {
-            var unavailable = new FirmwareGuideDevice("pro-iso", state, false);
-            check(ReferenceEquals(SelectFirmwareGuideTarget([unavailable], manual: false), unavailable) && !unavailable.CanOpenManager,
-                state + ": missing local files preserve status help without authorizing a firmware workflow");
-        }
-        foreach (var device in DeviceCatalog.All.Where(d => d.HasApprovedFirmwareManagement))
-        {
-            foreach (var operation in Enum.GetValues<FirmwareOperation>())
-            {
-                var wizard = new FirmwareWindow(device.Id, offlinePreview: true, initialOperation: operation);
-                try
-                {
-                    wizard.RunOfflineChecks(check); wizard.RunRuntimeVersionChecks(check);
-                    if (operation == FirmwareOperation.RestoreOriginal)
-                    {
-                        _firmwareAssessments[device.Id] = new(device.Id, FirmwareGuideState.Ready);
-                        ApplyFirmwareManagerOutcome(wizard, device.Id);
-                        check(!_firmwareAssessments.ContainsKey(device.Id), device.Id + ": returning from original restore invalidates the previous INGLORIOUS version label");
-                    }
-                }
-                finally { wizard.Close(); }
-            }
-            var info = new OnboardInfo(device.Id, device.Id == "pro-iso" ? (byte)1 : (byte)3, 0, 7, 0, 0, 1);
-            var current = new OnboardFirmwareVersion(device.Id, FirmwareRelease.CurrentVersion, FirmwareRelease.CurrentBuildId);
-            check(FirmwareGuideDevice.Classify(info, device.Id, current with { BuildId = 0 }) == FirmwareGuideState.Unverified,
-                device.Id + ": missing build identity cannot classify as current");
-            var instance = "USB\\VID_FEED&PID_" + (device.Id == "pro-iso" ? "1C01" : "1C02") + "\\fixture";
-            var detected = new DetectedDevice(device.Id, "fixture", "FEED", "0000", "0001", instance, "", "");
-            var candidate = new OnboardDevice(device.Id, "fixture", "fixture") { UsbInstanceId = instance };
+            var instance = "USB\\VID_FEED&PID_" + board.RuntimeProductId.ToString("X4") + "\\fixture";
+            var detected = new DetectedDevice(board.DeviceId, "fixture", "FEED", "0000", "0001", instance, "", "");
+            var candidate = new OnboardDevice(board.DeviceId, "fixture", "fixture") { UsbInstanceId = instance };
             check(MatchesOnboardingDevice(candidate, detected)
                 && !MatchesOnboardingDevice(candidate with { UsbInstanceId = null }, detected)
                 && !MatchesOnboardingDevice(candidate with { UsbInstanceId = instance + "-other" }, detected)
                 && !MatchesOnboardingDevice(candidate with { DeviceId = "unknown" }, detected),
-                device.Id + ": onboarding binds the exact PnP/HID USB instance; no model-only fallback");
-            check(FirmwareGuideDevice.Classify(info, device.Id, null) == FirmwareGuideState.Unverified,
-                device.Id + ": unsupported RAW13 is unverified and cannot offer an update");
-            check(FirmwareGuideDevice.Classify(info, device.Id, current) == FirmwareGuideState.Ready,
-                device.Id + ": actual current version is current regardless of active configuration schema");
-            check(FirmwareGuideDevice.Classify(info, device.Id, current with { Version = new(0, 7, 99) }) == FirmwareGuideState.UpdateRequired,
-                device.Id + ": older firmware with unchanged feature flags still requires an update");
-            check(FirmwareGuideDevice.Classify(info, device.Id, current with { Version = new(0, 9, 3) }) == FirmwareGuideState.NewerVersion,
-                device.Id + ": newer patch never offers downgrade");
-            foreach (var flags in new byte[] { 120, 125 })
-                check(FirmwareGuideDevice.Classify(info with { Flags = flags }, device.Id, current) == FirmwareGuideState.Unverified,
-                    device.Id + ": unavailable persistence or active staging remains unverified");
-            check(FirmwareGuideDevice.Classify(info, "unknown", current) == FirmwareGuideState.Unverified
-                && FirmwareGuideDevice.Classify(null, device.Id, current) == FirmwareGuideState.Unverified
-                && FirmwareGuideDevice.Classify(info, device.Id, current with { DeviceId = "unknown" }) == FirmwareGuideState.Unverified,
-                device.Id + ": version and INFO identity must match the selected device");
-            check(FirmwareWindow.IsExpectedRuntimeVersion(current, device.Id)
-                && !FirmwareWindow.IsExpectedRuntimeVersion(null, device.Id)
-                && !FirmwareWindow.IsExpectedRuntimeVersion(current with { BuildId = current.BuildId + 1 }, device.Id)
-                && !FirmwareWindow.IsExpectedRuntimeVersion(current with { Version = new(0, 9, 3) }, device.Id)
-                && !FirmwareWindow.IsExpectedRuntimeVersion(current, "unknown"),
-                device.Id + ": post-update confirmation requires exact board, release and build");
-            foreach (var state in Enum.GetValues<FirmwareGuideState>())
-            {
-                foreach (var localFiles in new[] { false, true })
-                {
-                    var report = new FirmwareGuideDevice(device.Id, state, localFiles)
-                    {
-                        RuntimeVersion = new(new(device.Id, new(0, 8, 0), 0x00080001), instance, DateTimeOffset.UtcNow)
-                    };
-                    var guide = new FirmwareGuideWindow([report], device.Id);
-                    try
-                    {
-                        var expected = localFiles && state is FirmwareGuideState.Original or FirmwareGuideState.UpdateRequired;
-                        check(((Button)guide.FindName("GuideOpenManager")).IsEnabled == expected && guide.Action == FirmwareGuideAction.None,
-                            device.Id + ": guide manager button requires known state plus verified local files; construction performs no action");
-                        check(guide.RequestedOperation == (state == FirmwareGuideState.Original ? FirmwareOperation.InstallFromOriginal : FirmwareOperation.Update),
-                            device.Id + ": guide distinguishes original installation from firmware update");
-                        check(!((Expander)guide.FindName("GuideDetails")).IsExpanded,
-                            device.Id + ": guide opens with technical details collapsed");
-                        var changelog = (FirmwareChangelogPanel)guide.FindName("GuideChangelog");
-                        var expectedNotes = FirmwareChangelog.Between(device.Id,
-                            state == FirmwareGuideState.UpdateRequired ? report.RuntimeVersion!.Report.Version : null, FirmwareRelease.CurrentVersion);
-                        check(changelog.Visibility == (expectedNotes.Count > 0 ? Visibility.Visible : Visibility.Collapsed)
-                            && changelog.Notes.SequenceEqual(expectedNotes),
-                            device.Id + ": release notes are shown in update guide, never in restore or setup");
-                        var expectedTitle = state switch { FirmwareGuideState.Original => L.T("INGLORIOUS einrichten"), FirmwareGuideState.UpdateRequired => L.T("Firmware aktualisieren"), _ => L.T("Gerätestatus") };
-                        check(guide.Title.StartsWith(expectedTitle, StringComparison.Ordinal),
-                            device.Id + ": status help uses setup only for positively identified original firmware");
-                    }
-                    finally { guide.Close(); }
-                }
-            }
+                board.DeviceId + ": onboarding binds the exact PnP/HID USB instance; no model-only fallback");
         }
-        check(!new FirmwareGuideDevice("unknown", FirmwareGuideState.UpdateRequired, true).CanOpenManager,
-            "Unknown model cannot acquire a firmware-manager action through verified-file flag");
     }
 }

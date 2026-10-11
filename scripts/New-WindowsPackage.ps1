@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$PublishDirectory,[Parameter(Mandatory)][string]$Destination,[string]$ExpectedVersion='0.6.47',[string]$ToolCatalogPath=(Join-Path $PSScriptRoot '../src/InGlorious.Core/SetupToolCatalog.json'),[switch]$Create)
+param([Parameter(Mandatory)][string]$PublishDirectory,[Parameter(Mandatory)][string]$Destination,[string]$ExpectedVersion='0.6.48',[string]$ToolCatalogPath=(Join-Path $PSScriptRoot '../src/InGlorious.Core/SetupToolCatalog.json'),[switch]$Create)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 function Assert-NoLink([string]$Path) {
@@ -36,7 +36,7 @@ foreach($name in @('INGLORIOUS Advanced.exe','INGLORIOUS Advanced.dll','INGLORIO
 $deps=Get-Content -LiteralPath (Join-Path $source 'INGLORIOUS Advanced.deps.json') -Raw|ConvertFrom-Json -AsHashtable
 if($deps.runtimeTarget.name-notmatch'^\.NETCoreApp,Version=v9\.0/win-x64$'-or-not$deps.targets.Contains($deps.runtimeTarget.name)){throw 'Unexpected published runtime target.'}
 foreach($library in $deps.targets[$deps.runtimeTarget.name].GetEnumerator()){
- if($library.Key-cne('INGLORIOUS Advanced/'+$ExpectedVersion)-and$library.Key-cnotmatch'^runtimepack\.Microsoft\.(NETCore|WindowsDesktop)\.App\.Runtime\.win-x64/9\.0\.[0-9]+$'){throw ('Unreviewed published dependency: '+$library.Key)}
+ if($library.Key-cne('INGLORIOUS Advanced/'+$ExpectedVersion)-and$library.Key-cnotmatch'^runtimepack\.Microsoft\.(NETCore|WindowsDesktop)\.App\.Runtime\.win-x64/9\.0\.20$'){throw ('Unreviewed published dependency: '+$library.Key)}
  foreach($kind in @('runtime','native','resources')){
   if(-not$library.Value.Contains($kind)){continue}
   foreach($asset in $library.Value[$kind].Keys){
@@ -46,14 +46,15 @@ foreach($library in $deps.targets[$deps.runtimeTarget.name].GetEnumerator()){
  }
 }
 # .NET omits WindowsDesktop satellite resources from deps.json. Take their exact
-# names and bytes from the official runtime package pinned by SDK 9.0.313.
-$desktopRuntime='runtimepack.Microsoft.WindowsDesktop.App.Runtime.win-x64/9.0.15'
+# names and bytes from the official runtime package pinned by SDK 9.0.318.
+$desktopRuntime='runtimepack.Microsoft.WindowsDesktop.App.Runtime.win-x64/9.0.20'
 if(-not$deps.targets[$deps.runtimeTarget.name].Contains($desktopRuntime)){throw 'The reviewed WindowsDesktop runtime is missing.'}
+if(-not$deps.targets[$deps.runtimeTarget.name].Contains('runtimepack.Microsoft.NETCore.App.Runtime.win-x64/9.0.20')){throw 'The reviewed .NET runtime is missing.'}
 $globalPackages=(& dotnet nuget locals global-packages --list)
 if($LASTEXITCODE-ne0-or$globalPackages-notmatch'^global-packages:\s+(.+)$'){throw 'Could not locate the restored WindowsDesktop runtime package.'}
-$runtimePackage=Join-Path $Matches[1] 'microsoft.windowsdesktop.app.runtime.win-x64/9.0.15/microsoft.windowsdesktop.app.runtime.win-x64.9.0.15.nupkg'
+$runtimePackage=Join-Path $Matches[1] 'microsoft.windowsdesktop.app.runtime.win-x64/9.0.20/microsoft.windowsdesktop.app.runtime.win-x64.9.0.20.nupkg'
 Assert-NoLink $runtimePackage
-if(-not(Test-Path -LiteralPath $runtimePackage)-or(Get-FileHash -LiteralPath $runtimePackage).Hash-cne'36C7A03FBCCE1DF79E6F5BB7EF6C9E71A6CEADADAEE88BD86F718117C9962F84'){throw 'Restored WindowsDesktop runtime package differs from the reviewed official package.'}
+if(-not(Test-Path -LiteralPath $runtimePackage)-or(Get-FileHash -LiteralPath $runtimePackage).Hash-cne'A1920B48F7540CA97742893F87DE74FB26EE4AA1B0DC32467C91FA3E3CD41A3C'){throw 'Restored WindowsDesktop runtime package differs from the reviewed official package.'}
 $runtimeArchive=[IO.Compression.ZipFile]::OpenRead($runtimePackage)
 try {
  $resourceCount=0;$resourcePrefix='runtimes/win-x64/lib/net9.0/'

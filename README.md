@@ -4,7 +4,7 @@ Configure Glorious keyboards with per-key lighting, effects, key assignments, ma
 
 I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
 
-**Early Alpha · App 0.6.47 · Firmware 0.11.0**
+**Early Alpha · App 0.6.48 · Firmware 0.11.1**
 
 Get installers and packages from the [Releases page](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases). macOS and Linux builds are Early Alpha; physical-device testing is still limited.
 

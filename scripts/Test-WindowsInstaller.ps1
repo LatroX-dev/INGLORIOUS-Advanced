@@ -72,6 +72,13 @@ try {
  $plan=&$builder -ToolCatalogPath $ToolCatalogPath -PublishDirectory $fixture -Destination $package -ExpectedVersion $version
  Check ($plan.mode-eq'plan' -and -not(Test-Path -LiteralPath $package)) 'Package default must be a side-effect-free plan.'
  Reject {&$builder -ToolCatalogPath $ToolCatalogPath -PublishDirectory $fixture -Destination $package -ExpectedVersion '99.0.0'} 'Old publish must not be packaged as a new version.'
+ $depsPath=Join-Path $fixture 'INGLORIOUS Advanced.deps.json';$originalDeps=[IO.File]::ReadAllText($depsPath)
+ foreach($runtime in @('NETCore','WindowsDesktop')){
+  $currentRuntime='runtimepack.Microsoft.'+$runtime+'.App.Runtime.win-x64/9.0.20'
+  if(-not$originalDeps.Contains($currentRuntime)){throw 'The runtime rejection fixture needs the reviewed current publish.'}
+  [IO.File]::WriteAllText($depsPath,$originalDeps.Replace($currentRuntime,$currentRuntime.Replace('/9.0.20','/9.0.19')))
+  try{Reject {&$builder -ToolCatalogPath $ToolCatalogPath -PublishDirectory $fixture -Destination $package -ExpectedVersion $version} 'Outdated self-contained runtimes must be rejected.'}finally{[IO.File]::WriteAllText($depsPath,$originalDeps)}
+ }
  $mixedPublishFile=Join-Path $fixture 'INGLORIOUS Core.dll'
  Copy-Item -LiteralPath (Join-Path $fixture 'INGLORIOUS Advanced.dll') -Destination $mixedPublishFile
  Reject {&$builder -ToolCatalogPath $ToolCatalogPath -PublishDirectory $fixture -Destination $package -ExpectedVersion $version} 'Packaging must reject mixed Core/Advanced entry files.'

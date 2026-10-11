@@ -9,6 +9,7 @@ internal static partial class Program
 {
     private static async Task CheckCoordinator()
     {
+        CheckNativeToolLockHandoff();
         Check(!System.Text.RegularExpressions.Regex.IsMatch(WindowsDeviceSetupEnvironment.DiscoveryScript,
             @"\$(?:PID|HOME|PSHOME)\s*=",System.Text.RegularExpressions.RegexOptions.IgnoreCase),
             "Discovery never assigns reserved PowerShell process/home variables.");
@@ -17,6 +18,37 @@ internal static partial class Program
         await CheckDiscoveryAndTransitions();
         await CheckCaptureFailures();
         await CheckWritesAndArchives();
+        using var busy = new SetupFixture("numpad");
+        var busySession = await busy.ReadyToCapture(); await busy.Service.CaptureAsync(busySession);
+        busy.Environment.WriteFault = "device-busy";
+        await RejectAsync(() => busy.Service.InstallAsync(busySession, true), "Concurrent adapter operation must refuse installation.");
+        Check(busySession.Stage == SetupStage.Blocked && !busySession.OutcomeUncertain && !busySession.WriteAttempted && busy.Environment.Writes == 0,
+            "Refusal before USB access is reported as no-write, without an uncertain flash result.");
+    }
+
+    private static void CheckNativeToolLockHandoff()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "inglorious-tool-lock-checks-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string path = Path.Combine(root, "synthetic-native-tool.bin");
+        byte[] contents = [1, 3, 5, 7]; File.WriteAllBytes(path, contents);
+        string hash = Convert.ToHexString(SHA256.HashData(contents));
+        try
+        {
+            using (var parent = FirmwareAdapterProcess.VerifyToolFile(path, contents.Length, hash, adapterOwnsNativeLock: true))
+            {
+                Check((parent is null) == !OperatingSystem.IsWindows(), "POSIX gives the native tool lock to the adapter; Windows keeps compatible read protection.");
+                using var child = new FileStream(path, FileMode.Open, FileAccess.Read, OperatingSystem.IsWindows() ? FileShare.Read : FileShare.None);
+                Check(child.Length == contents.Length, "The adapter can acquire its native tool handle after parent verification.");
+            }
+            using (var ordinary = FirmwareAdapterProcess.VerifyToolFile(path, contents.Length, hash, adapterOwnsNativeLock: false))
+                Check(ordinary is not null && ordinary.CanRead, "Managed adapter/runtime files remain held during execution.");
+            Reject(() => FirmwareAdapterProcess.VerifyToolFile(path, contents.Length, new string('0',64), true), "Native tool handoff still rejects altered bytes.");
+            Reject(() => FirmwareAdapterProcess.VerifyToolFile(path, contents.Length + 1, hash, true), "Native tool handoff still rejects wrong size.");
+            using var afterFailure = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            Check(afterFailure.Length == contents.Length, "A failed tool verification releases its handle without changing the input.");
+        }
+        finally { File.Delete(path); Directory.Delete(root); }
     }
 
     private static async Task CheckUpdates()
@@ -310,7 +342,7 @@ internal static partial class Program
             var packages=Path.Combine(Root,"Firmware");Directory.CreateDirectory(packages);
             var repo=FindRepo();
             var firmwareDirectory = System.Environment.GetEnvironmentVariable("INGLORIOUS_TEST_FIRMWARE_DIRECTORY")
-                ?? Path.Combine(repo,"firmware","candidates","0.11.0-gmmk3","build");
+                ?? Path.Combine(repo,"firmware","build");
             foreach(var file in Directory.EnumerateFiles(firmwareDirectory,"*.bin"))
                 File.Copy(file,Path.Combine(packages,Path.GetFileName(file)));
             Environment=new(id,forceSharedProPid);
@@ -423,6 +455,12 @@ internal static partial class Program
             }
             else if(op is "install" or "restore" or "update")
             {
+                if (WriteFault == "device-busy")
+                {
+                    response["status"] = "blocked"; response["errorCode"] = "DEVICE_OPERATION_BUSY";
+                    response["fingerprint"] = null; response["fingerprintSha256"] = null;
+                    return Task.FromResult(JsonSerializer.SerializeToElement(response));
+                }
                 if (WriteFault == "blocked-prewrite")
                 {
                     response["status"] = "blocked"; response["errorCode"] = "CURRENT_CHANGED_SINCE_CAPTURE";

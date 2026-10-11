@@ -18,6 +18,10 @@ public static class FirmwareChangelog
     // Customer-facing features, improvements and bugfixes: short English bullets, without technical details.
     private static readonly IReadOnlyList<FirmwareReleaseNotes> Notes = Array.AsReadOnly(new[]
     {
+        new FirmwareReleaseNotes(new(0, 11, 1), Array.AsReadOnly(new[]
+        {
+            "Fixed reactive lighting reappearing after long periods without input."
+        })),
         ColorOutputNotes,
         new FirmwareReleaseNotes(Version09, Array.AsReadOnly(new[]
         {
@@ -38,10 +42,13 @@ public static class FirmwareChangelog
     public static IReadOnlyList<FirmwareReleaseNotes> Between(string deviceId, FirmwareSemanticVersion? installed, FirmwareSemanticVersion target)
     {
         // No guessed starting version for an unknown device or a missing/default version report.
-        if (!installed.HasValue || installed.Value == default || installed.Value >= target || installed.Value >= FirmwareRelease.CurrentVersion)
+        // This catalog contains released changes only. Never derive a pending
+        // change from a device response or an undocumented future target.
+        var newestDocumentedVersion = Notes[0].Version;
+        if (!installed.HasValue || installed.Value == default || installed.Value >= target || installed.Value >= newestDocumentedVersion)
             return Array.Empty<FirmwareReleaseNotes>();
         var notes = deviceId switch { "pro-iso" => Notes, "numpad" => NumpadNotes, _ => null };
         if (notes is null) return Array.Empty<FirmwareReleaseNotes>();
-        return Array.AsReadOnly(notes.Where(note => installed.Value < note.Version && note.Version <= target && note.Version <= FirmwareRelease.CurrentVersion).ToArray());
+        return Array.AsReadOnly(notes.Where(note => installed.Value < note.Version && note.Version <= target && note.Version <= newestDocumentedVersion).ToArray());
     }
 }

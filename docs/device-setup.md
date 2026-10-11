@@ -34,7 +34,7 @@ Linux installations using `XDG_DATA_HOME` store the folder there instead of `~/.
 
 ## Installation and recovery association
 
-Firmware 0.11.0 binaries remain unchanged. The installer prepares a full flash image, adds a checked per-installation identifier in a reserved gap, and starts with an empty 32-KiB configuration area. The identifier contains the board number, a random installation UUID and the original-image SHA-256. It is not a hardware UID and can be cloned with a complete image.
+The reviewed firmware binaries remain unchanged when composing installation images. The installer prepares a full flash image, adds a checked per-installation identifier in a reserved gap, and starts with an empty 32-KiB configuration area. The identifier contains the board number, a random installation UUID and the original-image SHA-256. It is not a hardware UID and can be cloned with a complete image.
 
 Immediately before writing, two fresh reads must still match the captured original. After writing, two full reads must match the exact target image. The app independently checks the returned files and their content before asking for a normal reconnect. Neither the wizard nor adapter retries a write automatically.
 
@@ -48,7 +48,7 @@ The normal-mode RAW-HID handshake and explicit version query must identify the c
 
 Two complete current reads must agree. The update keeps the installation identifier and the full 32-KiB configuration tail byte-for-byte, and binds the write to the freshly captured image hash. Two new before-reads must still agree immediately before writing; two full readbacks must match afterwards. There is no downgrade or fallback to an arbitrary raw image.
 
-The first public catalog starts with 0.11.0. Unmarked development firmware and code absent from the reviewed catalog are not update sources. Such installations need their existing separate recovery procedure to return to original firmware before using the general first-installation flow. Private development update scripts and device bindings are not part of the public repository.
+The first public catalog starts with 0.11.0. One earlier GMMK PRO ISO release, 0.9.2, has a separate migration check: its exact reviewed code and erased gap must match, and two original-firmware copies must belong to the same STM32 ROM serial and stock model. A matching recovery archive must already exist locally. The installation identifier is added only as part of the fully checked update image; the configuration tail is preserved. No other unmarked or unknown code is accepted. Private development update scripts and device bindings are not part of the public repository.
 
 ## Build and package
 

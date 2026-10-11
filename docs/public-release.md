@@ -6,7 +6,7 @@ This document is for maintainers. The [getting-started guide](getting-started.md
 
 The public repository contains reviewed source, public reference definitions, documentation and licenses. It does not contain original firmware, personal profiles, device bindings, captures, local update scripts, toolchains or built binaries. Use the source export to produce that tree from a development workspace; do not push a development workspace wholesale.
 
-Requirements: PowerShell 7.2+, Git, Python 3, `tar` and the exact .NET SDK in `global.json`. Build each desktop package on its matching operating system and architecture. The full firmware build currently runs on Windows x64; its reviewed output is shared by all app platforms. Reserve several gigabytes of free disk space. The first full build downloads about 600 MB for QMK MSYS, plus other dependencies; extracting the toolchain and building all firmware variants takes time. Windows dependencies are pinned in `scripts/build-dependencies.json`, native Linux/macOS sources in `scripts/posix-native-dependencies.json`, and corresponding source archives in `reference/source-distribution.json`.
+Requirements: PowerShell 7.2+, Git, Python 3, `tar` and the exact .NET SDK in `global.json`. Build each desktop package on its matching operating system and architecture. The full firmware build currently runs on Windows x64; its reviewed output is shared by all app platforms. Reserve several gigabytes of free disk space. The first full build downloads about 600 MB for QMK MSYS, plus other dependencies; extracting the toolchain and building all firmware variants takes time. Windows dependencies are pinned in `scripts/build-dependencies.json`, native USB sources in `scripts/native-source-dependencies.json`, and corresponding source archives in `reference/source-distribution.json`.
 
 ```powershell
 pwsh -NoProfile -File scripts/Build-PublicRelease.ps1 -Mode SourceChecks -OutputDirectory artifacts/source-checks
@@ -38,7 +38,7 @@ The exporter uses an exact reviewed allowlist, checks content for private local 
 pwsh -NoProfile -File scripts/New-CorrespondingSource.ps1 `
   -PublicSourceDirectory <reviewed-public-folder> `
   -QmkDirectory firmware/qmk_firmware `
-  -Destination artifacts/INGLORIOUS-Advanced-0.6.47-Source `
+  -Destination artifacts/INGLORIOUS-Advanced-0.6.48-Source `
   -Download
 ```
 
@@ -59,9 +59,9 @@ pwsh -NoProfile -File scripts/Build-DesktopRelease.ps1 `
   -OutputDirectory artifacts/linux-release
 ```
 
-Use `osx-x64` or `osx-arm64` on the corresponding Mac. The script rejects a mismatched host architecture or firmware catalog. It builds pinned libusb 1.0.29 and dfu-util 0.11 sources, generates a native-tool catalog, publishes the adapter, prepares the setup assets and runs offline checks before packaging. All builds and tests in this script avoid device I/O.
+Use `osx-x64` or `osx-arm64` on the corresponding Mac. The script rejects a mismatched host architecture or firmware catalog. It builds pinned libusb 1.0.30 and dfu-util 0.11 sources, generates a native-tool catalog, publishes the adapter, prepares the setup assets and runs offline checks before packaging. All builds and tests in this script avoid device I/O.
 
-Packages are named `INGLORIOUS-Advanced-0.6.47-<runtime>.tar.gz` and have matching SHA-256 files. macOS packages contain `INGLORIOUS Advanced.app`; Linux packages contain `application/INGLORIOUS Advanced` plus a USB-permission helper. macOS builds use ad-hoc signatures and are not notarized. Sign native tools before generating their catalog and the adapter before generating the setup-tool catalog; do not recursively re-sign pinned files afterward.
+Packages are named `INGLORIOUS-Advanced-0.6.48-<runtime>.tar.gz` and have matching SHA-256 files. macOS packages contain `INGLORIOUS Advanced.app`; Linux packages contain `application/INGLORIOUS Advanced` plus a USB-permission helper. macOS builds use ad-hoc signatures and are not notarized. Sign native tools before generating their catalog and the adapter before generating the setup-tool catalog; do not recursively re-sign pinned files afterward.
 
 `Licenses/Desktop-ThirdParty.txt` preserves the locked desktop dependencies' license texts and notices. `reference/desktop-license-inventory.json` records their versions and provenance. After a deliberate dependency change, restore the locked packages, run `Collect-DesktopLicenses.ps1`, review the changes and rebuild the package. Runtime licenses must be retained in self-contained output.
 

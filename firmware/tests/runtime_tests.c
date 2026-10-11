@@ -218,6 +218,7 @@ static void timing_runtime_checks(void) {
     macro_running=true; check(command(8,NULL,0)==3 && !mock_reconnect_pending,"RAW8 blocked by active macro"); macro_running=false;
     uint8_t unexpected=1; check(command(8,&unexpected,1)==1 && !mock_reconnect_pending,"RAW8 rejects payload");
     effect_hit_count=3;
+    for (uint8_t i=0;i<effect_hit_count;i++) effect_hits[i].time=mock_now;
     check(command(8,NULL,0)==0 && response[8]==1 && response[9]==8 && response[10]==1 && !response[11] && mock_reconnect_pending,"RAW8 ACK reports old/new interval and queued action");
     mock_now+=99; housekeeping_task_user(); check(mock_reconnects==0 && effect_hit_count==3,"no reconnect before ACK delivery window");
     mock_now++; pressed_rows[0]=1; housekeeping_task_user(); check(mock_reconnects==0,"key activity defers scheduled reconnect");
@@ -228,6 +229,29 @@ static void timing_runtime_checks(void) {
     check(mock_active_interval==8 && mock_debounce==40,"early pre-init loads persisted timing before descriptors");
     keyboard_post_init_user(); check(mock_active_interval==8 && mock_debounce==40,"post-init does not undo early timing selection");
     storage_ok=false; check(command(8,NULL,0)==7,"storage fault blocks remote reconnect");
+}
+
+static void reactive_history_expiry_checks(void) {
+    uint8_t config[IG_MAX_SIZE]; reset(); make_v2(config);
+    config[IG_SIZE]=9; config[IG_SIZE+1]=0; install_size(config,IG_MAX_SIZE);
+    unsigned before_writes=writes; uint32_t before_generation=active_generation, before_crc=active_crc;
+    keyrecord_t press={.event={.pressed=true,.type=1,.key={0,0}}};
+    uint32_t first=UINT32_MAX-1999U;
+    mock_now=first; process_record_user(4,&press);
+    rgb_matrix_indicators_advanced_user(0,RGB_MATRIX_LED_COUNT);
+    check(rendered[0].r>0 && effect_hit_count==1,"new reactive key press lights its key");
+    mock_now=first+1000U; process_record_user(4,&press);
+    mock_now=first+3999U; housekeeping_task_user();
+    check(effect_hit_count==2,"oldest hit survives until maximum lifetime across timer wrap");
+    mock_now++; housekeeping_task_user();
+    check(effect_hit_count==1 && effect_hits[0].time==first+1000U,"only expired oldest hit is discarded at its deadline");
+    mock_now=first+5000U; housekeeping_task_user();
+    check(effect_hit_count==0,"latest hit is also permanently removed at its deadline");
+    // The same timer value recurs after a complete 32-bit timer cycle, without input.
+    mock_now=first+1000U; housekeeping_task_user();
+    rgb_matrix_indicators_advanced_user(0,RGB_MATRIX_LED_COUNT);
+    check(!rendered[0].r && !rendered[0].g && !rendered[0].b && !effect_hit_count,"expired hits cannot light up again after a complete timer cycle");
+    check(writes==before_writes && active_generation==before_generation && active_crc==before_crc,"reactive expiry does not change stored settings");
 }
 
 static void set_recovery_chord(void) {
@@ -369,6 +393,7 @@ int main(int argc, char **argv) {
     check(argc == 3, "C# legacy and standby fixture directories explicitly supplied"); fixture(argv[1], "default"); fixture(argv[1], "configured");
     fixture(argv[1],"effects"); fixture(argv[1],"timing"); fixture(argv[1],"v2-default"); fixture(argv[1],"sequences");
     effect_runtime_checks();
+    reactive_history_expiry_checks();
     timing_runtime_checks();
     color_sequence_checks(); runtime_brightness_checks();
     standby_checks(); fixture(argv[2],"v4-standby"); fixture(argv[2],"v4-sequences");

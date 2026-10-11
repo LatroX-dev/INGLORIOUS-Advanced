@@ -28,6 +28,7 @@ firmware/qmk_firmware/
 firmware/reference-forks/
 firmware/build/
 firmware/build-candidates*/
+firmware/build-review*/
 firmware/candidates/
 firmware/releases/
 firmware/local-firmware-bindings.json

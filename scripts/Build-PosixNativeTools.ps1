@@ -20,7 +20,7 @@ function Assert-NoLink([string]$Path){
 $output=[IO.Path]::GetFullPath($OutputDirectory);$cache=[IO.Path]::GetFullPath($SourceCache)
 Assert-NoLink $output;Assert-NoLink $cache
 if(Test-Path -LiteralPath $output){throw 'Native build output must be a new directory.'}
-$pins=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'posix-native-dependencies.json') -Raw|ConvertFrom-Json
+$pins=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'native-source-dependencies.json') -Raw|ConvertFrom-Json
 if($pins.schema-ne1-or$pins.sources.Count-ne2){throw 'Unexpected native source catalog.'}
 New-Item -ItemType Directory -Path $output|Out-Null
 New-Item -ItemType Directory -Path $cache -Force|Out-Null
@@ -52,6 +52,6 @@ $files=@(foreach($name in @($library,'dfu-util')){
 $catalog=Join-Path $output 'NativeToolCatalog.json'
 [IO.File]::WriteAllText($catalog,([ordered]@{schema=1;runtimeIdentifier=$Runtime;files=$files}|ConvertTo-Json -Depth 5),[Text.UTF8Encoding]::new($false))
 $licenses=Join-Path $output 'Licenses';New-Item -ItemType Directory -Path $licenses|Out-Null
-Copy-Item -LiteralPath (Join-Path $output 'libusb-1.0.29/COPYING') -Destination (Join-Path $licenses 'libusb-LGPL-2.1.txt')
+Copy-Item -LiteralPath (Join-Path $output 'libusb-1.0.30/COPYING') -Destination (Join-Path $licenses 'libusb-LGPL-2.1.txt')
 Copy-Item -LiteralPath (Join-Path $output 'dfu-util-0.11/COPYING') -Destination (Join-Path $licenses 'dfu-util-GPL-2.0.txt')
 [pscustomobject]@{runtimeIdentifier=$Runtime;nativeAssetDirectory=$native;nativeToolCatalogPath=$catalog;licenseDirectory=$licenses;hardwareAccess=$false}

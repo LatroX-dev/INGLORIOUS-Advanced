@@ -22,7 +22,7 @@ internal sealed class NativeBackend : IBackend
 
 internal sealed class Stm32Device : IDevice
 {
-    internal const string ToolHash = "662CC5C1C1992D0779C2F4201AE4770D60C6F56D8974CA71ABDCF35927B9F87D";
+    internal const string ToolHash = "BF9022E23AC7219FBFD7F54B83C75AA88F9ECFB874D7345FBADC894F56210F05";
     private readonly Selection selection;
     private readonly string evidence;
     private readonly string tool;
@@ -43,7 +43,7 @@ internal sealed class Stm32Device : IDevice
         tool = native.Path;
         toolLock = Files.Lock(tool, native.Bytes, native.Sha256).Stream;
     }
-    internal string[] Arguments(string operation, string? file = null)
+    internal static string[] Arguments(Selection selection, string operation, string? file = null)
     {
         string[] prefix = ["-d", "0483:df11", "-S", selection.Serial!, "-p", selection.Bus + "-" + selection.PortPath, "-c", "1", "-i", "0", "-a", "0"];
         return operation switch
@@ -98,30 +98,39 @@ internal sealed class Stm32Device : IDevice
         _ = Probe(model);
         Artifact artifact = Files.New(evidence, "dfu-write-image.bin", image, "exact-write-image");
         using var imageLock = Files.Lock(Files.Child(evidence, artifact.Path), artifact.Bytes, artifact.Sha256).Stream;
-        Run("write", Files.Child(evidence, artifact.Path), beforeFirstWrite);
+        // POSIX advisory locks do not prevent pathname replacement. dfu-util
+        // 0.11 supports -D - and buffers stdin before touching the device.
+        if (OperatingSystem.IsWindows()) Run("write", Files.Child(evidence, artifact.Path), beforeFirstWrite);
+        else Run("write", "-", beforeFirstWrite, image);
     }
-    private string Run(string operation, string? file = null, Action? beforeFirstWrite = null)
+    private string Run(string operation, string? file = null, Action? beforeFirstWrite = null, byte[]? standardInput = null)
     {
         if (operation == "write" && beforeFirstWrite == null) throw new InvalidOperationException("EXPLICIT_WRITE_GATE_REQUIRED");
-        string[] arguments = Arguments(operation, file);
+        if (standardInput is not null && (operation != "write" || file != "-" || standardInput.Length != 262144) ||
+            operation == "write" && !OperatingSystem.IsWindows() && standardInput is null)
+            throw new InvalidOperationException("VERIFIED_PROCESS_INPUT_REQUIRED");
+        string[] arguments = Arguments(selection, operation, file);
         string name = "dfu-" + (++sequence).ToString("D3") + "-" + operation;
         if (elapsed.ElapsedMilliseconds >= 300000) throw new TimeoutException("OPERATION_TIMEOUT");
         var request = new { executable = tool, arguments, write = operation == "write", utc = DateTimeOffset.UtcNow };
         Files.New(evidence, name + ".request.json", Json.Bytes(request), "tool-request");
-        var psi = new ProcessStartInfo(tool) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        var psi = new ProcessStartInfo(tool) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = standardInput is not null };
         psi.Environment["LC_ALL"] = "C";
         foreach (string arg in arguments) psi.ArgumentList.Add(arg);
         using var process = new Process { StartInfo = psi };
         string stdout = "", stderr = ""; int? exit = null; bool timeout = false; string? error = null;
         Task<string>? outTask = null, errTask = null;
+        Task? inputTask = null;
         try
         {
             beforeFirstWrite?.Invoke();
             if (!process.Start()) throw new IOException("TOOL_START_FAILED");
             outTask = process.StandardOutput.ReadToEndAsync(); errTask = process.StandardError.ReadToEndAsync();
+            if (standardInput is not null) inputTask = Files.WriteProcessInputAsync(process.StandardInput.BaseStream, standardInput);
             int remaining = Math.Max(1, 300000 - checked((int)elapsed.ElapsedMilliseconds));
             if (!process.WaitForExit(remaining)) { timeout = true; process.Kill(true); process.WaitForExit(); throw new TimeoutException("OPERATION_TIMEOUT"); }
             exit = process.ExitCode;
+            inputTask?.GetAwaiter().GetResult();
             stdout = outTask.GetAwaiter().GetResult(); stderr = errTask.GetAwaiter().GetResult();
             if (exit != 0) throw new IOException("DFU_TOOL_FAILED");
             if (stdout.Length + stderr.Length > 1024 * 1024) throw new IOException("DFU_OUTPUT_OVERSIZED");
@@ -130,6 +139,9 @@ internal sealed class Stm32Device : IDevice
         catch (Exception ex) { error = ex.Message; throw; }
         finally
         {
+            // A timeout kills the child and closes its reader. Observe any pipe
+            // failure without replacing the original operation failure.
+            if (inputTask is not null) { try { inputTask.GetAwaiter().GetResult(); } catch when (error is not null) { } }
             if (outTask != null) stdout = outTask.GetAwaiter().GetResult();
             if (errTask != null) stderr = errTask.GetAwaiter().GetResult();
             commands.Add(new { request, exitCode = exit, timedOut = timeout, error });

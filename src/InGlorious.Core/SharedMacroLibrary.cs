@@ -90,11 +90,34 @@ public static class SharedMacroLibrary
         return new(path, Hash(bytes), detached);
     }
 
-    public static void ExportFile(string path, IEnumerable<SharedMacro> macros, bool overwrite = false)
+    public static void ExportFile(string path, IEnumerable<SharedMacro> macros, bool overwrite = false, MacroLibrarySnapshot? library = null)
     {
+        path = System.IO.Path.GetFullPath(path);
+        // macOS commonly uses case-insensitive APFS. A conservative comparison also
+        // prevents a subset export from replacing the library through a linked folder.
+        var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var target = ResolveExportPath(path);
+        if (string.Equals(target, ResolveExportPath(DefaultPath), comparison)
+            || library is not null && string.Equals(target, ResolveExportPath(library.Path), comparison))
+            throw new InvalidDataException(L.T("Wähle für den Export eine andere Datei als die zentrale Bibliothek."));
         var detached = macros.Select(Clone).ToList(); Validate(detached);
         if (detached.Count == 0) throw new InvalidDataException(L.T("Wähle mindestens ein Makro aus."));
-        WriteAtomic(System.IO.Path.GetFullPath(path), Serialize(detached), overwrite);
+        WriteAtomic(path, Serialize(detached), overwrite);
+    }
+
+    private static string ResolveExportPath(string path)
+    {
+        var full = System.IO.Path.GetFullPath(path);
+        var resolved = System.IO.Path.GetPathRoot(full)!;
+        foreach (var segment in full[resolved.Length..].Split([System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries))
+        {
+            resolved = System.IO.Path.Combine(resolved, segment);
+            FileSystemInfo entry = Directory.Exists(resolved) ? new DirectoryInfo(resolved) : new FileInfo(resolved);
+            if (entry.LinkTarget is not null)
+                resolved = entry.ResolveLinkTarget(returnFinalTarget: true)?.FullName
+                    ?? throw new IOException(L.T("Wähle für den Export eine andere Datei als die zentrale Bibliothek."));
+        }
+        return resolved;
     }
 
     public static SharedMacro FromProfile(MacroDefinition macro)
@@ -170,7 +193,12 @@ public static class SharedMacroLibrary
     private static string Identity(SharedMacro macro) => JsonSerializer.Serialize(macro, Options);
     private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
     private static InvalidDataException Invalid() => new(L.T("Ungültige Makrodatei. Unterstützt werden Version 1, höchstens 256 Makros, 1–128 Schritte je Makro und vollständige Tastendrücke."));
-    private static byte[] Serialize(List<SharedMacro> macros) => JsonSerializer.SerializeToUtf8Bytes(new SharedMacroDocument { Macros = macros }, Options);
+    private static byte[] Serialize(List<SharedMacro> macros)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(new SharedMacroDocument { Macros = macros }, Options);
+        if (bytes.Length > MaximumFileBytes) throw Invalid();
+        return bytes;
+    }
     private static byte[] ReadBounded(string path)
     {
         using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);

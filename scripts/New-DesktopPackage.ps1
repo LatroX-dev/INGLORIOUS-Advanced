@@ -48,7 +48,7 @@ $locked=@{}
 foreach($targetLock in @($lock['net9.0'],$lock['net9.0/'+$Runtime])){foreach($entry in $targetLock.GetEnumerator()){$locked[$entry.Key]=$entry.Value}}
 $runtimeFiles=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 foreach($name in @('INGLORIOUS Advanced','INGLORIOUS Advanced.dll','INGLORIOUS Advanced.deps.json','INGLORIOUS Advanced.runtimeconfig.json')){[void]$runtimeFiles.Add($name)}
-$runtimePack='runtimepack.Microsoft.NETCore.App.Runtime.'+$Runtime+'/9.0.15'
+$runtimePack='runtimepack.Microsoft.NETCore.App.Runtime.'+$Runtime+'/9.0.20'
 foreach($library in $deps.targets[$runtimeTarget].GetEnumerator()){
  $parts=$library.Key.Split('/');$name=$parts[0];$version=$parts[1]
  if($library.Key-cne('INGLORIOUS Advanced/'+$ExpectedVersion)-and$library.Key-cne'InGlorious.Shared/1.0.0'-and$library.Key-cne$runtimePack){
@@ -69,7 +69,7 @@ if(-not$deps.targets[$runtimeTarget].ContainsKey($runtimePack)){throw 'Reviewed 
 $packages=(& dotnet nuget locals global-packages --list)
 if($LASTEXITCODE-ne0-or$packages-notmatch'^global-packages:\s+(.+)$'){throw 'Could not locate the actual runtime licenses.'}
 foreach($name in @('LICENSE.TXT','THIRD-PARTY-NOTICES.TXT')){
- $file=Join-Path $Matches[1] ('microsoft.netcore.app.runtime.'+$Runtime+'/9.0.15/'+$name)
+ $file=Join-Path $Matches[1] ('microsoft.netcore.app.runtime.'+$Runtime+'/9.0.20/'+$name)
  $reviewed['Licenses/dotnet-'+$Runtime+'-'+$name]=@{bytes=(Get-Item -LiteralPath $file).Length;sha256=(Get-FileHash -LiteralPath $file).Hash}
 }
 foreach($relative in $reviewed.Keys){

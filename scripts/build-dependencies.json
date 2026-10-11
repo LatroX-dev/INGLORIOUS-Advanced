@@ -2,12 +2,6 @@
   "schema": 1,
   "downloads": [
     {
-      "id": "dfu-util",
-      "file": "dfu-util-0.11-binaries.tar.xz",
-      "url": "https://dfu-util.sourceforge.net/releases/dfu-util-0.11-binaries.tar.xz",
-      "sha256": "6450DE30A7DCD8D8C1273F43F0B153F054FD24D85F7F38296B1AD8EDBD2DDB25"
-    },
-    {
       "id": "qmk-msys",
       "file": "QMK_MSYS-1.12.0.exe",
       "url": "https://github.com/qmk/qmk_distro_msys/releases/download/1.12.0/QMK_MSYS.exe",
@@ -31,7 +25,7 @@
     }
   },
   "nativeFiles": {
-    "libusb-1.0.dll": "3C3C1F47C8040D841A940218874BCF88A47E24F58A115A6BAFF0869D2532FB8E",
-    "dfu-util-static.exe": "662CC5C1C1992D0779C2F4201AE4770D60C6F56D8974CA71ABDCF35927B9F87D"
+    "libusb-1.0.dll": "7C4531E5369A763B1DAE7AEDD9152406587D52F65C3935479CCFC9C84F983AAC",
+    "dfu-util-static.exe": "BF9022E23AC7219FBFD7F54B83C75AA88F9ECFB874D7345FBADC894F56210F05"
   }
 }

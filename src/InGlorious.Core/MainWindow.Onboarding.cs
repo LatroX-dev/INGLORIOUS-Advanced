@@ -2,6 +2,19 @@ using System.Windows;
 
 namespace InGlorious.Core;
 
+internal enum FirmwareGuideState { Unverified, UpdateRequired, Ready, NewerVersion }
+internal sealed record FirmwareGuideDevice(string DeviceId, FirmwareGuideState State)
+{
+    public FirmwareRuntimeVersion? RuntimeVersion { get; init; }
+    public string Status => L.T(State switch
+    {
+        FirmwareGuideState.UpdateRequired => "INGLORIOUS erkannt · Aktualisierung erforderlich",
+        FirmwareGuideState.Ready => "Firmware ist aktuell",
+        FirmwareGuideState.NewerVersion => "Neuere Firmware installiert",
+        _ => "Gerät nicht eindeutig erkannt"
+    });
+}
+
 public partial class MainWindow
 {
     private bool _checkingFirmwareGuide, _automaticFirmwareGuideChecked;
@@ -12,19 +25,6 @@ public partial class MainWindow
         label.Text = Device.IsOfflineOnly ? L.T("Offline-Profil") : _firmwareAssessments.TryGetValue(Device.Id, out var assessment)
             ? assessment.RuntimeVersion is { } runtime ? "INGLORIOUS " + runtime.Report.Version + " · " + assessment.Status : assessment.Status
             : L.T("Version noch nicht geprüft");
-    }
-    private FirmwareWindow CreateFirmwareManager(FirmwareGuideDevice device)
-    {
-        var manager = new FirmwareWindow(device.DeviceId, initialOperation: device.Operation) { Owner = this };
-        manager.SetRuntimeVersionHint(device.RuntimeVersion);
-        return manager;
-    }
-    private void ApplyFirmwareManagerOutcome(FirmwareWindow manager, string deviceId)
-    {
-        if (manager.ConfirmedRuntimeVersion is { } runtime && runtime.Report.DeviceId == deviceId)
-            _firmwareAssessments[deviceId] = new(deviceId, FirmwareGuideState.Ready) { RuntimeVersion = runtime };
-        else _firmwareAssessments.Remove(deviceId);
-        RefreshFirmwareVersionLabel();
     }
     internal static bool MatchesOnboardingDevice(OnboardDevice candidate, DetectedDevice detected) => candidate.DeviceId == detected.DeviceId
         && candidate.UsbInstanceId is not null && string.Equals(candidate.UsbInstanceId, detected.InstanceId, StringComparison.OrdinalIgnoreCase);
@@ -39,18 +39,6 @@ public partial class MainWindow
         return version.Version < target ? FirmwareGuideState.UpdateRequired : version.Version > target ? FirmwareGuideState.NewerVersion : FirmwareGuideState.Ready;
     }
 
-    internal static FirmwareGuideDevice? SelectFirmwareGuideTarget(
-        IReadOnlyList<FirmwareGuideDevice> devices, bool manual, string? requestedDeviceId = null)
-    {
-        var supported = devices.Where(device => BoardDescriptorRegistry.TryGet(device.DeviceId, out var board) && board.HasApprovedFirmwareManagement).ToArray();
-        var actionable = supported.Where(device => device.State is FirmwareGuideState.Original or FirmwareGuideState.UpdateRequired).ToArray();
-        // Ready/unverified devices belong only to a manually opened status view.
-        if (manual)
-            return supported.FirstOrDefault(device => device.DeviceId == requestedDeviceId)
-                ?? actionable.FirstOrDefault() ?? supported.FirstOrDefault();
-        return actionable.FirstOrDefault(device => device.DeviceId == requestedDeviceId) ?? actionable.FirstOrDefault();
-    }
-
     public async Task CheckFirmwareGuideAsync(bool force = false, string? deviceId = null)
     {
         if (force && deviceId is not null && DeviceCatalog.Get(deviceId).IsOfflineOnly) return;
@@ -61,13 +49,12 @@ public partial class MainWindow
             _firmwareAssessments.Clear(); RefreshFirmwareVersionLabel();
             await _sharedBrightness.StopAsync();
             if (_startupClosed) return;
-            if (await Task.Run(FirmwareService.IsGloriousCoreRunning) is not false)
+            if (await Task.Run(DeviceSetupService.IsGloriousCoreRunning) is not false)
             {
                 if (force) Status(L.T("Schließe Glorious CORE, bevor du fortfährst."));
                 return;
             }
-            // Original devices always use the generic discovery/backup path. The
-            // former local wrappers are retained only for existing update/recovery history.
+            // Original devices use the same discovery and backup path as manual setup.
             var setupDevices = await new DeviceSetupService().ListDevicesAsync();
             if (setupDevices.Any(candidate => !candidate.IsRuntime &&
                 (!force || deviceId is null || candidate.CandidateDeviceIds.Contains(deviceId))))
@@ -87,7 +74,6 @@ public partial class MainWindow
                 if (_startupClosed) return;
                 var detected = detectedDevices.Where(item => item.DeviceId == device.Id).ToArray();
                 var state = FirmwareGuideState.Unverified;
-                var detail = "";
                 FirmwareRuntimeVersion? runtimeVersion = null;
                 if (detected.Length == 1)
                 {
@@ -106,15 +92,14 @@ public partial class MainWindow
                                 var info = await client.GetInfoAsync(timeout.Token);
                                 var reported = await client.GetFirmwareVersionAsync(timeout.Token);
                                 state = ClassifySetupFirmware(info, device.Id, reported);
-                                if (state == FirmwareGuideState.Unverified) detail = L.T("Die Firmware-Version konnte nicht geprüft werden.");
                                 if (reported is not null && state != FirmwareGuideState.Unverified)
                                     runtimeVersion = new(reported, usb.InstanceId, DateTimeOffset.UtcNow);
                             }
-                            catch { detail = L.T("Der Gerätestatus konnte nicht geprüft werden. Prüfe die USB-Verbindung und öffne die Anleitung erneut."); }
+                            catch { state = FirmwareGuideState.Unverified; }
                         }
                     }
                 }
-                var assessment = new FirmwareGuideDevice(device.Id, state, AvailabilityMessage: detail) { RuntimeVersion = runtimeVersion };
+                var assessment = new FirmwareGuideDevice(device.Id, state) { RuntimeVersion = runtimeVersion };
                 assessments.Add(assessment);
                 _firmwareAssessments[device.Id] = assessment;
             }

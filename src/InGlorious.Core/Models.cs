@@ -351,6 +351,7 @@ public static class BindingCatalog
 
 public static class ProjectService
 {
+    public const int MaximumFileBytes = 2 * 1024 * 1024;
     public static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase, UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow };
     public static AppProject Create(string deviceId)
     {
@@ -440,24 +441,56 @@ public static class ProjectService
     {
         var errors = Validate(project);
         if (errors.Count > 0) throw new InvalidDataException(string.Join(Environment.NewLine, errors));
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(project, JsonOptions);
+        if (bytes.Length > MaximumFileBytes) throw new InvalidDataException(L.T("Profildatei ist zu groß (max. 2 MB)."));
         var full = Path.GetFullPath(path);
         Directory.CreateDirectory(Path.GetDirectoryName(full)!);
         var temp = full + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
             using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            { JsonSerializer.Serialize(stream, project, JsonOptions); stream.Flush(true); }
+            { stream.Write(bytes); stream.Flush(true); }
             File.Move(temp, full, true);
         }
         finally { if (File.Exists(temp)) File.Delete(temp); }
     }
     public static AppProject Load(string path)
     {
-        var info = new FileInfo(path);
-        if (info.Length > 2 * 1024 * 1024) throw new InvalidDataException(L.T("Profildatei ist zu groß (max. 2 MB)."));
-        var project = JsonSerializer.Deserialize<AppProject>(File.ReadAllText(path), JsonOptions) ?? throw new InvalidDataException(L.T("Leere Profildatei."));
+        using var document = ReadProfileDocument(path);
+        return Load(document);
+    }
+    internal static JsonDocument ReadProfileDocument(string path) => ReadJsonFile(path, MaximumFileBytes, L.T("Profildatei ist zu groß (max. 2 MB)."));
+    internal static AppProject Load(JsonDocument document)
+    {
+        var project = document.Deserialize<AppProject>(JsonOptions) ?? throw new InvalidDataException(L.T("Leere Profildatei."));
         var errors = Validate(project);
         if (errors.Count > 0) throw new InvalidDataException(string.Join(Environment.NewLine, errors));
         return project;
+    }
+    internal static JsonDocument ReadJsonFile(string path, int maximumBytes, string sizeMessage)
+    {
+        // Check and read the same open handle. Replacing/growing a file cannot bypass the bound.
+        using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (file.Length > maximumBytes) throw new InvalidDataException(sizeMessage);
+        var bytes = new byte[checked((int)file.Length)]; file.ReadExactly(bytes);
+        if (file.ReadByte() != -1) throw new InvalidDataException(sizeMessage);
+        using var reader = new StreamReader(new MemoryStream(bytes), System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        var document = JsonDocument.Parse(reader.ReadToEnd(), new JsonDocumentOptions { MaxDepth = 16 });
+        try { CheckUniqueProperties(document.RootElement); return document; }
+        catch { document.Dispose(); throw; }
+    }
+    private static void CheckUniqueProperties(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.Object)
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var property in value.EnumerateObject())
+            {
+                if (!names.Add(property.Name)) throw new JsonException(L.T("Die Datei ist ungültig. Bitte wähle eine andere Datei."));
+                CheckUniqueProperties(property.Value);
+            }
+        }
+        else if (value.ValueKind == JsonValueKind.Array)
+            foreach (var item in value.EnumerateArray()) CheckUniqueProperties(item);
     }
 }

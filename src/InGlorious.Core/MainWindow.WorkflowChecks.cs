@@ -83,18 +83,6 @@ public partial class MainWindow
             check(ExperimentalDeviceLabel.IsVisible && ExperimentalDeviceNotice.IsVisible && ExperimentalDeviceNotice.Text == L.T("Experimentelle Unterstützung: noch nicht an diesem Modell getestet."), model.Id + ": device overview explains the experimental test status without an opt-in gate");
             check(DeviceHardwareOverview.Visibility == Visibility.Visible && OfflineDeviceOverview.Visibility == Visibility.Collapsed && DeviceRecoveryOverview.Visibility == Visibility.Visible && FirmwareInstallationNotice.Visibility == Visibility.Collapsed && ExperimentalSetupActions.Visibility == Visibility.Collapsed, model.Id + ": runtime status, generic update and restore share one device overview");
             check(ManageFirmwareButton.IsEnabled && RestoreOriginalFirmwareButton.IsEnabled, model.Id + ": connected models can open generic firmware checks with independent write protection");
-            var guide = SelectFirmwareGuideTarget([new(model.Id, FirmwareGuideState.Original, true)], manual: true);
-            check(guide is null && !new FirmwareGuideDevice(model.Id, FirmwareGuideState.UpdateRequired, true).CanOpenManager, model.Id + ": a candidate never inherits firmware installation permission");
-            var blocked = false;
-            var windowsBefore = Application.Current.Windows.Cast<Window>().ToHashSet();
-            try { new FirmwareWindow(model.Id, offlinePreview: true).Close(); }
-            catch (System.IO.InvalidDataException) { blocked = true; }
-            finally
-            {
-                // WPF registers Window in its base constructor, even when a derived constructor rejects the model.
-                foreach (var fixture in Application.Current.Windows.Cast<Window>().Where(window => !windowsBefore.Contains(window)).ToArray()) fixture.Close();
-            }
-            check(blocked, model.Id + ": direct firmware-manager construction also rejects an unapproved model");
             DiscardPendingEdits();
         }
         }

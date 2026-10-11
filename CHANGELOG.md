@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.48
+
+- Updated security components.
+- Improved firmware update reliability on macOS and Linux.
+- Better protection against conflicting firmware operations.
+- Safer profile and macro import/export.
+- Fixed reactive lighting after long periods without input.
+
 ## 0.6.47
 
 - Improved macOS packaging.

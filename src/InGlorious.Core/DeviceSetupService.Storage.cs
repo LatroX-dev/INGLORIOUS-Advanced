@@ -120,6 +120,16 @@ public sealed partial class DeviceSetupService
             log?.Report(L.T("USB angeschlossen und INGLORIOUS Advanced geöffnet lassen."));
             var adapterOperation = operation switch { SetupOperation.Install => "install", SetupOperation.Restore => "restore", _ => "update" };
             var response = await Adapter(session, adapterOperation, confirmWrite: true);
+            // The adapter can reject a concurrent operation before opening USB,
+            // so this particular refusal has no observed fingerprint or write.
+            if (response.GetProperty("schema").GetInt32() == 1 && response.GetProperty("operation").GetString() == adapterOperation &&
+                response.GetProperty("deviceId").GetString() == session.DeviceId && response.GetProperty("status").GetString() == "blocked" &&
+                response.TryGetProperty("errorCode", out var busyCode) && busyCode.GetString() == "DEVICE_OPERATION_BUSY" &&
+                !response.GetProperty("writeAttempted").GetBoolean() && !response.GetProperty("verified").GetBoolean())
+            {
+                session.OutcomeUncertain = false;
+                throw Error("Die Firmware konnte nicht sicher geprüft werden. Es wurde nichts auf die Tastatur geschrieben.");
+            }
             ValidateAdapterIdentity(response, session, adapterOperation);
             session.WriteAttempted = response.GetProperty("writeAttempted").GetBoolean();
             if (response.GetProperty("status").GetString() == "blocked" && !session.WriteAttempted && !response.GetProperty("verified").GetBoolean())

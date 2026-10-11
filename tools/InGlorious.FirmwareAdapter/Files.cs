@@ -6,7 +6,38 @@ namespace InGlorious.FirmwareAdapter;
 
 internal static class Files
 {
+    // dfu-util opens/closes its USB handle for each command. Keep one process-wide
+    // transaction owner across probing, capture, programming and both readbacks.
+    internal static IDisposable AcquireDeviceOperation()
+    {
+        var mutex = new Mutex(false, (OperatingSystem.IsWindows() ? @"Global\" : "") + "INGLORIOUS.Advanced.FirmwareAdapter.Operation");
+        try
+        {
+            bool acquired;
+            try { acquired = mutex.WaitOne(0); }
+            catch (AbandonedMutexException) { acquired = true; }
+            if (!acquired) throw new IOException("DEVICE_OPERATION_BUSY");
+            return new DeviceOperationLease(mutex);
+        }
+        catch { mutex.Dispose(); throw; }
+    }
+    private sealed class DeviceOperationLease(Mutex mutex) : IDisposable
+    {
+        private bool disposed;
+        public void Dispose()
+        {
+            if (disposed) return;
+            disposed = true;
+            try { mutex.ReleaseMutex(); } finally { mutex.Dispose(); }
+        }
+    }
     internal static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
+    internal static async Task WriteProcessInputAsync(Stream input, ReadOnlyMemory<byte> bytes)
+    {
+        // Closing the pipe supplies EOF. The native consumer never reopens a
+        // mutable filesystem path for these already verified image bytes.
+        await using (input) await input.WriteAsync(bytes).ConfigureAwait(false);
+    }
     internal static void NoLinks(string path)
     {
         string full = Path.GetFullPath(path);

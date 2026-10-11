@@ -8,6 +8,8 @@ Install Git, PowerShell 7.2+, Python 3, `tar` and the exact .NET SDK in `global.
 
 Dependencies and native binaries are pinned. Do not silently update a dependency, accept a different firmware hash or replace an unknown device with a similar model. Changes to those pins need explicit review and a new source package.
 
+Package restore audits direct and transitive NuGet dependencies. Known vulnerabilities fail the build; CI also fails if the advisory feed cannot be checked. Investigate and fix an advisory instead of suppressing it to complete a release.
+
 The product name is **INGLORIOUS Advanced**. Internal project directories and .NET namespaces, such as `InGlorious.Core`, retain their technical identifiers; the paths below are the actual source paths. The Windows application is `INGLORIOUS Advanced.exe`, its installer is `INGLORIOUS-Advanced-<version>-Setup.exe`, and the matching source archive is `INGLORIOUS-Advanced-<version>-Source.zip`.
 
 ## Test

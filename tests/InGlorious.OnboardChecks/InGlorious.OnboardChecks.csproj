@@ -11,5 +11,6 @@
     <EmbeddedResource Include="..\..\src\InGlorious.Core\Locales\*.json" LogicalName="InGlorious.Locales.%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup><Compile Include="../../src/InGlorious.Core/FirmwareRelease.cs" Link="FirmwareRelease.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/InGlorious.Core/FirmwareChangelog.cs" Link="FirmwareChangelog.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/InGlorious.Core/BoardDescriptorRegistry.cs" Link="BoardDescriptorRegistry.cs" /></ItemGroup>
 </Project>

@@ -16,8 +16,9 @@ public sealed partial class MainWindow
         var count = 0;
         void Check(bool condition, string name) { count++; if (!condition) throw new InvalidOperationException("Check failed: " + name); }
         void Reject(Action action, string name) { var rejected = false; try { action(); } catch (InvalidDataException) { rejected = true; } Check(rejected, name); }
-        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.47", "visible product assembly metadata uses INGLORIOUS 0.6.47");
+        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.48", "visible product assembly metadata uses INGLORIOUS 0.6.48");
         await RunConnectionsChecksAsync(Check);
+        await RunProfileReplacementChecksAsync(Check);
         RunExperimentalLabelsChecks(Check);
         RunLanguagePreferenceChecks(Check);
         AppAutostartEditor.RunOfflineChecks(Check);
@@ -496,6 +497,59 @@ public sealed partial class MainWindow
             check(!add.IsEnabled && !remove.IsEnabled, "invalid hex disables favorite actions");
         }
         finally { _favorites.Clear(); _favorites.AddRange(favorites); _pendingApply = null; _state = original; }
+    }
+    private async Task RunProfileReplacementChecksAsync(Action<bool, string> check)
+    {
+        var sessions = _sessions.ToArray(); var current = _state; var macro = _macroId;
+        var notices = _startupNotices.ToArray();
+        var folder = Path.Combine(Path.GetTempPath(), "inglorious-profile-opening-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            foreach (var source in new[] { "pro-iso", "numpad" })
+            {
+                var target = source == "pro-iso" ? "numpad" : "pro-iso";
+                var sourceDraft = new EditorState(source); sourceDraft.Change(p => p.Name = "Source unsaved fixture");
+                var targetDraft = new EditorState(target); targetDraft.Change(p => p.Name = "Target unsaved fixture");
+                _sessions[source] = _state = sourceDraft; _sessions[target] = targetDraft;
+                var sourceBefore = EditorState.Fingerprint(sourceDraft.Project);
+                var targetBefore = EditorState.Fingerprint(targetDraft.Project);
+                var path = Path.Combine(folder, "selected.json");
+                var selected = ProjectService.Create(target); selected.Name = "Selected fixture";
+                ProjectService.Save(path, selected);
+                check(!await LoadProfileCoreAsync(path, prior =>
+                {
+                    check(ReferenceEquals(prior, targetDraft), "profile confirmation belongs to the selected device draft");
+                    return Task.FromResult(false);
+                }), "cancel leaves the selected profile unopened");
+                foreach (var change in new Action[] { () => File.Delete(path), () => File.WriteAllText(path, "{broken"), () => ProjectService.Save(path, ProjectService.Create(source)) })
+                {
+                    ProjectService.Save(path, selected);
+                    var rejected = false;
+                    try { await LoadProfileCoreAsync(path, async _ => { await Task.Yield(); change(); return true; }); }
+                    catch (Exception ex) when (ex is IOException or InvalidDataException or System.Text.Json.JsonException) { rejected = true; }
+                    check(rejected && ReferenceEquals(_state, sourceDraft) && ReferenceEquals(_sessions[target], targetDraft) && ReferenceEquals(_sessions[source], sourceDraft),
+                        "changed or missing profile cannot replace another device or the visible session");
+                    check(EditorState.Fingerprint(sourceDraft.Project) == sourceBefore && EditorState.Fingerprint(targetDraft.Project) == targetBefore && sourceDraft.Dirty && targetDraft.Dirty,
+                        "both unsaved profiles survive failed replacement exactly");
+                }
+                ProjectService.Save(path, selected);
+                check(await LoadProfileCoreAsync(path, _ =>
+                {
+                    selected.Name = "Saved during confirmation"; ProjectService.Save(path, selected);
+                    return Task.FromResult(true);
+                }) && _state.Device.Id == target && _state.Project.Name == selected.Name && !_state.Dirty,
+                    "a successful same-device reread adopts the latest saved profile");
+                check(ReferenceEquals(_sessions[source], sourceDraft) && EditorState.Fingerprint(sourceDraft.Project) == sourceBefore,
+                    "successful replacement keeps the other device draft");
+            }
+        }
+        finally
+        {
+            _sessions.Clear(); foreach (var pair in sessions) _sessions.Add(pair.Key, pair.Value);
+            _startupNotices.Clear(); foreach (var pair in notices) _startupNotices.Add(pair.Key, pair.Value);
+            _state = current; _macroId = macro; Directory.Delete(folder, recursive: true);
+        }
     }
     private void RunSliderNavigationChecks(Action<bool, string> check)
     {

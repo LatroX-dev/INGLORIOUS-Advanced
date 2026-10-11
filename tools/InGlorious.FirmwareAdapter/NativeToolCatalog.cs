@@ -26,7 +26,7 @@ internal static class NativeToolCatalog
         string? resource = assembly.GetManifestResourceNames().SingleOrDefault(n => n.EndsWith(".NativeToolCatalog.json", StringComparison.Ordinal));
         if (resource is null)
         {
-            // Existing Windows source builds retain their reviewed, immutable upstream hashes.
+            // Windows builds use reviewed hashes of the reproducible pinned-source build.
             if (RuntimeIdentifier != "win-x64" || hash != (name == LibraryName ? NativeUsb.DllSha256 : Stm32Device.ToolHash))
                 throw new IOException("NATIVE_TOOL_CATALOG_REQUIRED");
         }
