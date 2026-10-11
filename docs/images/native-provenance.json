@@ -2,20 +2,36 @@
   "schema": 1,
   "images": [
     {
+      "file": "macos-pro-ansi.png",
+      "operatingSystem": "macOS",
+      "runtime": "osx-arm64",
+      "appVersion": "0.6.47",
+      "deviceId": "pro-ansi",
+      "language": "en",
+      "synthetic": true,
+      "hardwareAccess": false,
+      "userSettingsAccess": false,
+      "bytes": 122962,
+      "sha256": "D2F47A447EE2AB5736F7A450A2C131CB4DA98A545F15A2F333C2CE769F44E3B3",
+      "commit": "471e69115d91ba7bef159b40cf6d1145f0eaaa8e",
+      "workflowRun": "https://github.com/LatroX-dev/INGLORIOUS-Advanced/actions/runs/38149739529",
+      "artifactId": 11707455928
+    },
+    {
       "file": "linux-numpad.png",
       "operatingSystem": "Linux",
       "runtime": "linux-x64",
-      "appVersion": "0.6.45",
+      "appVersion": "0.6.47",
       "deviceId": "numpad",
       "language": "en",
       "synthetic": true,
       "hardwareAccess": false,
       "userSettingsAccess": false,
-      "bytes": 111736,
-      "sha256": "992E03BEBAEA0475BC991E7A32F80F3148C9E335BE39AD10986B2641E0D43D68",
-      "commit": "4fa01ebb81d826d2365dd22214affec4ddf1d7e7",
-      "workflowRun": "https://github.com/LatroX-dev/INGLORIOUS-Advanced/actions/runs/38143156297",
-      "artifactId": 11704229908
+      "bytes": 111735,
+      "sha256": "9F939F8627CA233373D162C08586B2AED6746CBE02135F3CB6B0AF0EC002534B",
+      "commit": "471e69115d91ba7bef159b40cf6d1145f0eaaa8e",
+      "workflowRun": "https://github.com/LatroX-dev/INGLORIOUS-Advanced/actions/runs/38149739529",
+      "artifactId": 11706812862
     }
   ]
 }

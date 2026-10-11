@@ -106,18 +106,22 @@ Use the firmware for your exact model, layout and hardware revision. For GMMK 3 
 | --- | --- |
 | Windows x64 | Main WPF app, configuration and guided firmware management |
 | Windows 11 ARM64 | No native package; the x64 build has not been tested under emulation |
-| macOS, Intel and Apple Silicon | Avalonia app with configuration and guided firmware management; native validation pending |
+| macOS, Intel and Apple Silicon | Early Alpha; native builds, packages and offline checks passed; physical-device testing pending |
 | Linux x64 | Early Alpha; native build, package and offline checks passed; physical-device testing pending |
 
 Physical-device checks for macOS and Linux are still pending. Windows packages are unsigned; macOS packages use ad-hoc signing and are not Apple notarized.
 
 ### macOS and Linux — Early Alpha
 
+**macOS — GMMK PRO ANSI**
+
+![macOS lighting editor with a GMMK PRO ANSI](docs/images/macos-pro-ansi.png)
+
 **Linux — GMMK Numpad**
 
 ![Linux lighting editor with a GMMK Numpad](docs/images/linux-numpad.png)
 
-This screenshot was captured on a native Linux runner using synthetic profiles. It shows the app, not a physical-device test. macOS screenshots will be added after its package passes native validation. [Capture details](docs/images/native-provenance.json).
+These screenshots were captured on native macOS and Linux runners using synthetic profiles. Both platforms are **Early Alpha**; the screenshots show the app and do not demonstrate a physical-device test. [Capture details](docs/images/native-provenance.json).
 
 ## Build and contribute
 

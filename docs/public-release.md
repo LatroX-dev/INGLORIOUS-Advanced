@@ -65,7 +65,7 @@ Packages are named `INGLORIOUS-Advanced-0.6.47-<runtime>.tar.gz` and have matchi
 
 `Licenses/Desktop-ThirdParty.txt` preserves the locked desktop dependencies' license texts and notices. `reference/desktop-license-inventory.json` records their versions and provenance. After a deliberate dependency change, restore the locked packages, run `Collect-DesktopLicenses.ps1`, review the changes and rebuild the package. Runtime licenses must be retained in self-contained output.
 
-Linux x64 has passed its native build, package and offline checks in CI. macOS packaging is still undergoing native validation. Physical USB workflows remain untested on both platforms. A cross-published executable, screenshot or simulated test does not establish physical-device behavior. Record native build results separately from [physical acceptance](hardware-acceptance.md).
+Linux x64 and both macOS architectures have passed their native build, package and offline checks in CI for 0.6.47. macOS checks include strict bundle-signature verification and an offline launch from the extracted archive. Physical USB workflows remain untested on both platforms. A cross-published executable, screenshot or simulated test does not establish physical-device behavior. Record native build results separately from [physical acceptance](hardware-acceptance.md).
 
 ## Publishing checklist
 
