@@ -2,6 +2,8 @@
 
 Configure Glorious keyboards with per-key lighting, effects, key assignments, macros and four layers. Settings run on the keyboard after transfer, so the app can be closed.
 
+I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
+
 **Windows alpha · App 0.6.40 · Firmware 0.11.0**
 
 **Source preview:** Public downloads are not available yet. The Windows package is awaiting its final hardware checks.
