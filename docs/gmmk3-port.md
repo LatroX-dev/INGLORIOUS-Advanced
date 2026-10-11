@@ -1,6 +1,6 @@
 # GMMK 3 development port
 
-App 0.6.37 and firmware candidate 0.11.0 add six experimental runtime targets. No GMMK 3 was physically available for testing. The existing local updater remains on 0.9.2 for its two previously identified devices. Original firmware detection, backup, installation and restore are not enabled for these new targets.
+Firmware 0.11.0 includes six experimental GMMK 3 targets. No GMMK 3 was physically available for testing. The current app supports original-firmware detection, backup, first installation, update and restoration for these targets through the guided workflow, subject to its device and backup checks. Physical hardware acceptance remains pending; see [model support](model-support.md) and [device setup](device-setup.md).
 
 ## Scope and provenance
 

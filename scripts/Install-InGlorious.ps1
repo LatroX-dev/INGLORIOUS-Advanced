@@ -12,7 +12,7 @@ $notice = 'Gemeinsames Dimmen von Numpad und Tastatur benötigt INGLORIOUS im Hi
 function Assert-NoLink([string]$Path) {
     $current = [IO.Path]::GetFullPath($Path)
     while ($current) {
-        if ((Test-Path -LiteralPath $current) -and ((Get-Item -LiteralPath $current).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Linked paths are not allowed.' }
+        if ((Test-Path -LiteralPath $current) -and ((Get-Item -LiteralPath $current -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Linked paths are not allowed.' }
         $current = [IO.Path]::GetDirectoryName($current)
     }
 }

@@ -31,4 +31,8 @@ An ambiguous model, changed connection, missing matching archive, disagreement b
 
 ## Current status
 
-The GMMK PRO revision 1 ISO and GMMK Numpad have historical physical-use evidence. On Windows, the Numpad lighting sequence and typing test passed after first installation with app 0.6.41. The unified installation, update and restoration workflow in app 0.6.43 still needs the above acceptance run. The other 13 variants remain experimental. Native macOS/Linux package, device, layout and permission testing is also pending. Automated checks and successful builds are reported separately.
+The GMMK PRO revision 1 ISO and GMMK Numpad have historical physical-use evidence. On Windows, the Numpad completed original-firmware recovery and subsequent first installation with app 0.6.43. The combined backup/write flow, automatic reconnection after installation, full lighting sequence and typing test were confirmed by the tester.
+
+After that restoration, Windows initially reported an unrecognized USB device; a second normal reconnection succeeded. The restoration had passed full readback verification. The cause of the USB enumeration failure remains undetermined. The subsequent installation completed with one normal reconnection after about five seconds unplugged.
+
+This is partial acceptance: the full checklist above, including every control, configuration persistence and the update path, remains open. The other 13 variants remain experimental. Native macOS/Linux package, device, layout and permission testing is also pending. Automated checks and successful builds are reported separately.

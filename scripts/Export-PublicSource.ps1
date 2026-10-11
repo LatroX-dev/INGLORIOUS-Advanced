@@ -11,7 +11,7 @@ $root = [IO.Path]::GetFullPath($SourceRoot).TrimEnd([IO.Path]::DirectorySeparato
 $utf8 = [Text.UTF8Encoding]::new($false)
 
 function Assert-NoLink([string]$Path) {
-    $item = Get-Item -LiteralPath $Path
+    $item = Get-Item -LiteralPath $Path -Force
     while ($item) {
         if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Export refuses reparse points in source or destination paths.' }
         $item = if ($item -is [IO.FileInfo]) { $item.Directory } else { $item.Parent }

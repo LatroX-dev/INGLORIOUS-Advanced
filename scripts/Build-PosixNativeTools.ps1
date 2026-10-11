@@ -14,7 +14,7 @@ $architecture=[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.
 if($Runtime-cne($platform+'-'+$architecture)){throw 'The requested runtime must match this native build process.'}
 function Assert-NoLink([string]$Path){
     for($value=[IO.Path]::GetFullPath($Path);$value;$value=[IO.Path]::GetDirectoryName($value)){
-        if((Test-Path -LiteralPath $value)-and((Get-Item -LiteralPath $value).Attributes-band[IO.FileAttributes]::ReparsePoint)){throw 'Linked native-build paths are not allowed.'}
+        if((Test-Path -LiteralPath $value)-and((Get-Item -LiteralPath $value -Force).Attributes-band[IO.FileAttributes]::ReparsePoint)){throw 'Linked native-build paths are not allowed.'}
     }
 }
 $output=[IO.Path]::GetFullPath($OutputDirectory);$cache=[IO.Path]::GetFullPath($SourceCache)

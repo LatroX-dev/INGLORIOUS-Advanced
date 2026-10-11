@@ -10,6 +10,38 @@ function Check([bool]$Value,[string]$Message){$script:checks++;if(-not$Value){th
 function Reject([scriptblock]$Action,[string]$Message){$failed=$false;try{$null=&$Action}catch{$failed=$true};Check $failed $Message}
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 try {
+ # Match Windows runners whose TEMP directory is below hidden AppData. The
+ # real package/installer checks below must still inspect every ancestor.
+ [IO.File]::SetAttributes($testRoot,([IO.File]::GetAttributes($testRoot)-bor[IO.FileAttributes]::Hidden))
+ $guardTarget=Join-Path $testRoot 'guard-target';New-Item -ItemType Directory -Path $guardTarget|Out-Null
+ $guardFile=Join-Path $guardTarget 'synthetic.txt';[IO.File]::WriteAllText($guardFile,'Synthetic path-check fixture only.')
+ $guardLink=Join-Path $testRoot 'hidden-junction'
+ New-Item -ItemType Junction -Path $guardLink -Target $guardTarget|Out-Null
+ try {
+  [IO.File]::SetAttributes($guardLink,([IO.File]::GetAttributes($guardLink)-bor[IO.FileAttributes]::Hidden))
+  $linkAttributes=(Get-Item -LiteralPath $guardLink -Force).Attributes
+  Check ([bool]($linkAttributes-band[IO.FileAttributes]::Hidden)-and[bool]($linkAttributes-band[IO.FileAttributes]::ReparsePoint)) 'The regression fixture must be a hidden junction.'
+  foreach($guardScript in @('New-WindowsPackage.ps1','Install-InGlorious.ps1','Export-PublicSource.ps1','New-CorrespondingSource.ps1','New-DesktopPackage.ps1','Initialize-BuildDependencies.ps1','Initialize-InstallerCompiler.ps1','Build-PosixNativeTools.ps1','Prepare-SetupAssets.ps1')){
+   # Execute the production guard in isolation, without starting the build,
+   # download, packaging or installation body of the corresponding script.
+   $parseErrors=$null;$tokens=$null
+   $tree=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot $guardScript),[ref]$tokens,[ref]$parseErrors)
+   Check ($parseErrors.Count-eq0) ('Path-guard script must parse: '+$guardScript)
+   $definitions=@($tree.FindAll({param($node)$node-is[Management.Automation.Language.FunctionDefinitionAst]-and$node.Name-ceq'Assert-NoLink'},$false))
+   Check ($definitions.Count-eq1) ('One production path guard is required: '+$guardScript)
+   $guard=[scriptblock]::Create($definitions[0].Extent.Text+"`nAssert-NoLink `$args[0]")
+   &$guard $testRoot;Check $true ('Hidden directory accepted: '+$guardScript)
+   &$guard $guardFile;Check $true ('Hidden ancestor accepted: '+$guardScript)
+   Reject {&$guard $guardLink} ('Hidden junction accepted: '+$guardScript)
+   Reject {&$guard (Join-Path $guardLink 'synthetic.txt')} ('Hidden junction ancestor accepted: '+$guardScript)
+  }
+ } finally {
+  # Remove only the verified junction itself; never recurse through its target.
+  if(Test-Path -LiteralPath $guardLink){
+   if(-not((Get-Item -LiteralPath $guardLink -Force).Attributes-band[IO.FileAttributes]::ReparsePoint)){throw 'Path-check junction changed before cleanup.'}
+   Remove-Item -LiteralPath $guardLink -Force
+  }
+ }
  $fixture=Join-Path $testRoot 'publish';New-Item -ItemType Directory -Path $fixture | Out-Null
  # A real existing apphost supplies Windows version metadata. It is never started.
  if([string]::IsNullOrWhiteSpace($AppHost)){$AppHost=Join-Path $workspace 'artifacts/app-standalone/INGLORIOUS Advanced.exe'}

@@ -5,7 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 function Assert-NoLink([string]$Path) {
  $current=[IO.Path]::GetFullPath($Path)
- while($current){if((Test-Path -LiteralPath $current)-and((Get-Item -LiteralPath $current).Attributes-band[IO.FileAttributes]::ReparsePoint)){throw 'Linked package paths are not allowed.'};$current=[IO.Path]::GetDirectoryName($current)}
+ while($current){if((Test-Path -LiteralPath $current)-and((Get-Item -LiteralPath $current -Force).Attributes-band[IO.FileAttributes]::ReparsePoint)){throw 'Linked package paths are not allowed.'};$current=[IO.Path]::GetDirectoryName($current)}
 }
 $source=[IO.Path]::GetFullPath($PublishDirectory).TrimEnd('\');$target=[IO.Path]::GetFullPath($Destination).TrimEnd('\')
 Assert-NoLink $source;Assert-NoLink $target

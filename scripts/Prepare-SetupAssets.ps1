@@ -14,7 +14,7 @@ $catalogRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../src/InGlorious.
 $destinationPath=[IO.Path]::GetFullPath($Destination)
 if(Test-Path -LiteralPath $destinationPath){throw 'Use a new destination; existing assets are never overwritten.'}
 function Assert-NoLink([string]$path){
- for($item=Get-Item -LiteralPath $path;$null-ne$item;$item=$item.Parent){
+ for($item=Get-Item -LiteralPath $path -Force;$null-ne$item;$item=$item.Parent){
   if($item.Attributes-band[IO.FileAttributes]::ReparsePoint){throw 'Linked source paths are not accepted.'}
   if($item-is[IO.FileInfo]){$item=$item.Directory;if($item.Attributes-band[IO.FileAttributes]::ReparsePoint){throw 'Linked source directory.'}}
  }

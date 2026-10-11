@@ -15,7 +15,7 @@ if($pins.schema-ne1){throw 'Unsupported dependency catalog.'}
 function Assert-NoLink([string]$Path){
     $value=[IO.Path]::GetFullPath($Path)
     while($value){
-        if((Test-Path -LiteralPath $value)-and((Get-Item -LiteralPath $value).Attributes-band[IO.FileAttributes]::ReparsePoint)){throw ('Linked dependency path: '+$value)}
+        if((Test-Path -LiteralPath $value)-and((Get-Item -LiteralPath $value -Force).Attributes-band[IO.FileAttributes]::ReparsePoint)){throw ('Linked dependency path: '+$value)}
         $value=[IO.Path]::GetDirectoryName($value)
     }
 }

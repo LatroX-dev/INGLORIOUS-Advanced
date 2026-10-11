@@ -36,7 +36,7 @@ Read the [setup and recovery guide](docs/getting-started.md). The **?** button o
 | GMMK 2, 65% and 96% | ANSI, ISO | Experimental |
 | GMMK 3, wired non-HE, 65%, 75% and 100% | ANSI, ISO | Experimental |
 
-There are **15 model/layout variants**, including **13 experimental variants**. Experimental devices can be configured and installed, but have not been tested on physical hardware. The new general installation, update and recovery workflow still needs a complete hardware acceptance run, including on the two previously used models.
+There are **15 model/layout variants**, including **13 experimental variants**. Experimental devices can be configured and installed, but have not been tested on physical hardware. The Numpad's original-firmware recovery, first installation, automatic reconnection, lighting sequence and typing test have been used on Windows with app 0.6.43. The complete [hardware acceptance checklist](docs/hardware-acceptance.md) is still in progress.
 
 GMMK 3 PRO is not automatically treated as a supported GMMK 3. GMMK HE, GMBK, GMMK Eternal, Bluetooth and other wireless modes are not supported. Check the [complete model list](docs/model-support.md) before installing firmware.
 
@@ -69,6 +69,14 @@ Ordinary configuration changes do not require a firmware update. Shared dimming 
 
 The app follows the system language by default, with English as fallback. It includes German, English, Spanish, French, Italian, Brazilian Portuguese, Polish, Turkish, Russian, Japanese, Korean and Simplified Chinese.
 
+## Built on QMK
+
+INGLORIOUS firmware is based on [QMK Firmware](https://qmk.fm/), the open-source keyboard firmware project. It uses QMK's keyboard and hardware support and adds the INGLORIOUS app connection, onboard configuration, lighting effects, macro handling, standby and screensaver features.
+
+Each supported model gets a complete firmware build that replaces its original firmware. Your original backup remains available for recovery. GMMK 3 support also uses adapted open-source keyboard definitions published by Glorious. Thanks to the QMK community and the upstream contributors who make this possible.
+
+The desktop app is developed as part of INGLORIOUS Advanced. See the [firmware documentation](firmware/README.md) for source details and [third-party notices](THIRD-PARTY-NOTICES.md) for credits and licenses.
+
 ## Original firmware and backups
 
 **Use this software and its firmware at your own risk.** Firmware changes can cause data loss or leave a device unusable. Keep a separate copy of your original-firmware backups.
@@ -90,6 +98,7 @@ Use the firmware for your exact model, layout and hardware revision. For GMMK 3 
 | Platform | Availability |
 | --- | --- |
 | Windows x64 | Main WPF app, configuration and guided firmware management |
+| Windows 11 ARM64 | No native package; the x64 build has not been tested under emulation |
 | macOS, Intel and Apple Silicon | Avalonia app with configuration and guided firmware management; native validation pending |
 | Linux x64 | Avalonia app with configuration and guided firmware management; native validation pending |
 

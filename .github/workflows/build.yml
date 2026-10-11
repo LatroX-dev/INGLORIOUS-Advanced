@@ -54,15 +54,6 @@ jobs:
       - name: Build reviewed firmware and Windows application
         shell: pwsh
         run: ./scripts/Build-PublicRelease.ps1 -Mode Windows
-      - name: Verify installation package without launching it
-        shell: pwsh
-        run: ./scripts/Test-WindowsInstaller.ps1 -AppHost 'artifacts/public-build/application/INGLORIOUS Advanced.exe' -ToolCatalogPath artifacts/public-build/SetupToolCatalog.json
-      - name: Verify native install, update, uninstall and running-app protection
-        shell: pwsh
-        run: |
-          [xml]$project = Get-Content src/InGlorious.Core/InGlorious.Core.csproj
-          $version = $project.Project.PropertyGroup.Version
-          ./scripts/Test-NativeWindowsInstaller.ps1 -PackageDirectory "artifacts/public-build/INGLORIOUS-Advanced-$version-win-x64" -ToolCatalogPath artifacts/public-build/SetupToolCatalog.json -OutputDirectory artifacts/native-installer-checks
       - name: Stage only reviewed firmware for the native platform builds
         shell: pwsh
         run: |
@@ -80,6 +71,15 @@ jobs:
           if-no-files-found: error
           retention-days: 3
           path: artifacts/reviewed-firmware/*.bin
+      - name: Verify installation package without launching it
+        shell: pwsh
+        run: ./scripts/Test-WindowsInstaller.ps1 -AppHost 'artifacts/public-build/application/INGLORIOUS Advanced.exe' -ToolCatalogPath artifacts/public-build/SetupToolCatalog.json
+      - name: Verify native install, update, uninstall and running-app protection
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content src/InGlorious.Core/InGlorious.Core.csproj
+          $version = $project.Project.PropertyGroup.Version
+          ./scripts/Test-NativeWindowsInstaller.ps1 -PackageDirectory "artifacts/public-build/INGLORIOUS-Advanced-$version-win-x64" -ToolCatalogPath artifacts/public-build/SetupToolCatalog.json -OutputDirectory artifacts/native-installer-checks
       - name: Prepare corresponding source
         shell: pwsh
         run: |
