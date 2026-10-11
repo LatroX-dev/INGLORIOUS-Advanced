@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.47
+
+- Improved macOS packaging.
+
 ## 0.6.46
 
 - Software update notifications and downloads.

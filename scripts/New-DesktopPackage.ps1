@@ -101,7 +101,7 @@ if($IsMacOS){
  New-Item -ItemType Directory -Path $macos|Out-Null
  $launcher=Join-Path $macos 'INGLORIOUS Advanced'
  $architecture=if($Runtime-eq'osx-arm64'){'arm64'}else{'x86_64'}
- & clang -std=c11 -Wall -Wextra -Werror -O2 -arch $architecture -mmacosx-version-min=12.0 (Join-Path $PSScriptRoot 'macos-launcher.c') -o $launcher
+ & clang -std=c11 -Wall -Wextra -Werror -O2 -arch $architecture '-mmacosx-version-min=12.0' (Join-Path $PSScriptRoot 'macos-launcher.c') -o $launcher
  if($LASTEXITCODE-ne0){throw 'Application launcher compilation failed.'}
  $plist=@"
 <?xml version="1.0" encoding="UTF-8"?>
