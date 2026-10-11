@@ -23,7 +23,7 @@ function Invoke-Checked([string]$Command,[string[]]$Arguments){
 $sdk=(& dotnet --version).Trim()
 $expectedSdk=(Get-Content -LiteralPath (Join-Path $root 'global.json') -Raw|ConvertFrom-Json).sdk.version
 if($sdk-cne$expectedSdk){throw ('Install .NET SDK '+$expectedSdk+' from Microsoft before building.')}
-$tests=@('InGlorious.Checks','InGlorious.BoardRegistryChecks','InGlorious.ModelChecks','InGlorious.DiscoveryChecks','InGlorious.OnboardChecks','InGlorious.MacroLibraryChecks','InGlorious.LightingPresetChecks','InGlorious.PreferencesChecks','InGlorious.RecordingChecks','InGlorious.PendingChecks','InGlorious.LightingTestChecks','InGlorious.AutostartChecks','InGlorious.StartupGuardChecks','InGlorious.BackgroundChecks')
+$tests=@('InGlorious.Checks','InGlorious.BoardRegistryChecks','InGlorious.ModelChecks','InGlorious.DiscoveryChecks','InGlorious.OnboardChecks','InGlorious.MacroLibraryChecks','InGlorious.LightingPresetChecks','InGlorious.PreferencesChecks','InGlorious.RecordingChecks','InGlorious.PendingChecks','InGlorious.LightingTestChecks','InGlorious.AutostartChecks','InGlorious.StartupGuardChecks','InGlorious.BackgroundChecks','InGlorious.AppStartupChecks','InGlorious.AdapterFileChecks')
 $executedTests=0
 foreach($suite in $tests){
     [xml]$testProject=Get-Content -LiteralPath (Join-Path $root ('tests/'+$suite+'/'+$suite+'.csproj'))
@@ -37,6 +37,7 @@ if($IsWindows){
     Invoke-Checked 'dotnet' @('build',(Join-Path $root 'src/InGlorious.Core/InGlorious.Core.csproj'),'-c','Release',('-p:SetupAssetsDirectory='+ (Join-Path $output 'no-firmware-assets')))
     Invoke-Checked 'dotnet' @('build',(Join-Path $root 'tools/InGlorious.FirmwareAdapter/InGlorious.FirmwareAdapter.csproj'),'-c','Release',('-p:NativeAssetDirectory='+ (Join-Path $output 'no-native-assets')))
 }
+if(-not$IsWindows){Invoke-Checked 'bash' @((Join-Path $root 'tests/PosixNativeChecks/check-dependency.sh'))}
 if($Mode-eq'SourceChecks'){
     [pscustomobject]@{mode=$Mode;tests=$executedTests;firmwareBundled=$false;hardwareAccess=$false}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $output 'result.json')
     return

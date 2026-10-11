@@ -4,7 +4,7 @@ Configure Glorious keyboards with per-key lighting, effects, key assignments, ma
 
 I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
 
-**Source preview · App 0.6.44 · Firmware 0.11.0**
+**Source preview · App 0.6.45 · Firmware 0.11.0**
 
 Public downloads are not available yet. Release and hardware checks are still in progress.
 

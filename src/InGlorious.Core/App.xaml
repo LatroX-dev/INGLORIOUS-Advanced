@@ -1,8 +1,7 @@
 <Application x:Class="InGlorious.Core.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:InGlorious.Core"
-             StartupUri="MainWindow.xaml">
+             xmlns:local="clr-namespace:InGlorious.Core">
     <Application.Resources>
         <SolidColorBrush x:Key="WindowBackground" Color="#141618"/>
         <SolidColorBrush x:Key="Surface" Color="#1C1F22"/>

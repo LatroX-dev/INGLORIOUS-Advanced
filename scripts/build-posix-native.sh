@@ -37,7 +37,7 @@ if [[ "$runtime" == linux-* ]]; then
 else
   cp -L "$prefix/lib/libusb-1.0.dylib" "$native/libusb-1.0.dylib"
   install_name_tool -id '@rpath/libusb-1.0.dylib' "$native/libusb-1.0.dylib"
-  dependency=$(otool -L "$native/dfu-util" | awk '$1 ~ /\/libusb-1\.0[^/]*\.dylib$/ {print $1}')
+  dependency=$(otool -L "$native/dfu-util" | awk '$1 ~ /\/libusb-1\.0[^\/]*\.dylib$/ {print $1}')
   [[ "$dependency" == "$prefix/lib/"* && "$dependency" != *$'\n'* ]]
   install_name_tool -change "$dependency" '@loader_path/libusb-1.0.dylib' "$native/dfu-util"
   otool -L "$native/dfu-util" | grep -F '@loader_path/libusb-1.0.dylib'

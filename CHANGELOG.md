@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.45
+
+- Fixed app startup.
+
 ## 0.6.44
 
 - Closing the window keeps the app in the notification area.

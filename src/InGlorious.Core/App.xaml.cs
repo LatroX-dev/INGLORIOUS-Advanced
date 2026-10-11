@@ -21,8 +21,7 @@ public partial class App : Application
             new RoutedEventHandler((sender, _) => ApplyWindowFrame((Window)sender)));
         if (!_installationGuard.CanStart)
         {
-            // Suppress StartupUri before the framework could construct MainWindow.
-            StartupUri = null;
+            // MainWindow is constructed explicitly only after both startup guards succeed.
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             L.SetLanguage(AppPreferencesStore.Load().Preferences.Language);
             ShowStartupNotice(_installationGuard.State);
@@ -37,7 +36,7 @@ public partial class App : Application
                 _instance = new ApplicationInstance(() => Dispatcher.BeginInvoke(() => (MainWindow as MainWindow)?.OpenFromTray()));
                 if (!_instance.IsPrimary)
                 {
-                    StartupUri = null; ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                    ShutdownMode = ShutdownMode.OnExplicitShutdown;
                     if (!_instance.NotifyExistingAsync(!e.Args.Contains("--background")).GetAwaiter().GetResult())
                     { L.SetLanguage(AppPreferencesStore.Load().Preferences.Language); ShowStartupNotice(ApplicationStartupState.GuardUnavailable); }
                     Shutdown(); return;
@@ -45,17 +44,17 @@ public partial class App : Application
             }
             catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.Security.SecurityException or NotSupportedException)
             {
-                StartupUri = null; ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 L.SetLanguage(AppPreferencesStore.Load().Preferences.Language); ShowStartupNotice(ApplicationStartupState.GuardUnavailable); Shutdown(); return;
             }
         }
         SystemParameters.StaticPropertyChanged += SystemParametersChanged;
-        if (!offline)
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
+        var window = new MainWindow();
+        MainWindow = window;
+        if (offline) window.Show();
+        else
         {
-            StartupUri = null;
-            ShutdownMode = ShutdownMode.OnMainWindowClose;
-            var window = new MainWindow();
-            MainWindow = window;
             _backgroundSession = new(window.OpenFromTray, window.InitializeInBackground, window.RequestApplicationExit, window.HideToTray);
             window.AttachTraySession(_backgroundSession);
             _backgroundSession.Start(() => WindowsTrayIcon.TryCreate(_backgroundSession.Open, _backgroundSession.Exit, _backgroundSession.TrayUnavailable),

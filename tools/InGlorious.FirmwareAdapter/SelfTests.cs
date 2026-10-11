@@ -81,9 +81,18 @@ internal static class SelfTests
         Reject(() => Files.Child(root, "C:\\outside.bin"), "absolute artifact");
         var artifact = Files.New(root, "original.bin", [1, 2, 3], "fixture");
         Reject(() => Files.New(root, "original.bin", [4, 5, 6], "fixture"), "no overwrite");
-        using var locked = Files.Lock(Path.Combine(root, artifact.Path), 3, artifact.Sha256).Stream;
-        Reject(() => File.WriteAllBytes(Path.Combine(root, artifact.Path), [9]), "read lock prevents mutation");
         Reject(() => Files.Lock(Path.Combine(root, artifact.Path), 3, new string('0', 64)), "hash lock");
+        var locked = Files.Lock(Path.Combine(root, artifact.Path), 3, artifact.Sha256);
+        using (locked.Stream)
+        {
+            Check(locked.Bytes.AsSpan().SequenceEqual(new byte[] { 1, 2, 3 }), "verified bytes are retained independently of the file");
+            Reject(() => File.WriteAllBytes(Path.Combine(root, artifact.Path), [9]), "read lock prevents mutation");
+            Check(locked.Stream.Length == 3, "rejected writer does not truncate locked input");
+            byte[] retained = new byte[3]; locked.Stream.ReadExactly(retained);
+            Check(retained.AsSpan().SequenceEqual(locked.Bytes), "locked input remains identical after rejected mutation");
+        }
+        File.WriteAllBytes(Path.Combine(root, artifact.Path), [4, 5, 6]);
+        Check(Files.ReadBounded(Path.Combine(root, artifact.Path), 3).AsSpan().SequenceEqual(new byte[] { 4, 5, 6 }), "disposing the verified input releases its lock");
     }
     private static void PageWriteChecks()
     {

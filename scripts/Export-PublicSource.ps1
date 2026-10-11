@@ -56,10 +56,12 @@ $allow.Add('scripts/Prepare-SetupAssets.ps1')
 foreach ($name in @('Build-PosixNativeTools.ps1','build-posix-native.sh','posix-native-dependencies.json','Build-DesktopRelease.ps1','New-DesktopPackage.ps1','Test-DesktopPackage.ps1','macos-entitlements.plist','70-inglorious.rules','Install-UsbPermissions.sh')) { $allow.Add('scripts/'+$name) }
 foreach ($name in @('Build-WindowsInstaller.ps1','Initialize-InstallerCompiler.ps1','Test-NativeWindowsInstaller.ps1','installer-dependencies.json')) { $allow.Add('scripts/'+$name) }
 $allow.Add('packaging/windows/INGLORIOUS-Advanced.iss')
-foreach ($suite in @('InGlorious.AutostartChecks','InGlorious.StartupGuardChecks','InGlorious.BackgroundChecks')) {
+foreach ($suite in @('InGlorious.AutostartChecks','InGlorious.StartupGuardChecks','InGlorious.BackgroundChecks','InGlorious.AppStartupChecks','InGlorious.AdapterFileChecks')) {
     $allow.Add('tests/'+$suite+'/'+$suite+'.csproj'); $allow.Add('tests/'+$suite+'/Program.cs')
 }
 $allow.Add('tests/InGlorious.BackgroundChecks/Paths.cs')
+$allow.Add('tests/InGlorious.AppStartupChecks/StartupDoubles.cs')
+$allow.Add('tests/PosixNativeChecks/check-dependency.sh')
 $adapterFiles=@('AdapterEngine.cs','Contracts.cs','Files.cs','InGlorious.FirmwareAdapter.csproj','NativeUsb.cs','NativeToolCatalog.cs','Program.cs','README.md','SelfTests.cs','Stm32Device.cs','WbProtocol.cs',
  'Licenses/dfu-util-binary-provenance.txt','Licenses/dfu-util-GPL-2.0.txt','Licenses/dotnet-MIT.txt','Licenses/dotnet-THIRD-PARTY-NOTICES.txt','Licenses/libusb-LGPL-2.1.txt','Licenses/README.txt','Licenses/Westberry-Apache-2.0.txt')
 foreach($name in $adapterFiles){$allow.Add('tools/InGlorious.FirmwareAdapter/'+$name)}

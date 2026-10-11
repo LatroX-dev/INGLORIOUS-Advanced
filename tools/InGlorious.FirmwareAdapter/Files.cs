@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 namespace InGlorious.FirmwareAdapter;
 
@@ -42,9 +44,14 @@ internal static class Files
     internal static (FileStream Stream, byte[] Bytes) Lock(string path, long length, string hash)
     {
         NoLinks(path);
-        var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        // Unix maps every sharing mode except None to a shared advisory lock;
+        // FileShare.Read alone therefore does not exclude another managed writer.
+        // Native dfu-util can still read while the exclusive advisory lock is held.
+        var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+            OperatingSystem.IsWindows() ? FileShare.Read : FileShare.None);
         try
         {
+            RequirePosixLock(stream.SafeFileHandle);
             if (length < 1 || length > 32 * 1024 * 1024 || stream.Length != length) throw new IOException("Artifact length mismatch.");
             byte[] bytes = new byte[checked((int)length)]; stream.ReadExactly(bytes);
             if (!string.Equals(Hash(bytes), hash, StringComparison.Ordinal)) throw new IOException("Artifact checksum mismatch.");
@@ -52,6 +59,21 @@ internal static class Files
         }
         catch { stream.Dispose(); throw; }
     }
+    private static void RequirePosixLock(SafeFileHandle handle)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        // FileStream deliberately ignores unsupported-lock errors on Unix. A
+        // firmware input must instead fail closed if the filesystem cannot lock.
+        const int exclusiveNonblocking = 2 | 4; // LOCK_EX | LOCK_NB on Linux/macOS.
+        int result = OperatingSystem.IsLinux() ? LinuxFlock(handle, exclusiveNonblocking)
+            : OperatingSystem.IsMacOS() ? MacFlock(handle, exclusiveNonblocking)
+            : throw new PlatformNotSupportedException("Firmware file locking is not supported on this platform.");
+        if (result != 0) throw new IOException("Artifact could not be locked for verification.", new System.ComponentModel.Win32Exception(Marshal.GetLastPInvokeError()));
+    }
+    [DllImport("libc", EntryPoint = "flock", SetLastError = true)]
+    private static extern int LinuxFlock(SafeFileHandle handle, int operation);
+    [DllImport("libSystem.B.dylib", EntryPoint = "flock", SetLastError = true)]
+    private static extern int MacFlock(SafeFileHandle handle, int operation);
     internal static string NewSession(string requested)
     {
         if (!Path.IsPathFullyQualified(requested)) throw new IOException("Session directory must be absolute.");
