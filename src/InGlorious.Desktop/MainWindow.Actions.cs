@@ -301,9 +301,11 @@ public sealed partial class MainWindow
     private bool _closing;
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
-        if (_allowClose || Program.Offline) return;
+        if (_allowClose) return;
+        if (KeepWindowInTray(e.CloseReason)) { e.Cancel = true; return; }
+        if (Program.Offline) return;
         if (_startupLoading) { _allowClose = true; _startupCancellation?.Cancel(); return; }
-        e.Cancel = true; if (_busy || _closing) return;
+        e.Cancel = true; if (_busy || _closing) { _applicationExitRequested = false; return; }
         _closing = true;
         try
         {
@@ -311,7 +313,7 @@ public sealed partial class MainWindow
             foreach (var session in _sessions.Values) if (!await MayReplace(session)) return;
             await _sharedBrightness.StopAsync(); _allowClose = true; Close();
         }
-        finally { _closing = false; }
+        finally { _closing = false; _applicationExitRequested = false; }
     }
     private void OnKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
     {

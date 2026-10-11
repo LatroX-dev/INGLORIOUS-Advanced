@@ -1,6 +1,6 @@
 # License and source-distribution record
 
-Updated for app 0.6.43 and included firmware 0.11.0. This is developer release documentation; it is not UI text or a guarantee that future dependencies have the same terms. Final native package and corresponding-source checks remain release requirements.
+Updated for app 0.6.44 and included firmware 0.11.0. This is developer release documentation; it is not UI text or a guarantee that future dependencies have the same terms. Final native package and corresponding-source checks remain release requirements.
 
 ## Project license
 

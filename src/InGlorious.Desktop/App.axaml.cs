@@ -70,20 +70,30 @@ public sealed partial class App : Application
                 }
             }
             var window = new MainWindow(settings.Preferences, settings.Warning);
-            if (BackgroundApplicationSession.Requested(Program.Arguments, Program.Offline))
+            if (!Program.Offline)
             {
-                // The lifetime automatically shows MainWindow before starting its loop.
-                // Assign it only after that stage, so a tray launch never flashes a window.
-                desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                bool startHidden = BackgroundApplicationSession.Requested(Program.Arguments, Program.Offline);
+                // Defer only a background launch: Avalonia otherwise shows MainWindow automatically.
+                desktop.ShutdownMode = startHidden ? ShutdownMode.OnExplicitShutdown : ShutdownMode.OnMainWindowClose;
+                if (!startHidden) desktop.MainWindow = window;
                 desktop.Exit += (_, _) => { _backgroundSession?.Dispose(); _backgroundSession = null; };
+                desktop.ShutdownRequested += (_, _) =>
+                {
+                    // A never-shown background window is absent from Avalonia's open-window list.
+                    // Register it before the lifetime runs its normal guarded shutdown. Closing here
+                    // would reenter that lifetime through MainWindow.Closed.
+                    if (!window.ApplicationExitApproved) window.OpenFromTray();
+                };
                 Dispatcher.UIThread.Post(async () =>
                 {
                     desktop.MainWindow = window;
                     desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
-                    if (_pendingActivation) { _pendingActivation = false; window.OpenFromTray(); }
-                    _backgroundSession = new(window.OpenFromTray, window.InitializeWindowOnce, window.Close);
+                    var session = _backgroundSession = new(window.OpenFromTray, window.InitializeWindowOnce, window.RequestApplicationExit, window.HideToTray);
+                    window.AttachTraySession(session);
                     bool available = await DesktopTrayIcon.HasNotificationAreaAsync();
-                    _backgroundSession.Start(() => available ? DesktopTrayIcon.TryCreate(this, _backgroundSession.Open, _backgroundSession.Exit, _backgroundSession.TrayUnavailable) : null);
+                    session.Start(() => available ? DesktopTrayIcon.TryCreate(this, session.Open, session.Exit, session.TrayUnavailable) : null,
+                        startHidden: startHidden && !_pendingActivation);
+                    _pendingActivation = false;
                 });
             }
             else { desktop.MainWindow = window; if (_pendingActivation) { _pendingActivation = false; window.OpenFromTray(); } }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.44
+
+- Closing the window keeps the app in the notification area.
+- Reopen or quit the app from its notification-area menu.
+
 ## 0.6.43
 
 - Simpler firmware updates and original-firmware recovery.

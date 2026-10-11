@@ -22,14 +22,25 @@ Check(!BackgroundApplicationSession.Requested(["--background"], true), "offline 
 
 var events = new List<string>();
 var tray = new FakeTray(() => events.Add("dispose"));
-using (var session = new BackgroundApplicationSession(() => events.Add("show"), () => events.Add("initialize"), () => events.Add("close")))
+using (var session = new BackgroundApplicationSession(() => events.Add("show"), () => events.Add("initialize"), () => events.Add("close"), () => events.Add("hide")))
 {
+    Check(!session.HandleWindowClose(false), "window cannot hide before a reachable tray exists");
     session.Start(() => { events.Add("tray"); return tray; });
     Check(events.SequenceEqual(["tray", "initialize"]), "background configuration starts only after reachable tray, without any window show");
     session.Start(() => throw new Exception("duplicate tray creation"));
     Check(events.Count == 2, "background initialization runs once");
     session.Open();
     Check(events[^1] == "show", "tray opens existing window");
+    int beforeHide = events.Count;
+    Check(session.HandleWindowClose(false), "window close is canceled when it can hide to the tray");
+    Check(events.Skip(beforeHide).SequenceEqual(["hide"]), "hiding neither initializes again nor requests actual application close");
+    session.Open();
+    Check(events[^1] == "show", "hidden window can be reopened");
+    int beforeQuit = events.Count;
+    Check(!session.HandleWindowClose(true), "explicit Quit continues through the window's normal close guards");
+    Check(events.Count == beforeQuit, "explicit Quit never hides the owner of a pending-edit prompt");
+    Check(session.HandleWindowClose(false, hasOpenDialog: true), "ordinary close keeps an active dialog reachable");
+    Check(events[^1] == "show", "window with an open dialog is brought forward instead of hiding its children");
     session.Exit();
     Check(events.TakeLast(2).SequenceEqual(["show", "close"]), "exit delegates to normal window close with a visible owner");
     Check(!tray.Disposed, "canceled unsaved-profile/firmware close retains tray and application");
@@ -37,16 +48,42 @@ using (var session = new BackgroundApplicationSession(() => events.Add("show"), 
     Check(events[^1] == "show", "window remains reachable after canceled exit");
     session.TrayUnavailable();
     Check(events.TakeLast(2).SequenceEqual(["dispose", "show"]), "lost notification area opens window and releases stale tray");
+    Check(!session.HandleWindowClose(false), "lost tray restores normal guarded close instead of stranding a hidden process");
     session.Dispose(); session.Dispose();
     int count = events.Count; session.Open(); session.Exit(); session.TrayUnavailable();
     Check(events.Count == count, "late native callbacks cannot reopen a disposed app");
+    Check(!session.HandleWindowClose(false), "disposed application never intercepts window closing");
     Check(tray.DisposeCount == 1, "tray is removed exactly once");
 }
 events.Clear();
-using (var session = new BackgroundApplicationSession(() => events.Add("show"), () => events.Add("initialize"), () => events.Add("close")))
+using (var session = new BackgroundApplicationSession(() => events.Add("show"), () => events.Add("initialize"), () => events.Add("close"), () => events.Add("hide")))
 {
     session.Start(() => null);
     Check(events.SequenceEqual(["show"]), "no tray shows normal window; its Loaded handler owns initialization");
+    Check(!session.HandleWindowClose(false), "no tray permits normal guarded application exit");
+}
+events.Clear();
+using (var session = new BackgroundApplicationSession(() => events.Add("show"), () => events.Add("initialize"), () => events.Add("close"), () => events.Add("hide")))
+{
+    session.Start(() => new FakeTray(() => events.Add("dispose")), startHidden: false);
+    Check(events.SequenceEqual(["show"]), "normal launch remains visible and initializes through the window only");
+    Check(session.HandleWindowClose(false) && events[^1] == "hide", "normal launch also supports closing to tray");
+    session.Open();
+    Check(events.SequenceEqual(["show", "hide", "show"]), "reopening uses the same window without replacing editor state");
+    session.Start(() => throw new Exception("second normal startup"), startHidden: false);
+    Check(events.Count == 3, "reopening does not create another tray or startup read");
+}
+events.Clear();
+using (var session = new BackgroundApplicationSession(() => events.Add("show"), () => events.Add("initialize"), () => events.Add("close"), () => events.Add("hide")))
+{
+    session.Dispose();
+    session.Start(() => throw new Exception("late asynchronous notification-area result"));
+    Check(events.Count == 0, "notification-area discovery finishing after exit cannot recreate the app");
+}
+using (var session = new BackgroundApplicationSession(() => { }, () => { }, () => { }))
+{
+    session.Start(() => new FakeTray(() => { }));
+    Check(!session.HandleWindowClose(false), "a session without a hide action never swallows close");
 }
 
 string NewScope() => "BackgroundTest." + Guid.NewGuid().ToString("N");

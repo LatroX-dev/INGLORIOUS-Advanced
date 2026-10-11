@@ -50,14 +50,16 @@ public partial class App : Application
             }
         }
         SystemParameters.StaticPropertyChanged += SystemParametersChanged;
-        if (BackgroundApplicationSession.Requested(e.Args, offline))
+        if (!offline)
         {
             StartupUri = null;
             ShutdownMode = ShutdownMode.OnMainWindowClose;
             var window = new MainWindow();
             MainWindow = window;
-            _backgroundSession = new(window.OpenFromTray, window.InitializeInBackground, window.Close);
-            _backgroundSession.Start(() => WindowsTrayIcon.TryCreate(_backgroundSession.Open, _backgroundSession.Exit, _backgroundSession.TrayUnavailable));
+            _backgroundSession = new(window.OpenFromTray, window.InitializeInBackground, window.RequestApplicationExit, window.HideToTray);
+            window.AttachTraySession(_backgroundSession);
+            _backgroundSession.Start(() => WindowsTrayIcon.TryCreate(_backgroundSession.Open, _backgroundSession.Exit, _backgroundSession.TrayUnavailable),
+                startHidden: BackgroundApplicationSession.Requested(e.Args, offline));
         }
         base.OnStartup(e);
     }
@@ -112,6 +114,14 @@ public partial class App : Application
         _installationGuard?.Dispose();
         _installationGuard = null;
         base.OnExit(e);
+    }
+
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        // WPF can end a Windows session without raising the main window's Closing event.
+        // Use that same guarded path explicitly; a busy firmware window may veto it.
+        if (MainWindow is MainWindow window && !window.RequestSessionEnd()) e.Cancel = true;
+        base.OnSessionEnding(e);
     }
 
     [DllImport("dwmapi.dll", ExactSpelling = true)]

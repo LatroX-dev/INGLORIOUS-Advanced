@@ -2012,6 +2012,7 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
+        if (KeepWindowInTray()) { e.Cancel = true; return; }
         if (_startupLoading || _startupFinishing) { _startupCancellation.Cancel(); return; }
         if (_readingDevice) { e.Cancel = true; Status(L.T("Der Gerätestand wird noch gelesen. Bitte warte auf das Prüfergebnis.")); return; }
         if (_screenshotMode) return;
@@ -2084,6 +2085,7 @@ public partial class MainWindow : Window
         RunStandbyChecks(Check);
         RunHelpChecks(Check);
         RunDeviceSetupChecks(Check);
+        RunBackgroundWindowChecks(Check);
         AppSettingsWindow.RunOfflineChecks(Check);
         await RunStartupChecksAsync(Check);
         await RunConnectionChecksAsync(Check);
