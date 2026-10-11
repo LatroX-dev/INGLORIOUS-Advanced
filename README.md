@@ -28,7 +28,7 @@ Read the [setup and recovery guide](docs/getting-started.md). The **?** button o
 | Model | Layouts | Status |
 | --- | --- | --- |
 | GMMK PRO, revision 1 | ISO | Used on physical hardware |
-| GMMK Numpad | USB | Used on physical hardware |
+| GMMK Numpad | **USB only — Bluetooth does not work** | Used on physical hardware |
 | GMMK PRO, revision 1 | ANSI | Experimental |
 | GMMK PRO, revision 2 | ANSI, ISO | Experimental |
 | GMMK 2, 65% and 96% | ANSI, ISO | Experimental |
