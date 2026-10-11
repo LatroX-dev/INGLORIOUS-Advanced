@@ -66,8 +66,8 @@ def stage(source: Path, destination: Path, version: str, repository: Path) -> li
         shutil.copyfile(path, destination / path.name)
         if file_digest(destination / path.name) != digests[path.name]:
             raise ValueError("Release copy verification failed.")
-    notes = ("**Early Alpha**\n\n" + section[1].strip() + "\n\n"
-             "Choose **Setup.exe** for Windows, **osx-arm64** for Apple silicon, **osx-x64** for Intel Macs, "
+    notes = (section[1].strip() + "\n\n"
+             "Choose **Windows (win-x64) — Setup** for Windows, **osx-arm64** for Apple silicon, **osx-x64** for Intel Macs, "
              "or **linux-x64** for Linux. Each app package includes firmware and its USB tools.\n\n"
              "macOS and Linux are **Early Alpha**. Native builds and offline checks do not replace physical-device testing. "
              "Windows packages are unsigned; macOS packages are not notarized.\n\n"

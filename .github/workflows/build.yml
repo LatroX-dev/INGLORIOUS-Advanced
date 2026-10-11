@@ -185,7 +185,7 @@ jobs:
         with:
           name: native-osx-arm64
           path: release-files/macos-arm
-      - name: Create an unpublished alpha release for review
+      - name: Create an unpublished release for review
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
@@ -197,5 +197,15 @@ jobs:
               raise SystemExit('Unsupported release tag')
           subprocess.run(['python', 'scripts/Prepare-ReleaseAssets.py', '--input', 'release-files', '--output', 'release-ready', '--version', version[1]], check=True)
           PY
-          gh release create "$RELEASE_TAG" --verify-tag --draft --prerelease --title "INGLORIOUS Advanced $RELEASE_TAG" --notes-file release-ready/release-notes.md
-          find release-ready -maxdepth 1 -type f ! -name 'release-notes.md' -print0 | xargs -0 gh release upload "$RELEASE_TAG" --
+          gh release create "$RELEASE_TAG" --verify-tag --draft --title "INGLORIOUS Advanced $RELEASE_TAG" --notes-file release-ready/release-notes.md
+          python - <<'PY'
+          import os, subprocess
+          from pathlib import Path
+          assets = []
+          for path in sorted(Path('release-ready').iterdir()):
+              if not path.is_file() or path.name == 'release-notes.md':
+                  continue
+              label = '#Windows (win-x64) — Setup' if path.name.endswith('-Setup.exe') else ''
+              assets.append(str(path) + label)
+          subprocess.run(['gh', 'release', 'upload', os.environ['RELEASE_TAG'], '--', *assets], check=True)
+          PY

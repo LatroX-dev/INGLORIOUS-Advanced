@@ -17,7 +17,7 @@ Use new output directories. The full Windows build obtains the pinned dependenci
 
 `Initialize-BuildDependencies.ps1 -Scope Native`, `-Scope Firmware` or `-Scope All` can prepare dependencies separately. Public builds do not require a private device, original backup or machine-specific path. Configuration files and generated tool catalogs belong to the build output.
 
-The app checks published releases from this repository, including Early Alpha prereleases. **Settings → Updates** controls automatic checks and provides a manual check. Downloads require a matching platform asset with a GitHub SHA-256 digest; the app verifies its size and digest before offering installation. No profile, backup or device data is sent. Windows opens the normal installer after the existing unsaved-change and firmware guards. macOS and Linux provide the verified package and replacement instructions. There is no silent installation or downgrade.
+The app checks published releases from this repository. Releases are regular releases; only the macOS and Linux packages are marked **Early Alpha**. **Settings → Updates** controls automatic checks and provides a manual check. Downloads require a matching platform asset with a GitHub SHA-256 digest; the app verifies its size and digest before offering installation. No profile, backup or device data is sent. Windows opens the normal installer after the existing unsaved-change and firmware guards. macOS and Linux provide the verified package and replacement instructions. There is no silent installation or downgrade.
 
 Firmware stays bundled with each app package. Updating the app does not flash connected keyboards. The device guide offers applicable firmware updates from the included catalog.
 
@@ -72,7 +72,7 @@ Linux x64 and both macOS architectures have passed their native build, package a
 1. Review the clean exported tree. Confirm there are no original firmware images, profiles, local paths, device serials or personal reports.
 2. Run offline verification and package tests. Keep their results outside the normal user interface.
 3. Complete and record the [hardware acceptance run](hardware-acceptance.md). Additional variants remain marked experimental until individually tested.
-4. Create a version tag and a **prerelease**, with short English notes from `CHANGELOG.md`. Do not claim unperformed hardware or native-platform tests.
+4. Create a version tag and a regular release, with short English notes from `CHANGELOG.md`. Keep it as a draft until its packages have been reviewed. Mark only the macOS and Linux packages as **Early Alpha**. Do not claim unperformed hardware or native-platform tests.
 5. Attach `INGLORIOUS-Advanced-<version>-Setup.exe`, validated native macOS/Linux archives, `INGLORIOUS-Advanced-<version>-Source.zip` and their checksums. Do not attach the internal Windows verification ZIP. State the tested platforms and remaining hardware limitations in the release notes.
 6. Enable private vulnerability reporting and keep issue templates available.
 7. Download the release assets again and check their hashes before announcing the release.

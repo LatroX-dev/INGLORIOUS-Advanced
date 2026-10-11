@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-During the alpha, security fixes target the latest published alpha. Older app and firmware combinations are not maintained as separate security branches. An experimental device label is not a security guarantee.
+Security fixes target the latest published release. Older app and firmware combinations are not maintained as separate security branches. An experimental device label is not a security guarantee.
 
 ## Report a vulnerability
 
@@ -12,7 +12,7 @@ Include the app version, operating system, affected model and a minimal reproduc
 
 ## Boundaries
 
-A package checksum detects changes; it does not prove publisher identity. Current Windows alpha packages are unsigned. Obtain app and firmware packages from the same repository release.
+A package checksum detects changes; it does not prove publisher identity. Current Windows packages are unsigned. Obtain app and firmware packages from the same repository release.
 
 The app verifies known model and memory geometry, requires confirmation before firmware writes, checks backups and verifies written data. It does not authenticate a keyboard against an immutable manufacturer identity. Installation identifiers can be copied with a flash image. An interrupted write can require separate recovery.
 

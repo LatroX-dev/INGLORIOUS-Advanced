@@ -1,6 +1,6 @@
 # Contributing
 
-INGLORIOUS Advanced is an alpha. Changes should make keyboard configuration easier without weakening model, backup or write checks.
+Changes to INGLORIOUS Advanced should make keyboard configuration easier without weakening model, backup or write checks. The macOS and Linux versions are Early Alpha.
 
 ## Build
 

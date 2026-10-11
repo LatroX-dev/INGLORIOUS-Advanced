@@ -39,7 +39,10 @@ class ReleaseAssetsChecks(unittest.TestCase):
     def test_exact_files_and_notes(self):
         self.assertEqual(len(self.stage()), 10)
         notes = (self.target / "release-notes.md").read_text()
-        self.assertIn("Early Alpha", notes)
+        self.assertTrue(notes.startswith("- Test release.\n"))
+        self.assertEqual(notes.count("Early Alpha"), 1)
+        self.assertIn("macOS and Linux are **Early Alpha**.", notes)
+        self.assertIn("Windows (win-x64)", notes)
         self.assertIn("USB only", notes)
         self.assertIn("- Test release.", notes)
         self.assertNotIn("- Old release.", notes)
