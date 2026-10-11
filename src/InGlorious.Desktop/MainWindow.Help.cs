@@ -63,7 +63,7 @@ public sealed partial class MainWindow
         ScrollViewer.SetHorizontalScrollBarVisibility(topics, ScrollBarVisibility.Disabled);
         Avalonia.Automation.AutomationProperties.SetName(topics, L.T("Anleitung"));
         layout.Children.Add(topics);
-        var article = new StackPanel { Name = "GuideArticle", Spacing = 12 };
+        var article = new StackPanel { Name = "GuideArticle", Spacing = 12, Margin = new Thickness(0, 0, 16, 0) };
         var scroll = new ScrollViewer { Name = "GuideArticleScroll", Content = article, Focusable = true, TabIndex = 1, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         Grid.SetColumn(scroll, 1); layout.Children.Add(scroll);
         void ShowTopic(GuideTopic topic)
