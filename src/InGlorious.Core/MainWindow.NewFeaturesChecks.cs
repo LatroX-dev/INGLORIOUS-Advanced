@@ -133,15 +133,16 @@ public partial class MainWindow
             source.Macros.Add(new() { Id = "transfer_macro", Name = "Imported macro", Steps = [new() { Kind = "down", Key = "KC_B" }, new() { Kind = "up", Key = "KC_B" }] });
             source.Layers[2].Keys[key].Binding = "MACRO:transfer_macro";
             var document = KeyBindingTransfer.Capture(source);
+            static KeyBindingSelection AllSelected() => new([0, 1, 2, 3], true);
             foreach (var slider in new[] { false, true })
             {
                 ShowBindingTarget(slider); UpdateLayout();
                 check(ImportKeyBindingsButton.IsVisible && ExportKeyBindingsButton.IsVisible,
                     "Binding file actions remain available for both keys and slider");
             }
-            check(!ImportKeyBindingsCore(context, document, () => false) && Fingerprint(_project) == context.Fingerprint && _undo.Count == 0,
+            check(!ImportKeyBindingsCore(context, document, () => null) && Fingerprint(_project) == context.Fingerprint && _undo.Count == 0,
                 "Canceling binding import preserves the complete draft and undo history");
-            check(ImportKeyBindingsCore(context, document, () => true) && _undo.Count == 1 && _redo.Count == 0,
+            check(ImportKeyBindingsCore(context, document, AllSelected) && _undo.Count == 1 && _redo.Count == 0,
                 "Confirmed binding import creates one undo step");
             var imported = Fingerprint(_project);
             check(_project.Layers[0].Keys[key].Binding == "KC_A" && _project.Layers[1].Name == "Work" && _project.Slider.Mode == 1 &&
@@ -158,23 +159,47 @@ public partial class MainWindow
             Redo_Click(this, new RoutedEventArgs());
             check(Fingerprint(_project) == imported && _undo.Count == 1, "Redo restores imported bindings and macros");
             Undo_Click(this, new RoutedEventArgs()); context = CaptureKeyBindingContext();
+            var beforePartialImport = context.Fingerprint;
+            var sparse = KeyBindingTransfer.Capture(source, [1, 2], includeSlider: false);
+            check(ImportKeyBindingsCore(context, sparse, () => new([1], false)) && _project.Layers[1].Name == "Work" &&
+                _project.Layers[0].Keys[key].Binding == originalBinding && _project.Macros.Count == 0 && _project.Slider.Mode == 0 && _undo.Count == 1,
+                "Selecting one imported layer preserves other layers, their macros and the global slider");
+            Undo_Click(this, new RoutedEventArgs()); context = CaptureKeyBindingContext();
+            check(Fingerprint(_project) == beforePartialImport && _undo.Count == 0,
+                "Partial binding import can be undone in one step");
+            var exported = CaptureSelectedKeyBindings(context, () => new([2], false));
+            check(exported is { Layers.Count: 1, Slider: null, Macros.Count: 0 } && exported.Layers[0].Index == 2 &&
+                Fingerprint(_project) == context.Fingerprint && _undo.Count == 0,
+                "Export captures only the chosen layer and its macros, with no implicit slider or editor mutation");
+            check(CaptureSelectedKeyBindings(context, () => null) is null && _undo.Count == 0,
+                "Canceling layer selection stops export before opening a file picker");
+            check(CaptureSelectedKeyBindings(context, () => { ProjectName.Text = "Edited during export"; return new([2], false); }) is null &&
+                ProjectName.Text == "Edited during export" && Fingerprint(_project) == context.Fingerprint,
+                "Layer selection cannot export stale data after an intervening name edit");
+            RefreshAll(); context = CaptureKeyBindingContext();
+            var emptyRejected = false;
+            try { ImportKeyBindingsCore(context, sparse, () => new([], false)); }
+            catch (InvalidDataException) { emptyRejected = true; }
+            check(emptyRejected && Fingerprint(_project) == context.Fingerprint && _undo.Count == 0,
+                "An empty import selection is rejected without creating an undo step");
+            RunKeyBindingSelectionDialogChecks(check);
             var confirmations = 0; var rejected = false;
-            try { ImportKeyBindingsCore(context, KeyBindingTransfer.Capture(ProjectService.Create("pro-iso")), () => { confirmations++; return true; }); }
+            try { ImportKeyBindingsCore(context, KeyBindingTransfer.Capture(ProjectService.Create("pro-iso")), () => { confirmations++; return AllSelected(); }); }
             catch (InvalidDataException) { rejected = true; }
             check(rejected && confirmations == 0 && Fingerprint(_project) == context.Fingerprint && _undo.Count == 0,
                 "Wrong-model bindings are rejected before confirmation without changing history");
-            check(!ImportKeyBindingsCore(context, document, () => { _project.Name = "Changed during confirmation"; return true; }) &&
+            check(!ImportKeyBindingsCore(context, document, () => { _project.Name = "Changed during confirmation"; return AllSelected(); }) &&
                 _project.Name == "Changed during confirmation" && _project.Layers[0].Keys[key].Binding == originalBinding && _undo.Count == 0,
                 "A confirmed import cannot overwrite intervening project changes");
             RefreshAll(); context = CaptureKeyBindingContext();
-            check(!ImportKeyBindingsCore(context, document, () => { _projectPath = context.Path + ".renamed"; return true; }) && _undo.Count == 0,
+            check(!ImportKeyBindingsCore(context, document, () => { _projectPath = context.Path + ".renamed"; return AllSelected(); }) && _undo.Count == 0,
                 "Saving under a different profile path invalidates a pending binding import");
             context = CaptureKeyBindingContext();
-            check(!ImportKeyBindingsCore(context, document, () => { ProjectName.Text = "Pending profile name"; return true; }) &&
+            check(!ImportKeyBindingsCore(context, document, () => { ProjectName.Text = "Pending profile name"; return AllSelected(); }) &&
                 ProjectName.Text == "Pending profile name" && _undo.Count == 0,
                 "A confirmed import preserves intervening uncommitted name input");
             RefreshAll(); context = CaptureKeyBindingContext();
-            check(!ImportKeyBindingsCore(context, document, () => { SwitchDevice("pro-iso"); return true; }) && _project.DeviceId == "pro-iso" &&
+            check(!ImportKeyBindingsCore(context, document, () => { SwitchDevice("pro-iso"); return AllSelected(); }) && _project.DeviceId == "pro-iso" &&
                 Fingerprint(_sessions["numpad"].Project) == context.Fingerprint,
                 "Changing the active device invalidates pending binding import without changing its saved session");
             check(IsKeyBindingExportProfilePath(context.Path!) && IsKeyBindingExportProfilePath(context.Path!.ToUpperInvariant()) &&
@@ -190,12 +215,12 @@ public partial class MainWindow
             })
             {
                 set(true);
-                check(!ImportKeyBindingsCore(context, document, () => { confirmations++; return true; }) && confirmations == 0,
+                check(!ImportKeyBindingsCore(context, document, () => { confirmations++; return AllSelected(); }) && confirmations == 0,
                     "Binding import refuses " + name + " before confirmation");
                 set(false);
             }
             DebounceInput.Text = "13";
-            check(!ImportKeyBindingsCore(context, document, () => { confirmations++; return true; }) && confirmations == 0 && HasPendingTiming,
+            check(!ImportKeyBindingsCore(context, document, () => { confirmations++; return AllSelected(); }) && confirmations == 0 && HasPendingTiming,
                 "Binding import never overwrites pending settings input");
             var pendingCalls = 0; _pendingEditDecisionOverride = () => { pendingCalls++; return PendingEditChoice.Apply; };
             ImportKeyBindings_Click(this, new RoutedEventArgs()); ExportKeyBindings_Click(this, new RoutedEventArgs());
@@ -209,6 +234,38 @@ public partial class MainWindow
             IsEnabled = enabled; EditorSurface.IsEnabled = editorEnabled; _pendingEditDecisionOverride = pendingDecision;
             DiscardPendingEdits(); ResetWorkflowFixture("pro-iso");
         }
+    }
+
+    private void RunKeyBindingSelectionDialogChecks(Action<bool, string> check)
+    {
+        foreach (var importing in new[] { false, true })
+        {
+            var layers = importing ? new[] { (1, "Work"), (3, "Media") } : new[] { (0, "Base"), (1, "Work"), (2, "Games"), (3, "Media") };
+            var dialog = new KeyBindingSelectionWindow(importing, layers, canIncludeSlider: true) { Owner = this };
+            check(dialog.LayerChoices.Count == layers.Length && dialog.LayerChoices.Values.All(choice => choice.IsChecked == true) &&
+                dialog.SliderChoice.IsChecked == false && dialog.ConfirmButton.IsEnabled,
+                (importing ? "Import" : "Export") + " offers exactly its available layers, all selected, with slider opt-in disabled");
+            foreach (var choice in dialog.LayerChoices.Values) choice.IsChecked = false;
+            dialog.SliderChoice.IsChecked = true;
+            check(!dialog.ConfirmButton.IsEnabled, "A slider-only selection cannot enable binding transfer");
+            var selected = layers[^1].Item1;
+            dialog.LayerChoices[selected].IsChecked = true;
+            check(dialog.ConfirmButton.IsEnabled, "Selecting a layer enables binding transfer again");
+            dialog.Loaded += (_, _) => dialog.Dispatcher.BeginInvoke(new Action(() => dialog.ConfirmButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent))));
+            dialog.ShowDialog();
+            check(dialog.Selection is { IncludeSlider: true } selection && selection.Layers.SequenceEqual(new[] { selected }),
+                "Layer selection returns its original index and the explicitly selected slider");
+        }
+        var noSlider = new KeyBindingSelectionWindow(true, [(2, "Games")], canIncludeSlider: false) { Owner = this };
+        noSlider.SliderChoice.IsChecked = true;
+        noSlider.Loaded += (_, _) => noSlider.Dispatcher.BeginInvoke(new Action(() => noSlider.ConfirmButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent))));
+        noSlider.ShowDialog();
+        check(noSlider.Selection is { IncludeSlider: false } onlyLayer && onlyLayer.Layers.SequenceEqual(new[] { 2 }),
+            "A file with no slider never returns a slider selection");
+        var canceled = new KeyBindingSelectionWindow(false, [(0, "Base")], canIncludeSlider: false) { Owner = this };
+        canceled.Loaded += (_, _) => canceled.Dispatcher.BeginInvoke(new Action(canceled.Close));
+        canceled.ShowDialog();
+        check(canceled.Selection is null, "Closing the layer-selection dialog cancels without a selection");
     }
 
     private void RunSliderPanelChecks(Action<bool, string> check)

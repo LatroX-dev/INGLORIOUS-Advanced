@@ -17,9 +17,12 @@ public sealed class KeyBindingDocument
 
 public sealed class KeyBindingLayer
 {
+    [JsonRequired] public int Index { get; set; }
     [JsonRequired] public string Name { get; set; } = "";
     [JsonRequired] public Dictionary<string, string> Bindings { get; set; } = [];
 }
+
+public sealed record KeyBindingSelection(IReadOnlyList<int> Layers, bool IncludeSlider);
 
 public static class KeyBindingTransfer
 {
@@ -30,21 +33,22 @@ public static class KeyBindingTransfer
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
 
-    public static KeyBindingDocument Capture(AppProject project)
+    public static KeyBindingDocument Capture(AppProject project, IEnumerable<int>? layers = null, bool includeSlider = true)
     {
         ArgumentNullException.ThrowIfNull(project);
         OnboardSerializer.ValidateEditorProject(project);
-        var referenced = References(project.Layers.SelectMany(layer => layer.Keys.Values.Select(key => key.Binding)));
+        var selected = SelectLayers(layers, new HashSet<int> { 0, 1, 2, 3 });
+        var referenced = References(selected.SelectMany(index => project.Layers[index].Keys.Values.Select(key => key.Binding)));
         var result = new KeyBindingDocument
         {
             DeviceId = project.DeviceId,
-            Layers = project.Layers.Select(layer => new KeyBindingLayer
+            Layers = selected.Order().Select(index => new KeyBindingLayer
             {
-                Name = layer.Name,
-                Bindings = layer.Keys.ToDictionary(key => key.Key, key => key.Value.Binding, StringComparer.Ordinal)
+                Index = index, Name = project.Layers[index].Name,
+                Bindings = project.Layers[index].Keys.ToDictionary(key => key.Key, key => key.Value.Binding, StringComparer.Ordinal)
             }).ToList(),
             Macros = project.Macros.Where(macro => referenced.Contains(macro.Id)).Select(CopyMacro).ToList(),
-            Slider = DeviceCatalog.Get(project.DeviceId).HasSlider ? CopySlider(project.Slider) : null
+            Slider = includeSlider && DeviceCatalog.Get(project.DeviceId).HasSlider ? CopySlider(project.Slider) : null
         };
         Validate(result);
         return result;
@@ -71,19 +75,21 @@ public static class KeyBindingTransfer
         catch (JsonException) { throw Invalid(); }
     }
 
-    public static AppProject Apply(AppProject project, KeyBindingDocument document)
+    public static AppProject Apply(AppProject project, KeyBindingDocument document, IEnumerable<int>? layers = null, bool includeSlider = true)
     {
         ArgumentNullException.ThrowIfNull(project);
         Validate(document);
         if (project.DeviceId != document.DeviceId)
             throw new InvalidDataException(L.T("Diese Tastenbelegungen gehören zu einem anderen Gerätemodell oder Layout."));
+        var selected = SelectLayers(layers, document.Layers.Select(layer => layer.Index).ToHashSet());
+        var referenced = References(document.Layers.Where(layer => selected.Contains(layer.Index)).SelectMany(layer => layer.Bindings.Values));
         OnboardSerializer.ValidateEditorProject(project);
         var result = ProjectService.Clone(project);
         var ids = result.Macros.Select(macro => macro.Id).ToHashSet(StringComparer.Ordinal);
         var identities = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var macro in result.Macros) identities.TryAdd(ContentIdentity(macro), macro.Id);
         var remapped = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var incoming in document.Macros)
+        foreach (var incoming in document.Macros.Where(macro => referenced.Contains(macro.Id)))
         {
             var identity = ContentIdentity(incoming);
             if (!identities.TryGetValue(identity, out var id))
@@ -96,7 +102,7 @@ public static class KeyBindingTransfer
             }
             remapped.Add(incoming.Id, id);
         }
-        Assign(result, document, remapped);
+        Assign(result, document, remapped, selected, includeSlider);
         // Lighting palettes/standby share device storage with macros. Validate the merged profile,
         // not only the imported subset; never remove old macros or truncate steps to make it fit.
         OnboardSerializer.ValidateEditorProject(result);
@@ -145,11 +151,12 @@ public static class KeyBindingTransfer
     {
         if (document is null || document.Format != "inglorious-bindings" || document.Version != 1) throw Invalid();
         var device = DeviceCatalog.All.FirstOrDefault(candidate => candidate.Id == document.DeviceId);
-        if (device is null || document.Layers is null || document.Layers.Count != 4 || document.Macros is null || document.Macros.Count > 32 ||
-            device.HasSlider != (document.Slider is not null)) throw Invalid();
+        if (device is null || document.Layers is null || document.Layers.Count is < 1 or > 4 || document.Macros is null || document.Macros.Count > 32 ||
+            !device.HasSlider && document.Slider is not null) throw Invalid();
+        var indices = new HashSet<int>();
         foreach (var layer in document.Layers)
         {
-            if (layer is null || !ValidName(layer.Name) || layer.Bindings is null || layer.Bindings.Count != device.Keys.Count ||
+            if (layer is null || layer.Index is < 0 or > 3 || !indices.Add(layer.Index) || !ValidName(layer.Name) || layer.Bindings is null || layer.Bindings.Count != device.Keys.Count ||
                 !layer.Bindings.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(device.Keys.Select(key => key.Id)) ||
                 layer.Bindings.Any(pair => pair.Value is null || pair.Value.Length > 70 || pair.Value.Any(char.IsControl))) throw Invalid();
         }
@@ -169,19 +176,28 @@ public static class KeyBindingTransfer
         if (steps > 768 || !ids.SetEquals(referenced)) throw Invalid();
         var neutral = ProjectService.Create(device.Id);
         neutral.Macros = document.Macros.Select(CopyMacro).ToList();
-        Assign(neutral, document, ids.ToDictionary(id => id, id => id, StringComparer.Ordinal));
+        Assign(neutral, document, ids.ToDictionary(id => id, id => id, StringComparer.Ordinal), indices, includeSlider: true);
         OnboardSerializer.ValidateEditorProject(neutral);
     }
 
-    private static void Assign(AppProject target, KeyBindingDocument document, IReadOnlyDictionary<string, string> remapped)
+    private static void Assign(AppProject target, KeyBindingDocument document, IReadOnlyDictionary<string, string> remapped, IReadOnlySet<int> selected, bool includeSlider)
     {
-        for (var index = 0; index < 4; index++)
+        foreach (var layer in document.Layers.Where(layer => selected.Contains(layer.Index)))
         {
-            target.Layers[index].Name = document.Layers[index].Name;
-            foreach (var (key, binding) in document.Layers[index].Bindings)
-                target.Layers[index].Keys[key].Binding = binding.StartsWith("MACRO:", StringComparison.Ordinal) ? "MACRO:" + remapped[binding[6..]] : binding;
+            target.Layers[layer.Index].Name = layer.Name;
+            foreach (var (key, binding) in layer.Bindings)
+                target.Layers[layer.Index].Keys[key].Binding = binding.StartsWith("MACRO:", StringComparison.Ordinal) ? "MACRO:" + remapped[binding[6..]] : binding;
         }
-        if (document.Slider is not null) target.Slider = CopySlider(document.Slider);
+        if (includeSlider && document.Slider is not null) target.Slider = CopySlider(document.Slider);
+    }
+
+    private static HashSet<int> SelectLayers(IEnumerable<int>? requested, IReadOnlySet<int> available)
+    {
+        var selected = new HashSet<int>();
+        foreach (var index in requested ?? available.Order())
+            if (!available.Contains(index) || !selected.Add(index)) throw Invalid();
+        if (selected.Count == 0) throw new InvalidDataException(L.T("Wähle mindestens eine Ebene aus."));
+        return selected;
     }
 
     private static HashSet<string> References(IEnumerable<string> bindings) => bindings.Where(binding => binding.StartsWith("MACRO:", StringComparison.Ordinal))
@@ -203,7 +219,7 @@ public static class KeyBindingTransfer
         if (root.GetProperty("layers").ValueKind != JsonValueKind.Array || root.GetProperty("macros").ValueKind != JsonValueKind.Array) throw Invalid();
         foreach (var layer in root.GetProperty("layers").EnumerateArray())
         {
-            RequireProperties(layer, "name", "bindings");
+            RequireProperties(layer, "index", "name", "bindings");
             var bindings = layer.GetProperty("bindings");
             if (bindings.ValueKind != JsonValueKind.Object) throw Invalid();
             var seen = new HashSet<string>(StringComparer.Ordinal);

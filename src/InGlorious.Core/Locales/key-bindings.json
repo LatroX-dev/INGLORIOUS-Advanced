@@ -25,19 +25,6 @@
     "ko": "키 할당 내보내기",
     "zh-Hans": "导出按键映射"
   },
-  "Alle vier Ebenen und Reglerbelegungen importieren? Farben und Effekte bleiben erhalten. Zugewiesene Makros werden ergänzt.": {
-    "en": "Import bindings for all four layers and controls? Colors and effects will be kept. Assigned macros will be added.",
-    "es": "¿Importar las asignaciones de las cuatro capas y los controles? Se conservarán los colores y efectos. Se añadirán las macros asignadas.",
-    "fr": "Importer les affectations des quatre couches et des commandes ? Les couleurs et les effets seront conservés. Les macros affectées seront ajoutées.",
-    "it": "Importare le assegnazioni di tutti e quattro i livelli e dei controlli? Colori ed effetti verranno mantenuti. Le macro assegnate verranno aggiunte.",
-    "pt-BR": "Importar as atribuições das quatro camadas e dos controles? As cores e os efeitos serão mantidos. As macros atribuídas serão adicionadas.",
-    "pl": "Zaimportować przypisania wszystkich czterech warstw i regulatorów? Kolory i efekty zostaną zachowane. Przypisane makra zostaną dodane.",
-    "tr": "Dört katmanın ve kontrollerin atamaları içe aktarılsın mı? Renkler ve efektler korunur. Atanmış makrolar eklenir.",
-    "ru": "Импортировать назначения всех четырёх слоёв и регуляторов? Цвета и эффекты сохранятся. Назначенные макросы будут добавлены.",
-    "ja": "4つのレイヤーとコントローラーの割り当てをインポートしますか？色とエフェクトは保持されます。割り当て済みのマクロが追加されます。",
-    "ko": "네 레이어와 컨트롤의 할당을 가져올까요? 색상과 효과는 유지됩니다. 할당된 매크로가 추가됩니다.",
-    "zh-Hans": "导入全部四个层及旋钮、滑块的映射？颜色和效果将保留，并添加已分配的宏。"
-  },
   "Tastenbelegung importiert.": {
     "en": "Key bindings imported.",
     "es": "Asignaciones de teclas importadas.",
@@ -155,17 +142,82 @@
     "ko": "가져오기 및 내보내기",
     "zh-Hans": "导入与导出"
   },
-  "Unter „Tastenbelegung“ kannst du die Belegungen aller vier Ebenen mit Reglerfunktionen und zugewiesenen Makros exportieren. Importiere sie auf demselben Gerätemodell. Farben und Effekte bleiben erhalten. Übertrage die importierten Belegungen anschließend mit „Auf Tastatur übertragen“.": {
-    "en": "Under “Key bindings”, you can export assignments for all four layers, including control functions and assigned macros. Import them on the same device model. Colors and effects are kept. Then use “Transfer to keyboard” to save the imported bindings to the device.",
-    "es": "En «Asignación de teclas» puedes exportar las asignaciones de las cuatro capas, incluidas las funciones de los controles y las macros asignadas. Impórtalas en el mismo modelo de dispositivo. Los colores y efectos se conservan. Después, pulsa «Transferir al teclado» para guardar las asignaciones importadas en el dispositivo.",
-    "fr": "Dans «Affectation des touches», tu peux exporter les affectations des quatre couches, avec les fonctions des commandes et les macros affectées. Importe-les sur le même modèle d’appareil. Les couleurs et les effets sont conservés. Utilise ensuite «Transférer vers le clavier» pour enregistrer les affectations importées sur l’appareil.",
-    "it": "In «Assegnazione tasti» puoi esportare le assegnazioni di tutti e quattro i livelli, comprese le funzioni dei controlli e le macro assegnate. Importale sullo stesso modello di dispositivo. Colori ed effetti vengono mantenuti. Usa poi «Trasferisci alla tastiera» per salvare le assegnazioni importate sul dispositivo.",
-    "pt-BR": "Em «Atribuição de teclas», você pode exportar as atribuições das quatro camadas, incluindo as funções dos controles e as macros atribuídas. Importe no mesmo modelo de dispositivo. As cores e os efeitos são mantidos. Depois, use «Transferir para o teclado» para salvar as atribuições importadas no dispositivo.",
-    "pl": "W sekcji „Przypisania klawiszy” możesz wyeksportować przypisania wszystkich czterech warstw wraz z funkcjami regulatorów i przypisanymi makrami. Importuj je na tym samym modelu urządzenia. Kolory i efekty zostaną zachowane. Następnie użyj „Prześlij do klawiatury”, aby zapisać zaimportowane przypisania na urządzeniu.",
-    "tr": "“Tuş atamaları” altında dört katmanın atamalarını, kontrol işlevlerini ve atanmış makroları dışa aktarabilirsiniz. Bunları aynı cihaz modeline içe aktarın. Renkler ve efektler korunur. Ardından “Klavyeye aktar” ile içe aktarılan atamaları cihaza kaydedin.",
-    "ru": "В разделе «Назначение клавиш» можно экспортировать назначения всех четырёх слоёв, включая функции регуляторов и назначенные макросы. Импортируйте их на устройство той же модели. Цвета и эффекты сохранятся. Затем нажмите «Передать на клавиатуру», чтобы сохранить импортированные назначения на устройстве.",
-    "ja": "「キー割り当て」で、4つのレイヤーの割り当てを、コントローラーの機能と割り当て済みマクロも含めてエクスポートできます。同じ機種にインポートしてください。色とエフェクトは保持されます。その後「キーボードに転送」で、インポートした割り当てをデバイスに保存します。",
-    "ko": "「키 할당」에서 네 레이어의 할당을 컨트롤 기능 및 할당된 매크로와 함께 내보낼 수 있습니다. 같은 기기 모델로 가져오세요. 색상과 효과는 유지됩니다. 그런 다음 「키보드로 전송」을 눌러 가져온 할당을 기기에 저장하세요.",
-    "zh-Hans": "在“按键映射”中，可导出全部四个层的映射，包括旋钮、滑块功能及已分配的宏。请导入到相同型号的设备。颜色和效果将保留。然后点击“传输到键盘”，将导入的映射保存到设备。"
+  "Nur die ausgewählten Ebenen werden ersetzt. Farben und Effekte bleiben erhalten.": {
+    "en": "Only the selected layers will be replaced. Colors and effects will be kept.",
+    "es": "Solo se sustituirán las capas seleccionadas. Se conservarán los colores y efectos.",
+    "fr": "Seules les couches sélectionnées seront remplacées. Les couleurs et les effets seront conservés.",
+    "it": "Verranno sostituiti solo i livelli selezionati. Colori ed effetti verranno mantenuti.",
+    "pt-BR": "Apenas as camadas selecionadas serão substituídas. As cores e os efeitos serão mantidos.",
+    "pl": "Zastąpione zostaną tylko wybrane warstwy. Kolory i efekty zostaną zachowane.",
+    "tr": "Yalnızca seçilen katmanlar değiştirilir. Renkler ve efektler korunur.",
+    "ru": "Будут заменены только выбранные слои. Цвета и эффекты сохранятся.",
+    "ja": "選択したレイヤーだけが置き換えられます。色とエフェクトは保持されます。",
+    "ko": "선택한 레이어만 교체됩니다. 색상과 효과는 유지됩니다.",
+    "zh-Hans": "仅替换所选层。颜色和效果将保留。"
+  },
+  "Wähle die Ebenen für den Export.": {
+    "en": "Choose the layers to export.",
+    "es": "Elige las capas que quieres exportar.",
+    "fr": "Choisis les couches à exporter.",
+    "it": "Scegli i livelli da esportare.",
+    "pt-BR": "Escolha as camadas para exportar.",
+    "pl": "Wybierz warstwy do eksportu.",
+    "tr": "Dışa aktarılacak katmanları seçin.",
+    "ru": "Выберите слои для экспорта.",
+    "ja": "エクスポートするレイヤーを選んでください。",
+    "ko": "내보낼 레이어를 선택하세요.",
+    "zh-Hans": "选择要导出的层。"
+  },
+  "Schieberegler einbeziehen": {
+    "en": "Include slider",
+    "es": "Incluir deslizador",
+    "fr": "Inclure le curseur",
+    "it": "Includi cursore",
+    "pt-BR": "Incluir controle deslizante",
+    "pl": "Uwzględnij suwak",
+    "tr": "Sürgüyü dahil et",
+    "ru": "Включить ползунок",
+    "ja": "スライダーを含める",
+    "ko": "슬라이더 포함",
+    "zh-Hans": "包含滑块"
+  },
+  "Gilt für alle Ebenen.": {
+    "en": "Applies to all layers.",
+    "es": "Se aplica a todas las capas.",
+    "fr": "S’applique à toutes les couches.",
+    "it": "Si applica a tutti i livelli.",
+    "pt-BR": "Aplica-se a todas as camadas.",
+    "pl": "Dotyczy wszystkich warstw.",
+    "tr": "Tüm katmanlar için geçerlidir.",
+    "ru": "Действует на всех слоях.",
+    "ja": "すべてのレイヤーに適用されます。",
+    "ko": "모든 레이어에 적용됩니다.",
+    "zh-Hans": "适用于所有层。"
+  },
+  "Wähle mindestens eine Ebene aus.": {
+    "en": "Select at least one layer.",
+    "es": "Selecciona al menos una capa.",
+    "fr": "Sélectionne au moins une couche.",
+    "it": "Seleziona almeno un livello.",
+    "pt-BR": "Selecione pelo menos uma camada.",
+    "pl": "Wybierz co najmniej jedną warstwę.",
+    "tr": "En az bir katman seçin.",
+    "ru": "Выберите хотя бы один слой.",
+    "ja": "レイヤーを1つ以上選んでください。",
+    "ko": "레이어를 하나 이상 선택하세요.",
+    "zh-Hans": "请至少选择一个层。"
+  },
+  "Beim Import und Export wählst du die Ebenen aus. Nur die gewählten Ebenen werden mit ihren Namen, Belegungen und zugewiesenen Makros übernommen; ihre Nummern bleiben gleich. Farben und Effekte bleiben erhalten. Den Schieberegler kannst du separat einbeziehen. Importiere auf demselben Gerätemodell und speichere danach mit „Auf Tastatur übertragen“.": {
+    "en": "When importing or exporting, choose the layers to include. Only the selected layers are transferred with their names, bindings and assigned macros; their numbers stay the same. Colors and effects are kept. You can include the slider separately. Import on the same device model, then save with “Transfer to keyboard”.",
+    "es": "Al importar o exportar, elige las capas que quieres incluir. Solo se transfieren las capas seleccionadas con sus nombres, asignaciones y macros asignadas; conservan sus números. Los colores y efectos se mantienen. Puedes incluir el deslizador por separado. Importa en el mismo modelo de dispositivo y guarda después con «Transferir al teclado».",
+    "fr": "Lors de l’importation ou de l’exportation, choisis les couches à inclure. Seules les couches sélectionnées sont transférées avec leurs noms, leurs affectations et les macros affectées ; leurs numéros restent identiques. Les couleurs et les effets sont conservés. Tu peux inclure le curseur séparément. Importe sur le même modèle d’appareil, puis enregistre avec «Transférer vers le clavier».",
+    "it": "Durante l’importazione o l’esportazione, scegli i livelli da includere. Vengono trasferiti solo i livelli selezionati con nomi, assegnazioni e macro assegnate; i numeri restano gli stessi. Colori ed effetti vengono mantenuti. Puoi includere il cursore separatamente. Importa sullo stesso modello di dispositivo, poi salva con «Trasferisci alla tastiera».",
+    "pt-BR": "Ao importar ou exportar, escolha as camadas que deseja incluir. Apenas as camadas selecionadas são transferidas com seus nomes, atribuições e macros atribuídas; seus números permanecem iguais. As cores e os efeitos são mantidos. Você pode incluir o controle deslizante separadamente. Importe no mesmo modelo de dispositivo e salve com «Transferir para o teclado».",
+    "pl": "Podczas importu lub eksportu wybierz warstwy, które chcesz uwzględnić. Przenoszone są tylko wybrane warstwy wraz z nazwami, przypisaniami i przypisanymi makrami; ich numery się nie zmieniają. Kolory i efekty zostają zachowane. Suwak możesz uwzględnić osobno. Importuj na tym samym modelu urządzenia, a następnie zapisz za pomocą „Prześlij do klawiatury”.",
+    "tr": "İçe veya dışa aktarırken dahil edilecek katmanları seçin. Yalnızca seçilen katmanlar adları, tuş atamaları ve atanmış makrolarıyla aktarılır; numaraları aynı kalır. Renkler ve efektler korunur. Sürgüyü ayrıca dahil edebilirsiniz. Aynı cihaz modeline içe aktarın ve ardından “Klavyeye aktar” ile kaydedin.",
+    "ru": "При импорте или экспорте выберите нужные слои. Переносятся только выбранные слои с их названиями, назначениями клавиш и макросами; номера слоёв не меняются. Цвета и эффекты сохраняются. Ползунок можно включить отдельно. Импортируйте на устройство той же модели, затем сохраните с помощью «Передать на клавиатуру».",
+    "ja": "インポートやエクスポートでは、含めるレイヤーを選びます。選択したレイヤーの名前、キー割り当て、割り当て済みマクロだけが転送され、レイヤー番号は変わりません。色とエフェクトは保持されます。スライダーは別途含めることができます。同じ機種にインポートし、「キーボードに転送」で保存してください。",
+    "ko": "가져오거나 내보낼 때 포함할 레이어를 선택하세요. 선택한 레이어의 이름, 키 할당, 할당된 매크로만 전송되며 레이어 번호는 그대로 유지됩니다. 색상과 효과는 유지됩니다. 슬라이더는 별도로 포함할 수 있습니다. 같은 기기 모델로 가져온 다음 「키보드로 전송」으로 저장하세요.",
+    "zh-Hans": "导入或导出时，可选择要包含的层。仅传输所选层的名称、按键映射及已分配的宏，层编号保持不变。颜色和效果将保留。滑块可单独选择是否包含。请导入到相同型号的设备，然后点击“传输到键盘”保存。"
   }
 }

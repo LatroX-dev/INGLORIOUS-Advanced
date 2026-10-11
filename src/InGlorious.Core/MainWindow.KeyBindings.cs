@@ -35,29 +35,28 @@ public partial class MainWindow
             };
             if (picker.ShowDialog(this) != true || !IsKeyBindingContextCurrent(context)) return;
             var document = KeyBindingTransfer.Load(picker.FileName);
-            ImportKeyBindingsCore(context, document, ConfirmKeyBindingImport);
+            ImportKeyBindingsCore(context, document, () => SelectKeyBindingLayers(true,
+                document.Layers.Select(layer => (layer.Index, layer.Name)).ToArray(), document.Slider is not null));
         }
         catch (InvalidDataException ex) { ShowError(ex.Message); }
         catch (Exception) { ShowError(L.T("Die Tastenbelegung konnte nicht importiert werden.")); }
         finally { _keyBindingTransferBusy = false; }
     }
 
-    private bool ConfirmKeyBindingImport()
+    private KeyBindingSelection? SelectKeyBindingLayers(bool importing, IReadOnlyList<(int Index, string Name)> layers, bool canIncludeSlider)
     {
-        var dialog = new UnsavedChangesWindow(L.T("Tastenbelegung importieren"),
-            L.T("Alle vier Ebenen und Reglerbelegungen importieren? Farben und Effekte bleiben erhalten. Zugewiesene Makros werden ergänzt."),
-            saveCaption: L.T("Übernehmen")) { Owner = this };
-        dialog.DiscardButton.Visibility = Visibility.Collapsed;
-        UiIcons.SetKind(dialog.SaveButton, "import");
-        dialog.ShowDialog();
-        return dialog.Choice == UnsavedChangesChoice.Save;
+        var dialog = new KeyBindingSelectionWindow(importing, layers, canIncludeSlider) { Owner = this };
+        return dialog.ShowDialog() == true ? dialog.Selection : null;
     }
 
-    private bool ImportKeyBindingsCore(KeyBindingContext context, KeyBindingDocument document, Func<bool> confirm)
+    private bool ImportKeyBindingsCore(KeyBindingContext context, KeyBindingDocument document, Func<KeyBindingSelection?> select)
     {
         if (!IsKeyBindingContextCurrent(context)) return false;
-        var candidate = KeyBindingTransfer.Apply(_project, document);
-        if (!confirm() || !IsKeyBindingContextCurrent(context)) return false;
+        if (document.DeviceId != _project.DeviceId)
+            throw new InvalidDataException(L.T("Diese Tastenbelegungen gehören zu einem anderen Gerätemodell oder Layout."));
+        var selection = select();
+        if (selection is null || !IsKeyBindingContextCurrent(context)) return false;
+        var candidate = KeyBindingTransfer.Apply(_project, document, selection.Layers, selection.IncludeSlider);
         if (Fingerprint(candidate) != context.Fingerprint)
         {
             BeginChange(); _project = candidate; _macroAssigning = false;
@@ -65,6 +64,14 @@ public partial class MainWindow
         }
         FinishChange(L.T("Tastenbelegung importiert."), false);
         return true;
+    }
+
+    private KeyBindingDocument? CaptureSelectedKeyBindings(KeyBindingContext context, Func<KeyBindingSelection?> select)
+    {
+        if (!IsKeyBindingContextCurrent(context)) return null;
+        var selection = select();
+        return selection is not null && IsKeyBindingContextCurrent(context)
+            ? KeyBindingTransfer.Capture(_project, selection.Layers, selection.IncludeSlider) : null;
     }
 
     private bool IsKeyBindingExportProfilePath(string path) => ProfileLibrary.PathsEqual(path, _projectPath) ||
@@ -80,7 +87,9 @@ public partial class MainWindow
             if (!ResolvePendingEdits() || !ReferenceEquals(_project, startingProject) || !CanTransferKeyBindings) return;
             CommitNames();
             var context = CaptureKeyBindingContext();
-            var document = KeyBindingTransfer.Capture(_project);
+            var document = CaptureSelectedKeyBindings(context, () => SelectKeyBindingLayers(false,
+                _project.Layers.Select((layer, index) => (index, layer.Name)).ToArray(), Device.HasSlider));
+            if (document is null) return;
             var picker = new SaveFileDialog
             {
                 Title = L.T("Tastenbelegung exportieren"), Filter = L.T("Tastenbelegung") + " (*.bindings.json)|*.bindings.json",

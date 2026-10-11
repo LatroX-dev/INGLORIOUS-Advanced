@@ -33,7 +33,7 @@ $app = @(
     'MainWindow.Startup.cs','MainWindow.StartupChecks.cs','MainWindow.Connections.cs','MainWindow.ConnectionChecks.cs','StartupDeviceLoader.cs','MainWindow.WorkflowChecks.cs','MainWindow.PendingEdits.cs','MainWindow.PendingEditsChecks.cs','PendingEditDecisionPolicy.cs',
     'MainWindow.NavigationChecks.cs','MainWindow.Animation.cs','MainWindow.AnimationChecks.cs','LightingPreviewEngine.cs',
     'Localization.cs','LocalizationUi.cs','MainWindow.Localization.cs','MainWindow.EffectColors.cs','MainWindow.Favorites.cs',
-    'MainWindow.MacroLibrary.cs','MainWindow.KeyBindings.cs','KeyBindingTransfer.cs','MainWindow.OsActions.cs','MainWindow.Profiles.cs','MainWindow.ProfileChecks.cs','MainWindow.SharedBrightness.cs',
+    'MainWindow.MacroLibrary.cs','MainWindow.KeyBindings.cs','KeyBindingTransfer.cs','KeyBindingSelectionWindow.cs','MainWindow.OsActions.cs','MainWindow.Profiles.cs','MainWindow.ProfileChecks.cs','MainWindow.SharedBrightness.cs',
     'MacroLibraryWindow.cs','OsActionCatalog.cs','OsActionsWindow.cs','ProfileLibrary.cs','SharedBrightnessService.cs','SharedMacroLibrary.cs',
     'LightingPresetStore.cs','LightPresetsWindow.cs','MainWindow.LightingPresets.cs','MainWindow.NewFeaturesChecks.cs',
     'BoardDescriptorRegistry.cs','OnboardClient.cs','OnboardHidTransport.cs','OnboardProtocol.cs','StockHidContract.cs','StockProtocol.cs','TransferWindow.cs','TransferWindow.StatusChecks.cs',

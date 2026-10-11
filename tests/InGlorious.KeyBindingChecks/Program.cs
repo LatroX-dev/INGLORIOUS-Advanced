@@ -35,12 +35,15 @@ try
         source.Layers[1].Keys[key].Binding = "MACRO:used";
         source.Layers[2].Name = "Function set";
         source.Layers[2].Keys[key].Binding = "TG(3)";
+        source.Layers[3].Name = "Utility";
+        source.Layers[3].Keys[key].Binding = "KC_F12";
         if (device.HasSlider) source.Slider = new() { Mode = 1, Minimum = 80, Maximum = 980, MidiChannel = 5, MidiController = 20 };
         var before = Json(source);
         var captured = KeyBindingTransfer.Capture(source);
         Check(Json(source) == before, device.Id + ": capture preserves source");
         Check(captured.Macros.Count == 1 && captured.Macros[0].Id == "used", device.Id + ": referenced macros only");
         Check(captured.Layers.Count == 4 && captured.Layers.All(layer => layer.Bindings.Count == device.Keys.Count), device.Id + ": all layers and encoder bindings");
+        Check(captured.Layers.Select(layer => layer.Index).SequenceEqual([0, 1, 2, 3]), device.Id + ": explicit layer indices");
         Check((captured.Slider is not null) == device.HasSlider, device.Id + ": slider model gate");
         var file = Path.Combine(root, device.Id + ".bindings.json");
         KeyBindingTransfer.Export(file, captured);
@@ -73,6 +76,23 @@ try
         Check(File.ReadAllBytes(file).AsSpan().SequenceEqual(bytes), device.Id + ": failed export preserves old bytes");
         KeyBindingTransfer.Export(file, captured, overwrite: true);
         Check(Json(KeyBindingTransfer.Load(file)) == Json(captured), device.Id + ": atomic overwrite roundtrip");
+        var sparse = KeyBindingTransfer.Capture(source, [3, 1], includeSlider: false);
+        Check(sparse.Layers.Select(layer => layer.Index).SequenceEqual([1, 3]) && sparse.Slider is null, device.Id + ": sparse export preserves true indices and optional slider");
+        Check(sparse.Macros.Count == 1 && sparse.Macros[0].Id == "used", device.Id + ": sparse export includes only referenced macros");
+        var sparseFile = Path.Combine(root, device.Id + ".selected.bindings.json");
+        KeyBindingTransfer.Export(sparseFile, sparse);
+        sparse = KeyBindingTransfer.Load(sparseFile);
+        Check(Json(KeyBindingTransfer.Capture(source, [1, 3], includeSlider: false)) == Json(sparse), device.Id + ": sparse file roundtrip");
+        var subset = KeyBindingTransfer.Apply(target, sparse, [3], includeSlider: false);
+        Check(subset.Layers[3].Name == "Utility" && subset.Layers[3].Keys[key].Binding == "KC_F12", device.Id + ": requested import layer applied at actual index");
+        Check(new[] { 0, 1, 2 }.All(index => Json(subset.Layers[index]) == Json(target.Layers[index])), device.Id + ": unselected complete layers unchanged");
+        Check(Json(subset.Macros) == Json(target.Macros), device.Id + ": macros used only by unselected file layers are not imported");
+        Check(Json(subset.Slider) == Json(target.Slider) && NonBindings(subset) == NonBindings(target), device.Id + ": optional slider and other settings unchanged");
+        var everyAvailable = KeyBindingTransfer.Apply(target, sparse);
+        Check(new[] { 0, 2 }.All(index => Json(everyAvailable.Layers[index]) == Json(target.Layers[index])) && everyAvailable.Layers[1].Keys[key].Binding == "MACRO:used",
+            device.Id + ": null selection imports all available sparse layers only");
+        Check(Json(KeyBindingTransfer.Capture(source, [3]).Macros) == "[]", device.Id + ": omitted layers cannot add export macros");
+        Check(Json(target) == targetBefore && Json(source) == before, device.Id + ": selection operations preserve inputs");
         captured.Macros[0].Steps[0].Key = "KC_Y";
         Check(Json(source) == before, device.Id + ": capture macro steps detached");
     }
@@ -95,7 +115,11 @@ try
     ChangedJson(node => node["serialNumber"] = "untrusted", "unknown serial property");
     ChangedJson(node => node["version"] = 2, "future format");
     ChangedJson(node => node["deviceId"] = "NUMPAD", "device case mismatch");
-    ChangedJson(node => node["layers"]!.AsArray().RemoveAt(3), "missing layer");
+    ChangedJson(node => node["layers"]!.AsArray().Clear(), "empty layer list");
+    ChangedJson(node => node["layers"]![1]!["index"] = 0, "duplicate layer index");
+    ChangedJson(node => node["layers"]![1]!["index"] = 4, "layer index too high");
+    ChangedJson(node => node["layers"]![1]!["index"] = -1, "negative layer index");
+    ChangedJson(node => node["layers"]![1]!["index"] = "1", "layer index must be a number");
     ChangedJson(node => node["layers"]![0]!["bindings"]!.AsObject().Remove("r1c0"), "missing key");
     ChangedJson(node => node["layers"]![0]!["bindings"]!["foreign"] = "KC_A", "unknown physical key");
     ChangedJson(node => node["layers"]![0]!["bindings"]!["r1c0"] = "KC_TRNS", "transparent base rejected");
@@ -106,12 +130,11 @@ try
     ChangedJson(node => node["macros"]!.AsArray().Add(node["macros"]![0]!.DeepClone()), "duplicate macro ID");
     ChangedJson(node => node["macros"]![0]!["steps"]!.AsArray().RemoveAt(1), "unreleased macro key");
     ChangedJson(node => node["macros"]![0]!["steps"]![0]!["key"] = "KC_CALC", "macro media code unsupported");
-    ChangedJson(node => node["slider"] = null, "numpad slider required");
     ChangedJson(node => node["slider"]!["mode"] = 4, "invalid slider mode");
     ChangedJson(node => node["slider"]!["minimum"] = 1023, "invalid slider calibration");
     foreach (var (path, fields) in new[]
     {
-        ("layer", new[] { "name", "bindings" }), ("macro", new[] { "id", "name", "steps" }),
+        ("layer", new[] { "index", "name", "bindings" }), ("macro", new[] { "id", "name", "steps" }),
         ("step", new[] { "kind", "key", "delayMs" }), ("slider", new[] { "mode", "minimum", "maximum", "midiChannel", "midiController" })
     })
     {
@@ -130,6 +153,34 @@ try
     File.WriteAllBytes(malformedFile, [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes(validJson)]);
     Check(Json(KeyBindingTransfer.Load(malformedFile)) == validJson, "UTF8 BOM accepted");
 
+    foreach (var selection in new int[][] { [], [1, 1], [-1], [4], [0, 1, 2, 3, 0] })
+    {
+        var original = Json(project); var originalDocument = Json(document);
+        Reject(() => KeyBindingTransfer.Capture(project, selection), "invalid export layer selection");
+        Reject(() => KeyBindingTransfer.Apply(project, document, selection), "invalid import layer selection");
+        Check(Json(project) == original && Json(document) == originalDocument, "invalid selections leave inputs unchanged");
+    }
+    var sparseDocument = KeyBindingTransfer.Capture(project, [1, 3], includeSlider: false);
+    var sparseBefore = Json(sparseDocument);
+    Reject(() => KeyBindingTransfer.Apply(project, sparseDocument, [0]), "import selection must be a subset of the document");
+    Check(Json(sparseDocument) == sparseBefore, "absent-index rejection preserves sparse input");
+    var transparentFunction = KeyBindingTransfer.Capture(ProjectService.Create("numpad"), [1]);
+    Check(KeyBindingTransfer.Apply(project, transparentFunction).Layers[1].Keys["r1c0"].Binding == "KC_TRNS", "transparency validated at actual layer1 rather than list position0");
+    transparentFunction.Layers[0].Index = 0;
+    Reject(() => KeyBindingTransfer.Apply(project, transparentFunction), "transparent imported base layer rejected");
+    var reversed = Copy(document); reversed.Layers.Reverse();
+    Check(Json(KeyBindingTransfer.Apply(project, reversed)) == Json(KeyBindingTransfer.Apply(project, document)), "document entry order cannot remap layer indices");
+    var sliderProject = ProjectService.Create("numpad"); sliderProject.Slider = new() { Mode = 1, Minimum = 70, Maximum = 920, MidiChannel = 7, MidiController = 55 };
+    var noSlider = KeyBindingTransfer.Capture(sliderProject, [2], includeSlider: false);
+    var withSlider = KeyBindingTransfer.Capture(sliderProject, [2]);
+    var sliderTarget = ProjectService.Create("numpad"); sliderTarget.Slider.Mode = 2;
+    Check(noSlider.Slider is null && Json(KeyBindingTransfer.Apply(sliderTarget, noSlider).Slider) == Json(sliderTarget.Slider), "missing global slider leaves target unchanged by default");
+    Check(Json(KeyBindingTransfer.Apply(sliderTarget, withSlider, includeSlider: false).Slider) == Json(sliderTarget.Slider), "import slider selection can decline present settings");
+    Check(Json(KeyBindingTransfer.Apply(sliderTarget, withSlider, includeSlider: true).Slider) == Json(sliderProject.Slider), "explicit slider inclusion imports complete settings");
+    var withoutSliderFile = Path.Combine(root, "no-slider.bindings.json");
+    KeyBindingTransfer.Export(withoutSliderFile, noSlider);
+    Check(KeyBindingTransfer.Load(withoutSliderFile).Slider is null, "numpad null slider survives strict file roundtrip");
+
     var targetProject = ProjectService.Create("numpad");
     targetProject.Macros.Add(Tap("used", "KC_B", "Existing conflict"));
     targetProject.Macros.Add(Tap("same", "KC_A", "Different name, identical action"));
@@ -145,6 +196,14 @@ try
     var assignedId = applied.Layers[0].Keys["r1c0"].Binding[6..];
     Check(assignedId != "used" && applied.Macros.Count == 2 && applied.Macros.Single(macro => macro.Id == assignedId).Steps[0].Key == "KC_A", "ID conflict safely remapped");
     Check(Json(targetProject) == conflictBefore && applied.Macros[0].Steps[0].Key == "KC_B", "conflicting old macro retained");
+    targetProject.Layers[2].Name = "Existing macro layer";
+    targetProject.Layers[2].Keys["r1c0"].Binding = "MACRO:used";
+    var untouchedLayer = Json(targetProject.Layers[2]);
+    var partialConflict = KeyBindingTransfer.Apply(targetProject, document, [0]);
+    var partialId = partialConflict.Layers[0].Keys["r1c0"].Binding[6..];
+    Check(partialId != "used" && Json(partialConflict.Layers[2]) == untouchedLayer && partialConflict.Macros.Single(macro => macro.Id == "used").Steps[0].Key == "KC_B",
+        "selected ID remapping never changes unselected bindings to an existing macro");
+    Check(partialConflict.Macros.Single(macro => macro.Id == partialId).Steps[0].Key == "KC_A", "partial import resolves selected binding to imported action");
     var equivalent = Copy(document); equivalent.Macros[0].Steps.ForEach(step => step.DelayMs = 500);
     Check(KeyBindingTransfer.Apply(applied, equivalent).Macros.Count == 2, "irrelevant key-step delays do not prevent semantic reuse");
     var duplicateContent = Copy(document); var another = Tap("second-id"); duplicateContent.Macros.Add(another);
@@ -167,6 +226,11 @@ try
     var fullBefore = Json(full);
     Reject(() => KeyBindingTransfer.Apply(full, document), "33 macros cannot fit");
     Check(Json(full) == fullBefore, "slot overflow leaves source unchanged");
+    Check(KeyBindingTransfer.Apply(full, document, [1]).Macros.Count == 32, "unselected macro references do not exhaust full target slots");
+    var sameAtCapacity = KeyBindingTransfer.Capture(project, [0]);
+    full.Macros[0] = Tap("keep-id");
+    var reusedAtCapacity = KeyBindingTransfer.Apply(full, sameAtCapacity, [0]);
+    Check(reusedAtCapacity.Macros.Count == 32 && reusedAtCapacity.Layers[0].Keys["r1c0"].Binding == "MACRO:keep-id", "selected same-content action reuses a full target slot");
     var crowded = ProjectService.Create("numpad");
     for (var index = 0; index < 6; index++) crowded.Macros.Add(new()
     { Id = "crowded-" + index, Name = "Old", Steps = Enumerable.Range(0, 128).Select(_ => new MacroStep { Kind = "delay", Key = "KC_A", DelayMs = 1 }).ToList() });
@@ -182,6 +246,7 @@ try
     var standbyBefore = Json(standby);
     Reject(() => KeyBindingTransfer.Apply(standby, document), "standby/color storage capacity respected");
     Check(Json(standby) == standbyBefore, "shared storage failure never removes old data");
+    Check(Json(KeyBindingTransfer.Apply(standby, document, [1]).Macros) == Json(standby.Macros), "unselected imported macros do not consume shared standby storage");
 
     foreach (var name in new[] { "GMMK Numpad", "CON", "LPT1", "../folder/bad:name", "Custom.inglorious.json", "Custom.bindings.json", " ", new string('a', 150), "a\nname" })
     {
@@ -193,7 +258,7 @@ try
     }
     Check(KeyBindingTransfer.SuggestFileName(new() { DeviceId = "numpad", Name = "GMMK Numpad" }) == "GMMK Numpad.bindings.json", "clean default suggestion");
     var destination = Path.Combine(root, "preserved.json"); File.WriteAllText(destination, "important existing contents");
-    var broken = Copy(document); broken.Layers.RemoveAt(3);
+    var broken = Copy(document); broken.Layers.Clear();
     Reject(() => KeyBindingTransfer.Export(destination, broken, overwrite: true), "invalid export never touches existing destination");
     Check(File.ReadAllText(destination) == "important existing contents", "invalid export leaves bytes intact");
     Reject(() => KeyBindingTransfer.Export(destination, document), "default export protects arbitrary existing file");
