@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -105,7 +106,109 @@ public partial class MainWindow
             check(dialog.Choice == choice, "Unsaved dialog returns " + choice + " only after the corresponding action");
         }
         RunSliderPanelChecks(check);
+        RunKeyBindingTransferChecks(check);
         ResetWorkflowFixture("pro-iso");
+    }
+
+    private void RunKeyBindingTransferChecks(Action<bool, string> check)
+    {
+        var reading = _readingDevice; var guide = _checkingFirmwareGuide; var scanning = _scanning;
+        var loading = _startupLoading; var finishing = _startupFinishing; var closed = _startupClosed;
+        var enabled = IsEnabled; var editorEnabled = EditorSurface.IsEnabled;
+        var pendingDecision = _pendingEditDecisionOverride;
+        try
+        {
+            _readingDevice = _checkingFirmwareGuide = _scanning = _startupLoading = _startupFinishing = _startupClosed = false;
+            IsEnabled = EditorSurface.IsEnabled = true;
+            ResetWorkflowFixture("numpad"); SetTab(1);
+            var key = Device.Keys.First(k => !k.IsEncoder).Id;
+            _projectPath = Path.Combine(Path.GetTempPath(), "inglorious-bindings-check-profile.json");
+            _project.Name = "Local profile"; Layer.Keys[key].Color = "#123456";
+            _project.DeviceSettings.DebounceMs = 9; _project.Standby.Enabled = true;
+            RefreshAll(); _savedFingerprint = Fingerprint(_project);
+            var context = CaptureKeyBindingContext();
+            var originalBinding = _project.Layers[0].Keys[key].Binding;
+            var source = ProjectService.Create("numpad");
+            source.Layers[0].Keys[key].Binding = "KC_A"; source.Layers[1].Name = "Work"; source.Slider.Mode = 1;
+            source.Macros.Add(new() { Id = "transfer_macro", Name = "Imported macro", Steps = [new() { Kind = "down", Key = "KC_B" }, new() { Kind = "up", Key = "KC_B" }] });
+            source.Layers[2].Keys[key].Binding = "MACRO:transfer_macro";
+            var document = KeyBindingTransfer.Capture(source);
+            foreach (var slider in new[] { false, true })
+            {
+                ShowBindingTarget(slider); UpdateLayout();
+                check(ImportKeyBindingsButton.IsVisible && ExportKeyBindingsButton.IsVisible,
+                    "Binding file actions remain available for both keys and slider");
+            }
+            check(!ImportKeyBindingsCore(context, document, () => false) && Fingerprint(_project) == context.Fingerprint && _undo.Count == 0,
+                "Canceling binding import preserves the complete draft and undo history");
+            check(ImportKeyBindingsCore(context, document, () => true) && _undo.Count == 1 && _redo.Count == 0,
+                "Confirmed binding import creates one undo step");
+            var imported = Fingerprint(_project);
+            check(_project.Layers[0].Keys[key].Binding == "KC_A" && _project.Layers[1].Name == "Work" && _project.Slider.Mode == 1 &&
+                _project.Layers[2].Keys[key].Binding == "MACRO:transfer_macro" && _project.Macros.Single().Id == "transfer_macro",
+                "Binding import includes layer names, assignments, slider and assigned macros");
+            check(_project.Layers[0].Keys[key].Color == "#123456" && _project.DeviceSettings.DebounceMs == 9 && _project.Standby.Enabled &&
+                _project.Name == "Local profile" && _projectPath == context.Path && _savedFingerprint == context.Fingerprint && IsDirty,
+                "Binding import preserves lighting, timing, standby and profile save identity");
+            check(ReferenceEquals(_sessions["numpad"].Project, _project) && _sessions["numpad"].Undo.Length == 1,
+                "The active device session retains the imported draft and undo history");
+            Undo_Click(this, new RoutedEventArgs());
+            check(Fingerprint(_project) == context.Fingerprint && _undo.Count == 0 && !IsDirty,
+                "One undo restores the complete profile before binding import");
+            Redo_Click(this, new RoutedEventArgs());
+            check(Fingerprint(_project) == imported && _undo.Count == 1, "Redo restores imported bindings and macros");
+            Undo_Click(this, new RoutedEventArgs()); context = CaptureKeyBindingContext();
+            var confirmations = 0; var rejected = false;
+            try { ImportKeyBindingsCore(context, KeyBindingTransfer.Capture(ProjectService.Create("pro-iso")), () => { confirmations++; return true; }); }
+            catch (InvalidDataException) { rejected = true; }
+            check(rejected && confirmations == 0 && Fingerprint(_project) == context.Fingerprint && _undo.Count == 0,
+                "Wrong-model bindings are rejected before confirmation without changing history");
+            check(!ImportKeyBindingsCore(context, document, () => { _project.Name = "Changed during confirmation"; return true; }) &&
+                _project.Name == "Changed during confirmation" && _project.Layers[0].Keys[key].Binding == originalBinding && _undo.Count == 0,
+                "A confirmed import cannot overwrite intervening project changes");
+            RefreshAll(); context = CaptureKeyBindingContext();
+            check(!ImportKeyBindingsCore(context, document, () => { _projectPath = context.Path + ".renamed"; return true; }) && _undo.Count == 0,
+                "Saving under a different profile path invalidates a pending binding import");
+            context = CaptureKeyBindingContext();
+            check(!ImportKeyBindingsCore(context, document, () => { ProjectName.Text = "Pending profile name"; return true; }) &&
+                ProjectName.Text == "Pending profile name" && _undo.Count == 0,
+                "A confirmed import preserves intervening uncommitted name input");
+            RefreshAll(); context = CaptureKeyBindingContext();
+            check(!ImportKeyBindingsCore(context, document, () => { SwitchDevice("pro-iso"); return true; }) && _project.DeviceId == "pro-iso" &&
+                Fingerprint(_sessions["numpad"].Project) == context.Fingerprint,
+                "Changing the active device invalidates pending binding import without changing its saved session");
+            check(IsKeyBindingExportProfilePath(context.Path!) && IsKeyBindingExportProfilePath(context.Path!.ToUpperInvariant()) &&
+                !IsKeyBindingExportProfilePath(Path.Combine(Path.GetTempPath(), "inglorious-bindings-export.bindings.json")),
+                "Binding export protects other open profile paths including Windows case aliases");
+            SwitchDevice("numpad"); context = CaptureKeyBindingContext();
+            check(IsKeyBindingExportProfilePath(_projectPath!), "Binding export protects the current profile file");
+            foreach (var (name, set) in new (string, Action<bool>)[]
+            {
+                ("device read", value => _readingDevice = value), ("firmware operation", value => _checkingFirmwareGuide = value),
+                ("connection scan", value => _scanning = value), ("startup read", value => _startupLoading = value),
+                ("startup completion", value => _startupFinishing = value), ("closed window", value => _startupClosed = value)
+            })
+            {
+                set(true);
+                check(!ImportKeyBindingsCore(context, document, () => { confirmations++; return true; }) && confirmations == 0,
+                    "Binding import refuses " + name + " before confirmation");
+                set(false);
+            }
+            DebounceInput.Text = "13";
+            check(!ImportKeyBindingsCore(context, document, () => { confirmations++; return true; }) && confirmations == 0 && HasPendingTiming,
+                "Binding import never overwrites pending settings input");
+            var pendingCalls = 0; _pendingEditDecisionOverride = () => { pendingCalls++; return PendingEditChoice.Apply; };
+            ImportKeyBindings_Click(this, new RoutedEventArgs()); ExportKeyBindings_Click(this, new RoutedEventArgs());
+            check(pendingCalls == 0 && HasPendingTiming && Fingerprint(_project) == context.Fingerprint,
+                "Offline file actions never open pickers or apply pending user input");
+        }
+        finally
+        {
+            _readingDevice = reading; _checkingFirmwareGuide = guide; _scanning = scanning;
+            _startupLoading = loading; _startupFinishing = finishing; _startupClosed = closed;
+            IsEnabled = enabled; EditorSurface.IsEnabled = editorEnabled; _pendingEditDecisionOverride = pendingDecision;
+            DiscardPendingEdits(); ResetWorkflowFixture("pro-iso");
+        }
     }
 
     private void RunSliderPanelChecks(Action<bool, string> check)

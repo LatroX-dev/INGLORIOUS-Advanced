@@ -22,6 +22,7 @@ public static class UserGuide
         new("bindings", "Tastenbelegung", Array.AsReadOnly(new GuideSection[]
         {
             new("Tasten und Drehgeber", "Wähle eine Taste in der Vorschau, suche eine Funktion und übernimm sie. Mehrere ausgewählte Tasten erhalten dieselbe Belegung. Die beiden Drehrichtungen des Drehgebers lassen sich getrennt belegen. Belegungen gelten für die oben ausgewählte Ebene."),
+            new("Import und Export", "Unter „Tastenbelegung“ kannst du die Belegungen aller vier Ebenen mit Reglerfunktionen und zugewiesenen Makros exportieren. Importiere sie auf demselben Gerätemodell. Farben und Effekte bleiben erhalten. Übertrage die importierten Belegungen anschließend mit „Auf Tastatur übertragen“."),
             new("Betriebssystemaktionen", "Unter „Betriebssystem-Aktion …“ wählst du Betriebssystem und Tastaturlayout. Die Aktion verwendet passende Tastenfolgen; ihre Wirkung hängt vom System und der geöffneten Anwendung ab. Prüfe die Auswahl, bevor du sie einer Taste zuweist.")
         })),
         new("macros", "Makros", Array.AsReadOnly(new GuideSection[]

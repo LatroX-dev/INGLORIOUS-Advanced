@@ -18,6 +18,7 @@ Run the repository's offline verification script before proposing a release. Foc
 
 ```powershell
 dotnet run --project tests/InGlorious.ModelChecks -c Release
+dotnet run --project tests/InGlorious.KeyBindingChecks -c Release
 dotnet run --project tests/InGlorious.DiscoveryChecks -c Release
 dotnet run --project tests/InGlorious.SetupChecks -c Release
 dotnet run --project tests/InGlorious.PortableSetupChecks -c Release

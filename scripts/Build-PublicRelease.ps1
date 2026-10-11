@@ -23,7 +23,7 @@ function Invoke-Checked([string]$Command,[string[]]$Arguments){
 $sdk=(& dotnet --version).Trim()
 $expectedSdk=(Get-Content -LiteralPath (Join-Path $root 'global.json') -Raw|ConvertFrom-Json).sdk.version
 if($sdk-cne$expectedSdk){throw ('Install .NET SDK '+$expectedSdk+' from Microsoft before building.')}
-$tests=@('InGlorious.Checks','InGlorious.BoardRegistryChecks','InGlorious.ModelChecks','InGlorious.DiscoveryChecks','InGlorious.OnboardChecks','InGlorious.MacroLibraryChecks','InGlorious.LightingPresetChecks','InGlorious.PreferencesChecks','InGlorious.RecordingChecks','InGlorious.PendingChecks','InGlorious.LightingTestChecks','InGlorious.AutostartChecks','InGlorious.StartupGuardChecks','InGlorious.BackgroundChecks','InGlorious.AppStartupChecks','InGlorious.AdapterFileChecks','InGlorious.SoftwareUpdateChecks')
+$tests=@('InGlorious.Checks','InGlorious.BoardRegistryChecks','InGlorious.ModelChecks','InGlorious.DiscoveryChecks','InGlorious.OnboardChecks','InGlorious.MacroLibraryChecks','InGlorious.KeyBindingChecks','InGlorious.LightingPresetChecks','InGlorious.PreferencesChecks','InGlorious.RecordingChecks','InGlorious.PendingChecks','InGlorious.LightingTestChecks','InGlorious.AutostartChecks','InGlorious.StartupGuardChecks','InGlorious.BackgroundChecks','InGlorious.AppStartupChecks','InGlorious.AdapterFileChecks','InGlorious.SoftwareUpdateChecks')
 $executedTests=0
 foreach($suite in $tests){
     [xml]$testProject=Get-Content -LiteralPath (Join-Path $root ('tests/'+$suite+'/'+$suite+'.csproj'))

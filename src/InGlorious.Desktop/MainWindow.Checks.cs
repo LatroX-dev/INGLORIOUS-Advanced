@@ -19,6 +19,7 @@ public sealed partial class MainWindow
         Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.49", "visible product assembly metadata uses INGLORIOUS 0.6.49");
         await RunConnectionsChecksAsync(Check);
         await RunProfileReplacementChecksAsync(Check);
+        await RunKeyBindingChecksAsync(Check);
         RunExperimentalLabelsChecks(Check);
         RunLanguagePreferenceChecks(Check);
         AppAutostartEditor.RunOfflineChecks(Check);

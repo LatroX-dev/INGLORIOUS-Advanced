@@ -202,6 +202,11 @@ public sealed partial class MainWindow
     }
     private void BuildBindingEditor()
     {
+        var import = AsyncButton("Importieren …", ImportKeyBindingsAsync); import.Name = "ImportKeyBindings";
+        var export = AsyncButton("Exportieren …", ExportKeyBindingsAsync); export.Name = "ExportKeyBindings";
+        var files = new WrapPanel { Orientation = Orientation.Horizontal };
+        import.Margin = new Thickness(0, 0, 7, 5); export.Margin = new Thickness(0, 0, 0, 5);
+        files.Children.Add(import); files.Children.Add(export); _editor.Children.Add(files);
         if (_state.Device.Id == "numpad")
         {
             var keys = AsyncButton("Tasten", () => ShowBindingEditorAsync(false)); keys.Name = "BindingKeysTab";

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Import and export key bindings across all four layers, including assigned macros.
 - Removed repeated messages during firmware installation, updates and recovery.
 
 ## 0.6.49

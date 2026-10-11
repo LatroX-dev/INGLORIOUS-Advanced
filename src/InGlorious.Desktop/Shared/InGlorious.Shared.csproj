@@ -19,6 +19,7 @@
     <Compile Include="../../InGlorious.Core/ProfileLibrary.cs" Link="ProfileLibrary.cs" />
     <Compile Include="../../InGlorious.Core/ColorPaletteStore.cs" Link="ColorPaletteStore.cs" />
     <Compile Include="../../InGlorious.Core/SharedMacroLibrary.cs" Link="SharedMacroLibrary.cs" />
+    <Compile Include="../../InGlorious.Core/KeyBindingTransfer.cs" Link="KeyBindingTransfer.cs" />
     <Compile Include="../../InGlorious.Core/MacroRecording.cs" Link="MacroRecording.cs" />
     <Compile Include="../../InGlorious.Core/LightingPreviewEngine.cs" Link="LightingPreviewEngine.cs" />
     <Compile Include="../../InGlorious.Core/OnboardProtocol.cs" Link="OnboardProtocol.cs" />

@@ -458,6 +458,10 @@
 
                             </StackPanel>
                             <StackPanel x:Name="BindingPanel" Visibility="Collapsed">
+                                <UniformGrid Columns="2" Margin="0,0,0,14">
+                                    <Button x:Name="ImportKeyBindingsButton" local:UiIcons.Kind="import" Content="{local:Tr Key='Importieren …'}" Click="ImportKeyBindings_Click" FontSize="11" Padding="7,9" Margin="0,0,3,0" />
+                                    <Button x:Name="ExportKeyBindingsButton" local:UiIcons.Kind="export" Content="{local:Tr Key='Exportieren …'}" Click="ExportKeyBindings_Click" FontSize="11" Padding="7,9" Margin="3,0,0,0" />
+                                </UniformGrid>
                                 <UniformGrid x:Name="BindingTargetButtons" Columns="2" Margin="0,0,0,16" Visibility="Collapsed">
                                     <Button x:Name="KeyBindingsButton" Content="{local:Tr Key='Tasten'}" Click="KeyBindings_Click" Margin="0,0,3,0"/>
                                     <Button x:Name="SliderBindingsButton" Content="{local:Tr Key='Schieberegler'}" Click="SliderBindings_Click" Margin="3,0,0,0"/>

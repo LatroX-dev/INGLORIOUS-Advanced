@@ -57,6 +57,7 @@ These screenshots show the Windows editor with offline demo data. They do not de
 - Per-key and side lighting, 21 effects, custom color sequences and animated previews.
 - Shared color favorites, lighting templates and import/export.
 - Key and encoder assignments, four layers and a shared macro library with import/export.
+- Import and export key bindings for all four layers, including assigned macros and control assignments, without changing lighting.
 - Local profiles for each device, with configuration readback after transfer.
 - Adjustable USB polling rate and debounce time.
 - Standby lighting and an optional INGLORIOUS screensaver.
