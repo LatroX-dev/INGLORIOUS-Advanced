@@ -1,13 +1,13 @@
-# Produkttexte und Bedienung
+# Product wording and usability
 
-INGLORIOUS Advanced richtet sich an Endkunden. Diese Regeln gelten grundsätzlich für die gesamte Oberfläche: Einstellungen, Einrichtung, Updates, Dialoge, Hinweise und sichtbare Protokolle.
+INGLORIOUS Advanced is intended for end users. These rules apply throughout the interface: settings, setup, updates, dialogs, notices and visible logs.
 
-- Beschreibe verständlich, was eine Funktion macht oder welchen nächsten Schritt der Nutzer ausführen soll. Halte Texte kurz und verwende eindeutige Bezeichnungen.
-- Zeige nur Informationen, die beim Benutzen oder Entscheiden helfen. Interne Abläufe, Protokollbefehle, Speicherformate, Prüfsummen, Implementierungsdetails und Entwickler-Testhistorie gehören in technische Prüfberichte oder Entwicklerdokumentation.
-- Notwendige Hinweise zu Datenverlust, Sicherung, Verbindungen und dem Ergebnis einer Änderung müssen weiterhin klar und korrekt sein. Vereinfache die Sprache, nicht die Prüfungen oder Schutzmechanismen.
-- Vermeide Marketingfloskeln, künstliche Begeisterung und generische KI-Phrasen. Verwende bei Fehlern eine verständliche Ursache und einen konkreten nächsten Schritt, wenn bekannt.
-- Changelogs sind bewusst auf Englisch, unabhängig von der gewählten Appsprache. Verwende kurze Stichpunkte über neue Funktionen, Verbesserungen und relevante Bugfixes. Nenne bei einem Bugfix das behobene Problem aus Nutzersicht, ohne technische Ursache oder Reparaturablauf.
-- Changelog-Beispiele für den gewünschten Umfang: "New lighting test after firmware updates." und "Optional screensaver." Ein Beispiel für eine Fehlerbehebung ist "Fixed saved colors not being restored." Dieses Fehlerbeispiel ist keine Behauptung über einen tatsächlich behobenen Fehler.
-- Nenne nur tatsächlich enthaltene Änderungen. Bewahre die bestehenden Geräte- und Versionsfilter des Changelogs; er darf keine ausstehenden Änderungen für unbekannte, aktuelle oder neuere Firmware erfinden.
+- Explain clearly what a feature does or what the user should do next. Keep text short and use unambiguous labels.
+- Show only information that helps users operate the app or make a decision. Internal processes, protocol commands, storage formats, checksums, implementation details and developer test history belong in technical reports or developer documentation.
+- Necessary information about data loss, backups, connections and the outcome of a change must remain clear and accurate. Simplify the language, not the checks or safeguards.
+- Avoid marketing jargon, artificial enthusiasm and generic AI phrases. For errors, state an understandable cause and a concrete next step when known.
+- Changelogs are deliberately in English, regardless of the selected app language. Use short bullet points about new features, improvements and relevant bug fixes. Describe the problem a bug fix resolves from the user's perspective, without technical causes or repair procedures.
+- Examples of the intended changelog detail: "New lighting test after firmware updates." and "Optional screensaver." An example bug-fix entry is "Fixed saved colors not being restored." This example does not claim that such a bug has actually been fixed.
+- Mention only changes that are actually included. Preserve the changelog's existing device and version filters; do not invent pending changes for unknown, current or newer firmware.
 
-Wende diese Regeln bei allen künftigen UI-Änderungen an. Ausführliche technische Nachweise bleiben außerhalb der normalen Bedienung erhalten.
+Apply these rules to all future UI changes. Keep detailed technical evidence outside the normal user flow.
