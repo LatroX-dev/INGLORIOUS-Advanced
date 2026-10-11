@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net9.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><RootNamespace>InGlorious.Core</RootNamespace></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="HidSharp" Version="2.6.4" />
+    <Compile Include="../../InGlorious.Core/Models.cs" Link="Models.cs" />
+    <Compile Include="../../InGlorious.Core/Localization.cs" Link="Localization.cs" />
+    <Compile Include="../../InGlorious.Core/UserGuide.cs" Link="UserGuide.cs" />
+    <Compile Include="../../InGlorious.Core/AppPreferences.cs" Link="AppPreferences.cs" />
+    <Compile Include="../../InGlorious.Core/ProfileLibrary.cs" Link="ProfileLibrary.cs" />
+    <Compile Include="../../InGlorious.Core/ColorPaletteStore.cs" Link="ColorPaletteStore.cs" />
+    <Compile Include="../../InGlorious.Core/SharedMacroLibrary.cs" Link="SharedMacroLibrary.cs" />
+    <Compile Include="../../InGlorious.Core/MacroRecording.cs" Link="MacroRecording.cs" />
+    <Compile Include="../../InGlorious.Core/LightingPreviewEngine.cs" Link="LightingPreviewEngine.cs" />
+    <Compile Include="../../InGlorious.Core/OnboardProtocol.cs" Link="OnboardProtocol.cs" />
+    <Compile Include="../../InGlorious.Core/OnboardClient.cs" Link="OnboardClient.cs" />
+    <Compile Include="../../InGlorious.Core/StartupDeviceLoader.cs" Link="StartupDeviceLoader.cs" />
+    <Compile Include="../../InGlorious.Core/FirmwareRelease.cs" Link="FirmwareRelease.cs" />
+    <Compile Include="../../InGlorious.Core/FirmwareChangelog.cs" Link="FirmwareChangelog.cs" />
+    <Compile Include="../../InGlorious.Core/OsActionCatalog.cs" Link="OsActionCatalog.cs" />
+    <Compile Include="../../InGlorious.Core/SharedBrightnessService.cs" Link="SharedBrightnessService.cs" />
+    <Compile Include="../../InGlorious.Core/LightingPresetStore.cs" Link="LightingPresetStore.cs" />
+    <EmbeddedResource Include="../../../reference/qmk/*.json" LogicalName="InGlorious.Layouts.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../../InGlorious.Core/Locales/*.json" LogicalName="InGlorious.Locales.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup><Compile Include="../../InGlorious.Core/BoardDescriptorRegistry.cs" Link="BoardDescriptorRegistry.cs" /></ItemGroup>
+</Project>

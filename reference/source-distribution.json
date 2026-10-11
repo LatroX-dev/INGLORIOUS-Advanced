@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "firmwareVersion": "0.11.0",
+  "repositories": [
+    { "id": "qmk", "relative": ".", "url": "https://github.com/qmk/qmk_firmware", "commit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1" },
+    { "id": "chibios", "relative": "lib/chibios", "url": "https://github.com/qmk/ChibiOS", "commit": "6170ddf92d55be54c89b708d1882eea229edeb2c" },
+    { "id": "chibios-contrib", "relative": "lib/chibios-contrib", "url": "https://github.com/qmk/ChibiOS-Contrib", "commit": "5a9ad82b6ba4f649cdb800e8c2bbc9be2d3ce767" },
+    { "id": "lufa", "relative": "lib/lufa", "url": "https://github.com/qmk/lufa", "commit": "549b97320d515bfca2f95c145a67bd13be968faa" },
+    { "id": "printf", "relative": "lib/printf", "url": "https://github.com/qmk/printf", "commit": "c2e3b4e10d281e7f0f694d3ecbd9f320977288cc" }
+  ],
+  "archives": [
+    { "id": "dfu-util", "version": "0.11", "file": "dfu-util-0.11.tar.gz", "url": "https://dfu-util.sourceforge.net/releases/dfu-util-0.11.tar.gz", "bytes": 152462, "sha256": "B4B53BA21A82EF7E3D4C47DF2952ADF5FA494F499B6B0B57C58C5D04AE8FF19E" },
+    { "id": "libusb", "version": "1a906274a66dd58bf81836db1306902d4a7dc185", "file": "libusb-1a906274a66dd58bf81836db1306902d4a7dc185.tar.gz", "url": "https://codeload.github.com/libusb/libusb/tar.gz/1a906274a66dd58bf81836db1306902d4a7dc185", "bytes": 368880, "sha256": "9C95417C6DFAFA883798FA8F6A0F726581573952C2293FA7B6C4252F38AFBC37" },
+    { "id": "wb32-dfu-updater", "version": "656f6a56354de86a8213b0d2dc8349b0aeb4b67e", "file": "wb32-dfu-updater-656f6a56354de86a8213b0d2dc8349b0aeb4b67e.tar.gz", "url": "https://codeload.github.com/WestberryTech/wb32-dfu-updater/tar.gz/656f6a56354de86a8213b0d2dc8349b0aeb4b67e", "bytes": 5586782, "sha256": "310992956CA30C7F57C00175AD993E239E90BB7DBB0260CCCC823376AFAD593F" }
+  ]
+}

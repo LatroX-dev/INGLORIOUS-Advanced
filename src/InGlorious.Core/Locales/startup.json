@@ -1,0 +1,67 @@
+{
+  "Konfigurationen werden von den Geräten gelesen …": {
+    "en": "Reading device settings …",
+    "es": "Leyendo los ajustes de los dispositivos…",
+    "fr": "Lecture des réglages des appareils…",
+    "it": "Lettura delle impostazioni dei dispositivi…",
+    "pt-BR": "Lendo as configurações dos dispositivos…",
+    "pl": "Odczytywanie ustawień urządzeń…",
+    "tr": "Cihaz ayarları okunuyor…",
+    "ru": "Чтение настроек устройств…",
+    "ja": "機器の設定を読み込み中…",
+    "ko": "장치 설정을 읽는 중…",
+    "zh-Hans": "正在读取设备设置…"
+  },
+  "Konfiguration geladen. Der Gerätespeicher ist nicht verfügbar.": {
+    "en": "Settings loaded. Device storage is unavailable.",
+    "es": "Ajustes cargados. La memoria del dispositivo no está disponible.",
+    "fr": "Réglages chargés. La mémoire de l’appareil n’est pas disponible.",
+    "it": "Impostazioni caricate. La memoria del dispositivo non è disponibile.",
+    "pt-BR": "Configurações carregadas. A memória do dispositivo não está disponível.",
+    "pl": "Wczytano ustawienia. Pamięć urządzenia jest niedostępna.",
+    "tr": "Ayarlar yüklendi. Cihaz belleği kullanılamıyor.",
+    "ru": "Настройки загружены. Память устройства недоступна.",
+    "ja": "設定を読み込みました。機器の保存領域を利用できません。",
+    "ko": "설정을 불러왔습니다. 장치 저장소를 사용할 수 없습니다.",
+    "zh-Hans": "设置已加载。设备存储不可用。"
+  },
+  "Kein Gerät mit INGLORIOUS verbunden. Lokales Profil geöffnet.": {
+    "en": "No device with INGLORIOUS connected. Local profile opened.",
+    "es": "No hay ningún dispositivo con INGLORIOUS conectado. Se ha abierto el perfil local.",
+    "fr": "Aucun appareil avec INGLORIOUS connecté. Profil local ouvert.",
+    "it": "Nessun dispositivo con INGLORIOUS collegato. Profilo locale aperto.",
+    "pt-BR": "Nenhum dispositivo com INGLORIOUS conectado. Perfil local aberto.",
+    "pl": "Brak podłączonego urządzenia z INGLORIOUS. Otwarto profil lokalny.",
+    "tr": "INGLORIOUS yüklü cihaz bağlı değil. Yerel profil açıldı.",
+    "ru": "Устройство с INGLORIOUS не подключено. Открыт локальный профиль.",
+    "ja": "INGLORIOUS搭載機器が接続されていません。ローカルプロファイルを開きました。",
+    "ko": "INGLORIOUS 장치가 연결되어 있지 않습니다. 로컬 프로필을 열었습니다.",
+    "zh-Hans": "未连接搭载 INGLORIOUS 的设备。已打开本地配置文件。"
+  },
+  "Mehrere passende Geräte verbunden. Wähle unter „Von Tastatur laden“ ein Gerät.": {
+    "en": "Several matching devices connected. Select one using “Load from keyboard”.",
+    "es": "Hay varios dispositivos compatibles conectados. Elige uno en «Cargar desde el teclado».",
+    "fr": "Plusieurs appareils compatibles sont connectés. Sélectionnez-en un avec «Charger depuis le clavier».",
+    "it": "Sono collegati più dispositivi compatibili. Scegline uno con «Carica dalla tastiera».",
+    "pt-BR": "Vários dispositivos compatíveis conectados. Selecione um em “Carregar do teclado”.",
+    "pl": "Podłączono kilka pasujących urządzeń. Wybierz jedno przez „Wczytaj z klawiatury”.",
+    "tr": "Birden fazla uygun cihaz bağlı. “Klavyeden yükle” ile birini seçin.",
+    "ru": "Подключено несколько подходящих устройств. Выберите одно через «Загрузить с клавиатуры».",
+    "ja": "対応する機器が複数接続されています。「キーボードから読み込む」で機器を選択してください。",
+    "ko": "해당하는 장치가 여러 개 연결되어 있습니다. ‘키보드에서 불러오기’로 장치를 선택하세요.",
+    "zh-Hans": "已连接多个匹配的设备。请通过“从键盘加载”选择一个设备。"
+  },
+  "Tastatur konnte nicht gelesen werden. Lokales Profil geöffnet. Prüfe die USB-Verbindung und wähle „Von Tastatur laden“.": {
+    "en": "Could not read the keyboard. Local profile opened. Check the USB connection and select “Load from keyboard”.",
+    "es": "No se pudo leer el teclado. Se ha abierto el perfil local. Comprueba la conexión USB y elige «Cargar desde el teclado».",
+    "fr": "Impossible de lire le clavier. Profil local ouvert. Vérifiez la connexion USB et sélectionnez «Charger depuis le clavier».",
+    "it": "Impossibile leggere la tastiera. Profilo locale aperto. Controlla il collegamento USB e scegli «Carica dalla tastiera».",
+    "pt-BR": "Não foi possível ler o teclado. Perfil local aberto. Verifique a conexão USB e selecione “Carregar do teclado”.",
+    "pl": "Nie udało się odczytać klawiatury. Otwarto profil lokalny. Sprawdź połączenie USB i wybierz „Wczytaj z klawiatury”.",
+    "tr": "Klavye okunamadı. Yerel profil açıldı. USB bağlantısını kontrol edip “Klavyeden yükle” seçeneğini seçin.",
+    "ru": "Не удалось прочитать настройки клавиатуры. Открыт локальный профиль. Проверьте USB-подключение и выберите «Загрузить с клавиатуры».",
+    "ja": "キーボードを読み込めませんでした。ローカルプロファイルを開きました。USB接続を確認し、「キーボードから読み込む」を選択してください。",
+    "ko": "키보드를 읽지 못했습니다. 로컬 프로필을 열었습니다. USB 연결을 확인하고 ‘키보드에서 불러오기’를 선택하세요.",
+    "zh-Hans": "无法读取键盘。已打开本地配置文件。请检查 USB 连接并选择“从键盘加载”。"
+  }
+}

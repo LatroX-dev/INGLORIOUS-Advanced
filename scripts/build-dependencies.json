@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "downloads": [
+    {
+      "id": "dfu-util",
+      "file": "dfu-util-0.11-binaries.tar.xz",
+      "url": "https://dfu-util.sourceforge.net/releases/dfu-util-0.11-binaries.tar.xz",
+      "sha256": "6450DE30A7DCD8D8C1273F43F0B153F054FD24D85F7F38296B1AD8EDBD2DDB25"
+    },
+    {
+      "id": "qmk-msys",
+      "file": "QMK_MSYS-1.12.0.exe",
+      "url": "https://github.com/qmk/qmk_distro_msys/releases/download/1.12.0/QMK_MSYS.exe",
+      "sha256": "21DF7D55F80870B22121D99867A541CC2A2ED834A28B908D379006A1F7C24C1C"
+    },
+    {
+      "id": "innounp",
+      "file": "innounp-2.zip",
+      "url": "https://raw.githubusercontent.com/jrathlev/InnoUnpacker-Windows-GUI/6fb49264aacf512a093e7b4fc6fb3dd266dad31a/innounp-2/bin/innounp-2.zip",
+      "sha256": "F2F037FDBC63DE31248EFAE9CCB294398D160DC0CBAD5F36D14C2F159E17BBF5"
+    }
+  ],
+  "qmk": {
+    "url": "https://github.com/qmk/qmk_firmware.git",
+    "commit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "submodules": {
+      "lib/chibios": "6170ddf92d55be54c89b708d1882eea229edeb2c",
+      "lib/chibios-contrib": "5a9ad82b6ba4f649cdb800e8c2bbc9be2d3ce767",
+      "lib/lufa": "549b97320d515bfca2f95c145a67bd13be968faa",
+      "lib/printf": "c2e3b4e10d281e7f0f694d3ecbd9f320977288cc"
+    }
+  },
+  "nativeFiles": {
+    "libusb-1.0.dll": "3C3C1F47C8040D841A940218874BCF88A47E24F58A115A6BAFF0869D2532FB8E",
+    "dfu-util-static.exe": "662CC5C1C1992D0779C2F4201AE4770D60C6F56D8974CA71ABDCF35927B9F87D"
+  }
+}

@@ -1,0 +1,756 @@
+{
+  "schemaVersion": 1,
+  "reviewedOn": "2026-10-11",
+  "purpose": "Manufacturer catalog recognition candidates only. No stock-image verification, silicon identification, unique specimen binding, restore test or write authorization is implied.",
+  "sources": {
+    "core": {
+      "publisher": "Glorious",
+      "version": "2.1.21",
+      "build": "2.1.21.4",
+      "officialSoftwarePage": "https://www.gloriousgaming.com/pages/software",
+      "localFile": "backups/initial/package-source/out/main/index.js",
+      "sha256": "9DE8428785A7A0AEE5AA965A782D41C891152411CB47051FA386AC802149BB75",
+      "sourceArchiveSha256": "5A3FD42E820BFA5EE3A89D019B714816F970C9E42103A04364804BCE96A5D1EA",
+      "method": "Read-only extraction of installed official package; proprietary source is not redistributed.",
+      "recognitionLogicLines": [
+        70903,
+        70933,
+        71242,
+        71255
+      ]
+    },
+    "firmwareManifest": {
+      "officialUrl": "https://gloriouscore.nyc3.digitaloceanspaces.com/CORE2/versions-manifest.prod.json",
+      "localFile": "backups/vendor-recovery-20261010/versions-manifest.prod.json",
+      "sha256": "F6963E7D540189B557A2D4CEAFD2C00825B5D91C073DED779C6C3E41A7607B80",
+      "capturedOn": "2026-10-10"
+    },
+    "qmk": {
+      "repository": "https://github.com/qmk/qmk_firmware",
+      "commit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1"
+    },
+    "gmmk3": {
+      "repository": "https://gitlab.com/glorious-public/qmk_firmware",
+      "originalManifest": "reference/glorious-gmmk3/sources.json",
+      "warning": "All six original GMMK3 QMK sources declare 504B:320F and version 0.0.1. These copied QMK descriptor values are not stock recognition evidence."
+    }
+  },
+  "limitations": [
+    "CORE names are not measured USB manufacturer/product descriptor strings.",
+    "HID usages identify collections; no exact interface numbers or report lengths have been measured for the thirteen experimental devices.",
+    "Catalog firmware versions identify updater packages, not models, silicon or physical specimens.",
+    "Vendor updater Bootloader declarations must not select a ROM DFU transport.",
+    "GMMK3 PRO, HE, wireless, GMBK and Eternal are intentionally excluded; no alias compatibility is claimed.",
+    "Custom QMK can reuse these normal VID/PIDs. A match does not prove original firmware.",
+    "USB serial numbers and port paths are not established as persistent unique specimen IDs."
+  ],
+  "devices": [
+    {
+      "vid": "320F",
+      "pid": "5044",
+      "coreProductId": "GMMKPROANSI",
+      "coreCatalogName": "GMMK PRO ANSI",
+      "candidateDeviceIds": [
+        "pro-ansi",
+        "pro-rev2-ansi"
+      ],
+      "confidence": "ambiguous-revision",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ANSI",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 10993,
+      "catalogUpdaterMode": {
+        "vid": "320F",
+        "pid": "B007",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0045",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.3_v0045_20220525_GMMK_Pro_Firmware.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/pro-ansi.json",
+          "sha256": "3FE0D88C7971D481C00409204E7ED5D5FA59C7DFAB244372FAC94F2151E1563F"
+        },
+        {
+          "file": "reference/qmk/pro-rev2-ansi.json",
+          "sha256": "8C37F33C8AD52CD5DA42B057D49BDF1048BA4FC834F52E57D6917F8E2492575C"
+        }
+      ],
+      "limitations": "Published QMK rev1 and rev2 reuse this pair with incompatible STM32/WB32 MCUs. The normal USB pair must not select a revision."
+    },
+    {
+      "vid": "320F",
+      "pid": "5046",
+      "coreProductId": "GMMKPROISO",
+      "coreCatalogName": "GMMK PRO ISO",
+      "candidateDeviceIds": [
+        "pro-iso",
+        "pro-rev2-iso"
+      ],
+      "confidence": "ambiguous-revision",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ISO",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 11077,
+      "catalogUpdaterMode": {
+        "vid": "320F",
+        "pid": "B009",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0017",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.3_v0017_20220525_GMMK_Pro_ISO_Firmware.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/pro-iso.json",
+          "sha256": "7DB8E1629DF56F2F95D2FE82AA5583A1A7BE4C651FBEAD526BEFD4226F8CFE1D"
+        },
+        {
+          "file": "reference/qmk/pro-rev2-iso.json",
+          "sha256": "DA74C81D7732A6BB0926F37DE2749347B1EF834BECD29A714B92BA61A379F868"
+        }
+      ],
+      "limitations": "Published QMK rev1 and rev2 reuse this pair with incompatible STM32/WB32 MCUs. The normal USB pair must not select a revision."
+    },
+    {
+      "vid": "320F",
+      "pid": "5092",
+      "coreProductId": "GMMKPROANSIALT",
+      "coreCatalogName": "GMMK PRO ANSI",
+      "candidateDeviceIds": [
+        "pro-rev2-ansi"
+      ],
+      "confidence": "catalog-model",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ANSI",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 20158,
+      "catalogUpdaterMode": {
+        "vid": "320F",
+        "pid": "B00F",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0008",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.3_v0008_20220525_GMMK_Pro_WB_Firmware.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/pro-rev2-ansi.json",
+          "sha256": "8C37F33C8AD52CD5DA42B057D49BDF1048BA4FC834F52E57D6917F8E2492575C"
+        }
+      ],
+      "limitations": "Official manifest maps ALT to *_WB_Firmware.zip, consistent with the QMK rev2 Westberry target. This is a revision candidate, not a measured MCU identity. The ANSI package info.ini still says IC_NAME=11U35; updater labels must not be treated as chip-ID proof."
+    },
+    {
+      "vid": "320F",
+      "pid": "5093",
+      "coreProductId": "GMMKPROISOALT",
+      "coreCatalogName": "GMMK PRO ISO",
+      "candidateDeviceIds": [
+        "pro-rev2-iso"
+      ],
+      "confidence": "catalog-model",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ISO",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 20234,
+      "catalogUpdaterMode": {
+        "vid": "320F",
+        "pid": "B010",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0009",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.3_v0009_20220525_GMMK_Pro_ISO_WB_Firmware.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/pro-rev2-iso.json",
+          "sha256": "DA74C81D7732A6BB0926F37DE2749347B1EF834BECD29A714B92BA61A379F868"
+        }
+      ],
+      "limitations": "Official manifest maps ALT to *_WB_Firmware.zip, consistent with the QMK rev2 Westberry target. This is a revision candidate, not a measured MCU identity. The ANSI package info.ini still says IC_NAME=11U35; updater labels must not be treated as chip-ID proof."
+    },
+    {
+      "vid": "320F",
+      "pid": "5088",
+      "coreProductId": "GMMKNumpad",
+      "coreCatalogName": "GMMK Numpad",
+      "candidateDeviceIds": [
+        "numpad"
+      ],
+      "confidence": "catalog-model",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "numpad",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 7640,
+      "catalogUpdaterMode": null,
+      "firmwareCatalogAtCapture": {
+        "version": "0008",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.4_v0088_20220919_GMMK_Numpad_Firmware.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/numpad.json",
+          "sha256": "EF2111E28A8F04DCB06D0FB752BDA6DE4A5967752312059E07362B9C2F208CC1"
+        }
+      ],
+      "limitations": "CORE separates this model/layout; hardware verification and a backup path are required before firmware installation."
+    },
+    {
+      "vid": "320F",
+      "pid": "5045",
+      "coreProductId": "GMMKV265ANSI",
+      "coreCatalogName": "GMMK V2 65 ANSI",
+      "candidateDeviceIds": [
+        "gmmk2-65-ansi"
+      ],
+      "confidence": "catalog-model",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ANSI",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 11509,
+      "catalogUpdaterMode": {
+        "vid": "320F",
+        "pid": "B008",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0019",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.3_v0019_20220525_GMMK_V2_65US_Firmware.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/gmmk2-65-ansi.json",
+          "sha256": "78BE95A9B99B8FACDF8472AA259A6D4EAFE0AC30D6059E7CA3236439D8EC5CE5"
+        }
+      ],
+      "limitations": "CORE separates this model/layout; hardware verification and a backup path are required before firmware installation."
+    },
+    {
+      "vid": "320F",
+      "pid": "504A",
+      "coreProductId": "GMMKV265ISO",
+      "coreCatalogName": "GMMK V2 65 ISO",
+      "candidateDeviceIds": [
+        "gmmk2-65-iso"
+      ],
+      "confidence": "catalog-model",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ISO",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 11595,
+      "catalogUpdaterMode": {
+        "vid": "320F",
+        "pid": "B00A",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0012",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.3_v0012_20220525_GMMK_V2_65ISO_Firmware.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/gmmk2-65-iso.json",
+          "sha256": "B6654AB888902BBFD7A218EADA55EB1575A15C3081BADAEB78A3DF7DD7C08F62"
+        }
+      ],
+      "limitations": "CORE separates this model/layout; hardware verification and a backup path are required before firmware installation."
+    },
+    {
+      "vid": "320F",
+      "pid": "504B",
+      "coreProductId": "GMMKV296ANSI",
+      "coreCatalogName": "GMMK V2 96 ANSI",
+      "candidateDeviceIds": [
+        "gmmk2-96-ansi"
+      ],
+      "confidence": "catalog-model",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ANSI",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 11682,
+      "catalogUpdaterMode": {
+        "vid": "320F",
+        "pid": "B00B",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0016",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.3_v0016_20220525_GMMK_V2_96US_Firmware.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/gmmk2-96-ansi.json",
+          "sha256": "B9253EFC1ACCD909477EDDF8B70FB6DE52E1483B6BADD3229554912F147E2DC6"
+        }
+      ],
+      "limitations": "CORE separates this model/layout; hardware verification and a backup path are required before firmware installation."
+    },
+    {
+      "vid": "320F",
+      "pid": "505A",
+      "coreProductId": "GMMKV296ISO",
+      "coreCatalogName": "GMMK V2 96 ISO",
+      "candidateDeviceIds": [
+        "gmmk2-96-iso"
+      ],
+      "confidence": "catalog-model",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ISO",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 11769,
+      "catalogUpdaterMode": {
+        "vid": "320F",
+        "pid": "B00C",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0013",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.3_v0013_20220525_GMMK_V2_96ISO_Firmware.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/gmmk2-96-iso.json",
+          "sha256": "F6E2A69BC7DB32D228C8F407D83C04E7A8EA74A6D36A548C14E6586F17B774B5"
+        }
+      ],
+      "limitations": "CORE separates this model/layout; hardware verification and a backup path are required before firmware installation."
+    },
+    {
+      "vid": "342D",
+      "pid": "E3CA",
+      "coreProductId": "GMMK365WiredANSI",
+      "coreCatalogName": "GMMK 3 65 Wired ANSI",
+      "candidateDeviceIds": [
+        "gmmk3-65-ansi"
+      ],
+      "confidence": "catalog-model",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ANSI",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 10655,
+      "catalogUpdaterMode": {
+        "vid": "2442",
+        "pid": "B052",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0010",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.4_v0010_20240726_GMMK3_wired_65.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/gmmk3-65-ansi.json",
+          "sha256": "B1307AA1370DC74A54AD19FE30C91D2843B3E6A0F17AC59CABFDF699B317A0C1"
+        }
+      ],
+      "limitations": "CORE separates this model/layout; hardware verification and a backup path are required before firmware installation."
+    },
+    {
+      "vid": "342D",
+      "pid": "E3D3",
+      "coreProductId": "GMMK365WiredISO",
+      "coreCatalogName": "GMMK 3 65 Wired ISO",
+      "candidateDeviceIds": [
+        "gmmk3-65-iso"
+      ],
+      "confidence": "catalog-model",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ISO",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 10731,
+      "catalogUpdaterMode": {
+        "vid": "2442",
+        "pid": "B052",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0002",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.4_v0002_20240726_GMMK3_ISO_wired_65.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/gmmk3-65-iso.json",
+          "sha256": "E8DDF2764B49CCA124539D57A5A7FA8AB97275C7244C544EA69C38B862835749"
+        }
+      ],
+      "limitations": "CORE separates this model/layout; hardware verification and a backup path are required before firmware installation."
+    },
+    {
+      "vid": "342D",
+      "pid": "E3C9",
+      "coreProductId": "GMMK375WiredANSI",
+      "coreCatalogName": "GMMK 3 75 Wired ANSI",
+      "candidateDeviceIds": [
+        "gmmk3-75-ansi"
+      ],
+      "confidence": "catalog-model",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ANSI",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 10579,
+      "catalogUpdaterMode": {
+        "vid": "2442",
+        "pid": "B053",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0009",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.4_v0009_20240726_GMMK3_wired_75.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/gmmk3-75-ansi.json",
+          "sha256": "C43B6BE0FA0B9B621F2CD5F9CF8FF81C821EC5C773D9D339A5BB306477B55BCA"
+        }
+      ],
+      "limitations": "CORE separates this model/layout; hardware verification and a backup path are required before firmware installation."
+    },
+    {
+      "vid": "342D",
+      "pid": "E3D2",
+      "coreProductId": "GMMK375WiredISO",
+      "coreCatalogName": "GMMK 3 75 Wired ISO",
+      "candidateDeviceIds": [
+        "gmmk3-75-iso"
+      ],
+      "confidence": "catalog-model",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ISO",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 10084,
+      "catalogUpdaterMode": {
+        "vid": "2442",
+        "pid": "B053",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0002",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.4_v0002_20240726_GMMK3_ISO_wired_75.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/gmmk3-75-iso.json",
+          "sha256": "6626D9D48BFE3102F25828060D5AEC86BDA8DB7DC7FF7E6F484C86DB29517498"
+        }
+      ],
+      "limitations": "CORE separates this model/layout; hardware verification and a backup path are required before firmware installation."
+    },
+    {
+      "vid": "342D",
+      "pid": "E3C8",
+      "coreProductId": "GMMK3100WiredANSI",
+      "coreCatalogName": "GMMK 3 100 Wired ANSI",
+      "candidateDeviceIds": [
+        "gmmk3-100-ansi"
+      ],
+      "confidence": "catalog-model",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ANSI",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 10427,
+      "catalogUpdaterMode": {
+        "vid": "2442",
+        "pid": "B051",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0009",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.4_v0009_20240726_GMMK3_wired_100.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/gmmk3-100-ansi.json",
+          "sha256": "20F4E94AF5225C8EE2520BA305B0A38D9B4D00279DF584D9C3B3528A0FF4D7AC"
+        }
+      ],
+      "limitations": "CORE separates this model/layout; hardware verification and a backup path are required before firmware installation."
+    },
+    {
+      "vid": "342D",
+      "pid": "E3D1",
+      "coreProductId": "GMMK3100WiredISO",
+      "coreCatalogName": "GMMK 3 100 Wired ISO",
+      "candidateDeviceIds": [
+        "gmmk3-100-iso"
+      ],
+      "confidence": "catalog-model",
+      "connection": "usb-wired",
+      "switchTechnology": "mechanical-non-HE",
+      "layout": "ISO",
+      "configurationUsage": {
+        "usagePage": "FF01",
+        "usage": "0001"
+      },
+      "notificationUsage": {
+        "usagePage": "FF00",
+        "usage": "FF00"
+      },
+      "exactUsbProductString": null,
+      "interfaceNumber": null,
+      "bcdDeviceIdentityRule": null,
+      "uniqueExemplarIdentifier": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "coreSourceLine": 10503,
+      "catalogUpdaterMode": {
+        "vid": "2442",
+        "pid": "B051",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "firmwareCatalogAtCapture": {
+        "version": "0002",
+        "url": "https://nyc3.digitaloceanspaces.com/gloriouscore/Glorious_Core/1.0.4_v0002_20240726_GMMK3_ISO_wired_100.zip",
+        "isHardwareIdentity": false
+      },
+      "qmkReferenceEvidence": [
+        {
+          "file": "reference/qmk/gmmk3-100-iso.json",
+          "sha256": "F91BF1ABEAEFDA877A09E6EE749F7EEB61FD789DCDC50D69413FF4647069E68B"
+        }
+      ],
+      "limitations": "CORE separates this model/layout; hardware verification and a backup path are required before firmware installation."
+    }
+  ],
+  "hardwareIdentityEvidence": {
+    "WB32FQ95": {
+      "manufacturerManual": "https://www.westberrytech.com/uploads/file/WB32FQ95xx/EN_RM2905025_WB32FQ95xx_V01.pdf",
+      "retrieval": "Official PDF text read through web source; direct HTTP download returned 403, so no local file/hash is claimed.",
+      "section": "26.3",
+      "page": 384,
+      "uidAddress": "0x1FFFF7E8",
+      "uidBytes": 12,
+      "cpuAndSwdReadDocumented": true,
+      "romDfuUidReadVerified": false,
+      "qmkUidBaseDefinedInPinnedCmsis": false,
+      "scope": "The manual documents the FQ95 family only; this does not establish access through its USB ROM bootloader."
+    },
+    "WB32F3G71": {
+      "manufacturerUidAddressEstablished": false,
+      "qmkUidBaseDefinedInPinnedCmsis": false,
+      "romDfuUidReadVerified": false,
+      "scope": "No F3G71-specific immutable UID address or supported bootloader read was established in the inspected manufacturer/QMK sources. Do not substitute the FQ95/STM32 address."
+    },
+    "qmkHardwareId": {
+      "file": "firmware/qmk_firmware/platforms/chibios/hardware_id.c",
+      "sha256": "AC6CC44B89E52241D610540C6DC3A711236BC5CDF6B47ABEF8D8E1E6225FBF98",
+      "behavior": "Without UID_BASE or RP2040, get_hardware_id returns all-zero; enabling hardware serial alone does not create WB32 identity."
+    },
+    "restorationBoundary": "Type code, image hash, descriptor name and physical USB path are not immutable per-device identity. A generated installation UUID identifies an installation only and can be copied with its flash image."
+  }
+}

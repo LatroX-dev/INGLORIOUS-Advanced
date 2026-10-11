@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><PlatformTarget>x64</PlatformTarget>
+    <NativeAssetDirectory Condition="'$(NativeAssetDirectory)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\dependencies\dfu-util-0.11-binaries\win64</NativeAssetDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Update="Licenses\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Compile Include="..\..\src\InGlorious.Core\InstallationIdentity.cs" Link="InstallationIdentity.cs" />
+    <Compile Include="..\..\src\InGlorious.Core\KnownFirmwareImages.cs" Link="KnownFirmwareImages.cs" />
+    <EmbeddedResource Include="..\..\src\InGlorious.Core\KnownFirmwareCatalog.json" Link="KnownFirmwareCatalog.json" LogicalName="InGlorious.FirmwareAdapter.KnownFirmwareCatalog.json" />
+    <None Include="$(NativeAssetDirectory)\libusb-1.0.dll" Link="native\libusb-1.0.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(NativeAssetDirectory)\libusb-1.0.dll')" />
+    <None Include="$(NativeAssetDirectory)\dfu-util-static.exe" Link="native\dfu-util-static.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(NativeAssetDirectory)\dfu-util-static.exe')" />
+  </ItemGroup>
+</Project>

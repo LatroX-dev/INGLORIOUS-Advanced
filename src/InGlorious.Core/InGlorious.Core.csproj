@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>INGLORIOUS Advanced</AssemblyName>
+    <RootNamespace>InGlorious.Core</RootNamespace>
+    <Version>0.6.40</Version>
+    <Product>INGLORIOUS Advanced</Product>
+    <Title>INGLORIOUS Advanced</Title>
+    <ApplicationIcon>Assets\inglorious.ico</ApplicationIcon>
+    <SetupAssetsDirectory Condition="'$(SetupAssetsDirectory)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\setup-assets</SetupAssetsDirectory>
+    <SetupFirmwareCatalogPath Condition="'$(SetupFirmwareCatalogPath)' == ''">$(MSBuildThisFileDirectory)SetupFirmwareCatalog.json</SetupFirmwareCatalogPath>
+    <SetupToolCatalogPath Condition="'$(SetupToolCatalogPath)' == ''">$(MSBuildThisFileDirectory)SetupToolCatalog.json</SetupToolCatalogPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="$(SetupFirmwareCatalogPath)" LogicalName="InGlorious.Core.SetupFirmwareCatalog.json" />
+    <EmbeddedResource Include="$(SetupToolCatalogPath)" LogicalName="InGlorious.Core.SetupToolCatalog.json" />
+    <EmbeddedResource Include="KnownFirmwareCatalog.json" />
+    <Content Include="$(SetupAssetsDirectory)\**\*" Link="%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <EmbeddedResource Include="..\..\reference\qmk\*.json" />
+    <EmbeddedResource Include="Locales\*.json" LogicalName="InGlorious.Locales.%(Filename)%(Extension)" />
+    <Resource Include="Assets\inglorious-mark.png" />
+    <Resource Include="Assets\inglorious.ico" />
+    <Resource Include="Assets\Fonts\INGLORIOUS-Oxanium-SemiBold.ttf" />
+    <None Update="Assets\Fonts\Oxanium-OFL.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" TargetPath="Licenses\Oxanium-OFL.txt" />
+    <Content Include="..\..\LICENSE" Link="Licenses\INGLORIOUS-GPL-3.0.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\COPYRIGHT.md;..\..\THIRD-PARTY-NOTICES.md" Link="Licenses\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\Licenses\*.txt" Link="Licenses\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

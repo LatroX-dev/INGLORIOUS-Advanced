@@ -1,0 +1,62 @@
+{
+  "Eine Farbfolge darf höchstens acht Farben im Format #RRGGBB enthalten.": {
+    "en": "A color sequence can contain up to eight colors in #RRGGBB format.",
+    "es": "Una secuencia puede contener hasta ocho colores en formato #RRGGBB.",
+    "fr": "Une séquence peut contenir jusqu’à huit couleurs au format #RRGGBB.",
+    "it": "Una sequenza può contenere fino a otto colori nel formato #RRGGBB.",
+    "pt-BR": "Uma sequência pode conter até oito cores no formato #RRGGBB.",
+    "pl": "Sekwencja może zawierać do ośmiu kolorów w formacie #RRGGBB.",
+    "tr": "Bir renk dizisi #RRGGBB biçiminde en fazla sekiz renk içerebilir.",
+    "ru": "Цветовая последовательность может содержать до восьми цветов в формате #RRGGBB.",
+    "ja": "色の順序には、#RRGGBB 形式の色を最大8色指定できます。",
+    "ko": "색상 순서에는 #RRGGBB 형식의 색상을 최대 8개 지정할 수 있습니다.",
+    "zh-Hans": "颜色序列最多可包含 8 种 #RRGGBB 格式的颜色。"
+  },
+  "Der Gerätespeicher fasst höchstens acht unterschiedliche Farbfolgen. Gleiche Folgen teilen sich einen Speicherplatz.": {
+    "en": "The device can store up to eight different color sequences. Identical sequences share one slot.",
+    "es": "El dispositivo admite hasta ocho secuencias de colores distintas. Las secuencias idénticas comparten un espacio.",
+    "fr": "L’appareil peut stocker jusqu’à huit séquences de couleurs différentes. Les séquences identiques partagent un emplacement.",
+    "it": "Il dispositivo può memorizzare fino a otto sequenze di colori diverse. Le sequenze identiche condividono uno spazio.",
+    "pt-BR": "O dispositivo armazena até oito sequências de cores diferentes. Sequências iguais compartilham um espaço.",
+    "pl": "Urządzenie mieści do ośmiu różnych sekwencji kolorów. Identyczne sekwencje zajmują jedno wspólne miejsce.",
+    "tr": "Cihaz en fazla sekiz farklı renk dizisi saklayabilir. Aynı diziler tek bir alanı paylaşır.",
+    "ru": "Устройство хранит до восьми разных цветовых последовательностей. Одинаковые последовательности занимают одну ячейку.",
+    "ja": "デバイスには異なる色の順序を最大8種類保存できます。同じ順序は1つの保存領域を共有します。",
+    "ko": "장치에는 서로 다른 색상 순서를 최대 8개 저장할 수 있습니다. 동일한 순서는 저장 공간 하나를 공유합니다.",
+    "zh-Hans": "设备最多可存储 8 个不同的颜色序列。相同的序列共用一个存储位置。"
+  },
+  "Die Makros benötigen {0} Schritte. Mit dieser Konfiguration stehen {1} zur Verfügung; es wird nichts gekürzt.": {
+    "en": "The macros require {0} steps. This configuration has room for {1}; nothing will be truncated.",
+    "es": "Las macros necesitan {0} pasos. Esta configuración admite {1}; no se recortará ningún paso.",
+    "fr": "Les macros nécessitent {0} étapes. Cette configuration en permet {1} ; aucune étape ne sera supprimée.",
+    "it": "Le macro richiedono {0} passaggi. Questa configurazione ne consente {1}; nessun passaggio verrà tagliato.",
+    "pt-BR": "As macros precisam de {0} etapas. Esta configuração comporta {1}; nenhuma será removida.",
+    "pl": "Makra wymagają {0} kroków. Ta konfiguracja mieści {1}; żaden krok nie zostanie obcięty.",
+    "tr": "Makrolar {0} adım gerektiriyor. Bu yapılandırma {1} adımı destekliyor; hiçbir adım kısaltılmayacak.",
+    "ru": "Макросам требуется {0} шагов. Эта конфигурация вмещает {1}; шаги не будут обрезаны.",
+    "ja": "マクロには {0} ステップが必要ですが、この設定では {1} ステップまで保存できます。ステップは削除されません。",
+    "ko": "매크로에 {0}단계가 필요하지만 이 구성에는 {1}단계까지 저장할 수 있습니다. 단계가 잘리지는 않습니다.",
+    "zh-Hans": "宏需要 {0} 个步骤，此配置可容纳 {1} 个。不会截断任何步骤。"
+  },
+  "Ungültiger Farbfolgenspeicher.": {
+    "en": "Invalid color sequence storage.", "es": "Almacenamiento de secuencias de colores no válido.", "fr": "Stockage des séquences de couleurs non valide.", "it": "Memoria delle sequenze di colori non valida.", "pt-BR": "Armazenamento de sequências de cores inválido.", "pl": "Nieprawidłowa pamięć sekwencji kolorów.", "tr": "Renk dizisi depolama verisi geçersiz.", "ru": "Некорректные данные хранилища цветовых последовательностей.", "ja": "色の順序の保存データが無効です。", "ko": "색상 순서 저장 데이터가 올바르지 않습니다.", "zh-Hans": "颜色序列存储数据无效。"
+  },
+  "Ungültiger Farbfolgenverweis.": {
+    "en": "Invalid color sequence reference.", "es": "Referencia de secuencia de colores no válida.", "fr": "Référence de séquence de couleurs non valide.", "it": "Riferimento alla sequenza di colori non valido.", "pt-BR": "Referência de sequência de cores inválida.", "pl": "Nieprawidłowe odwołanie do sekwencji kolorów.", "tr": "Renk dizisi başvurusu geçersiz.", "ru": "Некорректная ссылка на цветовую последовательность.", "ja": "色の順序への参照が無効です。", "ko": "색상 순서 참조가 올바르지 않습니다.", "zh-Hans": "颜色序列引用无效。"
+  },
+  "Eigene Farbfolgen benötigen ein Firmware-Update. Es wird nichts übertragen.": {
+    "en": "Custom color sequences require a firmware update. Nothing will be transferred.", "es": "Las secuencias de colores personalizadas requieren actualizar el firmware. No se transferirá nada.", "fr": "Les séquences de couleurs personnalisées nécessitent une mise à jour du micrologiciel. Rien ne sera transféré.", "it": "Le sequenze di colori personalizzate richiedono un aggiornamento del firmware. Non verrà trasferito nulla.", "pt-BR": "Sequências de cores personalizadas exigem uma atualização de firmware. Nada será transferido.", "pl": "Własne sekwencje kolorów wymagają aktualizacji firmware. Nic nie zostanie przesłane.", "tr": "Özel renk dizileri için ürün yazılımı güncellemesi gerekiyor. Hiçbir şey aktarılmayacak.", "ru": "Для собственных цветовых последовательностей требуется обновление прошивки. Ничего не будет передано.", "ja": "独自の色の順序を使うにはファームウェアの更新が必要です。何も転送されません。", "ko": "사용자 지정 색상 순서를 사용하려면 펌웨어를 업데이트해야 합니다. 아무것도 전송되지 않습니다.", "zh-Hans": "自定义颜色序列需要更新固件。不会传输任何内容。"
+  },
+  "Diese Firmware unterstützt keine flüchtige Helligkeitssteuerung.": {
+    "en": "This firmware does not support temporary brightness control.", "es": "Este firmware no admite el control temporal del brillo.", "fr": "Ce micrologiciel ne prend pas en charge le réglage temporaire de la luminosité.", "it": "Questo firmware non supporta il controllo temporaneo della luminosità.", "pt-BR": "Este firmware não permite o controle temporário do brilho.", "pl": "Ten firmware nie obsługuje tymczasowej regulacji jasności.", "tr": "Bu ürün yazılımı geçici parlaklık denetimini desteklemiyor.", "ru": "Эта прошивка не поддерживает временное управление яркостью.", "ja": "このファームウェアは一時的な明るさの制御に対応していません。", "ko": "이 펌웨어는 임시 밝기 제어를 지원하지 않습니다.", "zh-Hans": "此固件不支持临时亮度控制。"
+  },
+  "Ungültige Antwort zur Laufzeithelligkeit.": {
+    "en": "Invalid response for current brightness.", "es": "Respuesta no válida para el brillo actual.", "fr": "Réponse non valide pour la luminosité actuelle.", "it": "Risposta non valida per la luminosità attuale.", "pt-BR": "Resposta inválida para o brilho atual.", "pl": "Nieprawidłowa odpowiedź dotycząca bieżącej jasności.", "tr": "Geçerli parlaklık yanıtı geçersiz.", "ru": "Некорректный ответ о текущей яркости.", "ja": "現在の明るさに対する応答が無効です。", "ko": "현재 밝기에 대한 응답이 올바르지 않습니다.", "zh-Hans": "当前亮度的响应无效。"
+  },
+  "Eine Übertragung läuft. Die Laufzeithelligkeit wird nicht geändert.": {
+    "en": "A transfer is in progress. Current brightness will not be changed.", "es": "Hay una transferencia en curso. No se cambiará el brillo actual.", "fr": "Un transfert est en cours. La luminosité actuelle ne sera pas modifiée.", "it": "È in corso un trasferimento. La luminosità attuale non verrà modificata.", "pt-BR": "Há uma transferência em andamento. O brilho atual não será alterado.", "pl": "Trwa przesyłanie. Bieżąca jasność nie zostanie zmieniona.", "tr": "Aktarım sürüyor. Geçerli parlaklık değiştirilmeyecek.", "ru": "Идёт передача. Текущая яркость не будет изменена.", "ja": "転送中です。現在の明るさは変更されません。", "ko": "전송 중입니다. 현재 밝기는 변경되지 않습니다.", "zh-Hans": "正在传输。不会更改当前亮度。"
+  },
+  "Die Laufzeithelligkeit wurde nicht bestätigt.": {
+    "en": "Current brightness was not confirmed.", "es": "No se confirmó el brillo actual.", "fr": "La luminosité actuelle n’a pas été confirmée.", "it": "La luminosità attuale non è stata confermata.", "pt-BR": "O brilho atual não foi confirmado.", "pl": "Bieżąca jasność nie została potwierdzona.", "tr": "Geçerli parlaklık onaylanmadı.", "ru": "Текущая яркость не подтверждена.", "ja": "現在の明るさを確認できませんでした。", "ko": "현재 밝기가 확인되지 않았습니다.", "zh-Hans": "未能确认当前亮度。"
+  }
+}

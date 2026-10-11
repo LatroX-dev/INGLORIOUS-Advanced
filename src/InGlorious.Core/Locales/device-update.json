@@ -1,0 +1,188 @@
+{
+  "Gerät erkannt. Die installierte Firmware kann jetzt geprüft werden.": {
+    "en": "Device detected. You can now check the installed firmware.",
+    "es": "Dispositivo detectado. Ya puedes comprobar el firmware instalado.",
+    "fr": "Appareil détecté. Vous pouvez maintenant vérifier le firmware installé.",
+    "it": "Dispositivo rilevato. Ora puoi verificare il firmware installato.",
+    "pt-BR": "Dispositivo detectado. Agora você pode verificar o firmware instalado.",
+    "pl": "Wykryto urządzenie. Możesz teraz sprawdzić zainstalowane oprogramowanie sprzętowe.",
+    "tr": "Aygıt algılandı. Yüklü aygıt yazılımını şimdi kontrol edebilirsiniz.",
+    "ru": "Устройство обнаружено. Теперь можно проверить установленную прошивку.",
+    "ja": "デバイスを検出しました。インストール済みのファームウェアを確認できます。",
+    "ko": "기기를 감지했습니다. 설치된 펌웨어를 확인할 수 있습니다.",
+    "zh-Hans": "已检测到设备。现在可以检查已安装的固件。"
+  },
+  "Die Sicherung ist geprüft. Du kannst das Update jetzt bestätigen.": {
+    "en": "Backup verified. You can now confirm the update.",
+    "es": "Copia de seguridad verificada. Ya puedes confirmar la actualización.",
+    "fr": "Sauvegarde vérifiée. Vous pouvez maintenant confirmer la mise à jour.",
+    "it": "Backup verificato. Ora puoi confermare l’aggiornamento.",
+    "pt-BR": "Backup verificado. Agora você pode confirmar a atualização.",
+    "pl": "Kopia zapasowa została sprawdzona. Możesz teraz potwierdzić aktualizację.",
+    "tr": "Yedek doğrulandı. Güncellemeyi şimdi onaylayabilirsiniz.",
+    "ru": "Резервная копия проверена. Теперь можно подтвердить обновление.",
+    "ja": "バックアップを確認しました。更新を実行できます。",
+    "ko": "백업을 확인했습니다. 이제 업데이트를 승인할 수 있습니다.",
+    "zh-Hans": "备份已验证。现在可以确认更新。"
+  },
+  "Die Sicherung ist geprüft. Du kannst die Wiederherstellung jetzt bestätigen.": {
+    "en": "Backup verified. You can now confirm the restore.",
+    "es": "Copia de seguridad verificada. Ya puedes confirmar la restauración.",
+    "fr": "Sauvegarde vérifiée. Vous pouvez maintenant confirmer la restauration.",
+    "it": "Backup verificato. Ora puoi confermare il ripristino.",
+    "pt-BR": "Backup verificado. Agora você pode confirmar a restauração.",
+    "pl": "Kopia zapasowa została sprawdzona. Możesz teraz potwierdzić przywracanie.",
+    "tr": "Yedek doğrulandı. Geri yüklemeyi şimdi onaylayabilirsiniz.",
+    "ru": "Резервная копия проверена. Теперь можно подтвердить восстановление.",
+    "ja": "バックアップを確認しました。復元を実行できます。",
+    "ko": "백업을 확인했습니다. 이제 복원을 승인할 수 있습니다.",
+    "zh-Hans": "备份已验证。现在可以确认恢复。"
+  },
+  "Die installierte Firmware ist nicht bekannt. Das Update wurde angehalten.": {
+    "en": "The installed firmware is not recognized. The update has stopped.",
+    "es": "No se reconoce el firmware instalado. La actualización se ha detenido.",
+    "fr": "Le firmware installé n’est pas reconnu. La mise à jour a été arrêtée.",
+    "it": "Il firmware installato non è riconosciuto. L’aggiornamento è stato interrotto.",
+    "pt-BR": "O firmware instalado não foi reconhecido. A atualização foi interrompida.",
+    "pl": "Zainstalowane oprogramowanie sprzętowe nie zostało rozpoznane. Aktualizacja została zatrzymana.",
+    "tr": "Yüklü aygıt yazılımı tanınmıyor. Güncelleme durduruldu.",
+    "ru": "Установленная прошивка не распознана. Обновление остановлено.",
+    "ja": "インストール済みのファームウェアを認識できないため、更新を停止しました。",
+    "ko": "설치된 펌웨어를 인식할 수 없어 업데이트를 중단했습니다.",
+    "zh-Hans": "无法识别已安装的固件。更新已停止。"
+  },
+  "Die installierte Firmware ist neuer als das verfügbare Update.": {
+    "en": "The installed firmware is newer than the available update.",
+    "es": "El firmware instalado es más reciente que la actualización disponible.",
+    "fr": "Le firmware installé est plus récent que la mise à jour disponible.",
+    "it": "Il firmware installato è più recente dell’aggiornamento disponibile.",
+    "pt-BR": "O firmware instalado é mais recente que a atualização disponível.",
+    "pl": "Zainstalowane oprogramowanie sprzętowe jest nowsze niż dostępna aktualizacja.",
+    "tr": "Yüklü aygıt yazılımı, mevcut güncellemeden daha yeni.",
+    "ru": "Установленная прошивка новее доступного обновления.",
+    "ja": "インストール済みのファームウェアは、利用可能な更新より新しいバージョンです。",
+    "ko": "설치된 펌웨어가 제공되는 업데이트보다 최신 버전입니다.",
+    "zh-Hans": "已安装的固件比可用更新更新。"
+  },
+  "Die Firmware hat sich seit der Prüfung verändert. Starte das Update erneut.": {
+    "en": "The firmware has changed since it was checked. Start the update again.",
+    "es": "El firmware ha cambiado desde la comprobación. Inicia la actualización de nuevo.",
+    "fr": "Le firmware a changé depuis la vérification. Relancez la mise à jour.",
+    "it": "Il firmware è cambiato dopo la verifica. Avvia di nuovo l’aggiornamento.",
+    "pt-BR": "O firmware mudou desde a verificação. Inicie a atualização novamente.",
+    "pl": "Oprogramowanie sprzętowe zmieniło się od czasu sprawdzenia. Rozpocznij aktualizację ponownie.",
+    "tr": "Aygıt yazılımı kontrol edildikten sonra değişti. Güncellemeyi yeniden başlatın.",
+    "ru": "Прошивка изменилась после проверки. Начните обновление заново.",
+    "ja": "確認後にファームウェアが変更されました。更新を最初からやり直してください。",
+    "ko": "확인 이후 펌웨어가 변경되었습니다. 업데이트를 처음부터 다시 시작하세요.",
+    "zh-Hans": "固件在检查后发生了变化。请重新开始更新。"
+  },
+  "Die Einstellungen konnten nicht unverändert übernommen werden. Es wurde keine Firmware geschrieben.": {
+    "en": "Your settings could not be kept unchanged. No firmware was written.",
+    "es": "No se pudo mantener tu configuración intacta. No se ha escrito ningún firmware.",
+    "fr": "Vos réglages n’ont pas pu être conservés à l’identique. Aucun firmware n’a été écrit.",
+    "it": "Non è stato possibile mantenere le impostazioni invariate. Nessun firmware è stato scritto.",
+    "pt-BR": "Não foi possível manter suas configurações inalteradas. Nenhum firmware foi gravado.",
+    "pl": "Nie udało się zachować ustawień bez zmian. Nie zapisano oprogramowania sprzętowego.",
+    "tr": "Ayarlarınız olduğu gibi korunamadı. Aygıt yazılımı yazılmadı.",
+    "ru": "Не удалось сохранить настройки без изменений. Прошивка не записывалась.",
+    "ja": "設定を変更せずに引き継ぐことができませんでした。ファームウェアは書き込まれていません。",
+    "ko": "설정을 그대로 유지할 수 없어 펌웨어를 기록하지 않았습니다.",
+    "zh-Hans": "无法原样保留设置。未写入任何固件。"
+  },
+  "Die Firmware konnte nicht sicher geprüft werden. Es wurde nichts auf die Tastatur geschrieben.": {
+    "en": "The firmware could not be verified safely. Nothing was written to the keyboard.",
+    "es": "No se pudo verificar el firmware de forma segura. No se ha escrito nada en el teclado.",
+    "fr": "Le firmware n’a pas pu être vérifié de façon fiable. Rien n’a été écrit sur le clavier.",
+    "it": "Non è stato possibile verificare il firmware in modo sicuro. Non è stato scritto nulla sulla tastiera.",
+    "pt-BR": "Não foi possível verificar o firmware com segurança. Nada foi gravado no teclado.",
+    "pl": "Nie udało się bezpiecznie zweryfikować oprogramowania sprzętowego. Nic nie zapisano na klawiaturze.",
+    "tr": "Aygıt yazılımı güvenli biçimde doğrulanamadı. Klavyeye hiçbir şey yazılmadı.",
+    "ru": "Не удалось надёжно проверить прошивку. На клавиатуру ничего не записывалось.",
+    "ja": "ファームウェアを確実に確認できませんでした。キーボードには何も書き込まれていません。",
+    "ko": "펌웨어를 확실하게 검증할 수 없어 키보드에 아무것도 기록하지 않았습니다.",
+    "zh-Hans": "无法可靠地验证固件。未向键盘写入任何内容。"
+  },
+  "Update bestätigen": {
+    "en": "Confirm update", "es": "Confirmar actualización", "fr": "Confirmer la mise à jour",
+    "it": "Conferma aggiornamento", "pt-BR": "Confirmar atualização", "pl": "Potwierdź aktualizację",
+    "tr": "Güncellemeyi onayla", "ru": "Подтвердить обновление", "ja": "更新の確認", "ko": "업데이트 확인", "zh-Hans": "确认更新"
+  },
+  "Update abgeschlossen": {
+    "en": "Update complete", "es": "Actualización completada", "fr": "Mise à jour terminée",
+    "it": "Aggiornamento completato", "pt-BR": "Atualização concluída", "pl": "Aktualizacja zakończona",
+    "tr": "Güncelleme tamamlandı", "ru": "Обновление завершено", "ja": "更新完了", "ko": "업데이트 완료", "zh-Hans": "更新完成"
+  },
+  "Update angehalten": {
+    "en": "Update stopped", "es": "Actualización detenida", "fr": "Mise à jour arrêtée",
+    "it": "Aggiornamento interrotto", "pt-BR": "Atualização interrompida", "pl": "Aktualizacja zatrzymana",
+    "tr": "Güncelleme durduruldu", "ru": "Обновление остановлено", "ja": "更新を停止しました", "ko": "업데이트 중단", "zh-Hans": "更新已停止"
+  },
+  "Jetzt aktualisieren": {
+    "en": "Update now", "es": "Actualizar ahora", "fr": "Mettre à jour",
+    "it": "Aggiorna ora", "pt-BR": "Atualizar agora", "pl": "Aktualizuj teraz",
+    "tr": "Şimdi güncelle", "ru": "Обновить сейчас", "ja": "今すぐ更新", "ko": "지금 업데이트", "zh-Hans": "立即更新"
+  },
+  "Firmware-Version wird gelesen …": {
+    "en": "Reading firmware version …", "es": "Leyendo la versión del firmware …", "fr": "Lecture de la version du firmware …",
+    "it": "Lettura della versione del firmware …", "pt-BR": "Lendo a versão do firmware …", "pl": "Odczytywanie wersji oprogramowania sprzętowego …",
+    "tr": "Aygıt yazılımı sürümü okunuyor …", "ru": "Чтение версии прошивки …", "ja": "ファームウェアのバージョンを読み取り中 …", "ko": "펌웨어 버전 읽는 중 …", "zh-Hans": "正在读取固件版本 …"
+  },
+  "Firmware wird aktualisiert …": {
+    "en": "Updating firmware …", "es": "Actualizando el firmware …", "fr": "Mise à jour du firmware …",
+    "it": "Aggiornamento del firmware …", "pt-BR": "Atualizando o firmware …", "pl": "Aktualizowanie oprogramowania sprzętowego …",
+    "tr": "Aygıt yazılımı güncelleniyor …", "ru": "Обновление прошивки …", "ja": "ファームウェアを更新中 …", "ko": "펌웨어 업데이트 중 …", "zh-Hans": "正在更新固件 …"
+  },
+  "Deine Einstellungen und die Original-Sicherung bleiben erhalten.": {
+    "en": "Your settings and original firmware backup will be kept.",
+    "es": "Se conservarán tu configuración y la copia del firmware original.",
+    "fr": "Vos réglages et la sauvegarde du firmware d’origine seront conservés.",
+    "it": "Le impostazioni e il backup del firmware originale verranno conservati.",
+    "pt-BR": "Suas configurações e o backup do firmware original serão mantidos.",
+    "pl": "Twoje ustawienia i kopia oryginalnego oprogramowania sprzętowego zostaną zachowane.",
+    "tr": "Ayarlarınız ve orijinal aygıt yazılımı yedeği korunacak.",
+    "ru": "Ваши настройки и резервная копия оригинальной прошивки будут сохранены.",
+    "ja": "設定とオリジナルファームウェアのバックアップは保持されます。",
+    "ko": "설정과 원본 펌웨어 백업이 유지됩니다.",
+    "zh-Hans": "你的设置和原厂固件备份将保留。"
+  },
+  "Die Firmware-Version hat sich geändert. Starte das Update erneut.": {
+    "en": "The firmware version has changed. Start the update again.",
+    "es": "La versión del firmware ha cambiado. Inicia la actualización de nuevo.",
+    "fr": "La version du firmware a changé. Relancez la mise à jour.",
+    "it": "La versione del firmware è cambiata. Avvia di nuovo l’aggiornamento.",
+    "pt-BR": "A versão do firmware mudou. Inicie a atualização novamente.",
+    "pl": "Wersja oprogramowania sprzętowego się zmieniła. Rozpocznij aktualizację ponownie.",
+    "tr": "Aygıt yazılımı sürümü değişti. Güncellemeyi yeniden başlatın.",
+    "ru": "Версия прошивки изменилась. Начните обновление заново.",
+    "ja": "ファームウェアのバージョンが変更されました。更新を最初からやり直してください。",
+    "ko": "펌웨어 버전이 변경되었습니다. 업데이트를 처음부터 다시 시작하세요.",
+    "zh-Hans": "固件版本已更改。请重新开始更新。"
+  },
+  "Die Firmware ist bereits aktuell oder neuer als die angebotene Version.": {
+    "en": "The installed firmware is already up to date or newer than the offered version.",
+    "es": "El firmware instalado ya está actualizado o es más reciente que la versión ofrecida.",
+    "fr": "Le firmware installé est déjà à jour ou plus récent que la version proposée.",
+    "it": "Il firmware installato è già aggiornato o più recente della versione proposta.",
+    "pt-BR": "O firmware instalado já está atualizado ou é mais recente que a versão oferecida.",
+    "pl": "Zainstalowane oprogramowanie sprzętowe jest aktualne lub nowsze niż oferowana wersja.",
+    "tr": "Yüklü aygıt yazılımı zaten güncel veya sunulan sürümden daha yeni.",
+    "ru": "Установленная прошивка уже актуальна или новее предлагаемой версии.",
+    "ja": "インストール済みのファームウェアは、提供されているバージョンと同じか、それより新しいものです。",
+    "ko": "설치된 펌웨어가 제공되는 버전과 같거나 더 최신 버전입니다.",
+    "zh-Hans": "已安装的固件与提供的版本相同或更新。"
+  },
+  "Deine Original-Firmware wird bei der Einrichtung auf diesem Computer gesichert.": {
+    "en": "Your original firmware will be backed up on this computer during setup.",
+    "es": "Durante la configuración se guardará una copia de tu firmware original en este ordenador.",
+    "fr": "Votre firmware d’origine sera sauvegardé sur cet ordinateur pendant la configuration.",
+    "it": "Durante la configurazione verrà salvata su questo computer una copia del firmware originale.",
+    "pt-BR": "Um backup do firmware original será salvo neste computador durante a configuração.",
+    "pl": "Podczas konfiguracji na tym komputerze zostanie zapisana kopia oryginalnego oprogramowania sprzętowego.",
+    "tr": "Kurulum sırasında orijinal aygıt yazılımınız bu bilgisayara yedeklenecek.",
+    "ru": "Во время настройки оригинальная прошивка будет сохранена на этом компьютере.",
+    "ja": "セットアップ時に、このコンピューターへオリジナルファームウェアがバックアップされます。",
+    "ko": "설정 과정에서 원본 펌웨어가 이 컴퓨터에 백업됩니다.",
+    "zh-Hans": "设置过程中会将原厂固件备份到此电脑。"
+  }
+}

@@ -1,0 +1,16 @@
+name: Feature request
+description: Suggest an improvement
+title: "[Feature] "
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What do you want to do?
+      description: Describe the task and what currently makes it difficult.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested behavior
+      description: Include the keyboard model and operating system if relevant.

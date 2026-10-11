@@ -1,0 +1,148 @@
+name: Build and verify
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  source-checks:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - name: Check source without firmware assets or hardware
+        shell: pwsh
+        run: ./scripts/Build-PublicRelease.ps1 -Mode SourceChecks
+
+  windows:
+    needs: source-checks
+    runs-on: windows-2025
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - name: Build reviewed firmware and Windows application
+        shell: pwsh
+        run: ./scripts/Build-PublicRelease.ps1 -Mode Windows
+      - name: Verify installation package without launching it
+        shell: pwsh
+        run: ./scripts/Test-WindowsInstaller.ps1 -AppHost 'artifacts/public-build/application/INGLORIOUS Advanced.exe' -ToolCatalogPath artifacts/public-build/SetupToolCatalog.json
+      - name: Prepare corresponding source
+        shell: pwsh
+        run: |
+          $publicSource = Join-Path $env:RUNNER_TEMP 'inglorious-public-source'
+          ./scripts/Export-PublicSource.ps1 -Destination $publicSource -Export
+          ./scripts/New-CorrespondingSource.ps1 -PublicSourceDirectory $publicSource -Destination artifacts/corresponding-source -Download
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-and-source
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            artifacts/public-build/INGLORIOUS-Advanced-*.zip
+            artifacts/public-build/INGLORIOUS-Advanced-*.zip.sha256
+            artifacts/corresponding-source.zip
+            artifacts/corresponding-source.zip.sha256
+
+  desktop-preview:
+    needs: source-checks
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            runtime: linux-x64
+          - os: macos-15
+            runtime: osx-arm64
+          - os: macos-15-intel
+            runtime: osx-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - name: Build native desktop preview
+        shell: pwsh
+        env:
+          PREVIEW_RUNTIME: ${{ matrix.runtime }}
+        run: |
+          dotnet restore src/InGlorious.Desktop/InGlorious.Desktop.csproj --locked-mode
+          if ($LASTEXITCODE -ne 0) { throw 'Locked restore failed.' }
+          dotnet publish src/InGlorious.Desktop/InGlorious.Desktop.csproj -c Release -r $env:PREVIEW_RUNTIME --self-contained true -p:RestoreLockedMode=true -p:DebugType=None -p:ContinuousIntegrationBuild=true -o artifacts/preview
+          if ($LASTEXITCODE -ne 0) { throw 'Preview publish failed.' }
+          ./scripts/Copy-RuntimeNotices.ps1 -PublishDirectory artifacts/preview -Runtime $env:PREVIEW_RUNTIME
+          # No personal data, debug symbols or local paths are included.
+          Get-ChildItem artifacts/preview -Filter *.pdb -Recurse -File | Remove-Item
+          tar -czf "artifacts/INGLORIOUS-Advanced-preview-$env:PREVIEW_RUNTIME.tar.gz" -C artifacts/preview .
+          if ($LASTEXITCODE -ne 0) { throw 'Preview archive failed.' }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: preview-${{ matrix.runtime }}
+          if-no-files-found: error
+          retention-days: 14
+          path: artifacts/INGLORIOUS-Advanced-preview-*.tar.gz
+
+  draft-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, desktop-preview]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: release-files
+          merge-multiple: true
+      - name: Create an unpublished alpha release for review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os, re
+          from pathlib import Path
+          from xml.etree import ElementTree
+          version = re.fullmatch(r'v(\d+\.\d+\.\d+)(?:-[A-Za-z0-9.-]+)?', os.environ['RELEASE_TAG'])
+          if not version:
+              raise SystemExit('Unsupported release tag')
+          app_version = ElementTree.parse('src/InGlorious.Core/InGlorious.Core.csproj').findtext('PropertyGroup/Version')
+          if version[1] != app_version:
+              raise SystemExit('Release tag does not match the application version')
+          text = Path('CHANGELOG.md').read_text(encoding='utf-8')
+          section = re.search(r'^## ' + re.escape(version[1]) + r'\s*\n(.*?)(?=^## |\Z)', text, re.M | re.S)
+          if not section:
+              raise SystemExit('This version has no changelog entry')
+          Path('release-notes.md').write_text(section[1].strip() + '\n', encoding='utf-8')
+          PY
+          gh release create "$RELEASE_TAG" --verify-tag --draft --prerelease --title "INGLORIOUS Advanced $RELEASE_TAG" --notes-file release-notes.md
+          find release-files -type f \( -name '*.zip' -o -name '*.sha256' -o -name '*.tar.gz' \) -print0 | xargs -0 gh release upload "$RELEASE_TAG" --

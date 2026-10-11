@@ -1,0 +1,28 @@
+{
+  "Gerät nicht verbunden": {
+    "en": "Device not connected",
+    "es": "Dispositivo no conectado",
+    "fr": "Appareil non connecté",
+    "it": "Dispositivo non connesso",
+    "pt-BR": "Dispositivo não conectado",
+    "pl": "Urządzenie nie jest podłączone",
+    "tr": "Cihaz bağlı değil",
+    "ru": "Устройство не подключено",
+    "ja": "機器が接続されていません",
+    "ko": "장치가 연결되지 않음",
+    "zh-Hans": "设备未连接"
+  },
+  "Gerätesuche fehlgeschlagen": {
+    "en": "Device search failed",
+    "es": "Error al buscar dispositivos",
+    "fr": "Échec de la recherche d’appareils",
+    "it": "Ricerca dei dispositivi non riuscita",
+    "pt-BR": "Falha ao buscar dispositivos",
+    "pl": "Nie udało się wyszukać urządzeń",
+    "tr": "Cihaz araması başarısız oldu",
+    "ru": "Ошибка поиска устройств",
+    "ja": "機器の検索に失敗しました",
+    "ko": "장치 검색 실패",
+    "zh-Hans": "设备搜索失败"
+  }
+}

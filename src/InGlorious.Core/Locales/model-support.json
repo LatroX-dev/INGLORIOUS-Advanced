@@ -1,0 +1,67 @@
+{
+  "Offline-Profil": {
+    "en": "Offline profile",
+    "es": "Perfil sin conexión",
+    "fr": "Profil hors ligne",
+    "it": "Profilo offline",
+    "pt-BR": "Perfil offline",
+    "pl": "Profil offline",
+    "tr": "Çevrimdışı profil",
+    "ru": "Офлайн-профиль",
+    "ja": "オフラインプロファイル",
+    "ko": "오프라인 프로필",
+    "zh-Hans": "离线配置"
+  },
+  "Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar.": {
+    "en": "You can create profiles for this model. Transfers and firmware changes are not available yet.",
+    "es": "Puedes crear perfiles para este modelo. La transferencia y el cambio de firmware aún no están disponibles.",
+    "fr": "Vous pouvez créer des profils pour ce modèle. Le transfert et le changement de firmware ne sont pas encore disponibles.",
+    "it": "Puoi creare profili per questo modello. Il trasferimento e il cambio del firmware non sono ancora disponibili.",
+    "pt-BR": "Você pode criar perfis para este modelo. A transferência e a troca de firmware ainda não estão disponíveis.",
+    "pl": "Możesz tworzyć profile dla tego modelu. Przesyłanie i zmiana oprogramowania sprzętowego nie są jeszcze dostępne.",
+    "tr": "Bu model için profil oluşturabilirsin. Aktarma ve donanım yazılımı değiştirme henüz kullanılamıyor.",
+    "ru": "Для этой модели можно создавать профили. Передача на устройство и смена прошивки пока недоступны.",
+    "ja": "このモデルのプロファイルを作成できます。デバイスへの転送とファームウェアの変更にはまだ対応していません。",
+    "ko": "이 모델의 프로필을 만들 수 있습니다. 기기로 전송하거나 펌웨어를 변경하는 기능은 아직 사용할 수 없습니다.",
+    "zh-Hans": "你可以为此型号创建配置。暂不支持传输到设备或更换固件。"
+  },
+  "USB-Kennung erkannt; Platinenvariante nicht freigegeben.": {
+    "en": "USB device recognized; this board variant is not supported yet.",
+    "es": "Dispositivo USB reconocido; esta variante de placa aún no es compatible.",
+    "fr": "Périphérique USB reconnu ; cette variante de carte n’est pas encore prise en charge.",
+    "it": "Dispositivo USB riconosciuto; questa variante della scheda non è ancora supportata.",
+    "pt-BR": "Dispositivo USB reconhecido; esta variante da placa ainda não é compatível.",
+    "pl": "Rozpoznano urządzenie USB; ten wariant płytki nie jest jeszcze obsługiwany.",
+    "tr": "USB aygıtı tanındı; bu kart sürümü henüz desteklenmiyor.",
+    "ru": "USB-устройство распознано; эта версия платы пока не поддерживается.",
+    "ja": "USBデバイスを認識しました。この基板のバージョンにはまだ対応していません。",
+    "ko": "USB 기기를 인식했습니다. 이 보드 버전은 아직 지원되지 않습니다.",
+    "zh-Hans": "已识别 USB 设备；暂不支持此电路板版本。"
+  },
+  "Experimentell": {
+    "en": "Experimental",
+    "es": "Experimental",
+    "fr": "Expérimental",
+    "it": "Sperimentale",
+    "pt-BR": "Experimental",
+    "pl": "Eksperymentalne",
+    "tr": "Deneysel",
+    "ru": "Экспериментально",
+    "ja": "実験的",
+    "ko": "실험적",
+    "zh-Hans": "实验性"
+  },
+  "Experimentelle Unterstützung: noch nicht an diesem Modell getestet.": {
+    "en": "Experimental support: not yet tested on this model.",
+    "es": "Compatibilidad experimental: aún no probada en este modelo.",
+    "fr": "Prise en charge expérimentale : pas encore testée sur ce modèle.",
+    "it": "Supporto sperimentale: non ancora testato su questo modello.",
+    "pt-BR": "Suporte experimental: ainda não testado neste modelo.",
+    "pl": "Obsługa eksperymentalna: nieprzetestowana jeszcze na tym modelu.",
+    "tr": "Deneysel destek: bu modelde henüz test edilmedi.",
+    "ru": "Экспериментальная поддержка: ещё не проверена на этой модели.",
+    "ja": "実験的なサポート：このモデルではまだ動作確認されていません。",
+    "ko": "실험적 지원: 이 모델에서는 아직 테스트되지 않았습니다.",
+    "zh-Hans": "实验性支持：尚未在此型号上测试。"
+  }
+}

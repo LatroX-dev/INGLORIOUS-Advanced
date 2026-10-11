@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/InGlorious.Core/Models.cs" Link="Models.cs" />
+    <Compile Include="../../src/InGlorious.Core/BoardDescriptorRegistry.cs" Link="BoardDescriptorRegistry.cs" />
+    <Compile Include="../../src/InGlorious.Core/OnboardProtocol.cs" Link="OnboardProtocol.cs" />
+    <Compile Include="../../src/InGlorious.Core/LightingPreviewEngine.cs" Link="LightingPreviewEngine.cs" />
+    <Compile Include="../../src/InGlorious.Core/LightingPresetStore.cs" Link="LightingPresetStore.cs" />
+    <Compile Include="../../src/InGlorious.Core/ProfileLibrary.cs" Link="ProfileLibrary.cs" />
+    <Compile Include="../../src/InGlorious.Core/SharedMacroLibrary.cs" Link="SharedMacroLibrary.cs" />
+    <Compile Include="../../src/InGlorious.Core/OsActionCatalog.cs" Link="OsActionCatalog.cs" />
+    <Compile Include="../../src/InGlorious.Core/AppPreferences.cs" Link="AppPreferences.cs" />
+    <Compile Include="../../src/InGlorious.Core/Localization.cs" Link="Localization.cs" />
+    <EmbeddedResource Include="../../reference/qmk/*.json" LogicalName="InGlorious.Layouts.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../../src/InGlorious.Core/Locales/*.json" LogicalName="InGlorious.Locales.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

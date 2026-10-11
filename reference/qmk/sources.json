@@ -1,0 +1,309 @@
+[
+  {
+    "file": "pro-iso.json",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/master/keyboards/gmmk/pro/rev1/iso/keyboard.json",
+    "retrievedOn": "2026-10-10",
+    "sha256": "7DB8E1629DF56F2F95D2FE82AA5583A1A7BE4C651FBEAD526BEFD4226F8CFE1D",
+    "purpose": "QMK physical geometry, LED mapping, default key positions; not flashed firmware"
+  },
+  {
+    "file": "pro-iso-default.c",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/master/keyboards/gmmk/pro/rev1/iso/keymaps/default/keymap.c",
+    "retrievedOn": "2026-10-10",
+    "sha256": "C8BE2B0A281431EBCAEB76D41D853F46822031918C2C6CFC27BA2A00E3FDA99A",
+    "purpose": "QMK physical geometry, LED mapping, default key positions; not flashed firmware"
+  },
+  {
+    "file": "numpad.json",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/master/keyboards/gmmk/numpad/keyboard.json",
+    "retrievedOn": "2026-10-10",
+    "sha256": "EF2111E28A8F04DCB06D0FB752BDA6DE4A5967752312059E07362B9C2F208CC1",
+    "purpose": "QMK physical geometry, LED mapping, default key positions; not flashed firmware"
+  },
+  {
+    "file": "numpad-default.c",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/master/keyboards/gmmk/numpad/keymaps/default/keymap.c",
+    "retrievedOn": "2026-10-10",
+    "sha256": "298A7835C58A0100A43F5920D0BDD876B5DA71BD6E92DE59E0900254F8484C16",
+    "purpose": "QMK physical geometry, LED mapping, default key positions; not flashed firmware"
+  },
+  {
+    "file": "pro-ansi.json",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/pro/rev1/ansi/keyboard.json",
+    "sourcePath": "keyboards/gmmk/pro/rev1/ansi/keyboard.json",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 11773,
+    "sha256": "3FE0D88C7971D481C00409204E7ED5D5FA59C7DFAB244372FAC94F2151E1563F",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied"
+  },
+  {
+    "file": "pro-ansi-default.c",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/pro/rev1/ansi/keymaps/default/keymap.c",
+    "sourcePath": "keyboards/gmmk/pro/rev1/ansi/keymaps/default/keymap.c",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 4879,
+    "sha256": "65034B99432DAF5D0A02A2DB5382BE74819E4A311BF3670A42B5D32783D33579",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied",
+    "editorNormalization": "Base layer only. QK_GESC is represented as KC_ESC; MO(_FL) becomes MO(1). Function-layer firmware actions are not imported."
+  },
+  {
+    "file": "pro-rev2-ansi.json",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/pro/rev2/ansi/keyboard.json",
+    "sourcePath": "keyboards/gmmk/pro/rev2/ansi/keyboard.json",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 11932,
+    "sha256": "8C37F33C8AD52CD5DA42B057D49BDF1048BA4FC834F52E57D6917F8E2492575C",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied"
+  },
+  {
+    "file": "pro-rev2-ansi-default.c",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/pro/rev2/ansi/keymaps/default/keymap.c",
+    "sourcePath": "keyboards/gmmk/pro/rev2/ansi/keymaps/default/keymap.c",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 4879,
+    "sha256": "DDD17CE75377C3A0EBC13A488D7DC1ADC7D4E0C6890507C7C75CC1442146373A",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied",
+    "editorNormalization": "Base layer only. QK_GESC is represented as KC_ESC; MO(_FL) becomes MO(1). Function-layer firmware actions are not imported."
+  },
+  {
+    "file": "pro-rev2-iso.json",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/pro/rev2/iso/keyboard.json",
+    "sourcePath": "keyboards/gmmk/pro/rev2/iso/keyboard.json",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 12048,
+    "sha256": "DA74C81D7732A6BB0926F37DE2749347B1EF834BECD29A714B92BA61A379F868",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied"
+  },
+  {
+    "file": "pro-rev2-iso-default.c",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/pro/rev2/iso/keymaps/default/keymap.c",
+    "sourcePath": "keyboards/gmmk/pro/rev2/iso/keymaps/default/keymap.c",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 4879,
+    "sha256": "102C682516DDA547D7BCCBF0D15BFD0BFC846D56837321BD062D248A25288271",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied",
+    "editorNormalization": "Base layer only. QK_GESC is represented as KC_ESC; MO(_FL) becomes MO(1). Function-layer firmware actions are not imported."
+  },
+  {
+    "file": "gmmk2-65-ansi.json",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/gmmk2/p65/ansi/keyboard.json",
+    "sourcePath": "keyboards/gmmk/gmmk2/p65/ansi/keyboard.json",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 9864,
+    "sha256": "78BE95A9B99B8FACDF8472AA259A6D4EAFE0AC30D6059E7CA3236439D8EC5CE5",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied"
+  },
+  {
+    "file": "gmmk2-65-ansi-default.c",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/gmmk2/p65/ansi/keymaps/default/keymap.c",
+    "sourcePath": "keyboards/gmmk/gmmk2/p65/ansi/keymaps/default/keymap.c",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 2702,
+    "sha256": "5FABF413EC3471A7B6FBC65AC03F7B17D2D50B6B6B6940A570F68204425CCAFB",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied",
+    "editorNormalization": "Base layer only. QK_GESC is represented as KC_ESC; MO(_FL) becomes MO(1). Function-layer firmware actions are not imported."
+  },
+  {
+    "file": "gmmk2-65-iso.json",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/gmmk2/p65/iso/keyboard.json",
+    "sourcePath": "keyboards/gmmk/gmmk2/p65/iso/keyboard.json",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 9903,
+    "sha256": "B6654AB888902BBFD7A218EADA55EB1575A15C3081BADAEB78A3DF7DD7C08F62",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied"
+  },
+  {
+    "file": "gmmk2-65-iso-default.c",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/gmmk2/p65/iso/keymaps/default/keymap.c",
+    "sourcePath": "keyboards/gmmk/gmmk2/p65/iso/keymaps/default/keymap.c",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 2695,
+    "sha256": "C782C5049973C0C87E89D1E4D69A2789984BEC882D525FF619D1C37E0D05045F",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied",
+    "editorNormalization": "Base layer only. QK_GESC is represented as KC_ESC; MO(_FL) becomes MO(1). Function-layer firmware actions are not imported."
+  },
+  {
+    "file": "gmmk2-96-ansi.json",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/gmmk2/p96/ansi/keyboard.json",
+    "sourcePath": "keyboards/gmmk/gmmk2/p96/ansi/keyboard.json",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 14039,
+    "sha256": "B9253EFC1ACCD909477EDDF8B70FB6DE52E1483B6BADD3229554912F147E2DC6",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied"
+  },
+  {
+    "file": "gmmk2-96-ansi-default.c",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/gmmk2/p96/ansi/keymaps/default/keymap.c",
+    "sourcePath": "keyboards/gmmk/gmmk2/p96/ansi/keymaps/default/keymap.c",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 3268,
+    "sha256": "A701978E49813A31371EFB7F473FDA5AC3170C6E3AD2DEFA94D7101DA0DC8C8A",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied",
+    "editorNormalization": "Base layer only. QK_GESC is represented as KC_ESC; MO(_FL) becomes MO(1). Function-layer firmware actions are not imported."
+  },
+  {
+    "file": "gmmk2-96-iso.json",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/gmmk2/p96/iso/keyboard.json",
+    "sourcePath": "keyboards/gmmk/gmmk2/p96/iso/keyboard.json",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 14159,
+    "sha256": "F6E2A69BC7DB32D228C8F407D83C04E7A8EA74A6D36A548C14E6586F17B774B5",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied"
+  },
+  {
+    "file": "gmmk2-96-iso-default.c",
+    "url": "https://raw.githubusercontent.com/qmk/qmk_firmware/7a1bbf37c5c07da4ea0a162bb139083a46ef40a1/keyboards/gmmk/gmmk2/p96/iso/keymaps/default/keymap.c",
+    "sourcePath": "keyboards/gmmk/gmmk2/p96/iso/keymaps/default/keymap.c",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "retrievedOn": "2026-10-11",
+    "bytes": 3274,
+    "sha256": "6C045378190323EAFA2B3C2AFE10B914F4BF823AA62B6F2896574F4CC30CB299",
+    "purpose": "Pinned QMK editor geometry, LED mapping and base key positions; offline editor only, no hardware support implied",
+    "editorNormalization": "Base layer only. QK_GESC is represented as KC_ESC; MO(_FL) becomes MO(1). Function-layer firmware actions are not imported."
+  },
+  {
+    "file": "gmmk3-65-ansi.json",
+    "url": "https://gitlab.com/glorious-public/qmk_firmware/-/tree/6ce76ee92f7d83b798147baaed2d3d8ec89564b2/keyboards/gmmk/gmmk3/p65/ansi",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "manufacturerCommit": "6ce76ee92f7d83b798147baaed2d3d8ec89564b2",
+    "normalization": "firmware/ports/gmmk3/provenance.json",
+    "retrievedOn": "2026-10-11",
+    "bytes": 22353,
+    "sha256": "B1307AA1370DC74A54AD19FE30C91D2843B3E6A0F17AC59CABFDF699B317A0C1",
+    "purpose": "Normalized manufacturer geometry/default keys; not a hardware compatibility approval"
+  },
+  {
+    "file": "gmmk3-65-ansi-default.c",
+    "url": "https://gitlab.com/glorious-public/qmk_firmware/-/tree/6ce76ee92f7d83b798147baaed2d3d8ec89564b2/keyboards/gmmk/gmmk3/p65/ansi",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "manufacturerCommit": "6ce76ee92f7d83b798147baaed2d3d8ec89564b2",
+    "normalization": "firmware/ports/gmmk3/provenance.json",
+    "retrievedOn": "2026-10-11",
+    "bytes": 717,
+    "sha256": "4B4721B3BD7777367CDE927DF0830B0F4A326A9D056F5E727F0E6ACDB23ABF5A",
+    "purpose": "Normalized manufacturer geometry/default keys; not a hardware compatibility approval"
+  },
+  {
+    "file": "gmmk3-65-iso.json",
+    "url": "https://gitlab.com/glorious-public/qmk_firmware/-/tree/6ce76ee92f7d83b798147baaed2d3d8ec89564b2/keyboards/gmmk/gmmk3/p65/iso",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "manufacturerCommit": "6ce76ee92f7d83b798147baaed2d3d8ec89564b2",
+    "normalization": "firmware/ports/gmmk3/provenance.json",
+    "retrievedOn": "2026-10-11",
+    "bytes": 22622,
+    "sha256": "E8DDF2764B49CCA124539D57A5A7FA8AB97275C7244C544EA69C38B862835749",
+    "purpose": "Normalized manufacturer geometry/default keys; not a hardware compatibility approval"
+  },
+  {
+    "file": "gmmk3-65-iso-default.c",
+    "url": "https://gitlab.com/glorious-public/qmk_firmware/-/tree/6ce76ee92f7d83b798147baaed2d3d8ec89564b2/keyboards/gmmk/gmmk3/p65/iso",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "manufacturerCommit": "6ce76ee92f7d83b798147baaed2d3d8ec89564b2",
+    "normalization": "firmware/ports/gmmk3/provenance.json",
+    "retrievedOn": "2026-10-11",
+    "bytes": 727,
+    "sha256": "4F4ACEA6F721494A0DD694900F3A5852C5931E0DCD66610963A6EB2B63674B2C",
+    "purpose": "Normalized manufacturer geometry/default keys; not a hardware compatibility approval"
+  },
+  {
+    "file": "gmmk3-75-ansi.json",
+    "url": "https://gitlab.com/glorious-public/qmk_firmware/-/tree/121e1a6341c5c045b396dab8c5e755a4b9a4aefd/keyboards/gmmk/gmmk3/p75/ansi",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "manufacturerCommit": "121e1a6341c5c045b396dab8c5e755a4b9a4aefd",
+    "normalization": "firmware/ports/gmmk3/provenance.json",
+    "retrievedOn": "2026-10-11",
+    "bytes": 26745,
+    "sha256": "C43B6BE0FA0B9B621F2CD5F9CF8FF81C821EC5C773D9D339A5BB306477B55BCA",
+    "purpose": "Normalized manufacturer geometry/default keys; not a hardware compatibility approval"
+  },
+  {
+    "file": "gmmk3-75-ansi-default.c",
+    "url": "https://gitlab.com/glorious-public/qmk_firmware/-/tree/121e1a6341c5c045b396dab8c5e755a4b9a4aefd/keyboards/gmmk/gmmk3/p75/ansi",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "manufacturerCommit": "121e1a6341c5c045b396dab8c5e755a4b9a4aefd",
+    "normalization": "firmware/ports/gmmk3/provenance.json",
+    "retrievedOn": "2026-10-11",
+    "bytes": 829,
+    "sha256": "87FF3068CF22DA7CDA4C83BF559AB33836E6DCB20FFC4C48D9691DC9B2CE1F7D",
+    "purpose": "Normalized manufacturer geometry/default keys; not a hardware compatibility approval"
+  },
+  {
+    "file": "gmmk3-75-iso.json",
+    "url": "https://gitlab.com/glorious-public/qmk_firmware/-/tree/121e1a6341c5c045b396dab8c5e755a4b9a4aefd/keyboards/gmmk/gmmk3/p75/iso",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "manufacturerCommit": "121e1a6341c5c045b396dab8c5e755a4b9a4aefd",
+    "normalization": "firmware/ports/gmmk3/provenance.json",
+    "retrievedOn": "2026-10-11",
+    "bytes": 27018,
+    "sha256": "6626D9D48BFE3102F25828060D5AEC86BDA8DB7DC7FF7E6F484C86DB29517498",
+    "purpose": "Normalized manufacturer geometry/default keys; not a hardware compatibility approval"
+  },
+  {
+    "file": "gmmk3-75-iso-default.c",
+    "url": "https://gitlab.com/glorious-public/qmk_firmware/-/tree/121e1a6341c5c045b396dab8c5e755a4b9a4aefd/keyboards/gmmk/gmmk3/p75/iso",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "manufacturerCommit": "121e1a6341c5c045b396dab8c5e755a4b9a4aefd",
+    "normalization": "firmware/ports/gmmk3/provenance.json",
+    "retrievedOn": "2026-10-11",
+    "bytes": 838,
+    "sha256": "0EDB3356C285CAAC151529AAD473FE74F6B6A4705BC3A028424502B5EDF4F3F5",
+    "purpose": "Normalized manufacturer geometry/default keys; not a hardware compatibility approval"
+  },
+  {
+    "file": "gmmk3-100-ansi.json",
+    "url": "https://gitlab.com/glorious-public/qmk_firmware/-/tree/f53deb1cc507412fe4cbb849c89080a1f580886c/keyboards/gmmk/gmmk3/p100/ansi",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "manufacturerCommit": "f53deb1cc507412fe4cbb849c89080a1f580886c",
+    "normalization": "firmware/ports/gmmk3/provenance.json",
+    "retrievedOn": "2026-10-11",
+    "bytes": 33585,
+    "sha256": "20F4E94AF5225C8EE2520BA305B0A38D9B4D00279DF584D9C3B3528A0FF4D7AC",
+    "purpose": "Normalized manufacturer geometry/default keys; not a hardware compatibility approval"
+  },
+  {
+    "file": "gmmk3-100-ansi-default.c",
+    "url": "https://gitlab.com/glorious-public/qmk_firmware/-/tree/f53deb1cc507412fe4cbb849c89080a1f580886c/keyboards/gmmk/gmmk3/p100/ansi",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "manufacturerCommit": "f53deb1cc507412fe4cbb849c89080a1f580886c",
+    "normalization": "firmware/ports/gmmk3/provenance.json",
+    "retrievedOn": "2026-10-11",
+    "bytes": 1022,
+    "sha256": "E648EDAA8EEC663546562B0084098F03698A2082D6EADC54B52D57697DF2E927",
+    "purpose": "Normalized manufacturer geometry/default keys; not a hardware compatibility approval"
+  },
+  {
+    "file": "gmmk3-100-iso.json",
+    "url": "https://gitlab.com/glorious-public/qmk_firmware/-/tree/f53deb1cc507412fe4cbb849c89080a1f580886c/keyboards/gmmk/gmmk3/p100/iso",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "manufacturerCommit": "f53deb1cc507412fe4cbb849c89080a1f580886c",
+    "normalization": "firmware/ports/gmmk3/provenance.json",
+    "retrievedOn": "2026-10-11",
+    "bytes": 33859,
+    "sha256": "F91BF1ABEAEFDA877A09E6EE749F7EEB61FD789DCDC50D69413FF4647069E68B",
+    "purpose": "Normalized manufacturer geometry/default keys; not a hardware compatibility approval"
+  },
+  {
+    "file": "gmmk3-100-iso-default.c",
+    "url": "https://gitlab.com/glorious-public/qmk_firmware/-/tree/f53deb1cc507412fe4cbb849c89080a1f580886c/keyboards/gmmk/gmmk3/p100/iso",
+    "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "manufacturerCommit": "f53deb1cc507412fe4cbb849c89080a1f580886c",
+    "normalization": "firmware/ports/gmmk3/provenance.json",
+    "retrievedOn": "2026-10-11",
+    "bytes": 1031,
+    "sha256": "210451AC377273C73EF61BDAFD4914372F013E9C53C21A2194AD290648BB30C2",
+    "purpose": "Normalized manufacturer geometry/default keys; not a hardware compatibility approval"
+  }
+]

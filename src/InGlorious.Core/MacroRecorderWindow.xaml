@@ -1,0 +1,47 @@
+<Window x:Class="InGlorious.Core.MacroRecorderWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:InGlorious.Core"
+        Title="{local:Tr Key='Makro aufnehmen'}" Width="600" Height="630" MinWidth="510" MinHeight="520"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource WindowBackground}" Foreground="{DynamicResource Text}">
+    <Border Background="{DynamicResource WindowBackground}"><Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/><RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="{local:Tr Key='Makro aufnehmen'}" FontSize="18" FontWeight="SemiBold"/>
+            <TextBlock Margin="0,10,0,12" Style="{DynamicResource HelpText}"
+                       Text="{local:Tr Key='1. Aufnahme starten   2. Tasten drücken   3. Mit der Maus stoppen. Danach kannst du die Aufnahme bearbeiten und einer Taste zuweisen.'}"/>
+        </StackPanel>
+        <Grid Grid.Row="1" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Button x:Name="StartRecordingButton" Content="{local:Tr Key='Aufnahme starten'}" Click="Start_Click" Style="{DynamicResource PrimaryButton}"/>
+            <Button x:Name="StopRecordingButton" Grid.Column="1" Content="{local:Tr Key='Stoppen'}" Click="Stop_Click" IsEnabled="False" Margin="8,0,0,0"/>
+            <TextBlock x:Name="RecordingCountText" Grid.Column="2" Text="{local:Tr Key='0 / 128 Schritte'}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+        </Grid>
+        <Border x:Name="RecordingSurface" Grid.Row="2" Focusable="True" Background="{DynamicResource SurfaceRaised}"
+                BorderBrush="{DynamicResource Stroke}" BorderThickness="1" CornerRadius="3" Padding="12" Margin="0,0,0,12"
+                AutomationProperties.Name="{local:Tr Key='Aufnahmebereich'}">
+            <TextBlock x:Name="RecordingStatusText" Text="{local:Tr Key='Bereit.'}" TextWrapping="Wrap"/>
+        </Border>
+        <ListBox x:Name="RecordedStepsList" Grid.Row="3" Background="{DynamicResource Surface}" Foreground="{DynamicResource Text}"
+                 BorderBrush="{DynamicResource Stroke}" BorderThickness="1" FontFamily="Consolas" FontSize="12"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="{local:Tr Key='Aufgenommene Makroschritte'}"/>
+        <StackPanel Grid.Row="4" Margin="0,12,0,12">
+            <TextBlock x:Name="UnsupportedKeysText" TextWrapping="Wrap" Foreground="{DynamicResource Accent}"/>
+            <TextBlock Text="{local:Tr Key='Es wird nur in diesem Fenster aufgenommen. Beim Wechsel zu einem anderen Fenster stoppt die Aufnahme.'}" Style="{DynamicResource HelpText}" Margin="0,6,0,0"/>
+            <Expander Header="{local:Tr Key='Hinweise zur Aufnahme'}" Foreground="{DynamicResource Muted}" FontSize="11" Margin="0,8,0,0">
+            <TextBlock Margin="0,6,0,0" Style="{DynamicResource HelpText}"
+                       Text="{local:Tr Key='Physische ISO-Tastenpositionen, deutsch beschriftet. Keine Maus- oder Medientasten. Windows kann Systemkombinationen abfangen; Alt Gr kann zusätzlich Strg liefern. Außerhalb dieses Fensters wird nichts aufgezeichnet.'}"/>
+            </Expander>
+        </StackPanel>
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="CancelRecordingButton" Content="{local:Tr Key='Abbrechen'}" Click="Cancel_Click" MinWidth="90"/>
+            <Button x:Name="AcceptRecordingButton" Content="{local:Tr Key='Aufnahme übernehmen'}" Click="Accept_Click" Margin="8,0,0,0"
+                    Style="{DynamicResource PrimaryButton}" IsEnabled="False"/>
+        </StackPanel>
+    </Grid></Border>
+</Window>

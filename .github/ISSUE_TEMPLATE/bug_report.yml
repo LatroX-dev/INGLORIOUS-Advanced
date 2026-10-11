@@ -1,0 +1,39 @@
+name: Bug report
+description: Something does not work as expected
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: "Do not upload original firmware, personal profiles, serial numbers or unredacted diagnostic logs."
+  - type: input
+    id: version
+    attributes:
+      label: App and firmware versions
+      placeholder: App 0.6.40, firmware 0.11.0
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Keyboard model and layout
+      placeholder: GMMK PRO revision 1 ISO
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include what you expected and what happened.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshot or short error message
+      description: Remove personal data before sharing. For a failed firmware write, say whether the app reported verified success or an uncertain result.

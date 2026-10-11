@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <AssemblyName>INGLORIOUS Advanced</AssemblyName><Version>0.6.40</Version><Product>INGLORIOUS Advanced</Product><Title>INGLORIOUS Advanced</Title>
+    <ApplicationIcon>../InGlorious.Core/Assets/inglorious.ico</ApplicationIcon>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.1.4" />
+    <ProjectReference Include="Shared/InGlorious.Shared.csproj" />
+    <Compile Remove="Shared/**/*.cs" />
+    <AvaloniaResource Include="../InGlorious.Core/Assets/inglorious-mark.png" Link="Assets/inglorious-mark.png" />
+    <AvaloniaResource Include="../InGlorious.Core/Assets/inglorious.ico" Link="Assets/inglorious.ico" />
+    <AvaloniaResource Include="../InGlorious.Core/Assets/Fonts/INGLORIOUS-Oxanium-SemiBold.ttf" Link="Assets/Fonts/INGLORIOUS-Oxanium-SemiBold.ttf" />
+    <Content Include="../InGlorious.Core/Assets/Fonts/Oxanium-OFL.txt" Link="Licenses/Oxanium-OFL.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../LICENSE" Link="Licenses/INGLORIOUS-GPL-3.0.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../COPYRIGHT.md;../../THIRD-PARTY-NOTICES.md" Link="Licenses/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../Licenses/*.txt" Link="Licenses/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

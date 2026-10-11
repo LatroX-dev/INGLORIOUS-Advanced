@@ -1,0 +1,37 @@
+name: Device support or hardware report
+description: Report a model, revision or physical test result
+title: "[Device] "
+body:
+  - type: markdown
+    attributes:
+      value: "A similar model name is not proof of identical hardware. Do not bypass recognition checks or upload original firmware."
+  - type: input
+    id: model
+    attributes:
+      label: Exact model, layout and revision
+      placeholder: GMMK 2 96% ISO, wired
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App, firmware and operating system versions
+    validations:
+      required: true
+  - type: dropdown
+    id: report
+    attributes:
+      label: Report type
+      options:
+        - Unrecognized device
+        - Experimental model tested
+        - Request for another model
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Observations
+      description: List only checks actually performed. Include recognition, keys, lights, controls, persistence and restoration where tested.
+    validations:
+      required: true

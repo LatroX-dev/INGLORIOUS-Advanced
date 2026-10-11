@@ -1,0 +1,143 @@
+using System.Windows;
+
+namespace InGlorious.Core;
+
+public partial class MainWindow
+{
+    private bool _checkingFirmwareGuide, _automaticFirmwareGuideChecked;
+    private readonly Dictionary<string, FirmwareGuideDevice> _firmwareAssessments = [];
+    private void RefreshFirmwareVersionLabel()
+    {
+        if (FindName("DeviceFirmwareVersionText") is not System.Windows.Controls.TextBlock label) return;
+        label.Text = Device.IsOfflineOnly ? L.T("Offline-Profil") : _firmwareAssessments.TryGetValue(Device.Id, out var assessment)
+            ? assessment.RuntimeVersion is { } runtime ? "INGLORIOUS " + runtime.Report.Version + " · " + assessment.Status : assessment.Status
+            : L.T("Version noch nicht geprüft");
+    }
+    private FirmwareWindow CreateFirmwareManager(FirmwareGuideDevice device)
+    {
+        var manager = new FirmwareWindow(device.DeviceId, initialOperation: device.Operation) { Owner = this };
+        manager.SetRuntimeVersionHint(device.RuntimeVersion);
+        return manager;
+    }
+    private void ApplyFirmwareManagerOutcome(FirmwareWindow manager, string deviceId)
+    {
+        if (manager.ConfirmedRuntimeVersion is { } runtime && runtime.Report.DeviceId == deviceId)
+            _firmwareAssessments[deviceId] = new(deviceId, FirmwareGuideState.Ready) { RuntimeVersion = runtime };
+        else _firmwareAssessments.Remove(deviceId);
+        RefreshFirmwareVersionLabel();
+    }
+    internal static bool MatchesOnboardingDevice(OnboardDevice candidate, DetectedDevice detected) => candidate.DeviceId == detected.DeviceId
+        && candidate.UsbInstanceId is not null && string.Equals(candidate.UsbInstanceId, detected.InstanceId, StringComparison.OrdinalIgnoreCase);
+
+    // UI discovery only. The updater independently approves the full installed image
+    // and its original recovery archive before allowing any write.
+    internal static FirmwareGuideState ClassifySetupFirmware(OnboardInfo? info, string deviceId, OnboardFirmwareVersion? version)
+    {
+        if (!BoardDescriptorRegistry.TryGet(deviceId, out _) || info is null || info.DeviceId != deviceId || !info.Persistent || (info.Flags & 4) != 0 || info.StagingBytes != 0
+            || version is null || version.DeviceId != deviceId || version.BuildId == 0
+            || !FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var target)) return FirmwareGuideState.Unverified;
+        return version.Version < target ? FirmwareGuideState.UpdateRequired : version.Version > target ? FirmwareGuideState.NewerVersion : FirmwareGuideState.Ready;
+    }
+
+    internal static FirmwareGuideDevice? SelectFirmwareGuideTarget(
+        IReadOnlyList<FirmwareGuideDevice> devices, bool manual, string? requestedDeviceId = null)
+    {
+        var supported = devices.Where(device => BoardDescriptorRegistry.TryGet(device.DeviceId, out var board) && board.HasApprovedFirmwareManagement).ToArray();
+        var actionable = supported.Where(device => device.State is FirmwareGuideState.Original or FirmwareGuideState.UpdateRequired).ToArray();
+        // Ready/unverified devices belong only to a manually opened status view.
+        if (manual)
+            return supported.FirstOrDefault(device => device.DeviceId == requestedDeviceId)
+                ?? actionable.FirstOrDefault() ?? supported.FirstOrDefault();
+        return actionable.FirstOrDefault(device => device.DeviceId == requestedDeviceId) ?? actionable.FirstOrDefault();
+    }
+
+    public async Task CheckFirmwareGuideAsync(bool force = false, string? deviceId = null)
+    {
+        if (force && deviceId is not null && DeviceCatalog.Get(deviceId).IsOfflineOnly) return;
+        if (_screenshotMode || _startupLoading || _startupClosed || _checkingFirmwareGuide || _readingDevice || _scanning || (!force && _automaticFirmwareGuideChecked)) return;
+        _checkingFirmwareGuide = true; _automaticFirmwareGuideChecked = true;
+        try
+        {
+            _firmwareAssessments.Clear(); RefreshFirmwareVersionLabel();
+            await _sharedBrightness.StopAsync();
+            if (_startupClosed) return;
+            if (await Task.Run(FirmwareService.IsGloriousCoreRunning) is not false)
+            {
+                if (force) Status(L.T("Schließe Glorious CORE, bevor du fortfährst."));
+                return;
+            }
+            // Original devices always use the generic discovery/backup path. The
+            // former local wrappers are retained only for existing update/recovery history.
+            var setupDevices = await new DeviceSetupService().ListDevicesAsync();
+            if (setupDevices.Any(candidate => !candidate.IsRuntime &&
+                (!force || deviceId is null || candidate.CandidateDeviceIds.Contains(deviceId))))
+            {
+                var setup = new DeviceSetupWindow(deviceId) { Owner = this };
+                setup.ShowDialog();
+                RequestConnectionRefresh();
+                return;
+            }
+            // PnP metadata alone is not an INGLORIOUS capability confirmation.
+            var detectedDevices = await DeviceScanner.ScanAsync();
+            if (_startupClosed) return;
+            var candidates = await Task.Run(OnboardClient.FindDevices);
+            var assessments = new List<FirmwareGuideDevice>();
+            foreach (var device in DeviceCatalog.All.Where(d => !d.IsOfflineOnly))
+            {
+                if (_startupClosed) return;
+                var detected = detectedDevices.Where(item => item.DeviceId == device.Id).ToArray();
+                var state = FirmwareGuideState.Unverified;
+                var detail = "";
+                FirmwareRuntimeVersion? runtimeVersion = null;
+                if (detected.Length == 1)
+                {
+                    var usb = detected[0];
+                    var board = BoardDescriptorRegistry.Get(device.Id);
+                    if (usb.VendorId == "FEED" && usb.ProductId == board.RuntimeProductId.ToString("X4"))
+                    {
+                        var matches = candidates.Where(candidate => MatchesOnboardingDevice(candidate, usb)).ToArray();
+                        if (matches.Length == 1)
+                        {
+                            try
+                            {
+                                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_startupCancellation.Token);
+                                timeout.CancelAfter(TimeSpan.FromSeconds(8));
+                                await using var client = OnboardClient.Open(matches[0]);
+                                var info = await client.GetInfoAsync(timeout.Token);
+                                var reported = await client.GetFirmwareVersionAsync(timeout.Token);
+                                state = ClassifySetupFirmware(info, device.Id, reported);
+                                if (state == FirmwareGuideState.Unverified) detail = L.T("Die Firmware-Version konnte nicht geprüft werden.");
+                                if (reported is not null && state != FirmwareGuideState.Unverified)
+                                    runtimeVersion = new(reported, usb.InstanceId, DateTimeOffset.UtcNow);
+                            }
+                            catch { detail = L.T("Der Gerätestatus konnte nicht geprüft werden. Prüfe die USB-Verbindung und öffne die Anleitung erneut."); }
+                        }
+                    }
+                }
+                var assessment = new FirmwareGuideDevice(device.Id, state, AvailabilityMessage: detail) { RuntimeVersion = runtimeVersion };
+                assessments.Add(assessment);
+                _firmwareAssessments[device.Id] = assessment;
+            }
+            RefreshFirmwareVersionLabel();
+            if (_startupClosed || !IsVisible) return;
+            var target = force && deviceId is not null ? assessments.FirstOrDefault(item => item.DeviceId == deviceId)
+                : assessments.FirstOrDefault(item => item.State == FirmwareGuideState.UpdateRequired);
+            if (target?.State == FirmwareGuideState.UpdateRequired)
+            {
+                var update = new DeviceSetupWindow(target.DeviceId, SetupOperation.Update) { Owner = this };
+                update.ShowDialog();
+                if (update.DeviceStateMayHaveChanged) { _confirmedDeviceSaves.Remove(target.DeviceId); _firmwareAssessments.Remove(target.DeviceId); }
+                RequestConnectionRefresh(); RefreshFirmwareVersionLabel();
+            }
+            else if (force) Status(target?.State is FirmwareGuideState.Ready or FirmwareGuideState.NewerVersion ? target.Status
+                : L.T("Die Firmware-Version konnte nicht geprüft werden."));
+
+        }
+        catch { Status(L.T("Der Gerätestatus konnte nicht geprüft werden. Prüfe die USB-Verbindung und öffne die Anleitung erneut.")); }
+        finally
+        {
+            _checkingFirmwareGuide = false;
+            StartSharedBrightnessIfReady();
+        }
+    }
+}

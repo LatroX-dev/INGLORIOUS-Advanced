@@ -1,0 +1,54 @@
+{
+  "Logo": {
+    "en": "Logo",
+    "es": "Logotipo",
+    "fr": "Logo",
+    "it": "Logo",
+    "pt-BR": "Logotipo",
+    "pl": "Logo",
+    "tr": "Logo",
+    "ru": "Логотип",
+    "ja": "ロゴ",
+    "ko": "로고",
+    "zh-Hans": "徽标"
+  },
+  "Logo-Beleuchtung": {
+    "en": "Logo lighting",
+    "es": "Iluminación del logotipo",
+    "fr": "Éclairage du logo",
+    "it": "Illuminazione del logo",
+    "pt-BR": "Iluminação do logotipo",
+    "pl": "Podświetlenie logo",
+    "tr": "Logo aydınlatması",
+    "ru": "Подсветка логотипа",
+    "ja": "ロゴの照明",
+    "ko": "로고 조명",
+    "zh-Hans": "徽标灯光"
+  },
+  "Scroll Lock": {
+    "en": "Scroll Lock",
+    "es": "Bloqueo de desplazamiento",
+    "fr": "Arrêt défil.",
+    "it": "Bloc Scorr",
+    "pt-BR": "Scroll Lock",
+    "pl": "Scroll Lock",
+    "tr": "Scroll Lock",
+    "ru": "Scroll Lock",
+    "ja": "Scroll Lock",
+    "ko": "Scroll Lock",
+    "zh-Hans": "滚动锁定"
+  },
+  "Menu": {
+    "en": "Menu",
+    "es": "Menú",
+    "fr": "Menu",
+    "it": "Menu",
+    "pt-BR": "Menu",
+    "pl": "Menu",
+    "tr": "Menü",
+    "ru": "Меню",
+    "ja": "メニュー",
+    "ko": "메뉴",
+    "zh-Hans": "菜单"
+  }
+}

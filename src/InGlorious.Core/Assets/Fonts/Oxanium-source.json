@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "asset": "INGLORIOUS-Oxanium-SemiBold.ttf",
+  "family": "IG Preview Oxanium",
+  "weight": 600,
+  "static": true,
+  "modified": true,
+  "sha256": "0DA46BB90DA6ED019D329FAB2D3D6A93C1A5594288464B46240A33B2850C4016",
+  "sourceCommit": "bd8f81ddb5c74d5c8897b36ad88b440266245103",
+  "sourceUrl": "https://raw.githubusercontent.com/google/fonts/bd8f81ddb5c74d5c8897b36ad88b440266245103/ofl/oxanium/Oxanium%5Bwght%5D.ttf",
+  "sourceSha256": "2CE01D946E1E1FFC8D7EECFFFBDA8623BEDD63EAF811A20488C4B69AF45BABB0",
+  "generator": "fontTools.varLib.instancer 4.66.1",
+  "axis": {
+    "wght": 600
+  },
+  "license": "OFL-1.1",
+  "licenseFile": "Oxanium-OFL.txt",
+  "licenseSha256": "FE17C0F2581D71B4E1EA7E636E7F4877C29223E11BB1DD1A871E8C3F2A86336B",
+  "copyrightAndLicenseNameRecordsPreserved": true
+}

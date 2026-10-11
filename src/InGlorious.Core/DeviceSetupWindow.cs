@@ -1,0 +1,361 @@
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
+
+namespace InGlorious.Core;
+
+/// <summary>Explicit, device-bound installation, update and restoration. Offline mode has no service.</summary>
+public sealed partial class DeviceSetupWindow : Window
+{
+    private readonly DeviceSetupService? _service;
+    private readonly bool _offlinePreview;
+    private readonly string? _preferredDeviceId;
+    private readonly SetupOperation _operation;
+    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private SetupSession? _session;
+    private SetupProgress? _progress;
+    private bool _busy, _observing, _closed, _started, _error, _writeAttempted, _outcomeUncertain;
+    private int _revision, _versionRevision;
+    private bool _readingVersion;
+    private OnboardFirmwareVersion? _runtimeVersion;
+    private readonly List<Window> _owners = [];
+    private readonly ComboBox _devices = new() { Name = "SetupDevices", MinHeight = 36, Margin = new(0, 10, 0, 12) };
+    private readonly TextBlock _deviceName = Text(18), _version = Text(14), _step = Text(12), _heading = Text(24), _description = Text(14), _status = Text(13), _experimental = Text(12), _backup = Text(13), _keys = Text(16);
+    private readonly CheckBox _modelConfirmation = new() { Name = "SetupModelConfirmed", Margin = new(0, 18, 0, 0) };
+    private readonly CheckBox _writeConfirmation = new() { Name = "SetupWriteConfirmed", Margin = new(0, 18, 0, 0) };
+    private readonly Button _search = new() { Name = "SetupSearch", HorizontalAlignment = HorizontalAlignment.Left, Margin = new(0, 0, 0, 14) };
+    private readonly Button _action = new() { Name = "SetupAction", MinWidth = 155, Margin = new(12, 0, 0, 0) };
+    private readonly Button _close = new() { Name = "SetupClose", MinWidth = 100 };
+    private readonly ProgressBar _activity = new() { Height = 3, IsIndeterminate = true, Margin = new(0, 12, 0, 0), Visibility = Visibility.Collapsed };
+    private readonly TextBlock _keepOpen = Text(12);
+    private readonly StackPanel _driverHelp = new() { Margin = new(0, 14, 0, 0), Visibility = Visibility.Collapsed };
+    public string? DeviceId => _session?.DeviceId;
+    public bool Completed => _progress?.Stage == SetupStage.Complete && _writeAttempted;
+    public bool DeviceStateMayHaveChanged => _writeAttempted || _outcomeUncertain;
+
+    public DeviceSetupWindow(string? preferredDeviceId = null, SetupOperation operation = SetupOperation.Install, bool offlinePreview = false)
+    {
+        _preferredDeviceId = preferredDeviceId; _operation = operation; _offlinePreview = offlinePreview;
+        _service = offlinePreview ? null : new DeviceSetupService();
+        Title = OperationTitle + " · INGLORIOUS Advanced";
+        Width = 760; Height = 650; MinWidth = 600; MinHeight = 520;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner; ShowInTaskbar = false;
+        Background = (Brush)FindResource("WindowBackground"); Foreground = (Brush)FindResource("Text");
+        FontFamily = new("Segoe UI"); FontSize = 13; UseLayoutRounding = true;
+        var root = new Grid { Background = Background, Margin = new(26) };
+        root.RowDefinitions.Add(new() { Height = GridLength.Auto }); root.RowDefinitions.Add(new()); root.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        var header = new StackPanel(); _step.Foreground = (Brush)FindResource("Muted"); header.Children.Add(_step); header.Children.Add(_heading); root.Children.Add(header);
+        var body = new StackPanel { Margin = new(0, 22, 0, 18) };
+        InitializeCompletionControls();
+        foreach (var element in new UIElement[] { _devices, _deviceName, _version, _experimental, _search, _description, _keys, _backup, _modelConfirmation, _writeConfirmation, _activity, _status, _completion, _driverHelp, _keepOpen }) body.Children.Add(element);
+        var scroll = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        Grid.SetRow(scroll, 1); root.Children.Add(scroll);
+        _deviceName.FontWeight = FontWeights.SemiBold; _deviceName.Margin = new(0, 0, 0, 8);
+        _version.Margin = new(0, 0, 0, 12);
+        _experimental.Foreground = new SolidColorBrush(Color.FromRgb(233, 184, 107)); _experimental.Margin = new(0, 0, 0, 12);
+        _description.LineHeight = 23; _keys.FontWeight = FontWeights.SemiBold; _keys.Margin = new(0, 16, 0, 0);
+        _backup.Foreground = (Brush)FindResource("Muted"); _backup.LineHeight = 21; _backup.Margin = new(0, 18, 0, 0);
+        _status.Margin = new(0, 20, 0, 0); _status.LineHeight = 21;
+        _keepOpen.Text = L.T("INGLORIOUS ADVANCED nicht schließen."); _keepOpen.Foreground = (Brush)FindResource("Muted"); _keepOpen.Margin = new(0, 18, 0, 0);
+        _driverHelp.Children.Add(Text(13, L.T("Wähle in Zadig nur das Gerät im Update-Modus und installiere dafür WinUSB.")));
+        var driverLink = new Button { Content = L.T("USB-Treiber einrichten (Zadig)"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new(0, 8, 0, 0) };
+        driverLink.Click += (_, _) =>
+        {
+            if (_offlinePreview || _busy || _closed) return;
+            try { Process.Start(new ProcessStartInfo("https://zadig.akeo.ie/") { UseShellExecute = true }); }
+            catch (Exception ex) { Debug.WriteLine(ex); }
+        };
+        driverLink.IsEnabled = !_offlinePreview; _driverHelp.Children.Add(driverLink);
+        _modelConfirmation.Content = Text(13, L.T("Das erkannte Modell stimmt mit meinem Gerät überein."));
+        _writeConfirmation.Content = Text(13, L.T("Ich möchte die Firmware auf diesem Gerät ändern."));
+        _modelConfirmation.Foreground = _writeConfirmation.Foreground = (Brush)FindResource("Text");
+        ((TextBlock)_modelConfirmation.Content).Foreground = ((TextBlock)_writeConfirmation.Content).Foreground = (Brush)FindResource("Text");
+        _search.Content = L.T("Erneut prüfen"); _close.Content = L.T("Schließen"); _action.Style = (Style)FindResource("PrimaryButton");
+        var footer = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        footer.Children.Add(_close); footer.Children.Add(_action); Grid.SetRow(footer, 2); root.Children.Add(footer); Content = new Border { Background = Background, Child = root };
+        AutomationProperties.SetName(_devices, L.T("Gerät auswählen"));
+        _devices.SelectionChanged += async (_, _) =>
+        {
+            _error = false; _status.Text = ""; _runtimeVersion = null; _versionRevision++;
+            Render(); await ReadSelectedVersionAsync();
+        };
+        _modelConfirmation.Checked += (_, _) => Render(); _modelConfirmation.Unchecked += (_, _) => Render();
+        _writeConfirmation.Checked += (_, _) => Render(); _writeConfirmation.Unchecked += (_, _) => Render();
+        _search.Click += async (_, _) => await DiscoverAsync(); _action.Click += async (_, _) => await ActAsync();
+        _close.Click += (_, _) => Close(); Closing += WindowClosing;
+        Closed += (_, _) => { _closed = true; _revision++; _versionRevision++; _timer.Stop(); foreach (var owner in _owners) owner.Closing -= WindowClosing; _owners.Clear(); };
+        PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape && !_busy) { e.Handled = true; Close(); } };
+        _timer.Tick += async (_, _) => await ObserveAsync();
+        Loaded += async (_, _) =>
+        {
+            if (_started) return;
+            _started = true;
+            for (var owner = Owner; owner is not null; owner = owner.Owner) { owner.Closing += WindowClosing; _owners.Add(owner); }
+            if (!_offlinePreview) { await DiscoverAsync(); if (!_closed) _timer.Start(); }
+        };
+        Render();
+    }
+
+    private static TextBlock Text(double size, string text = "") => new() { Text = text, FontSize = size, TextWrapping = TextWrapping.Wrap };
+    private string OperationTitle => L.T(_operation switch { SetupOperation.Install => "Gerät einrichten", SetupOperation.Update => "Firmware aktualisieren", _ => "Original-Firmware wiederherstellen" });
+    private SetupDevice? SelectedDevice => _session?.Device ?? _devices.SelectedItem as SetupDevice;
+    private bool CanAct => !_offlinePreview && ActionReady;
+    private bool UpdateVersionReady => _operation != SetupOperation.Update ||
+        (_runtimeVersion is { } report && SelectedDevice?.CandidateDeviceIds.Contains(report.DeviceId) == true &&
+         FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var target) && report.Version < target &&
+         (_session?.InstalledFirmwareVersion is not { } captured || FirmwareSemanticVersion.TryParse(captured, out var version) && version == report.Version));
+    private bool ActionReady => !_busy && !_readingVersion && !_observing && !_closed && !_error && !_outcomeUncertain && UpdateVersionReady && (_session is null
+        ? SelectedDevice is not null
+        : HasResolvedModel && (_progress is { CanCapture: true } && _modelConfirmation.IsChecked == true
+          || _progress is { CanInstall: true } && _writeConfirmation.IsChecked == true && !_writeAttempted));
+    private bool HasResolvedModel => _session?.DeviceId is { } id && _session.Device.CandidateDeviceIds.Contains(id) && _progress?.DeviceId == id;
+
+    private void ApplyDevices(IReadOnlyList<SetupDevice> devices)
+    {
+        var eligible = devices.Where(device => device.IsRuntime == (_operation != SetupOperation.Install) &&
+            (_preferredDeviceId is null || device.CandidateDeviceIds.Contains(_preferredDeviceId))).ToArray();
+        _devices.ItemsSource = eligible;
+        // Even a preferred model cannot choose between two physical devices silently.
+        _devices.SelectedItem = eligible.Length == 1 ? eligible[0] : null;
+        _devices.Visibility = eligible.Length > 1 ? Visibility.Visible : Visibility.Collapsed;
+        if (eligible.Length == 0) _status.Text = L.T(_operation == SetupOperation.Install ? "Kein Gerät mit Original-Firmware verbunden." : "Kein Gerät mit INGLORIOUS verbunden.");
+        Render();
+    }
+
+    private async Task ReadSelectedVersionAsync()
+    {
+        var selected = SelectedDevice;
+        if (_offlinePreview || _closed || _session is not null || selected?.IsRuntime != true) { _readingVersion = false; Render(); return; }
+        int revision = _versionRevision;
+        _readingVersion = true; Render();
+        try
+        {
+            var report = await Task.Run(async () =>
+            {
+                if (FirmwareService.IsGloriousCoreRunning() is not false)
+                    throw new SetupException(L.T("Schließe Glorious CORE, bevor du fortfährst."), recoverable: true);
+                var matches = OnboardClient.FindDevices().Where(device => selected.CandidateDeviceIds.Contains(device.DeviceId) &&
+                    string.Equals(device.UsbInstanceId, selected.InstanceId, StringComparison.OrdinalIgnoreCase)).ToArray();
+                if (matches.Length != 1) throw new SetupException(L.T("Gerät nicht eindeutig erkannt."));
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await using var client = OnboardClient.Open(matches[0]);
+                var info = await client.GetInfoAsync(timeout.Token);
+                if (!info.Persistent || (info.Flags & 4) != 0 || info.StagingBytes != 0)
+                    throw new SetupException(L.T("Die Firmware-Version konnte nicht geprüft werden."));
+                return await client.GetFirmwareVersionAsync(timeout.Token)
+                    ?? throw new SetupException(L.T("Die Firmware-Version konnte nicht geprüft werden."));
+            });
+            if (!_closed && revision == _versionRevision && ReferenceEquals(selected, SelectedDevice))
+            {
+                _runtimeVersion = report;
+                if (_operation == SetupOperation.Update && !UpdateVersionReady) _status.Text = L.T("Die Firmware ist bereits aktuell oder neuer als die angebotene Version.");
+            }
+        }
+        catch (Exception exception)
+        {
+            if (!_closed && revision == _versionRevision)
+            {
+                Debug.WriteLine("Setup version read failed: " + exception);
+                if (_operation == SetupOperation.Update) { _error = true; _status.Text = DeviceSetupService.ForUser(exception); }
+            }
+        }
+        finally { if (!_closed && revision == _versionRevision) { _readingVersion = false; Render(); } }
+    }
+
+    private async Task DiscoverAsync()
+    {
+        if (_offlinePreview || _service is null || _busy || _readingVersion || _observing || _closed || _session is not null) return;
+        _busy = true; _error = false; _status.Text = L.T("Geräte werden gesucht …"); Render();
+        try { var devices = await _service.ListDevicesAsync(); if (!_closed) { _status.Text = ""; ApplyDevices(devices); } }
+        catch (Exception ex) { if (!_closed) ShowError(ex); }
+        finally { _busy = false; if (!_closed) Render(); }
+    }
+
+    private async Task ObserveAsync()
+    {
+        if (_offlinePreview || _service is null || _session is null || _busy || _observing || _closed || _session.Stage is SetupStage.Complete or SetupStage.Blocked) return;
+        var session = _session; var revision = _revision; _observing = true;
+        try
+        {
+            var progress = await _service.ObserveAsync(session);
+            if (_closed || revision != _revision || !ReferenceEquals(session, _session)) return;
+            if (progress.Stage == SetupStage.Complete && _operation != SetupOperation.Restore)
+            {
+                try { _returnedUsbInstanceId = await ReadVerifiedReturnedRuntimeAsync(session); }
+                catch (Exception exception)
+                {
+                    if (_closed || revision != _revision || !ReferenceEquals(session, _session)) return;
+                    // A normal USB descriptor is not confirmation of the flashed runtime.
+                    session.Stage = SetupStage.Reconnect;
+                    ApplyProgress(new(SetupStage.Reconnect, exception is SetupException ? exception.Message
+                        : L.T("Die USB-Verbindung konnte nicht geprüft werden. Die App versucht es erneut."), session.DeviceId));
+                    return;
+                }
+                if (_closed || revision != _revision || !ReferenceEquals(session, _session)) return;
+            }
+            ApplyProgress(progress);
+        }
+        catch (Exception ex) { if (!_closed && revision == _revision) ShowError(ex); }
+        finally { _observing = false; if (!_closed) Render(); }
+    }
+
+    private async Task ActAsync()
+    {
+        if (!CanAct || _service is null) return;
+        _busy = true; _error = false; Render();
+        try
+        {
+            if (_session is null)
+            {
+                _session = await _service.BeginAsync(SelectedDevice!, _operation); _revision++;
+                _devices.IsEnabled = false;
+                ApplyProgress(new(_session.Stage, L.T("Trenne das Gerät vom USB-Kabel."), _session.DeviceId));
+            }
+            else if (_progress is { CanCapture: true } && _modelConfirmation.IsChecked == true)
+            {
+                _status.Text = L.T(_operation == SetupOperation.Install ? "Die Original-Firmware wird gesichert und geprüft …" : "Der aktuelle Zustand und die Original-Sicherung werden geprüft …");
+                ApplyProgress(await _service.CaptureAsync(_session, Log()));
+                if (!UpdateVersionReady)
+                {
+                    _session.Stage = SetupStage.Blocked;
+                    throw new SetupException(L.T("Die Firmware-Version hat sich geändert. Starte das Update erneut."));
+                }
+            }
+            else if (_progress is { CanInstall: true } && _writeConfirmation.IsChecked == true && !_writeAttempted)
+            {
+                _writeConfirmation.IsChecked = false;
+                _status.Text = L.T(_operation == SetupOperation.Update ? "Firmware wird aktualisiert …" : "Firmware wird installiert …");
+                ApplyProgress(_operation switch
+                {
+                    SetupOperation.Install => await _service.InstallAsync(_session, explicitlyConfirmed: true, log: Log()),
+                    SetupOperation.Update => await _service.UpdateAsync(_session, explicitlyConfirmed: true, log: Log()),
+                    _ => await _service.RestoreAsync(_session, explicitlyConfirmed: true, log: Log())
+                });
+                _writeAttempted = _session.WriteAttempted;
+                _outcomeUncertain = _session.OutcomeUncertain;
+            }
+        }
+        catch (Exception ex)
+        {
+            _writeAttempted = _session?.WriteAttempted == true;
+            _outcomeUncertain = _session?.OutcomeUncertain == true;
+            ShowError(ex);
+            if (_writeAttempted || _outcomeUncertain || _session?.Stage == SetupStage.Blocked) { _progress = new(SetupStage.Blocked, _status.Text, _session?.DeviceId); _timer.Stop(); }
+        }
+        finally { _busy = false; if (!_closed) Render(); }
+    }
+
+    private IProgress<string> Log()
+    {
+        var revision = _revision;
+        return new Progress<string>(message => { if (!_closed && _busy && revision == _revision) _status.Text = message; });
+    }
+
+    private void ApplyProgress(SetupProgress progress)
+    {
+        if (_progress?.Stage != progress.Stage) { _modelConfirmation.IsChecked = false; _writeConfirmation.IsChecked = false; }
+        _progress = progress; _error = false; _status.Text = progress.Message;
+        if (progress.Stage is SetupStage.Complete or SetupStage.Blocked) _timer.Stop();
+        Render();
+    }
+
+    private void ShowError(Exception exception)
+    {
+        Debug.WriteLine("Device setup failed: " + exception); _error = true;
+        _status.Text = _outcomeUncertain ? FirmwareMessages.ForExecutionFailure() : DeviceSetupService.ForUser(exception);
+    }
+
+    private void Render()
+    {
+        var stage = _progress?.Stage; var device = SelectedDevice;
+        _heading.Text = stage switch
+        {
+            SetupStage.Disconnect => L.T("USB-Kabel trennen"), SetupStage.ConnectBootloader => L.T("Im Update-Modus verbinden"),
+            SetupStage.ReadyToBackup => L.T("Modell prüfen und sichern"), SetupStage.ReadyToInstall => L.T(_operation switch { SetupOperation.Install => "Installation bestätigen", SetupOperation.Update => "Update bestätigen", _ => "Wiederherstellung bestätigen" }),
+            SetupStage.Reconnect => L.T("Gerät wieder verbinden"), SetupStage.Complete => L.T(_operation == SetupOperation.Update ? "Update abgeschlossen" : "Einrichtung abgeschlossen"),
+            SetupStage.Blocked => L.T(_operation == SetupOperation.Update ? "Update angehalten" : "Einrichtung angehalten"), _ => OperationTitle
+        };
+        _step.Text = stage switch { null => L.T("Gerät auswählen"), SetupStage.Disconnect or SetupStage.ConnectBootloader => L.T("Verbindung"), SetupStage.ReadyToBackup => L.T("Sicherung"), SetupStage.ReadyToInstall => L.T("Bestätigung"), SetupStage.Reconnect or SetupStage.Complete => L.T("Abschluss"), _ => "" };
+        var resolvedModel = DeviceCatalog.All.FirstOrDefault(model => model.Id == _session?.DeviceId && device?.CandidateDeviceIds.Contains(model.Id) == true);
+        var productName = resolvedModel?.Name ?? device?.Name;
+        _deviceName.Text = productName is null ? L.T("Kein Gerät verbunden") : "\"" + productName + "\"";
+        _version.Text = _operation switch
+        {
+            SetupOperation.Install => "INGLORIOUS " + DeviceSetupService.TargetFirmwareVersion,
+            SetupOperation.Update when _runtimeVersion is { } report && FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var target) && report.Version < target
+                => "INGLORIOUS " + report.Version + " → " + DeviceSetupService.TargetFirmwareVersion,
+            SetupOperation.Update or SetupOperation.Restore when _runtimeVersion is { } report => "INGLORIOUS " + report.Version,
+            _ => _readingVersion ? L.T("Firmware-Version wird gelesen …") : ""
+        };
+        var experimental = resolvedModel?.IsExperimentalFirmware ?? device?.IsExperimental == true;
+        _experimental.Text = L.T("Experimentelle Unterstützung: noch nicht an diesem Modell getestet.");
+        _experimental.Visibility = experimental ? Visibility.Visible : Visibility.Collapsed;
+        ((TextBlock)_writeConfirmation.Content).Text = L.T(experimental && _operation != SetupOperation.Restore
+            ? "Ich möchte die experimentelle Firmware auf diesem Gerät installieren."
+            : "Ich möchte die Firmware auf diesem Gerät ändern.");
+        _description.Text = stage switch
+        {
+            null => L.T("Verbinde das Gerät normal per USB."),
+            SetupStage.Disconnect => L.Format("Trenne nur \"{0}\" vom USB-Kabel. Andere Geräte bleiben angeschlossen.", device?.Name ?? ""),
+            SetupStage.ConnectBootloader => L.T("Verbinde das Gerät im Update-Modus am selben USB-Anschluss."),
+            SetupStage.ReadyToBackup => L.T("Prüfe den Modellnamen. Danach liest die App die Firmware zweimal und vergleicht die Sicherungen."),
+            SetupStage.ReadyToInstall => _operation switch
+            {
+                SetupOperation.Install => L.T("INGLORIOUS ersetzt die Original-Firmware und startet mit Standardwerten. Übertrage danach dein Profil."),
+                SetupOperation.Update => L.T("Deine Einstellungen bleiben erhalten. Die App sichert den aktuellen Zustand vor dem Update."),
+                _ => L.T("Die Original-Firmware ersetzt INGLORIOUS und seine Einstellungen.")
+            },
+            SetupStage.Reconnect => L.T("Verbinde das Gerät ohne gedrückte Tasten neu."),
+            SetupStage.Complete => L.T("Prüfe jetzt die Tasten und die Beleuchtung."),
+            _ => L.T("Es wird nichts automatisch wiederholt.")
+        };
+        _keys.Text = stage == SetupStage.ConnectBootloader ? BootInstruction(device) : "";
+        _keys.Visibility = _keys.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        _backup.Text = _operation == SetupOperation.Install
+            ? L.T("Die Original-Firmware wird vor der Installation zweimal gesichert. Die geprüfte Sicherung bleibt auf diesem Computer und ermöglicht die Wiederherstellung.") + "\n" + L.T("Zusätzliche Profilspeicher und Bluetooth-Einstellungen sind nicht Teil dieser Sicherung.")
+            : _operation == SetupOperation.Update ? L.T("Deine Einstellungen und die Original-Sicherung bleiben erhalten.")
+            : L.T("Die Wiederherstellung verwendet ausschließlich die passende Original-Sicherung dieses Geräts.");
+        _backup.Visibility = stage is null or SetupStage.ReadyToBackup or SetupStage.ReadyToInstall ? Visibility.Visible : Visibility.Collapsed;
+        _modelConfirmation.Visibility = stage == SetupStage.ReadyToBackup ? Visibility.Visible : Visibility.Collapsed;
+        _writeConfirmation.Visibility = stage == SetupStage.ReadyToInstall ? Visibility.Visible : Visibility.Collapsed;
+        _modelConfirmation.IsEnabled = _writeConfirmation.IsEnabled = !_busy && !_offlinePreview;
+        _devices.IsEnabled = !_busy && _session is null;
+        _devices.Visibility = _session is null && _devices.Items.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+        _search.Visibility = _session is null ? Visibility.Visible : Visibility.Collapsed;
+        _search.IsEnabled = !_busy && !_readingVersion && !_offlinePreview;
+        _action.Content = stage switch
+        {
+            SetupStage.ReadyToBackup => L.T("Sicherung erstellen"),
+            SetupStage.ReadyToInstall => L.T(_operation switch { SetupOperation.Install => "INGLORIOUS jetzt installieren", SetupOperation.Update => "Jetzt aktualisieren", _ => "Original jetzt wiederherstellen" }),
+            _ => L.T(_operation == SetupOperation.Update ? "Update vorbereiten" : "Einrichtung starten")
+        };
+        _action.Visibility = stage is null or SetupStage.ReadyToBackup or SetupStage.ReadyToInstall ? Visibility.Visible : Visibility.Collapsed;
+        _action.IsEnabled = CanAct;
+        _close.IsEnabled = !_busy && !_lightingRunning; _close.Content = L.T(stage == SetupStage.Complete ? "Fertig" : "Schließen");
+        _activity.Visibility = _busy || _readingVersion ? Visibility.Visible : Visibility.Collapsed;
+        _driverHelp.Visibility = _status.Text == L.T("Für den Update-Modus fehlt der USB-Treiber.") ? Visibility.Visible : Visibility.Collapsed;
+        _keepOpen.Visibility = _session is not null && stage is not (SetupStage.Complete or SetupStage.Blocked) ? Visibility.Visible : Visibility.Collapsed;
+        RenderCompletion();
+    }
+
+    private static string BootInstruction(SetupDevice? device)
+    {
+        if (device is null) return "";
+        if (device.CandidateDeviceIds.All(id => id == "numpad")) return L.T("Halte Plus und Enter beim Einstecken gedrückt. Lass die Tasten nach etwa 3 Sekunden los.");
+        if (device.IsRuntime) return L.T("Halte Leertaste und B beim Einstecken gedrückt. Lass die Tasten nach etwa 3 Sekunden los.");
+        if (device.CandidateDeviceIds.All(id => id.StartsWith("gmmk3-", StringComparison.Ordinal))) return L.T("Halte Esc beim Einstecken gedrückt. Lass die Taste nach etwa 3 Sekunden los.");
+        if (device.CandidateDeviceIds.All(id => id.StartsWith("pro-", StringComparison.Ordinal) || id.StartsWith("gmmk2-", StringComparison.Ordinal))) return L.T("Halte Leertaste und B beim Einstecken gedrückt. Lass die Tasten nach etwa 3 Sekunden los.");
+        return L.T("Gerät nicht eindeutig erkannt.");
+    }
+
+    private void WindowClosing(object? sender, CancelEventArgs e)
+    {
+        if (_busy || _lightingRunning) { e.Cancel = true; _status.Text = L.T("INGLORIOUS ADVANCED nicht schließen."); }
+    }
+}

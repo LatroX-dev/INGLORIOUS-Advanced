@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "researchedOn": "2026-10-11",
+  "scope": "Read-only official product documentation and preserved installed CORE application metadata; no device access, firmware execution, download or source port performed.",
+  "sources": {
+    "gmbkProduct": "https://www.gloriousgaming.com/products/gmbk-75-keyboard",
+    "gmbkGuide": "https://www.gloriousgaming.com/pages/gmbk-75-keyboard-product-guide",
+    "eternalProduct": "https://www.gloriousgaming.com/products/gmmk-eternal-96-keyboard",
+    "eternalGuide": "https://www.gloriousgaming.com/pages/gmmk-eternal-96-keyboard-product-guide",
+    "coreChangelog": "https://www.gloriousgaming.com/en-de/pages/development-changelog",
+    "qmkGmmkTree": "https://api.github.com/repos/qmk/qmk_firmware/contents/keyboards/gmmk"
+  },
+  "localEvidence": {
+    "path": "backups/initial/package-source/out/main/index.js",
+    "provenanceManifest": "backups/initial/manifest.json",
+    "coreVersion": "2.1.21",
+    "coreBuildVersion": "2.1.21.4",
+    "bytes": 2686776,
+    "sha256": "9DE8428785A7A0AEE5AA965A782D41C891152411CB47051FA386AC802149BB75",
+    "hashReverified": true,
+    "redistribution": "Installed proprietary application evidence only; do not redistribute the vendor application source or branding assets. This file contains factual metadata, not copied implementation."
+  },
+  "qmkEvidence": {
+    "localPinnedCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+    "localGmmkDirectories": ["gmmk2", "numpad", "pro"],
+    "liveUpstreamGmmkDirectories": ["gmmk2", "numpad", "pro"],
+    "limitation": "Directory listing is not proof that no external or future port exists. No GMBK or Glorious GMMK Eternal port, MCU specification or VIA definition was verified in the inspected primary sources. Glorious GMMK3 fork is researched separately."
+  },
+  "models": [
+    {
+      "name": "GMBK 75%",
+      "readReady": false,
+      "writeReady": false,
+      "connection": "wired USB-C",
+      "switchTechnology": "membrane",
+      "layouts": ["ANSI", "ISO"],
+      "keysAnsi": 80,
+      "keysIso": 81,
+      "lighting": "10 independently configurable RGB zones with sidelights; not per-key RGB",
+      "rotaryKnob": true,
+      "onboardProfiles": 3,
+      "maxPollingHz": 1000,
+      "qmk": "Manufacturer explicitly lists No",
+      "via": "Not verified",
+      "coreDescriptors": {
+        "sourceLines": [12557, 12639],
+        "ansi": {"vid": "3794", "pid": "B000", "declaredBootloaderPid": "B002"},
+        "iso": {"vid": "3794", "pid": "B001", "declaredBootloaderPid": "B003"},
+        "setUsagePage": "FF01",
+        "setUsage": "0001",
+        "getUsagePage": "FF00",
+        "getUsage": "FF00",
+        "physicallyVerified": false
+      },
+      "protocolEvidence": {
+        "sourceLines": [48147, 48213, 48236, 48244, 48679, 49081, 49096, 49104],
+        "transport": "Vendor feature reports, report ID 7; buffer sizes differ by command, generally 264 bytes",
+        "getCommands": {"profileLayer": "81", "lighting": "82", "keys": "83", "settings": "91", "macro": "92"},
+        "scope": "Dedicated vendor handlers expose profile/layer selection, zone lighting, key bindings, settings and macros. Actual behavior, persistence and readback consistency remain untested.",
+        "updater": "Downloaded vendor FWUpdate.exe, controlled separately; no verified flash-readback interface"
+      },
+      "firmwarePort": "Blocked on unknown MCU, memory map, matrix/LED driver wiring and reliable original-firmware readback/recovery. Existing STM32/WB32 helpers are not automatically applicable.",
+      "integrationProposal": "Investigate a separate original-firmware protocol adapter with explicit ten-zone capabilities. Do not promise INGLORIOUS firmware or per-key lighting."
+    },
+    {
+      "name": "GMMK Eternal 96%",
+      "readReady": false,
+      "writeReady": false,
+      "connection": "wired USB-C",
+      "switchTechnology": "mechanical hot-swap MX",
+      "officialProductLayouts": ["US", "UK", "ND"],
+      "coreLayoutVariants": ["ANSI", "ISO"],
+      "lighting": "Per-key RGB",
+      "onboardProfiles": 3,
+      "maxPollingHz": 1000,
+      "qmk": "Not claimed by the inspected manufacturer product page or guide; no verified source port",
+      "via": "Not verified; usage FF60:0061 alone is not evidence of VIA support",
+      "coreDescriptors": {
+        "sourceLines": [37774, 37915],
+        "ansi": {"vid": "3794", "pid": "B010"},
+        "iso": {"vid": "3794", "pid": "B011"},
+        "setAndGetUsagePage": "FF60",
+        "setAndGetUsage": "0061",
+        "declaredBootloader": "3794:B012",
+        "conflictingUpdaterComment": "The update implementation comments describe an observed ISP identity 0603:1020 instead. Neither is physically verified by this research; do not derive a flash allowlist from this metadata.",
+        "physicallyVerified": false
+      },
+      "protocolEvidence": {
+        "sourceLines": [67518, 67694, 68361, 68702, 68963, 70030],
+        "transport": "Vendor 64-byte interrupt OUT/IN packets, report ID 9; distinct from GMBK feature-report protocol",
+        "getCommands": {"info": "82", "configuration": "84", "userData": "F1"},
+        "scope": "Dedicated vendor handler covers per-key lighting, bindings, macros and performance options. Onboard persistence is manufacturer-advertised, but a complete lossless export/restore is not verified here.",
+        "updater": "FWUpdate.exe plus UpdateFirmware.dll and .upf image; image header uses BLESINO signature and embedded VID/PID selection. This does not establish an MCU model or a firmware-dump method."
+      },
+      "firmwarePort": "Blocked on unknown MCU, memory map, matrix/LED driver wiring and reliable original-firmware readback/recovery.",
+      "integrationProposal": "A separately tested original-firmware protocol adapter is plausible. Exact key/LED maps must be independently derived and validated; do not substitute a GMMK2 96 layout solely because both are called 96%."
+    }
+  ],
+  "backupLimits": [
+    "A downloaded vendor update image is not a verified backup of the installed firmware or persistent configuration.",
+    "Product-guide factory-reset chords delete settings; they are not demonstrated nondestructive bootloader-entry or backup procedures.",
+    "No hardware communication, updater launch, firmware flash, driver change or device reset was performed."
+  ]
+}

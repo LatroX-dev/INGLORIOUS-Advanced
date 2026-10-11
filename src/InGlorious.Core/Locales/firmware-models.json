@@ -1,0 +1,15 @@
+{
+  "Firmwareinstallation ist für dieses Modell noch nicht verfügbar.": {
+    "en": "Firmware installation is not yet available for this model.",
+    "es": "La instalación del firmware aún no está disponible para este modelo.",
+    "fr": "L’installation du firmware n’est pas encore disponible pour ce modèle.",
+    "it": "L’installazione del firmware non è ancora disponibile per questo modello.",
+    "pt-BR": "A instalação do firmware ainda não está disponível para este modelo.",
+    "pl": "Instalacja oprogramowania układowego nie jest jeszcze dostępna dla tego modelu.",
+    "tr": "Bu model için ürün yazılımı kurulumu henüz kullanılamıyor.",
+    "ru": "Установка прошивки для этой модели пока недоступна.",
+    "ja": "このモデルへのファームウェアのインストールには、まだ対応していません。",
+    "ko": "이 모델은 아직 펌웨어 설치를 지원하지 않습니다.",
+    "zh-Hans": "此型号暂不支持固件安装。"
+  }
+}

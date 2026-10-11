@@ -1,0 +1,52 @@
+# INGLORIOUS onboard firmware
+
+The current included firmware is **0.11.0**, build `0x000B0001`, for the 15 model/layout variants in `targets.json`. Thirteen variants remain experimental. Model support and physical acceptance are listed in [the model overview](../docs/model-support.md).
+
+## Behavior
+
+The QMK-based firmware runs key assignments, four layers, macros, lighting and standby on the keyboard. The app may be closed after a successful configuration transfer. The Numpad is USB-only. Its slider supports disabled, lighting brightness, relative volume and MIDI control; linking brightness across devices requires the desktop app.
+
+There are 21 lighting modes with per-LED overrides, custom color sequences and global settings. The optional lighting test lasts 21 seconds and the screensaver repeats the sequence after inactivity. Settings and the test sequence run locally, without a background service.
+
+Each device has two configuration slots inside a 32-KiB internal flash reserve. Board IDs 1–9 use 7,168-byte slots; IDs 10–15 use 7,680-byte slots. Four layers, up to 32 macro slots and shared event/color pools fit within that fixed space. Oversized configurations are rejected rather than silently truncated. An upload stages data in the inactive part of the EEPROM RAM cache and commits only after full validation.
+
+This storage implementation does not promise atomic recovery from power loss during QMK flash consolidation. External stock SPI memory is disabled. The firmware does not store profiles in the wireless controller or preserve all original external settings.
+
+## Protocol and identities
+
+[`protocol.md`](protocol.md) defines the 32-byte RAW-HID configuration protocol, feature flags, explicit version response and persistent configuration formats. Development USB PIDs `FEED:1C01` through `FEED:1C0F` map to the 15 board IDs. These are development identities, not a commercial USB allocation. App handshake checks must agree with the expected model; a PID alone does not authorize writing.
+
+The runtime protocol offers no arbitrary memory access, firmware write, protection change or remote bootloader command. A physical startup gesture enters the bootloader. INGLORIOUS keyboard firmware uses Space+B; the Numpad uses Plus+Enter. Original-firmware gestures may differ: see [`setup-boot-gestures.md`](../docs/setup-boot-gestures.md).
+
+The generic installer composes an installation image using the reviewed firmware binary, a per-installation recovery identifier in the unused code gap and the configuration tail. The identifier is not part of the frozen raw firmware binary and is not an immutable hardware UID. Details are in [`device-setup.md`](../docs/device-setup.md).
+
+## Build
+
+The public build prepares pinned dependencies and builds all targets without accessing hardware:
+
+```powershell
+pwsh -NoProfile -File scripts/Initialize-BuildDependencies.ps1 -Scope Firmware
+pwsh -NoProfile -File firmware/Build-Firmware.ps1 -Board all -OutputDirectory firmware/build
+python firmware/Verify-CandidateBuild.py firmware/build
+```
+
+QMK base: `7a1bbf37c5c07da4ea0a162bb139083a46ef40a1`. ChibiOS: `6170ddf92d55be54c89b708d1882eea229edeb2c`. ChibiOS-Contrib: `5a9ad82b6ba4f649cdb800e8c2bbc9be2d3ce767`. The remaining submodule and compiler pins are in `scripts/build-dependencies.json`. Firmware uses QMK-MSYS 1.12.0 and ARM GCC 15.2.0; LTO is disabled. `Prepare-Overlay.ps1` generates board keymaps and physical mappings. The timing and storage patch scripts only accept their expected upstream input hashes.
+
+The GMMK 3 wired non-HE ports are normalized from pinned manufacturer sources. Their original sources, provenance and documented corrections are retained under `reference/glorious-gmmk3` and `ports/gmmk3`. The physical OS switch remains disabled pending hardware validation.
+
+The build records binary sizes, source hashes, compiler version, linker maps and stack reports. Firmware catalog hashes must match before those files can be packaged. A successful build proves neither hardware compatibility nor maximum stack usage under every input sequence.
+
+## Offline checks
+
+```powershell
+pwsh -NoProfile -File firmware/tests/Run-RuntimeChecks.ps1
+pwsh -NoProfile -File firmware/tests/Run-PortChecks.ps1
+pwsh -NoProfile -File firmware/tests/Run-StorageChecks.ps1
+pwsh -NoProfile -File firmware/tests/Run-BulkChecks.ps1
+```
+
+Tests exercise actual C modules with simulated storage, time and USB traffic. The storage suite compiles the patched QMK driver and covers interrupted writes and readback failures. Port tests compare physical layout references, configuration round trips, recovery key positions and lighting sequences. None of these tests changes a real keyboard.
+
+## License and source
+
+Original common firmware is GPL-2.0-or-later. QMK, ChibiOS, ChibiOS-Contrib and manufacturer files retain their per-file licenses and exceptions. A binary release must include the matching source and build/patch scripts, as described in [`public-release.md`](../docs/public-release.md). Original manufacturer firmware and personal recovery archives are not distributed.

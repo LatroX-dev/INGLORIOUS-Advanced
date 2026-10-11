@@ -1,0 +1,108 @@
+<Window x:Class="InGlorious.Core.FirmwareWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:InGlorious.Core"
+        Title="{local:Tr Key='Firmware · INGLORIOUS Advanced'}" Icon="Assets/inglorious.ico"
+        Width="760" Height="710" MinWidth="680" MinHeight="620"
+        WindowStartupLocation="CenterOwner" Background="{StaticResource WindowBackground}"
+        Foreground="{StaticResource Text}" FontFamily="Segoe UI" FontSize="13"
+        UseLayoutRounding="True" Closing="Window_Closing" Loaded="Window_Loaded" Closed="Window_Closed">
+    <Window.Resources>
+        <Style TargetType="ProgressBar">
+            <Setter Property="Foreground" Value="{StaticResource Accent}"/>
+            <Setter Property="Background" Value="{StaticResource Stroke}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid x:Name="PART_Track" Background="{TemplateBinding Background}">
+                            <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left"/>
+                            <Border x:Name="Pulse" Background="{TemplateBinding Foreground}" Visibility="Collapsed"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsIndeterminate" Value="True">
+                                <Setter TargetName="PART_Indicator" Property="Visibility" Value="Collapsed"/>
+                                <Setter TargetName="Pulse" Property="Visibility" Value="Visible"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard x:Name="PulseAnimation"><Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Pulse" Storyboard.TargetProperty="Opacity" From="0.2" To="0.8" Duration="0:0:0.8" AutoReverse="True" RepeatBehavior="Forever"/>
+                                    </Storyboard></BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions><StopStoryboard BeginStoryboardName="PulseAnimation"/></Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+    <Border Background="{StaticResource WindowBackground}">
+    <Grid x:Name="RootPanel" Margin="24">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <StackPanel Margin="0,0,0,20">
+            <TextBlock x:Name="FlowTitle" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock x:Name="DeviceTitle" Margin="0,5,0,0" Foreground="{StaticResource Muted}"/>
+            <ProgressBar x:Name="StepProgress" Maximum="5" Height="3" Margin="0,18,0,0" IsHitTestVisible="False"/>
+        </StackPanel>
+        <ScrollViewer x:Name="StepScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,10,0">
+            <StackPanel>
+                <TextBlock x:Name="StepNumber" Foreground="{StaticResource Accent}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <TextBlock x:Name="StepTitle" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                <TextBlock x:Name="StepDescription" Foreground="{StaticResource Muted}" TextWrapping="Wrap" LineHeight="21" Margin="0,10,0,14"/>
+                <ProgressBar x:Name="Progress" IsIndeterminate="True" Height="4" Margin="0,0,0,18" Visibility="Collapsed"/>
+                <TextBlock x:Name="CoreNotice" Foreground="{StaticResource Accent}" TextWrapping="Wrap" LineHeight="21" Margin="0,0,0,16" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
+                <StackPanel x:Name="ConnectionSteps" Margin="0,0,0,16">
+                    <Border Background="{StaticResource SurfaceRaised}" BorderBrush="{StaticResource Stroke}" BorderThickness="1" Padding="20" CornerRadius="6">
+                        <TextBlock x:Name="KeyCombination" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource Accent}" HorizontalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="{local:Tr Key='Die App erkennt den richtigen Modus automatisch. Es wird noch nichts installiert.'}" TextWrapping="Wrap" LineHeight="21" Margin="0,14,0,0" Foreground="{StaticResource Muted}"/>
+                </StackPanel>
+                <Border x:Name="ConfirmationPanel" Background="{StaticResource Surface}" Padding="16" CornerRadius="6" Margin="0,0,0,16" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock x:Name="VersionText" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                        <StackPanel x:Name="OriginalBackupNotice" Visibility="Collapsed" Margin="0,16,0,8">
+                            <TextBlock Text="{local:Tr Key='Jederzeit zurück zur Original-Firmware'}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            <TextBlock Text="{local:Tr Key='Vor der Installation sichert und prüft die App deine Original-Firmware. Die Sicherung bleibt auf deinem Computer. Unter „Gerät“ → „Original-Firmware wiederherstellen“ kannst du jederzeit zurückwechseln.'}" TextWrapping="Wrap" LineHeight="21" Margin="0,6,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="ScopeText" TextWrapping="Wrap" LineHeight="21" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+                <local:FirmwareChangelogPanel x:Name="UpdateChangelog"/>
+                <StackPanel x:Name="AcknowledgementPanel" Visibility="Collapsed" Margin="0,0,0,18">
+                    <TextBlock Text="{local:Tr Key='USB angeschlossen und die App geöffnet lassen, bis der Abschluss bestätigt wird.'}" TextWrapping="Wrap" LineHeight="21" Foreground="{StaticResource Accent}"/>
+                    <CheckBox x:Name="ConfirmationCheck" Margin="0,12,0,0" Foreground="{StaticResource Text}" Checked="ConfirmationCheck_Changed" Unchecked="ConfirmationCheck_Changed">
+                        <TextBlock Text="{local:Tr Key='Ich möchte die Firmware auf diesem Gerät ändern.'}" TextWrapping="Wrap"/>
+                    </CheckBox>
+                </StackPanel>
+                <StackPanel x:Name="TypingPanel" Visibility="Collapsed" Margin="0,0,0,18">
+                    <Button x:Name="LightingTestButton" Content="{local:Tr Key='Beleuchtung testen'}" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" MinHeight="38" Visibility="Collapsed" Click="LightingTestButton_Click"/>
+                    <TextBlock Text="{local:Tr Key='Dauert etwa 21 Sekunden.'}" Visibility="{Binding Visibility, ElementName=LightingTestButton}" TextWrapping="Wrap" LineHeight="21" Margin="0,8,0,0" Foreground="{StaticResource Muted}"/>
+                    <TextBlock Text="{local:Tr Key='Während des Lichttests keine Tasten drücken.'}" Visibility="{Binding Visibility, ElementName=LightingTestButton}" TextWrapping="Wrap" LineHeight="21" Margin="0,8,0,0" Foreground="{StaticResource Muted}"/>
+                    <TextBlock x:Name="LightingTestStatus" TextWrapping="Wrap" LineHeight="21" Margin="0,8,0,0" Foreground="{StaticResource Muted}" AutomationProperties.LiveSetting="Polite"/>
+                    <TextBlock Text="{local:Tr Key='Hier Tasten testen'}" Margin="0,18,0,8"/>
+                    <TextBlock x:Name="TypingTestHint" Text="{local:Tr Key='Schreibe INGLORIOUS, um abzuschließen, oder klicke auf „Fertig“.'}" TextWrapping="Wrap" LineHeight="21" Margin="0,0,0,10" Foreground="{StaticResource Muted}"/>
+                    <TextBox x:Name="TypingTest" MinHeight="44" MaxLength="200" AutomationProperties.Name="{local:Tr Key='Hier Tasten testen'}" TextChanged="TypingTest_TextChanged"/>
+                    <TextBlock Text="{local:Tr Key='Prüfe auch die Beleuchtung. Dein Profil kannst du anschließend über „Auf Tastatur übertragen“ anwenden.'}" TextWrapping="Wrap" LineHeight="21" Margin="0,12,0,0" Foreground="{StaticResource Muted}"/>
+                </StackPanel>
+                <TextBlock x:Name="StatusText" TextWrapping="Wrap" LineHeight="20" Foreground="{StaticResource Muted}" Margin="0,0,0,14" AutomationProperties.LiveSetting="Polite"/>
+                <Expander x:Name="ConnectionHelp" Header="{local:Tr Key='Gerät wird nicht erkannt?'}" Foreground="{StaticResource Text}" Margin="0,0,0,16" Visibility="Collapsed">
+                    <TextBlock Text="{local:Tr Key='Verwende denselben USB-Anschluss wie zuvor. Ziehe das Kabel noch einmal ab, halte beide angegebenen Tasten gedrückt und stecke es wieder ein.'}" TextWrapping="Wrap" LineHeight="21" Margin="0,10,0,0"/>
+                </Expander>
+                <Expander x:Name="LogExpander" Header="{local:Tr Key='Protokoll'}" IsExpanded="False" Foreground="{StaticResource Muted}" Margin="0,12,0,0">
+                    <StackPanel Margin="0,10,0,0">
+                        <TextBox x:Name="LogOutput" IsReadOnly="True" AcceptsReturn="True" FontFamily="Segoe UI" FontSize="13" MinHeight="120" MaxHeight="260" Padding="12" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" TextWrapping="Wrap" AutomationProperties.Name="{local:Tr Key='Protokoll'}"/>
+                        <Button x:Name="EvidenceButton" Content="{local:Tr Key='Prüfbericht öffnen'}" HorizontalAlignment="Left" Margin="0,10,0,0" Visibility="Collapsed" IsEnabled="False" Click="OpenEvidenceButton_Click"/>
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+        <Grid Grid.Row="2" Margin="0,20,0,0">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock x:Name="KeepOpenNotice" Grid.ColumnSpan="3" Text="{local:Tr Key='INGLORIOUS ADVANCED während des Updates nicht schließen.'}" Foreground="{StaticResource Accent}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,14"/>
+            <Button x:Name="BackButton" Grid.Row="1" Content="{local:Tr Key='Zurück'}" HorizontalAlignment="Left" MinHeight="38" Click="BackButton_Click" Visibility="Collapsed"/>
+            <Button x:Name="CloseButton" Grid.Row="1" Grid.Column="1" Content="{local:Tr Key='Schließen'}" Margin="10,0" MinHeight="38" Click="CloseButton_Click" IsCancel="True"/>
+            <Button x:Name="ContinueButton" Grid.Row="1" Grid.Column="2" Content="{local:Tr Key='Gerät ist bereit'}" Style="{StaticResource PrimaryButton}" MinHeight="38" IsEnabled="False" Click="ContinueButton_Click"/>
+        </Grid>
+    </Grid>
+    </Border>
+</Window>

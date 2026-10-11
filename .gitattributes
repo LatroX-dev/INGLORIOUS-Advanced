@@ -1,0 +1,3 @@
+# Firmware references and patches are checked byte-for-byte. Preserve reviewed
+# file contents on every host; editors may choose line endings explicitly.
+* -text
