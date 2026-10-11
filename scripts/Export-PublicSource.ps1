@@ -118,7 +118,7 @@ foreach ($size in @('65','75','100')) {
 $allow.Add('tests/InGlorious.OnboardChecks/StartupDeviceChecks.cs')
 foreach ($name in @('effect_oracle.c','Run-PreviewChecks.ps1')) { $allow.Add('tests/InGlorious.PreviewChecks/'+$name) }
 foreach ($name in @('sequence_oracle.c','Run-ColorSequenceChecks.ps1')) { $allow.Add('tests/InGlorious.ColorSequenceChecks/'+$name) }
-foreach ($name in @('.gitignore','.gitattributes','AGENTS.md','docs/public-release.md','docs/model-support.md','scripts/Test-ModelReferences.ps1','scripts/Export-PublicSource.ps1','scripts/Build-BrandIcon.ps1','scripts/Install-InGlorious.ps1','scripts/New-WindowsPackage.ps1','scripts/Test-WindowsInstaller.ps1')) { $allow.Add($name) }
+foreach ($name in @('.gitignore','.gitattributes','docs/public-release.md','docs/model-support.md','scripts/Test-ModelReferences.ps1','scripts/Export-PublicSource.ps1','scripts/Build-BrandIcon.ps1','scripts/Install-InGlorious.ps1','scripts/New-WindowsPackage.ps1','scripts/Test-WindowsInstaller.ps1')) { $allow.Add($name) }
 foreach ($name in @('README.md','LICENSE','COPYRIGHT.md','THIRD-PARTY-NOTICES.md','CONTRIBUTING.md','SECURITY.md','CHANGELOG.md','global.json','NuGet.Config',
     'docs/getting-started.md','docs/hardware-acceptance.md','docs/license-audit.md','docs/images/windows-lighting.png','docs/images/experimental-layout.png','docs/images/pro-ansi.png','docs/images/gmmk3-100-ansi.png',
     'scripts/Initialize-BuildDependencies.ps1','scripts/build-dependencies.json','scripts/Build-PublicRelease.ps1','scripts/Test-PublicSourceExport.ps1','scripts/Copy-RuntimeNotices.ps1',

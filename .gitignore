@@ -1,5 +1,6 @@
 **/bin/
 **/obj/
+AGENTS.md
 artifacts/
 source-export-manifest.json
 backups/

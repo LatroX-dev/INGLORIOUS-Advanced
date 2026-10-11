@@ -22,7 +22,7 @@ try {
   New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($target)) -Force | Out-Null
   Copy-Item -LiteralPath $source -Destination $target
  }
- $noise=@('backups/private.bin','data/profile.json','artifacts/hardware.txt','tools/private.exe','src/InGlorious.Core/bin/secret.txt','firmware/local-firmware-bindings.json','firmware/releases/private.bin')
+ $noise=@('AGENTS.md','docs/AGENTS.md','backups/private.bin','data/profile.json','artifacts/hardware.txt','tools/private.exe','src/InGlorious.Core/bin/secret.txt','firmware/local-firmware-bindings.json','firmware/releases/private.bin')
  foreach($name in $noise){$path=Join-Path $fixture $name;New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($path)) -Force|Out-Null;[IO.File]::WriteAllText($path,'private-test-noise')}
  $destination=Join-Path $testRoot 'export'
  $fixturePlan=&$exporter -SourceRoot $fixture -Destination $destination

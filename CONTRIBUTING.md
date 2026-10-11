@@ -47,7 +47,7 @@ Generated files go under ignored build/dependency directories. Personal profiles
 
 ## Changes
 
-- Keep customer text short and state a clear next step; follow `AGENTS.md`.
+- Keep customer text short and state a clear next step.
 - Update all supported languages for UI changes. Keep changelogs short and in English.
 - Include before/after screenshots for visible changes, without private profiles or identifiers.
 - Preserve existing license and copyright notices. See `COPYRIGHT.md` for component scope.

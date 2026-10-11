@@ -73,7 +73,9 @@ The app follows the system language by default, with English as fallback. It inc
 
 INGLORIOUS uses custom firmware developed for this project and built on [QMK Firmware](https://qmk.fm/). Each supported model receives its own INGLORIOUS build, combining QMK's keyboard and hardware support with our app connection, onboard configuration, lighting effects, macro handling, standby and screensaver features.
 
-The resulting firmware replaces the keyboard's original firmware. Your original backup remains available for recovery. GMMK 3 support also uses adapted open-source keyboard definitions published by Glorious. Thanks to the QMK community and the upstream contributors who make this possible.
+The resulting firmware replaces the keyboard's original firmware. Your original backup remains available for recovery. GMMK 3 support also uses adapted open-source keyboard definitions published by Glorious.
+
+**Thanks to the QMK community and the upstream contributors who make this possible.**
 
 The desktop app is developed as part of INGLORIOUS Advanced. See the [firmware documentation](firmware/README.md) for source details and [third-party notices](THIRD-PARTY-NOTICES.md) for credits and licenses.
 
