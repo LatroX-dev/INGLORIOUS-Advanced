@@ -61,6 +61,8 @@ The app follows the system language by default, with English as fallback. It inc
 
 ## Original firmware and backups
 
+**Use this software and its firmware at your own risk.** Firmware changes can cause data loss or leave a device unusable. Keep a separate copy of your original-firmware backups.
+
 Before first installation, the app creates and checks two copies of the keyboard's internal original firmware. Keep the backup folder: it is needed to return to the original firmware through **Settings → Restore original firmware**.
 
 This backup does not include external profile memory, wireless modules or protection settings. Original application settings are therefore not guaranteed to return exactly as before. A disconnected cable or loss of power during a firmware write can require separate recovery. The app stops if it cannot identify the device or verify a backup.
