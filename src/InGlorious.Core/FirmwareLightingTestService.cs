@@ -23,12 +23,21 @@ public sealed class FirmwareLightingTestService
     public FirmwareLightingTestService(Func<IReadOnlyList<OnboardDevice>> discover, Func<OnboardDevice, OnboardClient> open, Func<TimeSpan, CancellationToken, Task> delay, Func<long>? milliseconds = null)
     { _discover = discover ?? throw new ArgumentNullException(nameof(discover)); _open = open ?? throw new ArgumentNullException(nameof(open)); _delay = delay ?? throw new ArgumentNullException(nameof(delay)); _milliseconds = milliseconds ?? (() => Environment.TickCount64); }
 
-    public async Task BlinkAsync(string deviceId, string usbInstanceId, Func<Task<bool?>> coreStatus, CancellationToken cancellationToken)
+#if WINDOWS
+    public Task BlinkAsync(string deviceId, string usbInstanceId, Func<Task<bool?>> coreStatus, CancellationToken cancellationToken)
     {
         if (!BoardDescriptorRegistry.TryGet(deviceId, out var board)) throw new ArgumentException("Unbekanntes Gerätemodell.", nameof(deviceId));
         var pid = board.RuntimeProductId.ToString("X4");
         if (!OnboardHidTransport.IsPhysicalUsbRoot(usbInstanceId) || !usbInstanceId.StartsWith($@"USB\VID_FEED&PID_{pid}\", StringComparison.OrdinalIgnoreCase))
             throw Error(FirmwareLightingTestFailure.DeviceUnavailable, "Der Beleuchtungstest benötigt das eindeutig erkannte Gerät mit INGLORIOUS-Firmware.");
+        return BlinkAsync(deviceId, device => string.Equals(device.UsbInstanceId, usbInstanceId, StringComparison.OrdinalIgnoreCase) && OnboardHidTransport.IsAllowedPath(device.Path), coreStatus, cancellationToken);
+    }
+#endif
+
+    public async Task BlinkAsync(string deviceId, Func<OnboardDevice, bool> matchesPhysicalDevice, Func<Task<bool?>> coreStatus, CancellationToken cancellationToken)
+    {
+        if (!BoardDescriptorRegistry.TryGet(deviceId, out _)) throw new ArgumentException("Unbekanntes Gerätemodell.", nameof(deviceId));
+        ArgumentNullException.ThrowIfNull(matchesPhysicalDevice);
         ArgumentNullException.ThrowIfNull(coreStatus);
         if (Interlocked.CompareExchange(ref _running, 1, 0) != 0) throw Error(FirmwareLightingTestFailure.DeviceBusy, "Der Beleuchtungstest läuft bereits.");
         try
@@ -37,8 +46,8 @@ public sealed class FirmwareLightingTestService
             limit.CancelAfter(TimeSpan.FromSeconds(30));
             var token = limit.Token;
             await RequireCoreClosed(coreStatus, token).ConfigureAwait(false);
-            var candidates = _discover().Where(device => device.DeviceId == deviceId && string.Equals(device.UsbInstanceId, usbInstanceId, StringComparison.OrdinalIgnoreCase)).ToArray();
-            if (candidates.Length != 1 || !OnboardHidTransport.IsAllowedPath(candidates[0].Path)) throw Error(FirmwareLightingTestFailure.DeviceUnavailable, "Das Gerät für den Beleuchtungstest ist nicht eindeutig verbunden.");
+            var candidates = _discover().Where(device => device.DeviceId == deviceId && matchesPhysicalDevice(device)).ToArray();
+            if (candidates.Length != 1) throw Error(FirmwareLightingTestFailure.DeviceUnavailable, "Das Gerät für den Beleuchtungstest ist nicht eindeutig verbunden.");
             var device = candidates[0];
             OnboardInfo? before = null;
             var startAttempted = false;
@@ -52,6 +61,7 @@ public sealed class FirmwareLightingTestService
                 if (!extensions.SupportsLightingTest) throw Error(FirmwareLightingTestFailure.FirmwareUpdateRequired, "Für den Beleuchtungstest ist ein Firmware-Update erforderlich.");
                 if ((await client.GetLightingTestStatusAsync(token).ConfigureAwait(false)).Active) throw Error(FirmwareLightingTestFailure.DeviceBusy, "Der Beleuchtungstest läuft bereits.");
                 await RequireCoreClosed(coreStatus, token).ConfigureAwait(false);
+                if (!matchesPhysicalDevice(device)) throw Error(FirmwareLightingTestFailure.DeviceUnavailable, "Das Gerät für den Beleuchtungstest ist nicht eindeutig verbunden.");
                 startAttempted = true;
                 var requestedAt = _milliseconds();
                 var durationMs = extensions.LightingTestDurationMs;
@@ -85,6 +95,7 @@ public sealed class FirmwareLightingTestService
                     try
                     {
                         using var stopLimit = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+                        if (!matchesPhysicalDevice(device)) throw new IOException("The lighting-test device is no longer at its verified USB port.");
                         await using var cleanup = _open(device);
                         await cleanup.StopLightingTestAsync(stopLimit.Token).ConfigureAwait(false);
                         if ((await cleanup.GetLightingTestStatusAsync(stopLimit.Token).ConfigureAwait(false)).Active) throw new IOException("Lighting overlay is still active.");

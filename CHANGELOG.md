@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.41
+
+- Windows installer with an optional background start at login.
+- Uninstaller with a choice to keep or remove personal data.
+- Firmware setup, updates and original-firmware recovery on macOS and Linux.
+- Clearer setup steps and highlighted update-mode key combinations.
+- Clearer knob controls and corrected translations.
+
 ## 0.6.40
 
 - Firmware updates for supported device variants.

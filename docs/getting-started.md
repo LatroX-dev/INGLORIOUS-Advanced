@@ -4,24 +4,54 @@
 
 Public downloads are not available yet. To build the source preview, see the [build instructions](public-release.md).
 
-Once a Windows x64 ZIP is available in Releases, extract it and run **Install.cmd**. Open **INGLORIOUS Advanced** from the Start menu. Keep all files together if using the portable executable instead.
+Choose the package for your computer when downloads become available:
+
+- **Windows x64:** run **INGLORIOUS-Advanced-\<version\>-Setup.exe** and follow the installation guide. Open **INGLORIOUS Advanced** from the Start menu. No command script or separate .NET installation is needed.
+- **macOS:** extract the archive and drag **INGLORIOUS Advanced.app** to Applications. Choose `osx-arm64` for Apple silicon or `osx-x64` for an Intel Mac. These builds are not Apple-notarized; macOS may ask you to approve the app in **Privacy & Security**.
+- **Linux x64:** extract the archive and run **application/INGLORIOUS Advanced**. If USB access is blocked, follow the Linux USB instructions below.
+
+Keep the application files together. First installation, firmware updates and restoration use the same guided steps on all three platforms. Native macOS/Linux hardware validation is still pending; see the [test status](hardware-acceptance.md#current-status).
+
+### Open at system startup
+
+The Windows installer selects **Open at system startup** by default. You can clear it during installation or change it later in the app's **Settings**. Updates preserve your choice. Autostart opens the app in the notification area rather than displaying its window. Use the icon to open or quit INGLORIOUS Advanced. Starting the app normally opens its window.
+
+The same setting is available on macOS and Linux. macOS uses the menu bar; on Linux, a desktop without a supported tray shows the app window so it remains accessible.
+
+If your operating system separately blocks login items, allow INGLORIOUS Advanced in its startup settings as well.
+
+### Uninstall on Windows
+
+Open Windows **Settings → Apps → Installed apps → INGLORIOUS Advanced → Uninstall**. Choose whether to keep your personal data or remove it with the app. Keeping data is selected by default.
+
+Full removal also deletes the original-firmware backups in the app's data folder. Keep a separate copy if you want to return to the original firmware later. Files you exported to other folders are not removed. Uninstalling the app does not change the keyboard's firmware.
 
 ## Install INGLORIOUS firmware
 
 1. Connect your keyboard by USB and open **Settings → Set up device**.
 2. Choose the detected keyboard if more than one is connected. Check the full model name and layout. Experimental models are marked.
 3. Follow the displayed instructions to disconnect it and reconnect with the shown keys held.
-4. Wait while the app saves the original firmware. Confirm installation when ready.
+4. Select **Create backup** and wait while the app saves the original firmware. Confirm installation when ready.
 5. Keep the app open and USB connected until it asks you to reconnect normally.
 6. Select **Test lighting** for the approximately 21-second light sequence. Do not press keys during it. Then type **INGLORIOUS** in the test box, in any letter case, or **1234567890** on the Numpad. This finishes the guide; you can also select **Done**.
 
 The app handles the file checks. You do not choose a firmware file or inspect checksums. If Glorious CORE is running, close it when prompted. If a driver or device cannot be verified, follow the displayed message; do not choose a similar model to continue.
 
-First installation replaces the keyboard firmware and starts with new INGLORIOUS settings. The Numpad works through USB only.
+First installation replaces the keyboard firmware and starts with new INGLORIOUS settings. The Numpad is **USB only — Bluetooth does not work** with INGLORIOUS firmware.
 
-### If the USB driver is missing
+### Windows: if the USB driver is missing
 
 Use the guide's **Set up USB driver (Zadig)** button only when prompted. In Zadig, select the exact keyboard device that the guide identified in update mode, choose **WinUSB** and install it. Never replace the normal keyboard or HID driver. If you cannot identify the update-mode device confidently, stop and leave the drivers unchanged. Return to the guide after installing the driver.
+
+### Linux: allow USB access
+
+If the app cannot access the keyboard, open a terminal in the extracted package folder and run:
+
+```sh
+sudo bash Install-UsbPermissions.sh
+```
+
+Confirm the prompt to install access rules for the supported USB devices. Then reconnect the keyboard and reopen the app. Run INGLORIOUS Advanced as your normal user, not as root.
 
 ## Make changes
 
@@ -33,7 +63,7 @@ Use the **?** button next to Settings for help in your language. Language follow
 
 ## Update INGLORIOUS firmware
 
-The app compares the version reported by the keyboard with the firmware included in the app. An update is offered only when an older supported version is recognized. Open it from the device's firmware area and follow the guided reconnect steps.
+Every app package includes the matching firmware for all supported models. The app compares the version reported by the keyboard with this included firmware. An update is offered only when an older supported version is recognized. Installing a newer app does not flash the keyboard automatically. Open an available firmware update from the device's firmware area and follow the guided reconnect steps.
 
 An ordinary update preserves the stored INGLORIOUS configuration. Save a profile copy before updating. Do not disconnect the keyboard or close INGLORIOUS Advanced while the write is running. An unknown version is not treated as outdated.
 
@@ -46,15 +76,14 @@ After reconnecting, use **Test lighting** and the typing test described above, o
 3. Follow the reconnect instructions and confirm restoration.
 4. Reconnect normally when asked, then test typing and lighting.
 
-Restoring replaces INGLORIOUS and its stored configuration. It requires that keyboard's matching original backup. Backups are in `%LOCALAPPDATA%\INGLORIOUS Advanced\Firmware\Devices`; keep a separate copy before replacing or reinstalling Windows.
+Restoring replaces INGLORIOUS and its stored configuration. It requires that keyboard's matching original backup. Keep a separate copy of the complete backup folder before replacing or reinstalling your system. The [backup locations](device-setup.md#backup-locations) are listed for each platform.
 
 The backup covers internal firmware. External profile storage and wireless-module settings are not included, so original settings are not guaranteed to be restored completely. An interrupted firmware write can require separate recovery. If the app reports an uncertain result, leave the device connected and keep the diagnostic report; do not repeatedly retry.
 
 ## If a device is missing
 
-- Use a USB data cable and wait for Windows to finish detecting the keyboard.
+- Use a USB data cable and wait for your system to finish detecting the keyboard.
 - Close another configuration app if it is using the device.
 - Check the [model list](model-support.md); similar product names may contain different hardware.
-- If asked for a bootloader driver, do not replace the normal keyboard driver. The firmware guide must identify the update-mode device first.
-
-The macOS and Linux previews do not install or restore firmware.
+- On Windows, if asked for a bootloader driver, do not replace the normal keyboard driver. The firmware guide must identify the update-mode device first.
+- On Linux, check USB access using the instructions above.

@@ -73,7 +73,7 @@ public sealed partial class MainWindow
             if (!await GuardNavigation() || await Ask("Makro entfernen", L.T("Zugewiesene Tasten werden deaktiviert."), "Abbrechen", "Entfernen") != 1) return;
             _state.Change(p => { p.Macros.RemoveAll(m => m.Id == macro.Id); foreach (var layer in p.Layers) foreach (var assignment in layer.Keys.Values) if (assignment.Binding == "MACRO:" + macro.Id) assignment.Binding = "KC_NO"; }); _macroId = null; Changed(); Build();
         }));
-        var targetKeys = _state.Device.Keys.ToArray(); var assignment = Choice(targetKeys.Select(k => k.Label));
+        var targetKeys = _state.Device.Keys.ToArray(); var assignment = Choice(targetKeys.Select(k => k.AccessibleLabel));
         _editor.Children.Add(Heading("Taste zuweisen")); _editor.Children.Add(assignment);
         _editor.Children.Add(Button("Makro zuweisen", () =>
         {

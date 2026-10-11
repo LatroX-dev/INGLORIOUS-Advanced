@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 
 namespace InGlorious.Core;
 
@@ -46,6 +47,8 @@ public sealed partial class DeviceSetupWindow
         ShowOfflineStep("select");
         var device = SelectedDevice!;
         check(_service is null && !_timer.IsEnabled && !CanAct, "Setup: offline construction never creates a service or starts polling");
+        check(_flowTitle.Text == OperationTitle && _stepProgress.Value == 1 && _step.Text == L.Format("Schritt {0} von 5", 1) && _keepOpen.Visibility == Visibility.Visible,
+            "Setup: the operation header, first step and keep-open reminder are visible before preparation");
         check(!_description.Text.Contains("Glorious CORE", StringComparison.Ordinal) && _driverHelp.Visibility == Visibility.Collapsed, "Setup: ordinary discovery does not invent a CORE or driver problem");
         check(_devices.Visibility == Visibility.Collapsed && ReferenceEquals(_devices.SelectedItem, device), "Setup: exactly one eligible device is selected without a dropdown");
         ApplyDevices([device, device with { InstanceId = "second-fixture" }]);
@@ -78,6 +81,9 @@ public sealed partial class DeviceSetupWindow
             ShowOfflineStep(step);
             check(!CanAct && !_action.IsEnabled && !_timer.IsEnabled, "Setup: offline " + step + " has no executable device action");
             check(!ActionReady, "Setup: " + step + " never authorizes capture or writing without an explicit confirmation");
+            if (step is "disconnect" or "connect" or "reconnect")
+                check(_action.Visibility == Visibility.Visible && !_action.IsEnabled, "Setup: automatic USB waiting steps show a disabled waiting action");
+            check((_keyPanel.Visibility == Visibility.Visible) == (step == "connect"), "Setup: boot keys appear only during the bootloader connection step");
         }
         ShowOfflineStep("backup"); _modelConfirmation.IsChecked = true;
         check(ActionReady && !CanAct, "Setup: model confirmation permits only the separately requested capture action");
@@ -86,7 +92,10 @@ public sealed partial class DeviceSetupWindow
         ShowOfflineStep("confirm");
         _writeConfirmation.IsChecked = true;
         check(ActionReady && !CanAct, "Setup: a verified backup still requires the final write confirmation");
-        _busy = true; var closing = new CancelEventArgs(); WindowClosing(this, closing);
+        _busy = true; Render(); _activity.ApplyTemplate(); var closing = new CancelEventArgs(); WindowClosing(this, closing);
+        check(_activity.Visibility == Visibility.Visible && _activity.Foreground == FindResource("Accent") &&
+            _activity.Template.FindName("Pulse", _activity) is Border { Visibility: Visibility.Visible },
+            "Setup: capture and write activity use the flat accent progress template");
         check(closing.Cancel && !ActionReady, "Setup: capture or write blocks closing and reentry without cancellation");
         _busy = false; closing = new(); WindowClosing(this, closing);
         check(!closing.Cancel, "Setup: a waiting wizard can be closed");
@@ -109,6 +118,12 @@ public sealed partial class DeviceSetupWindow
             ShowOfflineStep("connect", model.Id);
             var instruction = BootInstruction(SelectedDevice);
             check(model.Id == "numpad" ? instruction.Contains("Plus", StringComparison.Ordinal) : _operation == SetupOperation.Install && model.Id.StartsWith("gmmk3-", StringComparison.Ordinal) ? instruction.Contains("Esc", StringComparison.Ordinal) : instruction.Contains("Leertaste", StringComparison.Ordinal), "Setup: " + model.Id + " " + _operation + " uses its reviewed firmware-specific boot gesture");
+            var keyLabels = _keyCaps.Children.OfType<Border>().Select(cap => ((TextBlock)cap.Child).Text).ToArray();
+            var expectedKeys = model.Id == "numpad" ? new[] { "+", "Enter" }
+                : _operation == SetupOperation.Install && model.Id.StartsWith("gmmk3-", StringComparison.Ordinal) ? ["Esc"] : new[] { "Leertaste", "B" };
+            check(keyLabels.SequenceEqual(expectedKeys) && _stepProgress.Value == 3, "Setup: " + model.Id + " shows the real boot keys as individual keycaps");
+            var firstCap = _keyCaps.Children[0]; Render();
+            check(ReferenceEquals(firstCap, _keyCaps.Children[0]), "Setup: USB observation does not replace or flicker unchanged keycaps");
             ShowOfflineStep("complete", model.Id);
             check(CompletionTestsVisible == (_operation != SetupOperation.Restore) && !_lightingButton.IsEnabled,
                 "Setup: " + model.Id + " " + _operation + " shows its post-flash test without allowing offline device access");
@@ -140,6 +155,9 @@ public sealed partial class DeviceSetupWindow
                 SelectReturnedDevice([returned with { IsRuntime = false }], original, model.Id) is null,
                 "Setup: another controller, duplicate runtime or stock descriptor cannot receive the post-flash test");
         }
+        foreach (var key in new[] { "Plus (+) + Enter", "Leertaste + B" })
+            check(L.Catalog[key].Count == L.SupportedLanguages.Count - 1 && L.Catalog[key].Values.All(value => value.Split(" + ").Length == 2),
+                "Setup: translated boot combinations remain two separate keycaps in every supported language");
         ShowOfflineStep("select");
     }
 }

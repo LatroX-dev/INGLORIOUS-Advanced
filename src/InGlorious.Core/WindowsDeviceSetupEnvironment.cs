@@ -59,61 +59,8 @@ internal sealed class WindowsDeviceSetupEnvironment : IDeviceSetupEnvironment
             throw new InvalidDataException("Duplicate USB inventory.");
         return result;
     }
-    public Task<bool?> IsCoreRunningAsync() => Task.FromResult(FirmwareService.IsGloriousCoreRunning());
+    public Task<bool?> IsCoreRunningAsync() => Task.FromResult(DeviceSetupService.IsGloriousCoreRunning());
 
-    public async Task<JsonElement> InvokeAdapterAsync(IReadOnlyDictionary<string, object?> request, string evidenceDirectory)
-    {
-        var root = Path.Combine(AppContext.BaseDirectory, "Tools", "FirmwareAdapter");
-        DeviceSetupService.AssertNoLinks(root);
-        var locks = new List<FileStream>();
-        try
-        {
-            // This resource is generated from the reviewed adapter publish, independently of device data.
-            var assembly = typeof(WindowsDeviceSetupEnvironment).Assembly;
-            var resource = assembly.GetManifestResourceNames().SingleOrDefault(name => name.EndsWith(".SetupToolCatalog.json", StringComparison.Ordinal));
-            if (resource is null) throw new SetupException(L.T("Die Firmware-Werkzeuge fehlen. Installiere die vollständige App erneut."));
-            using var stream = assembly.GetManifestResourceStream(resource)!;
-            using var manifest = JsonDocument.Parse(stream);
-            var expectedFiles = manifest.RootElement.GetProperty("files").EnumerateArray()
-                .Select(item => item.GetProperty("path").GetString()!).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var actualFiles = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
-                .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/')).ToArray();
-            if (actualFiles.Length != expectedFiles.Count || !actualFiles.All(expectedFiles.Contains))
-                throw new SetupException(L.T("Die Firmware-Werkzeuge sind beschädigt. Installiere die App erneut."));
-            foreach (var item in manifest.RootElement.GetProperty("files").EnumerateArray())
-            {
-                var path = DeviceSetupService.ContainedFile(root, item.GetProperty("path").GetString()!);
-                var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                locks.Add(file);
-                if (file.Length != item.GetProperty("bytes").GetInt64() ||
-                    Convert.ToHexString(SHA256.HashData(file)) != item.GetProperty("sha256").GetString())
-                    throw new SetupException(L.T("Die Firmware-Werkzeuge sind beschädigt. Installiere die App erneut."));
-            }
-            var callId = Guid.NewGuid().ToString("N");
-            var requestPath = Path.Combine(evidenceDirectory, "request-" + callId + ".json");
-            var responsePath = Path.Combine(evidenceDirectory, "response-" + callId + ".json");
-            DeviceSetupService.AssertNoLinks(evidenceDirectory);
-            using (var file = new FileStream(requestPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            { file.Write(JsonSerializer.SerializeToUtf8Bytes(request)); file.Flush(true); }
-            var start = new ProcessStartInfo(Path.Combine(root, "InGlorious.FirmwareAdapter.exe"))
-            { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = root };
-            start.ArgumentList.Add("--request"); start.ArgumentList.Add(requestPath);
-            start.ArgumentList.Add("--response"); start.ArgumentList.Add(responsePath);
-            using var process = Process.Start(start) ?? throw new IOException("Firmware adapter could not start.");
-            // The adapter bounds each native operation itself. Never kill an in-progress flash on a UI timer.
-            var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
-            var outText = await stdout; var errText = await stderr;
-            if (outText.Length + errText.Length > 4 * 1024 * 1024) throw new IOException("Firmware adapter output exceeded its limit.");
-            DeviceSetupService.AssertNoLinks(responsePath);
-            if (!File.Exists(responsePath) || new FileInfo(responsePath).Length > 1024 * 1024) throw new IOException("Firmware adapter returned no usable result.");
-            using var response = JsonDocument.Parse(File.ReadAllBytes(responsePath));
-            if (response.RootElement.GetProperty("schema").GetInt32() != 1 ||
-                response.RootElement.GetProperty("operation").GetString() != (string)request["operation"]!) throw new InvalidDataException("Firmware adapter operation mismatch.");
-            if (process.ExitCode != 0 && response.RootElement.GetProperty("status").GetString() is "ok" or "verified")
-                throw new InvalidDataException("Firmware adapter status mismatch.");
-            return response.RootElement.Clone();
-        }
-        finally { foreach (var item in locks) item.Dispose(); }
-    }
+    public Task<JsonElement> InvokeAdapterAsync(IReadOnlyDictionary<string, object?> request, string evidenceDirectory) =>
+        FirmwareAdapterProcess.InvokeAsync(request, evidenceDirectory);
 }

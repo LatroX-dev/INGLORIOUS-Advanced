@@ -23,7 +23,7 @@ function Invoke-Checked([string]$Command,[string[]]$Arguments){
 $sdk=(& dotnet --version).Trim()
 $expectedSdk=(Get-Content -LiteralPath (Join-Path $root 'global.json') -Raw|ConvertFrom-Json).sdk.version
 if($sdk-cne$expectedSdk){throw ('Install .NET SDK '+$expectedSdk+' from Microsoft before building.')}
-$tests=@('InGlorious.Checks','InGlorious.BoardRegistryChecks','InGlorious.ModelChecks','InGlorious.DiscoveryChecks','InGlorious.OnboardChecks','InGlorious.MacroLibraryChecks','InGlorious.LightingPresetChecks','InGlorious.PreferencesChecks','InGlorious.RecordingChecks','InGlorious.PendingChecks','InGlorious.LightingTestChecks')
+$tests=@('InGlorious.Checks','InGlorious.BoardRegistryChecks','InGlorious.ModelChecks','InGlorious.DiscoveryChecks','InGlorious.OnboardChecks','InGlorious.MacroLibraryChecks','InGlorious.LightingPresetChecks','InGlorious.PreferencesChecks','InGlorious.RecordingChecks','InGlorious.PendingChecks','InGlorious.LightingTestChecks','InGlorious.AutostartChecks','InGlorious.StartupGuardChecks','InGlorious.BackgroundChecks')
 $executedTests=0
 foreach($suite in $tests){
     [xml]$testProject=Get-Content -LiteralPath (Join-Path $root ('tests/'+$suite+'/'+$suite+'.csproj'))
@@ -82,4 +82,5 @@ $package=Join-Path $output ('INGLORIOUS-Advanced-'+$version+'-win-x64')
 & (Join-Path $PSScriptRoot 'New-WindowsPackage.ps1') -PublishDirectory $publish -Destination $package -ExpectedVersion $version -ToolCatalogPath $toolCatalog -Create|Out-Host
 $zip=$package+'.zip';Compress-Archive -LiteralPath $package -DestinationPath $zip
 ((Get-FileHash -LiteralPath $zip).Hash.ToLowerInvariant()+'  '+[IO.Path]::GetFileName($zip))|Set-Content -LiteralPath ($zip+'.sha256')
-[pscustomobject]@{mode=$Mode;version=$version;firmwareRelease=$catalog.releaseId;models=$catalog.targets.Count;package=$zip;toolCatalog=$toolCatalog;hardwareAccess=$false}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $output 'result.json')
+$installer=& (Join-Path $PSScriptRoot 'Build-WindowsInstaller.ps1') -PackageDirectory $package -ToolCatalogPath $toolCatalog -OutputDirectory (Join-Path $output 'installer') -Offline:$Offline
+[pscustomobject]@{mode=$Mode;version=$version;firmwareRelease=$catalog.releaseId;models=$catalog.targets.Count;installer=$installer.installer;internalPackage=$zip;toolCatalog=$toolCatalog;hardwareAccess=$false}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $output 'result.json')

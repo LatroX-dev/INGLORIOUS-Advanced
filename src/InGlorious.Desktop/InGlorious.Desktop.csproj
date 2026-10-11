@@ -1,10 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType><TargetFramework>net9.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
-    <AssemblyName>INGLORIOUS Advanced</AssemblyName><Version>0.6.40</Version><Product>INGLORIOUS Advanced</Product><Title>INGLORIOUS Advanced</Title>
+    <AssemblyName>INGLORIOUS Advanced</AssemblyName><Version>0.6.41</Version><Product>INGLORIOUS Advanced</Product><Title>INGLORIOUS Advanced</Title>
     <ApplicationIcon>../InGlorious.Core/Assets/inglorious.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <SetupAssetsDirectory Condition="'$(SetupAssetsDirectory)' == ''">$(MSBuildThisFileDirectory)../../artifacts/portable-setup-assets</SetupAssetsDirectory>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.4" />
@@ -12,6 +14,7 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
     <PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.1.4" />
     <ProjectReference Include="Shared/InGlorious.Shared.csproj" />
+    <Content Include="$(SetupAssetsDirectory)/**/*" Link="%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Compile Remove="Shared/**/*.cs" />
     <AvaloniaResource Include="../InGlorious.Core/Assets/inglorious-mark.png" Link="Assets/inglorious-mark.png" />
     <AvaloniaResource Include="../InGlorious.Core/Assets/inglorious.ico" Link="Assets/inglorious.ico" />

@@ -34,13 +34,14 @@ internal sealed class Stm32Device : IDevice
     public object[] Log => commands.ToArray();
     internal Stm32Device(Selection selection, string evidence)
     {
-        if (selection.Vid != 0x0483 || selection.Pid != 0xDF11 || selection.Bus == 0 ||
-            !Regex.IsMatch(selection.PortPath, "^[1-9][0-9]?(?:\\.[1-9][0-9]?){0,7}$", RegexOptions.CultureInvariant) ||
+        if (selection.Vid != 0x0483 || selection.Pid != 0xDF11 || (selection.Bus == 0 && !OperatingSystem.IsMacOS()) ||
+            !Regex.IsMatch(selection.PortPath, "^[1-9][0-9]{0,2}(?:\\.[1-9][0-9]{0,2}){0,7}$", RegexOptions.CultureInvariant) ||
+            selection.PortPath.Split('.').Any(part => !byte.TryParse(part, out byte number) || number == 0) ||
             !Regex.IsMatch(selection.Serial ?? "", "^[0-9A-Fa-f]{12}$", RegexOptions.CultureInvariant)) throw new InvalidDataException("STM_SELECTION_INVALID");
         this.selection = selection; this.evidence = evidence;
-        tool = Path.Combine(AppContext.BaseDirectory, "native", "dfu-util-static.exe");
-        var length = new FileInfo(tool).Length;
-        toolLock = Files.Lock(tool, length, ToolHash).Stream;
+        var native = NativeToolCatalog.Verify(NativeToolCatalog.DfuName);
+        tool = native.Path;
+        toolLock = Files.Lock(tool, native.Bytes, native.Sha256).Stream;
     }
     internal string[] Arguments(string operation, string? file = null)
     {
@@ -106,6 +107,7 @@ internal sealed class Stm32Device : IDevice
         var request = new { executable = tool, arguments, write = operation == "write", utc = DateTimeOffset.UtcNow };
         Files.New(evidence, name + ".request.json", Json.Bytes(request), "tool-request");
         var psi = new ProcessStartInfo(tool) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        psi.Environment["LC_ALL"] = "C";
         foreach (string arg in arguments) psi.ArgumentList.Add(arg);
         using var process = new Process { StartInfo = psi };
         string stdout = "", stderr = ""; int? exit = null; bool timeout = false; string? error = null;

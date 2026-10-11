@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -164,7 +164,7 @@ public partial class MainWindow : Window
                 if (!_startupComplete || _startupClosed) return;
                 await Task.WhenAll(ScanDevicesAsync(selectInitial: true), InspectBackupAsync());
                 if (_startupClosed) return;
-                await CheckFirmwareGuideAsync();
+                if (IsVisible) await CheckFirmwareGuideAsync();
             }
             finally
             {
@@ -429,31 +429,34 @@ public partial class MainWindow : Window
             // Neutral legends remain readable even when the configured RGB is black or very dark.
             var capColor = Color.FromRgb((byte)(color.R * .055 + 34), (byte)(color.G * .055 + 37), (byte)(color.B * .055 + 41));
             var selected = _selection.Contains(key.Id) && (_activeTab != 0 || _lightingTarget == LightingTarget.Keys && (!_showLightingEffects || _effectForSelection));
-            var content = new Grid { Margin = largeLayout ? new Thickness(4, 3, 4, 4) : new Thickness(6, 5, 6, 6), IsHitTestVisible = false };
-            var displayLabel = key.Id switch { "encoder:ccw" => "Links", "encoder:cw" => "Rechts", _ => key.Label == "Knob" ? "Knopf" : key.Label };
+            var content = new Grid { Margin = key.IsEncoder || key.Label == "Knob" ? new Thickness(0) : largeLayout ? new Thickness(4, 3, 4, 4) : new Thickness(6, 5, 6, 6), IsHitTestVisible = false };
+            var displayLabel = key.DisplayLabel;
             if (largeLayout && key.DefaultBinding == "KC_SCRL") displayLabel = "ScrLk";
-            var label = new TextBlock { Text = displayLabel, FontSize = key.Label == "Knob" || key.Id.StartsWith("encoder:", StringComparison.Ordinal) ? 9 : displayLabel.Length > 6 ? 10 : displayLabel.Length > 3 ? 11 : 14, FontWeight = FontWeights.SemiBold, Foreground = Brush("#E4E7EB"), VerticalAlignment = key.Label == "Knob" ? VerticalAlignment.Center : VerticalAlignment.Top, HorizontalAlignment = key.Label == "Knob" ? HorizontalAlignment.Center : HorizontalAlignment.Left, TextWrapping = TextWrapping.NoWrap };
-            if (largeLayout) label.FontSize *= 1.4;
-            content.Children.Add(label);
+            var centered = key.Label == "Knob" || key.IsEncoder;
+            var label = new TextBlock { Text = displayLabel, FontSize = key.IsEncoder ? 22 : key.Label == "Knob" ? (displayLabel.Length > 8 ? 8 : 9) : displayLabel.Length > 6 ? 10 : displayLabel.Length > 3 ? 11 : 14, FontWeight = FontWeights.SemiBold, Foreground = Brush("#E4E7EB"), VerticalAlignment = centered ? VerticalAlignment.Center : VerticalAlignment.Top, HorizontalAlignment = centered ? HorizontalAlignment.Center : HorizontalAlignment.Left, TextWrapping = TextWrapping.NoWrap };
+            if (largeLayout && !centered) label.FontSize *= 1.4;
+            else if (largeLayout && key.Label == "Knob") label.FontSize *= 1.2;
+            content.Children.Add(key.Label == "Knob" ? new Viewbox { Child = label, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, Margin = new Thickness(3), VerticalAlignment = VerticalAlignment.Center } : label);
             var bottom = new Border { Height = 2, CornerRadius = new CornerRadius(0), Background = new SolidColorBrush(color), Opacity = key.LedIndex is null ? .25 : .95, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 0) };
             if (key.IsIsoEnter) bottom.Margin = new Thickness(.25 * unit, 0, 0, 0);
             if (key.LedIndex is not null) content.Children.Add(bottom);
             var inherited = assignment.Binding == "KC_TRNS";
-            if (assignment.Binding != key.DefaultBinding && !inherited)
+            if (!centered && assignment.Binding != key.DefaultBinding && !inherited)
             {
                 content.Children.Add(new TextBlock { Text = ShortBinding(assignment.Binding), FontSize = 8, Foreground = Brush("#C3C9D0"), VerticalAlignment = VerticalAlignment.Bottom, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 5), TextTrimming = TextTrimming.CharacterEllipsis });
             }
-            else if (inherited)
+            else if (!centered && inherited)
                 content.Children.Add(new TextBlock { Text = "▽", FontSize = 9, Foreground = Brush("#A0A7B0"), VerticalAlignment = VerticalAlignment.Bottom, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 0, 4) });
             var button = new Button
             {
                 Width = Math.Max(20, (key.W + (key.IsIsoEnter ? .25 : 0)) * unit - 5), Height = Math.Max(20, key.H * unit - 5),
                 Content = content, Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch,
                 Background = new SolidColorBrush(capColor), BorderBrush = selected ? Brush("#EF646B") : Brush("#424950"), BorderThickness = new Thickness(selected ? 2 : 1),
-                ToolTip = L.F($"{key.Label}\n{BindingLabel(assignment.Binding)} · {(key.LedIndex is null ? L.T("Keine eigene RGB-LED") : assignment.Color)}\nUmschalt+Klick: zur Auswahl hinzufügen"), Focusable = false,
+                ToolTip = L.F($"{key.AccessibleLabel}\n{BindingLabel(assignment.Binding)} · {(key.LedIndex is null ? L.T("Keine eigene RGB-LED") : assignment.Color)}\nUmschalt+Klick: zur Auswahl hinzufügen"), Focusable = false,
                 Template = (ControlTemplate)FindResource("KeycapTemplate")
             };
             if (key.LedIndex is int led) RegisterPreviewLed(led, bottom, button);
+            System.Windows.Automation.AutomationProperties.SetName(button, key.AccessibleLabel);
             button.Click += (_, _) => { PreviewKeyHit(key.Id); SelectKey(key.Id); };
             if (key.Label == "Knob") button.Template = (ControlTemplate)FindResource("RoundKeyTemplate");
             if (key.IsIsoEnter)
@@ -467,13 +470,6 @@ public partial class MainWindow : Window
             Canvas.SetTop(button, topInset + key.Y * unit);
             KeyboardCanvas.Children.Add(button);
             _keyButtons[key.Id] = button;
-        }
-        if (Device.HasEncoder)
-        {
-        var encoderHint = new TextBlock { Text = L.T("DREHGEBER · LINKS / RECHTS"), FontSize = 10, Foreground = Brush("#A0A7B0") };
-        Canvas.SetLeft(encoderHint, inset + 6);
-        Canvas.SetTop(encoderHint, topInset + (Device.Height - .55) * unit);
-        KeyboardCanvas.Children.Add(encoderHint);
         }
         RenderSideStrip(Device.LeftSideLedIndices, LightingTarget.Left, 4, unit, topInset);
         RenderSideStrip(Device.RightSideLedIndices, LightingTarget.Right, inset + Device.PreviewWidth * unit + 12, unit, topInset);
@@ -657,7 +653,7 @@ public partial class MainWindow : Window
         RefreshLayerTools();
         CurrentBindingText.Text = keys.Count == 0 ? L.T("Zuerst eine Taste in der Vorschau auswählen.") : L.T("Aktuell: ") + string.Join(" / ", keys.Select(k => BindingLabel(Assignment(k.Id).Binding)).Distinct());
         MacroAssignmentHint.Text = _macroAssigning
-            ? keys.Count == 0 ? L.T("Eine oder mehrere Tasten in der Vorschau auswählen.") : string.Join(", ", keys.Select(k => k.Label)) + L.F($" · Ebene {_layerIndex}")
+            ? keys.Count == 0 ? L.T("Eine oder mehrere Tasten in der Vorschau auswählen.") : string.Join(", ", keys.Select(k => k.AccessibleLabel)) + L.F($" · Ebene {_layerIndex}")
             : L.T("Wähle nach dem Bearbeiten die Taste, die das Makro auslösen soll.");
         AssignMacroButton.Content = _macroAssigning ? L.T("Makro zuweisen") : L.T("Taste auswählen …");
         AssignMacroButton.IsEnabled = CurrentMacro?.Steps.Count > 0 && (!_macroAssigning || keys.Count > 0);
@@ -1345,7 +1341,7 @@ public partial class MainWindow : Window
     {
         if (CompareLayer.SelectedIndex is < 0 or > 3) return;
         var other = _project.Layers[CompareLayer.SelectedIndex];
-        var changes = Device.Keys.Where(k => Layer.Keys[k.Id].Binding != other.Keys[k.Id].Binding).Select(k => $"{k.Label}: {BindingLabel(Layer.Keys[k.Id].Binding)} → {BindingLabel(other.Keys[k.Id].Binding)}").ToArray();
+        var changes = Device.Keys.Where(k => Layer.Keys[k.Id].Binding != other.Keys[k.Id].Binding).Select(k => $"{k.AccessibleLabel}: {BindingLabel(Layer.Keys[k.Id].Binding)} → {BindingLabel(other.Keys[k.Id].Binding)}").ToArray();
         var colors = Device.Keys.Count(k => k.LedIndex.HasValue && Layer.Keys[k.Id].Color != other.Keys[k.Id].Color);
         var effectsDiffer = JsonSerializer.Serialize(Layer.LightingEffect) != JsonSerializer.Serialize(other.LightingEffect) || JsonSerializer.Serialize(Layer.LedEffects) != JsonSerializer.Serialize(other.LedEffects);
         var sideColors = Device.NonKeyLedIndices.Count(i => !SideLedColor(i).Equals(other.ExtraLedColors.GetValueOrDefault(i, other.SideLedColor), StringComparison.OrdinalIgnoreCase));
@@ -1430,7 +1426,7 @@ public partial class MainWindow : Window
         {
             1 => L.T("Steuert einen MIDI-Controller in einer kompatiblen Anwendung."),
             2 => L.T("Ändert die Lautstärke durch Bewegen des Reglers."),
-            3 => L.T("Regelt die Helligkeit der Numpad-Beleuchtung."),
+            3 => L.T("Regelt die Helligkeit der GMMK Numpad-Beleuchtung."),
             _ => L.T("Keine Aktion beim Bewegen des Reglers.")
         };
     }
@@ -1561,7 +1557,7 @@ public partial class MainWindow : Window
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); layout.RowDefinitions.Add(new RowDefinition()); layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         layout.Children.Add(new TextBlock { Text = L.T("Mehrere passende Geräte gefunden. Wähle das gewünschte Gerät anhand seines USB-Pfads."), FontSize = 13, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) });
         var choice = new ListBox();
-        foreach (var device in devices) choice.Items.Add(new ListBoxItem { Tag = device, Content = new TextBlock { Text = device.Name + "\n" + device.Path, FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(7) }, ToolTip = device.Path });
+        foreach (var device in devices) choice.Items.Add(new ListBoxItem { Tag = device, Content = new TextBlock { Text = DeviceCatalog.Get(device.DeviceId).Name + "\n" + device.Path, FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(7) }, ToolTip = device.Path });
         Grid.SetRow(choice, 1); layout.Children.Add(choice);
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 0, 0) };
         var cancel = new Button { Content = L.T("Abbrechen"), IsCancel = true, Margin = new Thickness(0, 0, 8, 0) }; cancel.Click += (_, _) => dialog.Close(); actions.Children.Add(cancel);
@@ -1597,7 +1593,7 @@ public partial class MainWindow : Window
         MacroValidation.Text = macro is null ? L.T("Erstelle ein Makro, um Schritte hinzuzufügen.") : MacroWarnings(macro);
         if (macro is not null)
         {
-            var usages = _project.Layers.SelectMany((l, i) => Device.Keys.Where(k => l.Keys[k.Id].Binding == "MACRO:" + macro.Id).Select(k => L.F($"{k.Label} (Ebene {i})"))).ToArray();
+            var usages = _project.Layers.SelectMany((l, i) => Device.Keys.Where(k => l.Keys[k.Id].Binding == "MACRO:" + macro.Id).Select(k => L.F($"{k.AccessibleLabel} (Ebene {i})"))).ToArray();
             MacroUsage.Text = L.F($"{macro.Steps.Count}/128 Schritte · {macro.Steps.Where(s => s.Kind == "delay").Sum(s => s.DelayMs)} ms Pausen\n") + (usages.Length == 0 ? L.T("Noch keiner Taste zugewiesen.") : L.T("Zugewiesen: ") + string.Join(", ", usages));
         }
         else MacroUsage.Text = L.T("Ein Makro aufnehmen oder mit „Neu“ Schritt für Schritt anlegen.");
@@ -2088,6 +2084,7 @@ public partial class MainWindow : Window
         RunStandbyChecks(Check);
         RunHelpChecks(Check);
         RunDeviceSetupChecks(Check);
+        AppSettingsWindow.RunOfflineChecks(Check);
         await RunStartupChecksAsync(Check);
         await RunConnectionChecksAsync(Check);
         SwitchDevice("pro-iso");

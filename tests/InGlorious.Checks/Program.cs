@@ -109,7 +109,8 @@ try
         {
             Require(device.Keys.DistinctBy(k => k.Id).Count() == device.Keys.Count);
             Require(device.Keys.Where(k => k.LedIndex.HasValue).DistinctBy(k => k.LedIndex).Count() == device.Keys.Count(k => k.LedIndex.HasValue));
-            Require(device.Keys.All(k => k.X >= 0 && k.Y >= 0 && k.X + k.W <= device.Width && k.Y + k.H <= device.Height));
+            Require(device.Keys.Where(k => !k.IsEncoder).All(k => k.X >= 0 && k.Y >= 0 && k.X + k.W <= device.Width && k.Y + k.H <= device.Height));
+            Require(device.Keys.All(k => k.X >= 0 && k.Y + device.PreviewTopInset >= 0 && k.X + k.W <= device.PreviewWidth && k.Y + k.H + device.PreviewTopInset <= device.PreviewHeight));
             Require(ProjectService.Validate(ProjectService.Create(device.Id)).Count == 0);
         }
     });

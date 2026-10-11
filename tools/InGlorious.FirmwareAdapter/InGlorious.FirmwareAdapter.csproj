@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType><TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><PlatformTarget>x64</PlatformTarget>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
     <NativeAssetDirectory Condition="'$(NativeAssetDirectory)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\dependencies\dfu-util-0.11-binaries\win64</NativeAssetDirectory>
   </PropertyGroup>
   <ItemGroup>
@@ -9,7 +9,11 @@
     <Compile Include="..\..\src\InGlorious.Core\InstallationIdentity.cs" Link="InstallationIdentity.cs" />
     <Compile Include="..\..\src\InGlorious.Core\KnownFirmwareImages.cs" Link="KnownFirmwareImages.cs" />
     <EmbeddedResource Include="..\..\src\InGlorious.Core\KnownFirmwareCatalog.json" Link="KnownFirmwareCatalog.json" LogicalName="InGlorious.FirmwareAdapter.KnownFirmwareCatalog.json" />
+    <EmbeddedResource Include="$(NativeToolCatalogPath)" Link="NativeToolCatalog.json" LogicalName="InGlorious.FirmwareAdapter.NativeToolCatalog.json" Condition="'$(NativeToolCatalogPath)' != ''" />
     <None Include="$(NativeAssetDirectory)\libusb-1.0.dll" Link="native\libusb-1.0.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(NativeAssetDirectory)\libusb-1.0.dll')" />
     <None Include="$(NativeAssetDirectory)\dfu-util-static.exe" Link="native\dfu-util-static.exe" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(NativeAssetDirectory)\dfu-util-static.exe')" />
+    <None Include="$(NativeAssetDirectory)/libusb-1.0.so.0" Link="native/libusb-1.0.so.0" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(NativeAssetDirectory)/libusb-1.0.so.0')" />
+    <None Include="$(NativeAssetDirectory)/libusb-1.0.dylib" Link="native/libusb-1.0.dylib" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(NativeAssetDirectory)/libusb-1.0.dylib')" />
+    <None Include="$(NativeAssetDirectory)/dfu-util" Link="native/dfu-util" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(NativeAssetDirectory)/dfu-util')" />
   </ItemGroup>
 </Project>

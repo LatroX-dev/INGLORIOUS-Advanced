@@ -27,6 +27,7 @@ if (-not (Get-Item -LiteralPath $root).PSIsContainer) { throw 'SourceRoot must b
 
 # Exact relative paths only. New files never enter this list through recursion or a glob.
 $app = @(
+    'FirmwareAdapterProcess.cs','PosixDeviceSetupEnvironment.cs','PlatformUsbIdentity.cs','AppAutostart.cs','AppAutostartEditor.cs','WindowsInstallationGuard.cs','BackgroundApplicationSession.cs','WindowsTrayIcon.cs','MainWindow.Background.cs','ApplicationInstance.cs',
     'App.xaml','App.xaml.cs','AppPreferences.cs','AppSettingsWindow.xaml','AppSettingsWindow.xaml.cs','BackupService.cs','ColorPaletteStore.cs','ColorPickerWindow.cs',
     'DeviceScanner.cs','StockDeviceCatalog.cs','StockFirmwareInspector.cs','InstallationIdentity.cs','KnownFirmwareImages.cs','DeviceSetupService.cs','DeviceSetupService.Storage.cs','WindowsDeviceSetupEnvironment.cs','DeviceSetupWindow.cs','DeviceSetupWindow.Checks.cs','DeviceSetupWindow.Completion.cs','MainWindow.Setup.cs','InGlorious.Core.csproj','MainWindow.xaml','MainWindow.xaml.cs','Models.cs','UserGuide.cs','HelpWindow.cs','MainWindow.Help.cs',
     'MainWindow.Startup.cs','MainWindow.StartupChecks.cs','MainWindow.Connections.cs','MainWindow.ConnectionChecks.cs','StartupDeviceLoader.cs','MainWindow.WorkflowChecks.cs','MainWindow.PendingEdits.cs','MainWindow.PendingEditsChecks.cs','PendingEditDecisionPolicy.cs',
@@ -47,19 +48,28 @@ $allow.Add('src/InGlorious.Core/SetupToolCatalog.json')
 $allow.Add('src/InGlorious.Core/Locales/device-setup-ui.json')
 $allow.Add('src/InGlorious.Core/Locales/device-setup-service.json')
 $allow.Add('src/InGlorious.Core/Locales/device-update.json')
+$allow.Add('src/InGlorious.Core/Locales/startup-settings.json')
 $allow.Add('reference/glorious-stock-devices.json')
 $allow.Add('docs/setup-boot-gestures.md')
 $allow.Add('docs/device-setup.md')
 $allow.Add('scripts/Prepare-SetupAssets.ps1')
-$adapterFiles=@('AdapterEngine.cs','Contracts.cs','Files.cs','InGlorious.FirmwareAdapter.csproj','NativeUsb.cs','Program.cs','README.md','SelfTests.cs','Stm32Device.cs','WbProtocol.cs',
+foreach ($name in @('Build-PosixNativeTools.ps1','build-posix-native.sh','posix-native-dependencies.json','Build-DesktopRelease.ps1','New-DesktopPackage.ps1','Test-DesktopPackage.ps1','macos-entitlements.plist','70-inglorious.rules','Install-UsbPermissions.sh')) { $allow.Add('scripts/'+$name) }
+foreach ($name in @('Build-WindowsInstaller.ps1','Initialize-InstallerCompiler.ps1','Test-NativeWindowsInstaller.ps1','installer-dependencies.json')) { $allow.Add('scripts/'+$name) }
+$allow.Add('packaging/windows/INGLORIOUS-Advanced.iss')
+foreach ($suite in @('InGlorious.AutostartChecks','InGlorious.StartupGuardChecks','InGlorious.BackgroundChecks')) {
+    $allow.Add('tests/'+$suite+'/'+$suite+'.csproj'); $allow.Add('tests/'+$suite+'/Program.cs')
+}
+$allow.Add('tests/InGlorious.BackgroundChecks/Paths.cs')
+$adapterFiles=@('AdapterEngine.cs','Contracts.cs','Files.cs','InGlorious.FirmwareAdapter.csproj','NativeUsb.cs','NativeToolCatalog.cs','Program.cs','README.md','SelfTests.cs','Stm32Device.cs','WbProtocol.cs',
  'Licenses/dfu-util-binary-provenance.txt','Licenses/dfu-util-GPL-2.0.txt','Licenses/dotnet-MIT.txt','Licenses/dotnet-THIRD-PARTY-NOTICES.txt','Licenses/libusb-LGPL-2.1.txt','Licenses/README.txt','Licenses/Westberry-Apache-2.0.txt')
 foreach($name in $adapterFiles){$allow.Add('tools/InGlorious.FirmwareAdapter/'+$name)}
 foreach($suite in @('InGlorious.DiscoveryChecks','InGlorious.SetupChecks')){
  $allow.Add('tests/'+$suite+'/'+$suite+'.csproj');$allow.Add('tests/'+$suite+'/Program.cs')
 }
-foreach($name in @('CoordinatorChecks.cs','IdentityChecks.cs','StockFirmwareChecks.cs')){$allow.Add('tests/InGlorious.SetupChecks/'+$name)}
+foreach($name in @('CoordinatorChecks.cs','IdentityChecks.cs','StockFirmwareChecks.cs','PortableUsbChecks.cs')){$allow.Add('tests/InGlorious.SetupChecks/'+$name)}
+$allow.Add('tests/InGlorious.PortableSetupChecks/InGlorious.PortableSetupChecks.csproj')
 foreach ($name in @('desktop.json','dialogs.json','favorites.json','firmware.json','firmware-service.json','firmware-guide-simple.json','firmware-wizard-simple.json','firmware-routing.json','firmware-details.json','firmware-log.json','firmware-source.json','lighting-presets.json','macros.json','main-status.json','main.json','models.json','operations.json','preferences-profiles.json','sequences.json','standby.json','transfer-simple.json','startup.json','guide.json','slider-editor.json','model-support.json','connections.json','firmware-models.json')) { $allow.Add('src/InGlorious.Core/Locales/'+$name) }
-$desktop = @('App.axaml','App.axaml.cs','EditorState.cs','InGlorious.Desktop.csproj','MainWindow.Actions.cs','MainWindow.Checks.cs','MainWindow.cs','MainWindow.Editors.cs','MainWindow.Icons.cs','MainWindow.Macros.cs','MainWindow.Presets.cs','MainWindow.Settings.cs','MainWindow.Startup.cs','MainWindow.StartupChecks.cs','MainWindow.Connections.cs','MainWindow.ConnectionsChecks.cs','MainWindow.Help.cs','MainWindow.HelpChecks.cs','Program.cs','README.md','Shared/InGlorious.Shared.csproj','Shared/OnboardHidTransport.cs','Shared/PlatformDeviceService.cs')
+$desktop = @('App.axaml','App.axaml.cs','EditorState.cs','InGlorious.Desktop.csproj','MainWindow.Actions.cs','MainWindow.Checks.cs','MainWindow.cs','MainWindow.Editors.cs','MainWindow.Icons.cs','MainWindow.Macros.cs','MainWindow.Presets.cs','MainWindow.Settings.cs','MainWindow.Startup.cs','MainWindow.StartupChecks.cs','MainWindow.Connections.cs','MainWindow.ConnectionsChecks.cs','MainWindow.Help.cs','MainWindow.HelpChecks.cs','MainWindow.Setup.cs','DeviceSetupWindow.cs','DeviceSetupWindow.Checks.cs','DeviceSetupWindow.Completion.cs','Program.cs','README.md','DesktopTrayIcon.cs','MainWindow.Background.cs','Shared/AssemblyInfo.cs','Shared/InGlorious.Shared.csproj','Shared/OnboardHidTransport.cs','Shared/PlatformDeviceService.cs')
 foreach ($name in $desktop) { $allow.Add('src/InGlorious.Desktop/'+$name) }
 foreach ($name in @('inglorious-mark.png','inglorious.ico')) { $allow.Add('src/InGlorious.Core/Assets/'+$name) }
 foreach ($name in @('INGLORIOUS-Oxanium-SemiBold.ttf','Oxanium-OFL.txt','Oxanium-source.json')) { $allow.Add('src/InGlorious.Core/Assets/Fonts/'+$name) }

@@ -1,4 +1,4 @@
-{
+﻿{
   "Auf diesem Gerät läuft noch die Original-Firmware. Die Einrichtung ermöglicht Farben, Effekte und Belegungen direkt auf der Tastatur.": {
     "en": "This device still runs the original firmware. Setup enables colors, effects and key assignments directly on the keyboard.",
     "es": "Este dispositivo aún usa el firmware original. La configuración permite usar colores, efectos y asignaciones directamente en el teclado.",
@@ -194,18 +194,18 @@
     "ko": "Glorious CORE로 돌아가기",
     "zh-Hans": "恢复使用 Glorious CORE"
   },
-  "INGLORIOUS ADVANCED während des Updates nicht schließen.": {
-    "en": "Do not close INGLORIOUS ADVANCED during the update.",
-    "es": "No cierres INGLORIOUS ADVANCED durante la actualización.",
-    "fr": "Ne fermez pas INGLORIOUS ADVANCED pendant la mise à jour.",
-    "it": "Non chiudere INGLORIOUS ADVANCED durante l’aggiornamento.",
-    "pt-BR": "Não feche o INGLORIOUS ADVANCED durante a atualização.",
-    "pl": "Nie zamykaj INGLORIOUS ADVANCED podczas aktualizacji.",
-    "tr": "Güncelleme sırasında INGLORIOUS ADVANCED uygulamasını kapatmayın.",
-    "ru": "Не закрывайте INGLORIOUS ADVANCED во время обновления.",
-    "ja": "更新中はINGLORIOUS ADVANCEDを閉じないでください。",
-    "ko": "업데이트 중에는 INGLORIOUS ADVANCED를 닫지 마세요.",
-    "zh-Hans": "更新期间请勿关闭 INGLORIOUS ADVANCED。"
+  "INGLORIOUS Advanced während des Updates nicht schließen.": {
+    "en": "Do not close INGLORIOUS Advanced during the update.",
+    "es": "No cierres INGLORIOUS Advanced durante la actualización.",
+    "fr": "Ne fermez pas INGLORIOUS Advanced pendant la mise à jour.",
+    "it": "Non chiudere INGLORIOUS Advanced durante l’aggiornamento.",
+    "pt-BR": "Não feche o INGLORIOUS Advanced durante a atualização.",
+    "pl": "Nie zamykaj INGLORIOUS Advanced podczas aktualizacji.",
+    "tr": "Güncelleme sırasında INGLORIOUS Advanced uygulamasını kapatmayın.",
+    "ru": "Не закрывайте INGLORIOUS Advanced во время обновления.",
+    "ja": "更新中はINGLORIOUS Advancedを閉じないでください。",
+    "ko": "업데이트 중에는 INGLORIOUS Advanced를 닫지 마세요.",
+    "zh-Hans": "更新期间请勿关闭 INGLORIOUS Advanced。"
   },
   "2. Trenne nur \"{0}\" vom USB-Kabel.": {
     "en": "2. Disconnect only \"{0}\" from its USB cable.",
@@ -220,18 +220,18 @@
     "ko": "2. \"{0}\"에서만 USB 케이블을 분리하세요.",
     "zh-Hans": "2. 仅拔下 \"{0}\" 的 USB 线。"
   },
-  "1. Glorious CORE schließen. INGLORIOUS ADVANCED nicht schließen.": {
-    "en": "1. Close Glorious CORE. Do not close INGLORIOUS ADVANCED.",
-    "es": "1. Cierra Glorious CORE. No cierres INGLORIOUS ADVANCED.",
-    "fr": "1. Fermez Glorious CORE. Ne fermez pas INGLORIOUS ADVANCED.",
-    "it": "1. Chiudi Glorious CORE. Non chiudere INGLORIOUS ADVANCED.",
-    "pt-BR": "1. Feche o Glorious CORE. Não feche o INGLORIOUS ADVANCED.",
-    "pl": "1. Zamknij Glorious CORE. Nie zamykaj INGLORIOUS ADVANCED.",
-    "tr": "1. Glorious CORE uygulamasını kapatın. INGLORIOUS ADVANCED uygulamasını kapatmayın.",
-    "ru": "1. Закройте Glorious CORE. Не закрывайте INGLORIOUS ADVANCED.",
-    "ja": "1. Glorious COREを終了してください。INGLORIOUS ADVANCEDは閉じないでください。",
-    "ko": "1. Glorious CORE를 닫으세요. INGLORIOUS ADVANCED는 닫지 마세요.",
-    "zh-Hans": "1. 关闭 Glorious CORE。请勿关闭 INGLORIOUS ADVANCED。"
+  "1. Glorious CORE schließen. INGLORIOUS Advanced nicht schließen.": {
+    "en": "1. Close Glorious CORE. Do not close INGLORIOUS Advanced.",
+    "es": "1. Cierra Glorious CORE. No cierres INGLORIOUS Advanced.",
+    "fr": "1. Fermez Glorious CORE. Ne fermez pas INGLORIOUS Advanced.",
+    "it": "1. Chiudi Glorious CORE. Non chiudere INGLORIOUS Advanced.",
+    "pt-BR": "1. Feche o Glorious CORE. Não feche o INGLORIOUS Advanced.",
+    "pl": "1. Zamknij Glorious CORE. Nie zamykaj INGLORIOUS Advanced.",
+    "tr": "1. Glorious CORE uygulamasını kapatın. INGLORIOUS Advanced uygulamasını kapatmayın.",
+    "ru": "1. Закройте Glorious CORE. Не закрывайте INGLORIOUS Advanced.",
+    "ja": "1. Glorious COREを終了してください。INGLORIOUS Advancedは閉じないでください。",
+    "ko": "1. Glorious CORE를 닫으세요. INGLORIOUS Advanced는 닫지 마세요.",
+    "zh-Hans": "1. 关闭 Glorious CORE。请勿关闭 INGLORIOUS Advanced。"
   },
   "\"{0}\" ist für die Installation bereit.": {
     "en": "\"{0}\" is ready for installation.",
@@ -246,18 +246,18 @@
     "ko": "\"{0}\"의 설치 준비가 완료되었습니다.",
     "zh-Hans": "\"{0}\" 已准备好安装。"
   },
-  "CORE ist geschlossen · Weiter": {
-    "en": "CORE is closed · Next",
-    "es": "CORE está cerrado · Siguiente",
-    "fr": "CORE est fermé · Suivant",
-    "it": "CORE è chiuso · Avanti",
-    "pt-BR": "CORE está fechado · Avançar",
-    "pl": "CORE zamknięte · Dalej",
-    "tr": "CORE kapalı · İleri",
-    "ru": "CORE закрыт · Далее",
+  "Glorious CORE ist geschlossen · Weiter": {
+    "en": "Glorious CORE is closed · Next",
+    "es": "Glorious CORE está cerrado · Siguiente",
+    "fr": "Glorious CORE est fermé · Suivant",
+    "it": "Glorious CORE è chiuso · Avanti",
+    "pt-BR": "Glorious CORE está fechado · Avançar",
+    "pl": "Glorious CORE zamknięte · Dalej",
+    "tr": "Glorious CORE kapalı · İleri",
+    "ru": "Glorious CORE закрыт · Далее",
     "ja": "COREを終了しました · 次へ",
     "ko": "CORE를 닫았습니다 · 다음",
-    "zh-Hans": "CORE 已关闭 · 下一步"
+    "zh-Hans": "Glorious CORE 已关闭 · 下一步"
   },
   "Die App erkennt den richtigen Modus automatisch. Es wird noch nichts installiert.": {
     "en": "The app detects the correct mode automatically. Nothing is being installed yet.",
@@ -350,18 +350,18 @@
     "ko": "여기서 키 테스트",
     "zh-Hans": "在此测试按键"
   },
-  "INGLORIOUS ADVANCED nicht schließen. Lass das USB-Kabel vorerst angeschlossen.": {
-    "en": "Do not close INGLORIOUS ADVANCED. Keep the USB cable connected for now.",
-    "es": "No cierres INGLORIOUS ADVANCED. Deja el cable USB conectado por ahora.",
-    "fr": "Ne fermez pas INGLORIOUS ADVANCED. Laissez le câble USB branché pour le moment.",
-    "it": "Non chiudere INGLORIOUS ADVANCED. Per ora lascia collegato il cavo USB.",
-    "pt-BR": "Não feche o INGLORIOUS ADVANCED. Por enquanto, mantenha o cabo USB conectado.",
-    "pl": "Nie zamykaj INGLORIOUS ADVANCED. Na razie pozostaw kabel USB podłączony.",
-    "tr": "INGLORIOUS ADVANCED uygulamasını kapatmayın. USB kablosunu şimdilik bağlı tutun.",
-    "ru": "Не закрывайте INGLORIOUS ADVANCED. Пока оставьте USB-кабель подключённым.",
-    "ja": "INGLORIOUS ADVANCEDを閉じないでください。今はUSBケーブルを接続したままにしてください。",
-    "ko": "INGLORIOUS ADVANCED를 닫지 마세요. 지금은 USB 케이블을 연결한 상태로 두세요.",
-    "zh-Hans": "请勿关闭 INGLORIOUS ADVANCED。暂时保持 USB 线连接。"
+  "INGLORIOUS Advanced nicht schließen. Lass das USB-Kabel vorerst angeschlossen.": {
+    "en": "Do not close INGLORIOUS Advanced. Keep the USB cable connected for now.",
+    "es": "No cierres INGLORIOUS Advanced. Deja el cable USB conectado por ahora.",
+    "fr": "Ne fermez pas INGLORIOUS Advanced. Laissez le câble USB branché pour le moment.",
+    "it": "Non chiudere INGLORIOUS Advanced. Per ora lascia collegato il cavo USB.",
+    "pt-BR": "Não feche o INGLORIOUS Advanced. Por enquanto, mantenha o cabo USB conectado.",
+    "pl": "Nie zamykaj INGLORIOUS Advanced. Na razie pozostaw kabel USB podłączony.",
+    "tr": "INGLORIOUS Advanced uygulamasını kapatmayın. USB kablosunu şimdilik bağlı tutun.",
+    "ru": "Не закрывайте INGLORIOUS Advanced. Пока оставьте USB-кабель подключённым.",
+    "ja": "INGLORIOUS Advancedを閉じないでください。今はUSBケーブルを接続したままにしてください。",
+    "ko": "INGLORIOUS Advanced를 닫지 마세요. 지금은 USB 케이블을 연결한 상태로 두세요.",
+    "zh-Hans": "请勿关闭 INGLORIOUS Advanced。暂时保持 USB 线连接。"
   },
   "Warte auf USB-Trennung …": {
     "en": "Waiting for USB disconnection…",
@@ -376,18 +376,18 @@
     "ko": "USB 연결 분리 대기 중…",
     "zh-Hans": "正在等待断开 USB 连接…"
   },
-  "Starte den Beleuchtungstest. Prüfe danach die Tasten im Eingabefeld. Für Ziffern muss am Numpad Num Lock eingeschaltet sein.": {
-    "en": "Start the lighting test. Then check the keys in the input field. Num Lock must be enabled on the Numpad to enter numbers.",
-    "es": "Inicia la prueba de iluminación. Después, comprueba las teclas en el campo de entrada. Num Lock debe estar activado en el Numpad para introducir números.",
-    "fr": "Lancez le test d’éclairage. Vérifiez ensuite les touches dans le champ de saisie. Num Lock doit être activé sur le Numpad pour saisir des chiffres.",
-    "it": "Avvia il test dell’illuminazione. Poi prova i tasti nel campo di immissione. Per digitare cifre, Num Lock deve essere attivo sul Numpad.",
-    "pt-BR": "Inicie o teste de iluminação. Depois, teste as teclas no campo de entrada. Num Lock precisa estar ativado no Numpad para digitar números.",
-    "pl": "Uruchom test podświetlenia. Następnie sprawdź klawisze w polu tekstowym. Aby wpisywać cyfry, włącz Num Lock na Numpadzie.",
-    "tr": "Aydınlatma testini başlatın. Ardından giriş alanında tuşları kontrol edin. Rakam girmek için Numpad üzerinde Num Lock açık olmalıdır.",
-    "ru": "Запустите проверку подсветки. Затем проверьте клавиши в поле ввода. Для ввода цифр на Numpad должен быть включён Num Lock.",
-    "ja": "照明テストを開始してください。その後、入力欄でキーを確認してください。Numpadで数字を入力するには、Num Lockをオンにしてください。",
-    "ko": "조명 테스트를 시작하세요. 그다음 입력란에서 키를 확인하세요. Numpad에서 숫자를 입력하려면 Num Lock이 켜져 있어야 합니다.",
-    "zh-Hans": "启动灯光测试，然后在输入框中检查按键。要在 Numpad 上输入数字，必须开启 Num Lock。"
+  "Starte den Beleuchtungstest. Prüfe danach die Tasten im Eingabefeld. Für Ziffern muss am GMMK Numpad Num Lock eingeschaltet sein.": {
+    "en": "Start the lighting test. Then check the keys in the input field. Num Lock must be enabled on the GMMK Numpad to enter numbers.",
+    "es": "Inicia la prueba de iluminación. Después, comprueba las teclas en el campo de entrada. Num Lock debe estar activado en el GMMK Numpad para introducir números.",
+    "fr": "Lancez le test d’éclairage. Vérifiez ensuite les touches dans le champ de saisie. Num Lock doit être activé sur le GMMK Numpad pour saisir des chiffres.",
+    "it": "Avvia il test dell’illuminazione. Poi prova i tasti nel campo di immissione. Per digitare cifre, Num Lock deve essere attivo sul GMMK Numpad.",
+    "pt-BR": "Inicie o teste de iluminação. Depois, teste as teclas no campo de entrada. Num Lock precisa estar ativado no GMMK Numpad para digitar números.",
+    "pl": "Uruchom test podświetlenia. Następnie sprawdź klawisze w polu tekstowym. Aby wpisywać cyfry na GMMK Numpad, włącz Num Lock.",
+    "tr": "Aydınlatma testini başlatın. Ardından giriş alanında tuşları kontrol edin. Rakam girmek için GMMK Numpad üzerinde Num Lock açık olmalıdır.",
+    "ru": "Запустите проверку подсветки. Затем проверьте клавиши в поле ввода. Для ввода цифр на GMMK Numpad должен быть включён Num Lock.",
+    "ja": "照明テストを開始してください。その後、入力欄でキーを確認してください。GMMK Numpadで数字を入力するには、Num Lockをオンにしてください。",
+    "ko": "조명 테스트를 시작하세요. 그다음 입력란에서 키를 확인하세요. GMMK Numpad에서 숫자를 입력하려면 Num Lock이 켜져 있어야 합니다.",
+    "zh-Hans": "启动灯光测试，然后在输入框中检查按键。要在 GMMK Numpad 上输入数字，必须开启 Num Lock。"
   },
   "Lass die Tasten los. Du kannst die Installation jetzt bestätigen.": {
     "en": "Release the keys. You can now confirm installation.",
@@ -649,18 +649,18 @@
     "ko": "이전과 같은 USB 포트를 사용하세요. 케이블을 다시 분리하고 표시된 두 키를 누른 채 다시 연결하세요.",
     "zh-Hans": "请使用之前的同一 USB 端口。再次拔下线缆，按住指定的两个键并重新连接。"
   },
-  "INGLORIOUS ADVANCED nicht schließen.": {
-    "en": "Do not close INGLORIOUS ADVANCED.",
-    "es": "No cierres INGLORIOUS ADVANCED.",
-    "fr": "Ne fermez pas INGLORIOUS ADVANCED.",
-    "it": "Non chiudere INGLORIOUS ADVANCED.",
-    "pt-BR": "Não feche o INGLORIOUS ADVANCED.",
-    "pl": "Nie zamykaj INGLORIOUS ADVANCED.",
-    "tr": "INGLORIOUS ADVANCED uygulamasını kapatmayın.",
-    "ru": "Не закрывайте INGLORIOUS ADVANCED.",
-    "ja": "INGLORIOUS ADVANCEDを閉じないでください。",
-    "ko": "INGLORIOUS ADVANCED를 닫지 마세요.",
-    "zh-Hans": "请勿关闭 INGLORIOUS ADVANCED。"
+  "INGLORIOUS Advanced nicht schließen.": {
+    "en": "Do not close INGLORIOUS Advanced.",
+    "es": "No cierres INGLORIOUS Advanced.",
+    "fr": "Ne fermez pas INGLORIOUS Advanced.",
+    "it": "Non chiudere INGLORIOUS Advanced.",
+    "pt-BR": "Não feche o INGLORIOUS Advanced.",
+    "pl": "Nie zamykaj INGLORIOUS Advanced.",
+    "tr": "INGLORIOUS Advanced uygulamasını kapatmayın.",
+    "ru": "Не закрывайте INGLORIOUS Advanced.",
+    "ja": "INGLORIOUS Advancedを閉じないでください。",
+    "ko": "INGLORIOUS Advanced를 닫지 마세요.",
+    "zh-Hans": "请勿关闭 INGLORIOUS Advanced。"
   },
   "Die App prüft automatisch Firmware, Sicherung und benötigte Werkzeuge.": {
     "en": "The app automatically checks the firmware, backup and required tools.",

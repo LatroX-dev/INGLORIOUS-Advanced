@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -10,6 +10,13 @@ public record KeyDefinition(string Id, string Label, double X, double Y, double 
     public int? LedIndex { get; init; }
     public bool IsIsoEnter { get; init; }
     public bool IsEncoder => Id.StartsWith("encoder:", StringComparison.Ordinal);
+    public string DisplayLabel => Label == "Knob" ? L.T("Drücken") : Label;
+    public string AccessibleLabel => Id switch
+    {
+        "encoder:ccw" => L.T("Nach links drehen"),
+        "encoder:cw" => L.T("Nach rechts drehen"),
+        _ => Label == "Knob" ? L.T("Drehregler drücken") : Label
+    };
 }
 // Preview geometry in key units, independent of QMK's normalized effect coordinates.
 // A physical badge can exist without a separately addressable LED in the reviewed port.
@@ -33,8 +40,8 @@ public record DeviceDefinition(string Id, string Name, string SourceSubtitle, st
     public IReadOnlyList<int> NonKeyLedIndices { get; init; } = [];
     public IReadOnlyList<int> BadgeLedIndices { get; init; } = [];
     public BadgeGeometry? BadgeGeometry { get; init; }
-    public double PreviewTopInset => Math.Max(0, -(BadgeGeometry?.Y ?? 0));
-    public double PreviewWidth => Math.Max(Width, (BadgeGeometry?.X ?? 0) + (BadgeGeometry?.W ?? 0));
+    public double PreviewTopInset => Math.Max(0, -Math.Min(Keys.Min(key => key.Y), BadgeGeometry?.Y ?? 0));
+    public double PreviewWidth => Math.Max(Math.Max(Width, Keys.Max(key => key.X + key.W)), (BadgeGeometry?.X ?? 0) + (BadgeGeometry?.W ?? 0));
     public double PreviewHeight => Math.Max(Height, (BadgeGeometry?.Y ?? 0) + (BadgeGeometry?.H ?? 0)) + PreviewTopInset;
     public IReadOnlyList<int> SideLedIndices => LeftSideLedIndices.Concat(RightSideLedIndices).ToArray();
     public IReadOnlyList<int> LeftSideLedIndices { get; init; } = [];
@@ -169,12 +176,22 @@ public static class Paths
 {
     public static string WorkspaceRoot { get; } = FindRoot();
     public static string DataRoot => Path.Combine(WorkspaceRoot, "data");
+    public static string UserDataRoot => ResolveUserDataRoot(Environment.GetFolderPath);
+    internal static string ResolveUserDataRoot(Func<Environment.SpecialFolder, Environment.SpecialFolderOption, string> getFolderPath)
+    {
+        // On Unix the default overload returns an empty string when the user data
+        // directory does not exist yet. Resolve its intended location without creating it.
+        string folder = getFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify);
+        if (string.IsNullOrWhiteSpace(folder) || !Path.IsPathFullyQualified(folder))
+            throw new IOException("The per-user application data directory could not be located.");
+        return Path.GetFullPath(Path.Combine(folder, "INGLORIOUS Advanced"));
+    }
     private static string FindRoot()
     {
         foreach (var start in new[] { AppContext.BaseDirectory, Environment.CurrentDirectory })
             for (var dir = new DirectoryInfo(start); dir != null; dir = dir.Parent)
                 if (File.Exists(Path.Combine(dir.FullName, "inglorious.workspace.json"))) return dir.FullName;
-        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "INGLORIOUS Advanced");
+        return UserDataRoot;
     }
 }
 
@@ -216,6 +233,15 @@ public static class DeviceCatalog
         new("gmmk3-100-ansi", "GMMK 3 100% ANSI", "ANSI", "", Gmmk3100AnsiBindings, "", EncoderKeyId: "r11c6", SupportsOnboardConfiguration: true, AnsiLegends: true),
         new("gmmk3-100-iso", "GMMK 3 100% ISO", "ISO", "", Gmmk3100IsoBindings, "", EncoderKeyId: "r11c6", SupportsOnboardConfiguration: true)
     }.Select(Build).ToArray();
+    // Display only: shared USB IDs must not imply that a hardware revision is resolved.
+    public static string ModelGroupName(IReadOnlyList<string> deviceIds)
+    {
+        if (deviceIds.Count == 0) throw new InvalidDataException(L.T("Unbekanntes Gerätemodell."));
+        var names = deviceIds.Select(id => Get(id).Name).Distinct(StringComparer.Ordinal).ToArray();
+        if (names.Length == 1) return names[0];
+        return string.Join(" / ", names.Select(name => name.Split(" · Rev.", StringSplitOptions.None)[0]).Distinct(StringComparer.Ordinal));
+    }
+
     public static DeviceDefinition Get(string id) => All.FirstOrDefault(d => d.Id == id) ?? throw new InvalidDataException(L.T("Unbekanntes Gerätemodell."));
     private static DeviceDefinition Build(Descriptor definition)
     {
@@ -267,10 +293,11 @@ public static class DeviceCatalog
         var height = keys.Max(k => k.Y + k.H);
         if (definition.EncoderKeyId is not null)
         {
-            keys.Add(new("encoder:ccw", "↶", width - 2, height + .45, 1, .7, "KC_VOLD"));
-            keys.Add(new("encoder:cw", "↷", width - 1, height + .45, 1, .7, "KC_VOLU"));
+            var knob = keys.Single(key => key.Id == definition.EncoderKeyId);
+            keys.Add(new("encoder:ccw", "↶", knob.X - .1, knob.Y - .78, .6, .65, "KC_VOLD"));
+            keys.Add(new("encoder:cw", "↷", knob.X + .5, knob.Y - .78, .6, .65, "KC_VOLU"));
         }
-        return new(id, definition.Name, definition.Subtitle, definition.ProductId, keys, width, height + (definition.EncoderKeyId is not null ? 1.15 : 0))
+        return new(id, definition.Name, definition.Subtitle, definition.ProductId, keys, width, height)
         {
             SupportsOnboardConfiguration = definition.SupportsOnboardConfiguration,
             IsExperimentalFirmware = definition.SupportsOnboardConfiguration && !definition.HasApprovedFirmwareManagement,
@@ -332,7 +359,7 @@ public static class ProjectService
         var result = new AppProject { DeviceId = deviceId, Name = device.Name };
         for (var l = 0; l < 4; l++)
         {
-            var layer = new LayerProfile { Name = l == 0 ? "Basis" : l == 1 ? "Funktion" : $"Ebene {l}" };
+            var layer = new LayerProfile { Name = l == 0 ? L.T("Basis") : l == 1 ? L.T("Funktion") : L.F($"Ebene {l}") };
             foreach (var key in device.Keys) layer.Keys[key.Id] = new() { Binding = l == 0 ? key.DefaultBinding : "KC_TRNS", Color = colors[Math.Min(3, (int)(key.X / device.Width * 4))] };
             result.Layers.Add(layer);
         }

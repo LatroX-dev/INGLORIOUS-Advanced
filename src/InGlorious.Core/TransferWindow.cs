@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -139,7 +139,7 @@ public sealed partial class TransferWindow : Window
                     await using var client = OnboardClient.Open(device);
                     var info = await client.GetInfoAsync();
                     var extensions = await ReadRequiredExtensionsAsync(client);
-                    matches.Add(new(device, info, device.Name + " (" + (matches.Count + 1) + ")", extensions));
+                    matches.Add(new(device, info, DeviceCatalog.Get(device.DeviceId).Name + " (" + (matches.Count + 1) + ")", extensions));
                 }
                 catch (Exception ex) { failed = true; System.Diagnostics.Trace.TraceError(ex.ToString()); }
             }
@@ -164,7 +164,7 @@ public sealed partial class TransferWindow : Window
         if (!_offlinePreview) throw new InvalidOperationException("Offline preview required.");
         var device = new OnboardDevice(_image.DeviceId, DeviceCatalog.Get(_image.DeviceId).Name, "offline-preview");
         var info = new OnboardInfo(_image.DeviceId, 249, _image.UsedBytes, 1, _image.Crc32, 0, _image.SchemaVersion);
-        SetDiscoveredTargets([new(device, info, device.Name, new OnboardExtensions(1, 3, 21000))]);
+        SetDiscoveredTargets([new(device, info, DeviceCatalog.Get(device.DeviceId).Name, new OnboardExtensions(1, 3, 21000))]);
         _deviceStatus.Text = L.T("Offline-Vorschau · keine Geräteprüfung");
     }
 

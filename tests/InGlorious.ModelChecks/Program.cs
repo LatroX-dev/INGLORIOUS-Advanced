@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using InGlorious.Core;
@@ -16,6 +16,20 @@ using var manifest = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(reference
 var tempParent = Path.Combine(Path.GetTempPath(), "InGlorious.ModelChecks");
 var temp = Path.Combine(tempParent, Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(temp);
+L.SetLanguage("de");
+foreach (var model in DeviceCatalog.All)
+    Check(DeviceCatalog.ModelGroupName([model.Id]) == model.Name && model.Name.StartsWith("GMMK ", StringComparison.Ordinal), "Complete official model name in single-device setup");
+Check(DeviceCatalog.ModelGroupName(["pro-iso", "pro-rev2-iso"]) == "GMMK PRO ISO", "Ambiguous revision uses full product family without inventing its revision");
+Check(DeviceCatalog.ModelGroupName(["pro-rev2-iso"]) == "GMMK PRO ISO · Rev. 2", "Identified second revision keeps its model designation");
+Reject(() => DeviceCatalog.ModelGroupName([]), "Empty model selection has no invented name");
+var namedProfile = ProjectService.Create("pro-iso"); namedProfile.Name = "My profile"; namedProfile.Layers[0].Name = "My layer";
+foreach (var language in L.SupportedLanguages)
+{
+    L.SetLanguage(language.Code);
+    var localized = ProjectService.Create("pro-iso");
+    Check(localized.Layers[0].Name == L.T("Basis") && localized.Layers[1].Name == L.T("Funktion") && localized.Layers[2].Name == L.Format("Ebene {0}", 2), "New profiles use localized initial layer labels");
+    Check(namedProfile.Name == "My profile" && namedProfile.Layers[0].Name == "My layer", "Language changes preserve existing profile and layer names");
+}
 L.SetLanguage("de");
 try
 {
@@ -70,13 +84,20 @@ try
         {
             Check(facts.Id.StartsWith("gmmk3-", StringComparison.Ordinal), "Only reviewed physical badge housings are added " + facts.Id);
             Check(badge.W > 0 && badge.H > 0 && badge.X >= 0 && badge.Y + model.PreviewTopInset >= 0 && badge.X + badge.W <= model.PreviewWidth && badge.Y + badge.H + model.PreviewTopInset <= model.PreviewHeight, "Complete badge fits preview, including upper housing and right bezel " + facts.Id);
-            Check(model.Keys.Where(k => !k.IsEncoder).All(k => Math.Min(k.X + k.W, badge.X + badge.W) <= Math.Max(k.X, badge.X) || Math.Min(k.Y + k.H, badge.Y + badge.H) <= Math.Max(k.Y, badge.Y)), "Badge does not cover a key or rotary knob " + facts.Id);
+            Check(model.Keys.All(k => Math.Min(k.X + k.W, badge.X + badge.W) <= Math.Max(k.X, badge.X) || Math.Min(k.Y + k.H, badge.Y + badge.H) <= Math.Max(k.Y, badge.Y)), "Badge does not cover a key, rotary knob or rotation control " + facts.Id);
             var compact = facts.Id.StartsWith("gmmk3-65-", StringComparison.Ordinal);
             Check(badge.IsHorizontal == compact && badge.LedIndex.HasValue == !compact, "65% physical badge does not invent an addressable LED " + facts.Id);
             if (badge.LedIndex is { } badgeIndex) Check(model.BadgeLedIndices.SequenceEqual(new[] { badgeIndex }), "Physical badge maps only its own protocol LED " + facts.Id);
             Check(badge.Y < model.KeyAreaHeight && (compact ? badge.X > 15 && badge.Y == 1 : badge.Y < 0), "Badge stays in the photographed housing position, not the bottom control row " + facts.Id);
         }
-        else Check(!facts.Id.StartsWith("gmmk3-", StringComparison.Ordinal) && model.PreviewWidth == model.Width && model.PreviewHeight == model.Height && model.PreviewTopInset == 0, "Existing devices keep unchanged preview bounds " + facts.Id);
+        else Check(!facts.Id.StartsWith("gmmk3-", StringComparison.Ordinal) && model.PreviewWidth >= model.Width && model.PreviewHeight >= model.Height, "Preview contains the physical keyboard " + facts.Id);
+        if (model.HasEncoder)
+        {
+            var knob = model.Keys.Single(key => key.Label == "Knob");
+            var turns = model.Keys.Where(key => key.IsEncoder).ToArray();
+            Check(turns.All(key => key.Y + model.PreviewTopInset >= 0 && key.X + key.W <= model.PreviewWidth && key.Y + key.H < knob.Y && knob.Y - key.Y < 1 && Math.Abs(key.X - knob.X) < 1), "Rotation controls stay visible beside their own knob " + facts.Id);
+            Check(turns.All(key => key.LedIndex is null && key.DefaultBinding == (key.Id == "encoder:ccw" ? "KC_VOLD" : "KC_VOLU")), "Rotation controls preserve bindings and do not invent LEDs " + facts.Id);
+        }
         var rightX = sideOracle.Max(p => p.led.GetProperty("x").GetInt32());
         foreach (var (x, side) in new[] { (0, model.LeftSideLedIndices), (rightX, model.RightSideLedIndices) })
             Check(side.SequenceEqual(sideOracle.Where(p => p.led.GetProperty("x").GetInt32() == x).OrderBy(p => p.led.GetProperty("y").GetInt32()).Select(p => p.index)), "Independent side ordering " + facts.Id);

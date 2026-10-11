@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -124,12 +124,12 @@ public sealed partial class MainWindow
         var devices = (await PlatformDeviceService.FindAsync()).Where(d => d.DeviceId == _state.Device.Id).ToArray();
         if (devices.Length == 0)
         {
-            await CreateFirmwareGuide("Keine passende eigene INGLORIOUS-Firmware erkannt. Ein Gerät mit Original-Firmware kann hier noch nicht ausgelesen werden.").ShowDialog(this);
+            await OpenDeviceSetupAsync(_state.Device.Id, allowBusy: true);
             return null;
         }
         if (devices.Length == 1) return devices[0];
         var window = new Window { Title = L.T("Gerät auswählen"), Width = 540, Height = 340, WindowStartupLocation = WindowStartupLocation.CenterOwner };
-        var list = new ListBox { ItemsSource = devices.Select((d, i) => new ListBoxItem { Content = d.Name + " · " + (i + 1), [ToolTip.TipProperty] = d.Path }).ToArray(), Height = 210 };
+        var list = new ListBox { ItemsSource = devices.Select((d, i) => new ListBoxItem { Content = DeviceCatalog.Get(d.DeviceId).Name + " · " + (i + 1), [ToolTip.TipProperty] = d.Path }).ToArray(), Height = 210 };
         var accept = new Button { Content = L.T("Übernehmen"), IsEnabled = false };
         list.SelectionChanged += (_, _) => accept.IsEnabled = list.SelectedIndex >= 0;
         accept.Click += (_, _) => window.Close(devices[list.SelectedIndex]);
@@ -139,40 +139,23 @@ public sealed partial class MainWindow
     private Control BuildFirmwareVersionPanel()
     {
         if (_state.Device.IsOfflineOnly) return Text(L.T("Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar."), true);
-        var status = Text(L.T("Version noch nicht geprüft")); status.Name = "FirmwareVersionStatus";
+        var id = _state.Device.Id;
+        _firmwareAssessments.TryGetValue(id, out var assessment);
+        var status = Text(assessment?.Version is { } reported ? "INGLORIOUS " + reported.Version + " · " + SetupStatusText(assessment)
+            : assessment is null ? L.T("Version noch nicht geprüft") : SetupStatusText(assessment));
+        status.Name = "FirmwareVersionStatus";
         var changelog = new StackPanel { Name = "FirmwareChangelog", IsVisible = false };
-        var read = AsyncButton("Version prüfen", async () =>
-        {
-            if (Program.Offline || _busy) return;
-            ShowFirmwareChangelog(changelog, _state.Device.Id, null);
-            _busy = true; _root.IsEnabled = false;
-            try
-            {
-                await _sharedBrightness.StopAsync();
-                var device = await ChooseDeviceAsync(); if (device is null) return;
-                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-                await using var client = OnboardClient.Open(device);
-                var info = await client.GetInfoAsync(timeout.Token);
-                var reported = await client.GetFirmwareVersionAsync(timeout.Token);
-                if (info.DeviceId != device.DeviceId || !info.Persistent || (info.Flags & 4) != 0)
-                    throw new IOException("Unverified device state.");
-                status.Text = reported is null
-                    ? L.T("Die Firmware-Version konnte nicht geprüft werden.")
-                    : "INGLORIOUS " + reported.Version + (_state.Device.HasApprovedFirmwareManagement ? " · " + L.T(reported.Version < FirmwareRelease.CurrentVersion
-                        ? "Eine neuere Firmware-Version ist verfügbar." : reported.Version > FirmwareRelease.CurrentVersion
-                        ? "Die installierte Firmware ist neuer als die Version dieser App. Es wird kein Downgrade angeboten." : "Firmware ist aktuell") : "");
-                ShowFirmwareChangelog(changelog, device.DeviceId, reported?.Version);
-            }
-            catch { status.Text = L.T("Die Firmware-Version konnte nicht geprüft werden."); }
-            finally { _busy = false; _root.IsEnabled = true; await UpdateBrightnessService(); }
-        });
-        read.Name = "ReadFirmwareVersion";
-        return Column(status, changelog, read);
+        ShowFirmwareChangelog(changelog, id, assessment?.Version?.Version);
+        var read = AsyncButton("Version prüfen", () => CheckFirmwareSetupAsync(force: true, requestedId: id)); read.Name = "ReadFirmwareVersion";
+        var update = AsyncButton("Firmware aktualisieren", () => CheckFirmwareSetupAsync(force: true, requestedId: id), true);
+        update.Name = "UpdateFirmware"; update.IsVisible = assessment?.State == SetupRuntimeState.UpdateAvailable;
+        return Column(status, changelog, read, update);
     }
     private static void ShowFirmwareChangelog(StackPanel target, string deviceId, FirmwareSemanticVersion? installed)
     {
         target.Children.Clear();
-        var notes = FirmwareChangelog.Between(deviceId, installed, FirmwareRelease.CurrentVersion);
+        if (!FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var targetVersion)) { target.IsVisible = false; return; }
+        var notes = FirmwareChangelog.Between(deviceId, installed, targetVersion);
         target.IsVisible = notes.Count != 0;
         if (notes.Count == 0) return;
         var body = new StackPanel { Spacing = 8 };
@@ -189,21 +172,6 @@ public sealed partial class MainWindow
             }
         }
         target.Children.Add(new Border { Child = body, Background = Brush("#1C1F22"), BorderBrush = Brush("#353A40"), BorderThickness = new(1), CornerRadius = new(6), Padding = new(16), Margin = new(0, 10, 0, 10) });
-    }
-    private Window CreateFirmwareGuide(string reason)
-    {
-        var dialog = new Window { Title = L.T("Firmware") + " · " + FirmwareRelease.DisplayVersion, Width = 660, MaxHeight = 760, SizeToContent = SizeToContent.Height, WindowStartupLocation = WindowStartupLocation.CenterOwner };
-        var body = Column(Text(_state.Device.Name, size: 20), Text(L.T(reason)),
-            Text(L.T("Für Effekte, Farbfolgen und Geräteeinstellungen benötigt das Gerät passende INGLORIOUS-Firmware."), true),
-            Heading("2. Original-Sicherung prüfen"), Text("Windows: " + L.T("Vor der Installation sichert und prüft die App deine Original-Firmware. Die Sicherung bleibt auf deinem Computer. Unter „Gerät“ → „Original-Firmware wiederherstellen“ kannst du jederzeit zurückwechseln.")),
-            Text(L.T("Externe Profilspeicher sind nicht vollständig gesichert und werden nicht verändert."), true),
-            Heading("3. Firmware-Manager öffnen"), Text(L.T("Firmware wird in dieser Ausgabe nicht installiert. Verwende den Firmware-Manager der Windows-Ausgabe mit den lokal geprüften Werkzeugen und Sicherungen.")),
-            Heading("4. Wieder verbinden"), Text(L.T("Nach dem bestätigten Update das USB-Kabel neu verbinden, den Gerätestand lesen und das gewünschte Profil übertragen.")));
-        body.Children.Insert(1, Heading("1. Gerät erkennen"));
-        if (!_state.Device.HasApprovedFirmwareManagement)
-            body = Column(Text(_state.Device.Name, size: 20), Text(L.T("Firmware-Installation und Originalwiederherstellung sind in dieser plattformübergreifenden Ausgabe noch nicht verfügbar.")));
-        var close = Button("Schließen", () => dialog.Close()); close.IsDefault = close.IsCancel = true; close.HorizontalAlignment = HorizontalAlignment.Right; body.Children.Add(close);
-        dialog.Content = new ScrollViewer { Content = new Border { Padding = new Thickness(24), Child = body } }; return dialog;
     }
     private async Task ReadDeviceAsync()
     {
@@ -249,7 +217,7 @@ public sealed partial class MainWindow
         finally { _busy = false; _root.IsEnabled = true; }
         if (PlatformDeviceService.UnsupportedReason(info, image, extensions) is { } unsupported)
         {
-            await CreateFirmwareGuide(unsupported).ShowDialog(this); return;
+            Status(unsupported); await CheckFirmwareSetupAsync(force: true, requestedId: target.DeviceId); return;
         }
         var dialog = new Window { Title = L.T("Auf Tastatur übertragen"), Width = 540, SizeToContent = SizeToContent.Height, WindowStartupLocation = WindowStartupLocation.CenterOwner, CanResize = false };
         var status = Text(L.T("Bereit zur Übertragung"));
@@ -257,7 +225,7 @@ public sealed partial class MainWindow
         var go = new Button { Content = ButtonContent("Auf Tastatur übertragen") }; go.Classes.Add("primary");
         var readBack = new Button { Content = L.T("Gerätestand lesen") }; readBack.IsVisible = false;
         var close = new Button { Content = L.T("Schließen") }; close.Click += (_, _) => dialog.Close();
-        var guide = AsyncButton("Firmware", async () => await CreateFirmwareGuide("INGLORIOUS erkannt · Aktualisierung erforderlich").ShowDialog(dialog)); guide.IsVisible = false;
+        var guide = AsyncButton("Firmware", () => CheckFirmwareSetupAsync(force: true, requestedId: target.DeviceId, owner: dialog)); guide.IsVisible = false;
         var running = false;
         string? completionNotice = null;
         dialog.Closing += (_, e) => { if (running) e.Cancel = true; };
@@ -324,7 +292,7 @@ public sealed partial class MainWindow
                 if (saved) { Status(completionNotice ?? L.T("Auf Tastatur bestätigt")); dialog.Close(); }
             }
         };
-        dialog.Content = new Border { Padding = new Thickness(24), Child = Column(Heading("Auf Tastatur übertragen"), Text(snapshot.Name + " · " + target.Name),
+        dialog.Content = new Border { Padding = new Thickness(24), Child = Column(Heading("Auf Tastatur übertragen"), Text(snapshot.Name + " · " + DeviceCatalog.Get(target.DeviceId).Name),
             Text(L.T("Der bisherige Gerätestand wird automatisch gesichert."), true), status, progress, Row(guide, readBack, close, go)) };
         await dialog.ShowDialog(this);
         }
@@ -368,11 +336,12 @@ public sealed partial class MainWindow
                 var shot = Array.IndexOf(Program.Arguments, "--screenshot");
                 if (shot >= 0 && shot + 1 < Program.Arguments.Length)
                 {
-                    if (Program.Arguments.Contains("--help") || Program.Arguments.Contains("--close-prompt") || Program.Arguments.Contains("--picker") || Program.Arguments.Contains("--firmware-guide"))
+                    if (Program.Arguments.Contains("--help") || Program.Arguments.Contains("--close-prompt") || Program.Arguments.Contains("--picker") || Program.Arguments.Contains("--device-setup") || Program.Arguments.Contains("--settings"))
                     {
                         var helpTopic = Array.IndexOf(Program.Arguments, "--help-topic");
                         var prompt = Program.Arguments.Contains("--help") ? CreateUserGuide(helpTopic >= 0 && helpTopic + 1 < Program.Arguments.Length ? Program.Arguments[helpTopic + 1] : CurrentGuideTopic())
-                            : Program.Arguments.Contains("--firmware-guide") ? CreateFirmwareGuide("INGLORIOUS erkannt · Aktualisierung erforderlich") : Program.Arguments.Contains("--picker") ? CreateColorPicker("#EF646B") : CreatePrompt("Ungespeichertes Profil", L.F($"Änderungen an „{_state.Project.Name}“ zuerst speichern?"), "Abbrechen", "Profil speichern", "Verwerfen");
+                            : Program.Arguments.Contains("--settings") ? CreateSettingsWindow(_preferences, offlinePreview: true)
+                            : Program.Arguments.Contains("--device-setup") ? CreateOfflineSetupPreview() : Program.Arguments.Contains("--picker") ? CreateColorPicker("#EF646B") : CreatePrompt("Ungespeichertes Profil", L.F($"Änderungen an „{_state.Project.Name}“ zuerst speichern?"), "Abbrechen", "Profil speichern", "Verwerfen");
                         if (Program.Arguments.Contains("--help") && Program.Arguments.Contains("--minimum")) { prompt.Width = prompt.MinWidth; prompt.Height = prompt.MinHeight; }
                         prompt.Opened += async (_, _) =>
                         {
@@ -411,9 +380,9 @@ public sealed partial class MainWindow
         if (_startupWindowClosed || _allowClose) return;
         await LoadInitialConnectionsAsync();
         if (_startupWindowClosed || _allowClose) return;
-        if (!_preferences.SharedBrightnessNoticeDismissed)
+        if (IsVisible && !_preferences.SharedBrightnessNoticeDismissed)
         {
-            var result = await Ask("Gemeinsames Dimmen", L.T("Gemeinsames Dimmen von Numpad und Tastatur benötigt INGLORIOUS im Hintergrund. Nur das Numpad dimmt auch ohne laufende App. Farben, Effekte und Belegungen bleiben auf den Geräten gespeichert."), "Schließen", "Verstanden");
+            var result = await Ask("Gemeinsames Dimmen", L.T("Gemeinsames Dimmen von GMMK Numpad und Tastatur benötigt INGLORIOUS Advanced im Hintergrund. Nur das GMMK Numpad dimmt auch ohne laufende App. Farben, Effekte und Belegungen bleiben auf den Geräten gespeichert."), "Schließen", "Verstanden");
             if (result == 1)
             {
                 try { var session = AppPreferencesStore.BeginEdit(); _preferences = session.Preferences with { SharedBrightnessNoticeDismissed = true }; AppPreferencesStore.Save(session, _preferences); }
@@ -422,6 +391,7 @@ public sealed partial class MainWindow
         }
         _sharedBrightness.StatusChanged += value => Dispatcher.UIThread.Post(() => { if (!_busy && value.Length > 0) Status(value); });
         await UpdateBrightnessService();
+        if (IsVisible) await CheckFirmwareSetupAsync();
     }
     private void SaveWindowPreferences()
     {

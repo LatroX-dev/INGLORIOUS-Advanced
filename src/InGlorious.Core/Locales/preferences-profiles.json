@@ -1,4 +1,4 @@
-{
+﻿{
   "INGLORIOUS einrichten": {
     "en": "Set up INGLORIOUS",
     "es": "Configurar INGLORIOUS",
@@ -246,31 +246,31 @@
     "ko": "먼저 관리자에서 로컬 계획을 확인하세요. 그곳에 명시되고 정확히 검증된 초기 상태에서만 업데이트할 수 있습니다.",
     "zh-Hans": "先在管理器中验证本地计划。仅支持从其中指定并精确验证的初始状态进行更新。"
   },
-  "PRO: CORE schließen, USB abziehen und Leertaste + B am selben geprüften USB-Anschluss beim Anstecken etwa drei Sekunden halten. Keine weitere Taste drücken.": {
-    "en": "PRO: Close CORE, unplug USB, then hold Space + B for about three seconds while reconnecting to the same verified USB port. Press no other key.",
-    "es": "PRO: Cierra CORE, desconecta USB y mantén Espacio + B unos tres segundos al reconectar al mismo puerto USB verificado. No pulses otra tecla.",
-    "fr": "PRO : fermez CORE, débranchez l’USB, puis maintenez Espace + B environ trois secondes en reconnectant au même port USB vérifié. N’appuyez sur aucune autre touche.",
-    "it": "PRO: chiudi CORE, scollega USB e tieni premuti Spazio + B per circa tre secondi mentre ricolleghi alla stessa porta USB verificata. Non premere altri tasti.",
-    "pt-BR": "PRO: feche o CORE, desconecte USB e segure Espaço + B por cerca de três segundos ao reconectar à mesma porta USB verificada. Não pressione outra tecla.",
-    "pl": "PRO: zamknij CORE, odłącz USB, a przy podłączaniu do tego samego sprawdzonego portu trzymaj Spację + B przez około trzy sekundy. Nie naciskaj innych klawiszy.",
-    "tr": "PRO: CORE'u kapatın, USB'yi çıkarın ve aynı doğrulanmış USB portuna takarken Boşluk + B'yi yaklaşık üç saniye basılı tutun. Başka tuşa basmayın.",
-    "ru": "PRO: закройте CORE, отключите USB и удерживайте Пробел + B около трёх секунд при подключении к тому же проверенному порту USB. Не нажимайте другие клавиши.",
-    "ja": "PRO：COREを閉じてUSBを抜き、同じ確認済みUSBポートに再接続しながらSpace + Bを約3秒押し続けます。他のキーは押さないでください。",
-    "ko": "PRO: CORE를 닫고 USB를 뽑은 뒤, 검증된 동일 USB 포트에 다시 연결하면서 Space + B를 약 3초간 누르세요. 다른 키는 누르지 마세요.",
-    "zh-Hans": "PRO：关闭 CORE，拔下 USB，然后重新插入同一已验证的 USB 接口时按住空格 + B 约三秒。不要按其他键。"
+  "GMMK PRO ISO: Glorious CORE schließen, USB abziehen und Leertaste + B am selben geprüften USB-Anschluss beim Anstecken etwa drei Sekunden halten. Keine weitere Taste drücken.": {
+    "en": "GMMK PRO ISO: Close Glorious CORE, unplug USB, then hold Space + B for about three seconds while reconnecting to the same verified USB port. Press no other key.",
+    "es": "GMMK PRO ISO: Cierra Glorious CORE, desconecta USB y mantén Espacio + B unos tres segundos al reconectar al mismo puerto USB verificado. No pulses otra tecla.",
+    "fr": "GMMK PRO ISO : fermez Glorious CORE, débranchez l’USB, puis maintenez Espace + B environ trois secondes en reconnectant au même port USB vérifié. N’appuyez sur aucune autre touche.",
+    "it": "GMMK PRO ISO: chiudi Glorious CORE, scollega USB e tieni premuti Spazio + B per circa tre secondi mentre ricolleghi alla stessa porta USB verificata. Non premere altri tasti.",
+    "pt-BR": "GMMK PRO ISO: feche o Glorious CORE, desconecte USB e segure Espaço + B por cerca de três segundos ao reconectar à mesma porta USB verificada. Não pressione outra tecla.",
+    "pl": "GMMK PRO ISO: zamknij Glorious CORE, odłącz USB, a przy podłączaniu do tego samego sprawdzonego portu trzymaj Spację + B przez około trzy sekundy. Nie naciskaj innych klawiszy.",
+    "tr": "GMMK PRO ISO: Glorious CORE'u kapatın, USB'yi çıkarın ve aynı doğrulanmış USB portuna takarken Boşluk + B'yi yaklaşık üç saniye basılı tutun. Başka tuşa basmayın.",
+    "ru": "GMMK PRO ISO: закройте Glorious CORE, отключите USB и удерживайте Пробел + B около трёх секунд при подключении к тому же проверенному порту USB. Не нажимайте другие клавиши.",
+    "ja": "GMMK PRO ISO：COREを閉じてUSBを抜き、同じ確認済みUSBポートに再接続しながらSpace + Bを約3秒押し続けます。他のキーは押さないでください。",
+    "ko": "GMMK PRO ISO: CORE를 닫고 USB를 뽑은 뒤, 검증된 동일 USB 포트에 다시 연결하면서 Space + B를 약 3초간 누르세요. 다른 키는 누르지 마세요.",
+    "zh-Hans": "GMMK PRO ISO：关闭 Glorious CORE，拔下 USB，然后重新插入同一已验证的 USB 接口时按住空格 + B 约三秒。不要按其他键。"
   },
-  "Numpad: CORE schließen, USB abziehen und Plus + Enter am selben geprüften USB-Anschluss beim Anstecken etwa drei Sekunden halten. Keine weitere Taste drücken.": {
-    "en": "Numpad: Close CORE, unplug USB, then hold Plus + Enter for about three seconds while reconnecting to the same verified USB port. Press no other key.",
-    "es": "Numpad: Cierra CORE, desconecta USB y mantén Más + Intro unos tres segundos al reconectar al mismo puerto USB verificado. No pulses otra tecla.",
-    "fr": "Numpad : fermez CORE, débranchez l’USB, puis maintenez Plus + Entrée environ trois secondes en reconnectant au même port USB vérifié. N’appuyez sur aucune autre touche.",
-    "it": "Numpad: chiudi CORE, scollega USB e tieni premuti Più + Invio per circa tre secondi mentre ricolleghi alla stessa porta USB verificata. Non premere altri tasti.",
-    "pt-BR": "Numpad: feche o CORE, desconecte USB e segure Mais + Enter por cerca de três segundos ao reconectar à mesma porta USB verificada. Não pressione outra tecla.",
-    "pl": "Numpad: zamknij CORE, odłącz USB, a przy podłączaniu do tego samego sprawdzonego portu trzymaj Plus + Enter przez około trzy sekundy. Nie naciskaj innych klawiszy.",
-    "tr": "Numpad: CORE'u kapatın, USB'yi çıkarın ve aynı doğrulanmış USB portuna takarken Artı + Enter'ı yaklaşık üç saniye basılı tutun. Başka tuşa basmayın.",
-    "ru": "Numpad: закройте CORE, отключите USB и удерживайте Плюс + Enter около трёх секунд при подключении к тому же проверенному порту USB. Не нажимайте другие клавиши.",
-    "ja": "Numpad：COREを閉じてUSBを抜き、同じ確認済みUSBポートに再接続しながらPlus + Enterを約3秒押し続けます。他のキーは押さないでください。",
-    "ko": "Numpad: CORE를 닫고 USB를 뽑은 뒤, 검증된 동일 USB 포트에 다시 연결하면서 Plus + Enter를 약 3초간 누르세요. 다른 키는 누르지 마세요.",
-    "zh-Hans": "Numpad：关闭 CORE，拔下 USB，然后重新插入同一已验证的 USB 接口时按住加号 + Enter 约三秒。不要按其他键。"
+  "GMMK Numpad: Glorious CORE schließen, USB abziehen und Plus + Enter am selben geprüften USB-Anschluss beim Anstecken etwa drei Sekunden halten. Keine weitere Taste drücken.": {
+    "en": "GMMK Numpad: Close Glorious CORE, unplug USB, then hold Plus + Enter for about three seconds while reconnecting to the same verified USB port. Press no other key.",
+    "es": "GMMK Numpad: Cierra Glorious CORE, desconecta USB y mantén Más + Intro unos tres segundos al reconectar al mismo puerto USB verificado. No pulses otra tecla.",
+    "fr": "GMMK Numpad : fermez Glorious CORE, débranchez l’USB, puis maintenez Plus + Entrée environ trois secondes en reconnectant au même port USB vérifié. N’appuyez sur aucune autre touche.",
+    "it": "GMMK Numpad: chiudi Glorious CORE, scollega USB e tieni premuti Più + Invio per circa tre secondi mentre ricolleghi alla stessa porta USB verificata. Non premere altri tasti.",
+    "pt-BR": "GMMK Numpad: feche o Glorious CORE, desconecte USB e segure Mais + Enter por cerca de três segundos ao reconectar à mesma porta USB verificada. Não pressione outra tecla.",
+    "pl": "GMMK Numpad: zamknij Glorious CORE, odłącz USB, a przy podłączaniu do tego samego sprawdzonego portu trzymaj Plus + Enter przez około trzy sekundy. Nie naciskaj innych klawiszy.",
+    "tr": "GMMK Numpad: Glorious CORE'u kapatın, USB'yi çıkarın ve aynı doğrulanmış USB portuna takarken Artı + Enter'ı yaklaşık üç saniye basılı tutun. Başka tuşa basmayın.",
+    "ru": "GMMK Numpad: закройте Glorious CORE, отключите USB и удерживайте Плюс + Enter около трёх секунд при подключении к тому же проверенному порту USB. Не нажимайте другие клавиши.",
+    "ja": "GMMK Numpad：COREを閉じてUSBを抜き、同じ確認済みUSBポートに再接続しながらPlus + Enterを約3秒押し続けます。他のキーは押さないでください。",
+    "ko": "GMMK Numpad: CORE를 닫고 USB를 뽑은 뒤, 검증된 동일 USB 포트에 다시 연결하면서 Plus + Enter를 약 3초간 누르세요. 다른 키는 누르지 마세요.",
+    "zh-Hans": "GMMK Numpad：关闭 Glorious CORE，拔下 USB，然后重新插入同一已验证的 USB 接口时按住加号 + Enter 约三秒。不要按其他键。"
   },
   "Während des Schreibens USB nicht trennen. Erst nach bestätigter vollständiger Rücklesung normal neu verbinden.": {
     "en": "Do not disconnect USB while writing. Reconnect normally only after a complete readback has been confirmed.",

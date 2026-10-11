@@ -276,6 +276,13 @@ internal static partial class Program
         var root=Path.TrimEndingDirectorySeparator(Path.GetFullPath(fixtureRoot))+Path.DirectorySeparatorChar;
         if(new[]{link,target}.Any(path=>!Path.GetFullPath(path).StartsWith(root,StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException("Junction fixture must remain within its isolated root.");
+        if (!OperatingSystem.IsWindows())
+        {
+            Directory.CreateSymbolicLink(link, target);
+            if (!File.GetAttributes(link).HasFlag(FileAttributes.ReparsePoint))
+                throw new IOException("Symbolic-link fixture failed.");
+            return;
+        }
         // NTFS directory junctions exercise the same ReparsePoint rejection without
         // requiring Windows Developer Mode or the symbolic-link privilege.
         var start=new ProcessStartInfo(Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.System),"cmd.exe"))

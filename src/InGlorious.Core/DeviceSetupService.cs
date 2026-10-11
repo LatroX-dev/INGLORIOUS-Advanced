@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -58,8 +58,9 @@ public sealed partial class DeviceSetupService
     private readonly IDeviceSetupEnvironment _environment;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private SetupSession? _active;
-    public DeviceSetupService() : this(new WindowsDeviceSetupEnvironment(),
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "INGLORIOUS Advanced", "Firmware", "Devices"),
+    public static string RecoveryDirectory => Path.Combine(Paths.UserDataRoot, "Firmware", "Devices");
+    public DeviceSetupService() : this(OperatingSystem.IsWindows() ? new WindowsDeviceSetupEnvironment() : new PosixDeviceSetupEnvironment(),
+        RecoveryDirectory,
         Path.Combine(AppContext.BaseDirectory, "Firmware")) { }
     internal DeviceSetupService(IDeviceSetupEnvironment environment, string archiveRoot, string packageRoot)
     { _environment = environment; _archiveRoot = Path.GetFullPath(archiveRoot); _packageRoot = Path.GetFullPath(packageRoot); }
@@ -70,7 +71,7 @@ public sealed partial class DeviceSetupService
         return nodes.Where(node => node.Service != "Unavailable").Select(node =>
         {
             if (StockDeviceCatalog.Match(node.VendorId, node.ProductId) is { } stock)
-                return new SetupDevice(node.InstanceId, stock.CoreCatalogName, stock.CandidateDeviceIds,
+                return new SetupDevice(node.InstanceId, DeviceCatalog.ModelGroupName(stock.CandidateDeviceIds), stock.CandidateDeviceIds,
                     node.VendorId, node.ProductId, node.LocationPaths, false);
             if (BoardDescriptorRegistry.TryGetRuntimeUsb(node.VendorId, node.ProductId, out var board))
                 return new SetupDevice(node.InstanceId, DeviceCatalog.Get(board.DeviceId).Name, new[] { board.DeviceId },
@@ -140,8 +141,8 @@ public sealed partial class DeviceSetupService
                 return Progress(session);
             }
             var boot = bootloaders[0];
-            if (!string.Equals(boot.Service, "WinUSB", StringComparison.OrdinalIgnoreCase))
-                return new(session.Stage, L.T("Für den Update-Modus fehlt der USB-Treiber."));
+            if (!HasUsableUsbTransport(boot))
+                return new(session.Stage, L.T(OperatingSystem.IsWindows() ? "Für den Update-Modus fehlt der USB-Treiber." : "Der USB-Zugriff ist nicht freigegeben. Prüfe die USB-Berechtigungen für INGLORIOUS Advanced."));
             if (session.Bootloader is not null)
             {
                 if (boot.InstanceId != session.Bootloader.InstanceId) return Block(session, "Die USB-Verbindung hat sich geändert. Starte die Einrichtung erneut.");
@@ -157,7 +158,7 @@ public sealed partial class DeviceSetupService
             if (selections.Length != 1) return Block(session, "Verbinde nur eine Tastatur im Update-Modus.");
             var selection = selections[0];
             if (selection.GetProperty("vid").GetUInt16() != boot.VendorId || selection.GetProperty("pid").GetUInt16() != boot.ProductId ||
-                selection.GetProperty("transport").GetString() != transport || !UsbPortMatches(boot.LocationPaths, selection.GetProperty("portPath").GetString()))
+                selection.GetProperty("transport").GetString() != transport || !UsbPortMatches(boot.LocationPaths, selection.GetProperty("portPath").GetString(), selection.GetProperty("bus").GetByte()))
                 return Block(session, "Gerät nicht eindeutig erkannt.");
             session.Selection = selection.Clone();
             var probe = await Adapter(session, "probe");
@@ -196,10 +197,44 @@ public sealed partial class DeviceSetupService
     internal static int FlashBytesFor(string id) => TransportFor(id) == "stm32-dfuse" ? 262144 : 131072;
     internal static bool IsBootloader(SetupUsbNode node) => (node.VendorId, node.ProductId) is (0x0483, 0xDF11) or (0x342D, 0xDFA0);
     internal static bool SamePort(IReadOnlyList<string> left, IReadOnlyList<string> right) => left.Count > 0 && right.Count > 0 &&
-        left.Intersect(right, StringComparer.OrdinalIgnoreCase).Any(path => path.Contains("#USB(", StringComparison.OrdinalIgnoreCase));
-    internal static bool UsbPortMatches(IReadOnlyList<string> locations, string? portPath) =>
-        !string.IsNullOrWhiteSpace(portPath) && locations.Any(location => string.Join('.',
-            Regex.Matches(location, @"#USB\((\d+)\)", RegexOptions.IgnoreCase).Select(match => match.Groups[1].Value)) == portPath);
+        left.Intersect(right, StringComparer.OrdinalIgnoreCase).Any(path => path.StartsWith("USBPORT(", StringComparison.OrdinalIgnoreCase)
+            ? PlatformUsbIdentity.IsCanonicalLocation(path) : path.Contains("#USB(", StringComparison.OrdinalIgnoreCase));
+    internal static bool UsbPortMatches(IReadOnlyList<string> locations, string? portPath, byte? bus = null) =>
+        !string.IsNullOrWhiteSpace(portPath) && locations.Any(location => location.StartsWith("USBPORT(", StringComparison.OrdinalIgnoreCase)
+            ? bus.HasValue && PlatformUsbIdentity.IsCanonicalLocation(location) && location == PlatformUsbIdentity.Location(bus.Value, portPath)
+            : string.Join('.', Regex.Matches(location, @"#USB\((\d+)\)", RegexOptions.IgnoreCase).Select(match => match.Groups[1].Value)) == portPath);
+    internal static bool HasUsableUsbTransport(SetupUsbNode node) =>
+        string.Equals(node.Service, "WinUSB", StringComparison.OrdinalIgnoreCase) && node.LocationPaths.Any(path => !path.StartsWith("USBPORT(", StringComparison.OrdinalIgnoreCase) && path.Contains("#USB(", StringComparison.OrdinalIgnoreCase)) ||
+        node.Service == "libusb" && node.LocationPaths.Count == 1 && PlatformUsbIdentity.IsCanonicalLocation(node.LocationPaths[0]);
+
+    public bool MatchesRuntimePort(SetupSession session, string hidPath, ushort vendor, ushort product)
+    {
+        AssertSession(session);
+        if (session.DeviceId is not { } id || !BoardDescriptorRegistry.TryGetRuntimeUsb(vendor, product, out var board) || board.DeviceId != id) return false;
+        return SamePort(session.Device.LocationPaths, PlatformUsbIdentity.LocationsForHidPath(hidPath, vendor, product));
+    }
+    public bool MatchesRuntimePort(SetupDevice device, string hidPath, ushort vendor, ushort product) =>
+        device.IsRuntime && device.VendorId == vendor && device.ProductId == product &&
+        SamePort(device.LocationPaths, PlatformUsbIdentity.LocationsForHidPath(hidPath, vendor, product));
+
+    public static bool? IsGloriousCoreRunning()
+    {
+        Process[] processes;
+        try { processes = Process.GetProcessesByName("Glorious Core"); }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException or NotSupportedException) { return null; }
+        bool uncertain = false;
+        try
+        {
+            foreach (var process in processes)
+            {
+                try { if (!process.HasExited && string.Equals(process.ProcessName, "Glorious Core", StringComparison.OrdinalIgnoreCase)) return true; }
+                catch (InvalidOperationException) { }
+                catch (Exception error) when (error is System.ComponentModel.Win32Exception or NotSupportedException) { uncertain = true; }
+            }
+            return uncertain ? null : false;
+        }
+        finally { foreach (var process in processes) process.Dispose(); }
+    }
     private static SetupException Error(string message) => new(L.T(message));
     public static string ForUser(Exception error) => error is SetupException ? error.Message :
         L.T("Der Vorgang konnte nicht abgeschlossen werden. Es wird nichts automatisch wiederholt.");
@@ -248,7 +283,11 @@ public sealed partial class DeviceSetupService
     private static void RequireSuccess(JsonElement response)
     {
         if (response.GetProperty("status").GetString() is not ("ok" or "verified"))
+        {
+            if (!OperatingSystem.IsWindows() && response.TryGetProperty("errorCode", out var code) && (code.GetString() ?? "").Contains("libusb error -3", StringComparison.Ordinal))
+                throw Error("Der USB-Zugriff ist nicht freigegeben. Prüfe die USB-Berechtigungen für INGLORIOUS Advanced.");
             throw Error("Das Gerät konnte nicht sicher geprüft werden. Es wurde keine Installation freigegeben.");
+        }
     }
     internal static void AssertNoLinks(string path)
     {

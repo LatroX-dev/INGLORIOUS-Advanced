@@ -1,4 +1,4 @@
-{
+﻿{
   " · lokaler Firmware-Zugang": {
     "en": " · local firmware access",
     "es": " · acceso local al firmware",
@@ -38,18 +38,18 @@
     "ko": "여기서 검증한 INGLORIOUS 버전을 업데이트합니다. 기존 설정을 유지하며 먼저 현재 상태를 백업합니다.",
     "zh-Hans": "更新此处已验证的 INGLORIOUS 版本。保留现有设置，并先备份当前状态。"
   },
-  "Installiert INGLORIOUS auf dem exakt gesicherten Originalzustand. Danach gelten Standardwerte. Farben und Profile anschließend separat übertragen; CORE-Profile werden nicht automatisch übernommen.": {
-    "en": "Installs INGLORIOUS on the exact backed-up original state. Defaults apply afterward. Transfer colors and profiles separately afterward; CORE profiles are not imported automatically.",
-    "es": "Instala INGLORIOUS sobre el estado original exacto respaldado. Después se usan valores predeterminados. Transfiere colores y perfiles por separado; los perfiles CORE no se importan automáticamente.",
-    "fr": "Installe INGLORIOUS sur l’état d’origine exact sauvegardé. Les réglages par défaut s’appliquent ensuite. Transférer séparément couleurs et profils ; les profils CORE ne sont pas importés automatiquement.",
-    "it": "Installa INGLORIOUS sullo stato originale esatto salvato. Poi valgono i valori predefiniti. Trasferisci colori e profili separatamente; i profili CORE non vengono importati automaticamente.",
-    "pt-BR": "Instala o INGLORIOUS sobre o estado original exato salvo. Depois, são usados os padrões. Transfira cores e perfis separadamente; perfis CORE não são importados automaticamente.",
-    "pl": "Instaluje INGLORIOUS na dokładnie zapisanym stanie oryginalnym. Potem obowiązują ustawienia domyślne. Kolory i profile prześlij osobno; profile CORE nie są importowane automatycznie.",
-    "tr": "INGLORIOUS’u yedeklenmiş özgün durumun tam üzerine kurar. Ardından varsayılanlar kullanılır. Renkleri ve profilleri ayrıca aktar; CORE profilleri otomatik alınmaz.",
-    "ru": "Устанавливает INGLORIOUS поверх точно сохранённого исходного состояния. Затем действуют настройки по умолчанию. Цвета и профили нужно передать отдельно; профили CORE не импортируются автоматически.",
+  "Installiert INGLORIOUS auf dem exakt gesicherten Originalzustand. Danach gelten Standardwerte. Farben und Profile anschließend separat übertragen; Glorious CORE-Profile werden nicht automatisch übernommen.": {
+    "en": "Installs INGLORIOUS on the exact backed-up original state. Defaults apply afterward. Transfer colors and profiles separately afterward; Glorious CORE profiles are not imported automatically.",
+    "es": "Instala INGLORIOUS sobre el estado original exacto respaldado. Después se usan valores predeterminados. Transfiere colores y perfiles por separado; los perfiles Glorious CORE no se importan automáticamente.",
+    "fr": "Installe INGLORIOUS sur l’état d’origine exact sauvegardé. Les réglages par défaut s’appliquent ensuite. Transférer séparément couleurs et profils ; les profils Glorious CORE ne sont pas importés automatiquement.",
+    "it": "Installa INGLORIOUS sullo stato originale esatto salvato. Poi valgono i valori predefiniti. Trasferisci colori e profili separatamente; i profili Glorious CORE non vengono importati automaticamente.",
+    "pt-BR": "Instala o INGLORIOUS sobre o estado original exato salvo. Depois, são usados os padrões. Transfira cores e perfis separadamente; perfis Glorious CORE não são importados automaticamente.",
+    "pl": "Instaluje INGLORIOUS na dokładnie zapisanym stanie oryginalnym. Potem obowiązują ustawienia domyślne. Kolory i profile prześlij osobno; profile Glorious CORE nie są importowane automatycznie.",
+    "tr": "INGLORIOUS’u yedeklenmiş özgün durumun tam üzerine kurar. Ardından varsayılanlar kullanılır. Renkleri ve profilleri ayrıca aktar; Glorious CORE profilleri otomatik alınmaz.",
+    "ru": "Устанавливает INGLORIOUS поверх точно сохранённого исходного состояния. Затем действуют настройки по умолчанию. Цвета и профили нужно передать отдельно; профили Glorious CORE не импортируются автоматически.",
     "ja": "バックアップと完全一致する純正状態にINGLORIOUSをインストールします。初期設定で起動するため、色とプロファイルは後で別途転送してください。COREプロファイルは自動移行されません。",
-    "ko": "정확히 백업된 원본 상태에 INGLORIOUS를 설치합니다. 이후 기본값이 적용됩니다. 색상과 프로필은 별도로 전송해야 하며 CORE 프로필은 자동으로 가져오지 않습니다.",
-    "zh-Hans": "在与备份完全一致的原厂状态上安装 INGLORIOUS，安装后使用默认值。颜色和配置文件需另行传输；不会自动导入 CORE 配置文件。"
+    "ko": "정확히 백업된 원본 상태에 INGLORIOUS를 설치합니다. 이후 기본값이 적용됩니다. 색상과 프로필은 별도로 전송해야 하며 Glorious CORE 프로필은 자동으로 가져오지 않습니다.",
+    "zh-Hans": "在与备份完全一致的原厂状态上安装 INGLORIOUS，安装后使用默认值。颜色和配置文件需另行传输；不会自动导入 Glorious CORE 配置文件。"
   },
   "Spielt die gesicherte Original-Firmware zurück. INGLORIOUS und seine internen Einstellungen werden ersetzt; der aktuelle Zustand wird vorher gesichert.": {
     "en": "Restores the backed-up original firmware. INGLORIOUS and its internal settings are replaced; the current state is backed up first.",
@@ -103,31 +103,31 @@
     "ko": " 매번 기록 후 두 번의 전체 읽기 검증이 필요합니다.",
     "zh-Hans": " 每次写入后均须完整回读两次。"
   },
-  "2. CORE und andere Firmware-Werkzeuge schließen. PRO abziehen; Leertaste + B beim USB-Anstecken etwa drei Sekunden halten. Danach loslassen.": {
-    "en": "2. Close CORE and other firmware tools. Unplug PRO; hold Space + B for about three seconds while plugging USB in. Then release.",
-    "es": "2. Cierra CORE y otras herramientas de firmware. Desconecta PRO; mantén Espacio + B unos tres segundos al conectar USB. Después suelta.",
-    "fr": "2. Fermer CORE et les autres outils de firmware. Débrancher PRO ; maintenir Espace + B environ trois secondes en rebranchant l’USB. Relâcher ensuite.",
-    "it": "2. Chiudi CORE e gli altri strumenti firmware. Scollega PRO; tieni Spazio + B per circa tre secondi mentre colleghi l’USB. Poi rilascia.",
-    "pt-BR": "2. Feche o CORE e outras ferramentas de firmware. Desconecte o PRO; segure Espaço + B por cerca de três segundos ao conectar o USB. Depois solte.",
-    "pl": "2. Zamknij CORE i inne narzędzia firmware. Odłącz PRO; podczas podłączania USB trzymaj Spację + B przez około trzy sekundy. Następnie puść.",
-    "tr": "2. CORE’u ve diğer donanım yazılımı araçlarını kapat. PRO’yu çıkar; USB’yi takarken Boşluk + B’yi yaklaşık üç saniye basılı tut. Sonra bırak.",
-    "ru": "2. Закройте CORE и другие утилиты прошивки. Отключите PRO; при подключении USB удерживайте Пробел + B около трёх секунд. Затем отпустите.",
-    "ja": "2. COREと他のファームウェアツールを閉じます。PROを外し、スペース＋Bを押しながらUSBを接続して約3秒保持し、離します。",
-    "ko": "2. CORE와 다른 펌웨어 도구를 닫으세요. PRO를 분리한 뒤 스페이스 + B를 누른 채 USB를 연결하고 약 3초 후 놓으세요.",
-    "zh-Hans": "2. 关闭 CORE 和其他固件工具。拔下 PRO，按住空格 + B 插入 USB，保持约三秒后松开。"
+  "2. Glorious CORE und andere Firmware-Werkzeuge schließen. GMMK PRO ISO abziehen; Leertaste + B beim USB-Anstecken etwa drei Sekunden halten. Danach loslassen.": {
+    "en": "2. Close Glorious CORE and other firmware tools. Unplug GMMK PRO ISO; hold Space + B for about three seconds while plugging USB in. Then release.",
+    "es": "2. Cierra Glorious CORE y otras herramientas de firmware. Desconecta GMMK PRO ISO; mantén Espacio + B unos tres segundos al conectar USB. Después suelta.",
+    "fr": "2. Fermer Glorious CORE et les autres outils de firmware. Débrancher GMMK PRO ISO ; maintenir Espace + B environ trois secondes en rebranchant l’USB. Relâcher ensuite.",
+    "it": "2. Chiudi Glorious CORE e gli altri strumenti firmware. Scollega GMMK PRO ISO; tieni Spazio + B per circa tre secondi mentre colleghi l’USB. Poi rilascia.",
+    "pt-BR": "2. Feche o Glorious CORE e outras ferramentas de firmware. Desconecte o GMMK PRO ISO; segure Espaço + B por cerca de três segundos ao conectar o USB. Depois solte.",
+    "pl": "2. Zamknij Glorious CORE i inne narzędzia firmware. Odłącz GMMK PRO ISO; podczas podłączania USB trzymaj Spację + B przez około trzy sekundy. Następnie puść.",
+    "tr": "2. Glorious CORE’u ve diğer donanım yazılımı araçlarını kapat. GMMK PRO ISO’yu çıkar; USB’yi takarken Boşluk + B’yi yaklaşık üç saniye basılı tut. Sonra bırak.",
+    "ru": "2. Закройте Glorious CORE и другие утилиты прошивки. Отключите GMMK PRO ISO; при подключении USB удерживайте Пробел + B около трёх секунд. Затем отпустите.",
+    "ja": "2. COREと他のファームウェアツールを閉じます。GMMK PRO ISOを外し、スペース＋Bを押しながらUSBを接続して約3秒保持し、離します。",
+    "ko": "2. CORE와 다른 펌웨어 도구를 닫으세요. GMMK PRO ISO를 분리한 뒤 스페이스 + B를 누른 채 USB를 연결하고 약 3초 후 놓으세요.",
+    "zh-Hans": "2. 关闭 Glorious CORE 和其他固件工具。拔下 GMMK PRO ISO，按住空格 + B 插入 USB，保持约三秒后松开。"
   },
-  "2. CORE und andere Firmware-Werkzeuge schließen. Numpad abziehen; Plus + Enter beim USB-Anstecken etwa drei Sekunden halten. Danach loslassen.": {
-    "en": "2. Close CORE and other firmware tools. Unplug Numpad; hold Plus + Enter for about three seconds while plugging USB in. Then release.",
-    "es": "2. Cierra CORE y otras herramientas de firmware. Desconecta Numpad; mantén Más + Intro unos tres segundos al conectar USB. Después suelta.",
-    "fr": "2. Fermer CORE et les autres outils de firmware. Débrancher Numpad ; maintenir Plus + Entrée environ trois secondes en rebranchant l’USB. Relâcher ensuite.",
-    "it": "2. Chiudi CORE e gli altri strumenti firmware. Scollega Numpad; tieni Più + Invio per circa tre secondi mentre colleghi l’USB. Poi rilascia.",
-    "pt-BR": "2. Feche o CORE e outras ferramentas de firmware. Desconecte o Numpad; segure Mais + Enter por cerca de três segundos ao conectar o USB. Depois solte.",
-    "pl": "2. Zamknij CORE i inne narzędzia firmware. Odłącz Numpad; podczas podłączania USB trzymaj Plus + Enter przez około trzy sekundy. Następnie puść.",
-    "tr": "2. CORE’u ve diğer donanım yazılımı araçlarını kapat. Numpad’i çıkar; USB’yi takarken Artı + Enter’ı yaklaşık üç saniye basılı tut. Sonra bırak.",
-    "ru": "2. Закройте CORE и другие утилиты прошивки. Отключите Numpad; при подключении USB удерживайте Плюс + Enter около трёх секунд. Затем отпустите.",
-    "ja": "2. COREと他のファームウェアツールを閉じます。Numpadを外し、プラス＋Enterを押しながらUSBを接続して約3秒保持し、離します。",
-    "ko": "2. CORE와 다른 펌웨어 도구를 닫으세요. Numpad를 분리한 뒤 더하기 + Enter를 누른 채 USB를 연결하고 약 3초 후 놓으세요.",
-    "zh-Hans": "2. 关闭 CORE 和其他固件工具。拔下 Numpad，按住加号 + Enter 插入 USB，保持约三秒后松开。"
+  "2. Glorious CORE und andere Firmware-Werkzeuge schließen. GMMK Numpad abziehen; Plus + Enter beim USB-Anstecken etwa drei Sekunden halten. Danach loslassen.": {
+    "en": "2. Close Glorious CORE and other firmware tools. Unplug GMMK Numpad; hold Plus + Enter for about three seconds while plugging USB in. Then release.",
+    "es": "2. Cierra Glorious CORE y otras herramientas de firmware. Desconecta GMMK Numpad; mantén Más + Intro unos tres segundos al conectar USB. Después suelta.",
+    "fr": "2. Fermer Glorious CORE et les autres outils de firmware. Débrancher GMMK Numpad ; maintenir Plus + Entrée environ trois secondes en rebranchant l’USB. Relâcher ensuite.",
+    "it": "2. Chiudi Glorious CORE e gli altri strumenti firmware. Scollega GMMK Numpad; tieni Più + Invio per circa tre secondi mentre colleghi l’USB. Poi rilascia.",
+    "pt-BR": "2. Feche o Glorious CORE e outras ferramentas de firmware. Desconecte o GMMK Numpad; segure Mais + Enter por cerca de três segundos ao conectar o USB. Depois solte.",
+    "pl": "2. Zamknij Glorious CORE i inne narzędzia firmware. Odłącz GMMK Numpad; podczas podłączania USB trzymaj Plus + Enter przez około trzy sekundy. Następnie puść.",
+    "tr": "2. Glorious CORE’u ve diğer donanım yazılımı araçlarını kapat. GMMK Numpad’i çıkar; USB’yi takarken Artı + Enter’ı yaklaşık üç saniye basılı tut. Sonra bırak.",
+    "ru": "2. Закройте Glorious CORE и другие утилиты прошивки. Отключите GMMK Numpad; при подключении USB удерживайте Плюс + Enter около трёх секунд. Затем отпустите.",
+    "ja": "2. COREと他のファームウェアツールを閉じます。GMMK Numpadを外し、プラス＋Enterを押しながらUSBを接続して約3秒保持し、離します。",
+    "ko": "2. CORE와 다른 펌웨어 도구를 닫으세요. GMMK Numpad를 분리한 뒤 더하기 + Enter를 누른 채 USB를 연결하고 약 3초 후 놓으세요.",
+    "zh-Hans": "2. 关闭 Glorious CORE 和其他固件工具。拔下 GMMK Numpad，按住加号 + Enter 插入 USB，保持约三秒后松开。"
   },
   "Vorschau: Datei- und Geräteprüfungen sowie alle Prozessaufrufe sind deaktiviert.": {
     "en": "Preview: file checks, device checks and all process launches are disabled.",

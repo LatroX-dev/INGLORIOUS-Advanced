@@ -1,11 +1,11 @@
 # Supported keyboards
 
-The Windows app contains 15 model/layout variants. Two models have been used on physical hardware; the remaining 13 are marked **Experimental** in the app. An experimental label does not bypass device, backup or firmware checks.
+The app contains 15 model/layout variants on Windows, macOS and Linux. Two models have been used on physical hardware through the Windows app; the remaining 13 are marked **Experimental**. An experimental label does not bypass device, backup or firmware checks.
 
 | Keyboard | Layout | Status | Device ID |
 | --- | --- | --- | --- |
 | GMMK PRO, revision 1 (STM32) | ISO | Hardware used | `pro-iso` |
-| GMMK Numpad | USB | Hardware used | `numpad` |
+| GMMK Numpad | USB only; no Bluetooth | Hardware used | `numpad` |
 | GMMK PRO, revision 1 (STM32) | ANSI | Experimental | `pro-ansi` |
 | GMMK PRO, revision 2 (WB32) | ANSI | Experimental | `pro-rev2-ansi` |
 | GMMK PRO, revision 2 (WB32) | ISO | Experimental | `pro-rev2-iso` |
@@ -20,7 +20,7 @@ The Windows app contains 15 model/layout variants. Two models have been used on 
 | GMMK 3, wired non-HE, 100% | ANSI | Experimental | `gmmk3-100-ansi` |
 | GMMK 3, wired non-HE, 100% | ISO | Experimental | `gmmk3-100-iso` |
 
-All listed variants have an editor layout, configuration protocol and built firmware. First installation, update and original-firmware recovery are available through the Windows guide when its checks pass. The new general workflow still needs its hardware acceptance run. Previous use of a model does not certify every revision, firmware feature or recovery scenario.
+All listed variants have an editor layout, configuration protocol and built firmware. First installation, update and original-firmware recovery are implemented in the guide on all three platforms and require its checks to pass. The general workflow still needs its hardware acceptance run; native macOS/Linux package and device validation is also pending. Previous use of a model does not certify every revision, firmware feature, operating system or recovery scenario.
 
 The app shows connected devices only. The physical ANSI/ISO layout is separate from the operating system's typing language. PRO revisions that share a normal USB ID are distinguished in update mode; the app must resolve the revision before writing.
 

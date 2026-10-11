@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -171,7 +171,7 @@ public sealed partial class MainWindow
         };
         button.Classes.Add("nav");
         Avalonia.Automation.AutomationProperties.SetName(button, device.Name);
-        ToolTip.SetTip(button, device.Name + " · " + device.HardwareRevision);
+        ToolTip.SetTip(button, device.Name + "\n" + device.Subtitle);
         button.Click += async (_, _) => await SelectConnectedDeviceAsync(device.Id);
         return button;
     }

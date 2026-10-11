@@ -1,4 +1,4 @@
-{
+﻿{
   "Funktion": {
     "en": "Function",
     "es": "Función",
@@ -116,18 +116,18 @@
     "ko": "슬라이더를 움직여 볼륨을 조절합니다.",
     "zh-Hans": "移动滑块可调节音量。"
   },
-  "Regelt die Helligkeit der Numpad-Beleuchtung.": {
-    "en": "Adjusts the Numpad lighting brightness.",
-    "es": "Ajusta el brillo de la iluminación del Numpad.",
-    "fr": "Règle la luminosité de l’éclairage du Numpad.",
-    "it": "Regola la luminosità dell’illuminazione del Numpad.",
-    "pt-BR": "Ajusta o brilho da iluminação do Numpad.",
-    "pl": "Reguluje jasność podświetlenia Numpada.",
-    "tr": "Numpad aydınlatmasının parlaklığını ayarlar.",
-    "ru": "Регулирует яркость подсветки Numpad.",
-    "ja": "Numpadの照明の明るさを調整します。",
-    "ko": "Numpad 조명의 밝기를 조절합니다.",
-    "zh-Hans": "调节 Numpad 灯光亮度。"
+  "Regelt die Helligkeit der GMMK Numpad-Beleuchtung.": {
+    "en": "Adjusts the GMMK Numpad lighting brightness.",
+    "es": "Ajusta el brillo de la iluminación del GMMK Numpad.",
+    "fr": "Règle la luminosité de l’éclairage du GMMK Numpad.",
+    "it": "Regola la luminosità dell’illuminazione del GMMK Numpad.",
+    "pt-BR": "Ajusta o brilho da iluminação do GMMK Numpad.",
+    "pl": "Reguluje jasność podświetlenia GMMK Numpad.",
+    "tr": "GMMK Numpad aydınlatmasının parlaklığını ayarlar.",
+    "ru": "Регулирует яркость подсветки GMMK Numpad.",
+    "ja": "GMMK Numpadの照明の明るさを調整します。",
+    "ko": "GMMK Numpad 조명의 밝기를 조절합니다.",
+    "zh-Hans": "调节 GMMK Numpad 灯光亮度。"
   },
   "Keine Aktion beim Bewegen des Reglers.": {
     "en": "Moving the slider has no action.",

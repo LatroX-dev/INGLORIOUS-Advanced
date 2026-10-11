@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -394,7 +394,7 @@ public partial class FirmwareWindow : Window
         StepDescription.Text = _step switch {
             Step.Overview or Step.Ready when UpdateVersionMissing => L.T("Die Firmware-Version konnte nicht geprüft werden."),
             Step.Overview when VersionBlocksUpdate => L.T("Die installierte Firmware ist gleich oder neuer. Es wird kein Update gestartet."),
-            Step.Overview => L.T("INGLORIOUS ADVANCED nicht schließen."),
+            Step.Overview => L.T("INGLORIOUS Advanced nicht schließen."),
             Step.Preparing => L.T("Die App prüft automatisch Firmware, Sicherung und benötigte Werkzeuge."),
             Step.Unplug => L.Format("Trenne nur \"{0}\" vom USB-Kabel. Andere Geräte bleiben angeschlossen.", FirmwareService.DeviceName(_deviceId)),
             Step.Connect => L.T("Halte die unten angezeigte Tastenkombination gedrückt und stecke das USB-Kabel am selben Anschluss wieder ein. Lass die Tasten nach etwa 3 Sekunden los."),
@@ -404,7 +404,7 @@ public partial class FirmwareWindow : Window
             Step.Reconnect => L.Format("Trenne \"{0}\" einmal vom USB-Kabel und stecke es ohne gedrückte Tasten wieder ein.", FirmwareService.DeviceName(_deviceId)),
             Step.Complete => Operation == FirmwareOperation.RestoreOriginal
                 ? L.T("Prüfe die Tasten und die Beleuchtung. Für die weitere Einrichtung der Original-Firmware verwende Glorious CORE.")
-                : L.T("Starte den Beleuchtungstest. Prüfe danach die Tasten im Eingabefeld. Für Ziffern muss am Numpad Num Lock eingeschaltet sein."),
+                : L.T("Starte den Beleuchtungstest. Prüfe danach die Tasten im Eingabefeld. Für Ziffern muss am GMMK Numpad Num Lock eingeschaltet sein."),
             _ => L.T("Es wird nichts automatisch wiederholt. Die Ursache und der nächste Schritt stehen im Protokoll.")
         };
         ConnectionSteps.Visibility = _step == Step.Connect ? Visibility.Visible : Visibility.Collapsed;
@@ -477,7 +477,7 @@ public partial class FirmwareWindow : Window
             _deviceId + ": original installation and restore do not require an INGLORIOUS runtime version");
         check(FlowTitle.Text == (Operation == FirmwareOperation.InstallFromOriginal ? L.T("INGLORIOUS einrichten") : Operation == FirmwareOperation.Update ? L.T("Firmware aktualisieren") : L.T("Original-Firmware wiederherstellen")), _deviceId + ": setup, update and restore have separate fixed headings");
         ShowOfflineStep("overview"); ApplyCoreStatus(false);
-        check(CoreNotice.Visibility == Visibility.Collapsed && StepTitle.Text != L.T("Glorious CORE schließen") && !Equals(ContinueButton.Content, L.T("CORE ist geschlossen · Weiter")), _deviceId + ": absent CORE shows no close instruction or redundant confirmation");
+        check(CoreNotice.Visibility == Visibility.Collapsed && StepTitle.Text != L.T("Glorious CORE schließen") && !Equals(ContinueButton.Content, L.T("Glorious CORE ist geschlossen · Weiter")), _deviceId + ": absent CORE shows no close instruction or redundant confirmation");
         ApplyCoreStatus(true);
         check(CoreNotice.Visibility == Visibility.Visible && StepTitle.Text == L.T("Glorious CORE schließen") && !_busy && _plan is null, _deviceId + ": detected CORE alone shows the close instruction, never writes");
         ApplyCoreStatus(null);
@@ -518,7 +518,7 @@ public partial class FirmwareWindow : Window
         BackButton_Click(this, new RoutedEventArgs());
         check(_step == Step.Overview && !_bootloaderReady && ConfirmationCheck.IsChecked == false && !CanExecuteConfirmed && !_probeTimer.IsEnabled, _deviceId + ": Back requires fresh preparation and invalidates readiness");
         check(_step == Step.Overview && _plan is null && ConfirmationCheck.IsChecked == false && !CanExecuteConfirmed, _deviceId + ": Back discards plan and acknowledgement");
-        check(StepDescription.Text.Contains("INGLORIOUS ADVANCED") && StepNumber.Text == L.Format("Schritt {0} von 5", 1), _deviceId + ": first step keeps this application open and shows progress");
+        check(StepDescription.Text.Contains("INGLORIOUS Advanced") && StepNumber.Text == L.Format("Schritt {0} von 5", 1), _deviceId + ": first step keeps this application open and shows progress");
         ShowOfflineStep("unplug");
         check(StepDescription.Text.Contains("\"" + FirmwareService.DeviceName(_deviceId) + "\"") && ConnectionSteps.Visibility == Visibility.Collapsed, _deviceId + ": unplug step names the full quoted device without later instructions");
         DetectedDevice Fixture(string id, string instance) => new(id, "Test device", "1234", "5678", "0001", instance, "", "");

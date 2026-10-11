@@ -18,7 +18,7 @@ public partial class MainWindow
             SetOfflineConnectionFixture([]);
             ResetWorkflowFixture(model.Id); SetTab(0); UpdateLayout();
             check(ExperimentalDeviceLabel.IsVisible && ExperimentalDeviceLabel.Text == L.T("Experimentell") && DeviceButtons.Children.Count == 0, model.Id + ": disconnected profile keeps its experimental label without inventing a connected device");
-            check(KeyboardCanvas.Children.OfType<TextBlock>().Any(t => t.Text == L.T("DREHGEBER · LINKS / RECHTS")) == model.HasEncoder, model.Id + ": encoder guidance exists only for physical encoders");
+            check(_keyButtons.Keys.Count(id => id.StartsWith("encoder:", StringComparison.Ordinal)) == (model.HasEncoder ? 2 : 0), model.Id + ": rotation controls exist only for physical encoders");
             if (Device.BadgeGeometry is { } geometry)
             {
                 const double unit = 51, inset = 32;

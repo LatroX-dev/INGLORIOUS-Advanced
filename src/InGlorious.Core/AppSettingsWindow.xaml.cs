@@ -9,6 +9,7 @@ public partial class AppSettingsWindow : Window
 {
     private readonly bool _offlinePreview;
     private readonly AppPreferencesEditSession? _session;
+    private readonly AppAutostartEditor _autostart;
     public AppPreferences Preferences { get; private set; }
     public Func<Task>? SetupAction { get; set; }
     public Func<Task>? RestoreSetupAction { get; set; }
@@ -19,6 +20,7 @@ public partial class AppSettingsWindow : Window
         AppPreferencesStore.Validate(current);
         Preferences = current.ClonePreferences();
         _offlinePreview = offlinePreview;
+        _autostart = new AppAutostartEditor(offlinePreview);
         InitializeComponent();
         LanguageChoice.ItemsSource = L.LanguageChoices;
         LanguageChoice.SelectedValue = current.Language;
@@ -29,6 +31,8 @@ public partial class AppSettingsWindow : Window
         StartDeviceChoice.SelectedValue = current.StartDevice;
         RememberSizeCheck.IsChecked = current.RememberWindowSize;
         ShowHelpCheck.IsChecked = current.ShowHelp;
+        AutostartDescriptionText.Text = AppAutostartEditor.Description;
+        RefreshAutostartControl();
         ProjectFolderText.Text = Paths.DataRoot;
         var assembly = typeof(AppSettingsWindow).Assembly;
         var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
@@ -64,12 +68,35 @@ public partial class AppSettingsWindow : Window
         };
         try
         {
-            AppPreferencesStore.Save(_session, changed);
+            AppPreferencesStore.Validate(changed);
+            if (!_autostart.Save(AutostartCheck.IsChecked == true, () => AppPreferencesStore.Save(_session, changed)))
+            {
+                RefreshAutostartControl();
+                StatusText.Text = "";
+                return;
+            }
             Preferences = changed;
             DialogResult = true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException)
         { StatusText.Text = L.T("Einstellungen wurden nicht gespeichert. ") + ex.Message; }
+    }
+
+    private void RefreshAutostartControl()
+    {
+        AutostartCheck.IsChecked = _autostart.Enabled;
+        AutostartCheck.IsEnabled = _autostart.CanEdit;
+        AutostartStatusText.Text = _autostart.Message;
+        AutostartStatusText.Visibility = string.IsNullOrEmpty(_autostart.Message) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    internal static void RunOfflineChecks(Action<bool, string> check)
+    {
+        AppAutostartEditor.RunOfflineChecks(check);
+        var preview = new AppSettingsWindow(new AppPreferences(), offlinePreview: true);
+        check(preview.AutostartCheck.IsChecked == false && !preview.AutostartCheck.IsEnabled && !preview.SaveButton.IsEnabled,
+            "Settings: offline startup switch is neutral and cannot modify the system");
+        preview.Close();
     }
 
     private void OpenFolder_Click(object sender, RoutedEventArgs e)

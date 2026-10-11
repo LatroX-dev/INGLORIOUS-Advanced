@@ -1,9 +1,9 @@
-namespace InGlorious.Core;
+﻿namespace InGlorious.Core;
 
 /// <summary>Copies a volatile dimmer value. Configuration and flash commands are never used.</summary>
 public sealed class SharedBrightnessService(Func<IReadOnlyList<OnboardDevice>>? discover = null, Func<OnboardDevice, OnboardClient>? open = null)
 {
-    public const string Notice = "Gemeinsames Dimmen von Numpad und Tastatur benötigt INGLORIOUS im Hintergrund. Nur das Numpad dimmt auch ohne laufende App. Farben, Effekte und Belegungen bleiben auf den Geräten gespeichert.";
+    public const string Notice = "Gemeinsames Dimmen von GMMK Numpad und Tastatur benötigt INGLORIOUS Advanced im Hintergrund. Nur das GMMK Numpad dimmt auch ohne laufende App. Farben, Effekte und Belegungen bleiben auf den Geräten gespeichert.";
     private CancellationTokenSource? _stop;
     private Task _worker = Task.CompletedTask;
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
@@ -39,7 +39,7 @@ public sealed class SharedBrightnessService(Func<IReadOnlyList<OnboardDevice>>? 
                 var pads = devices.Where(d => d.DeviceId == "numpad").ToArray();
                 var pros = devices.Where(d => d.DeviceId == "pro-iso").ToArray();
                 if (pads.Length != 1 || pros.Length != 1)
-                    SetStatus(L.T("Zum gemeinsamen Dimmen genau ein Numpad und eine PRO verbinden."));
+                    SetStatus(L.T("Zum gemeinsamen Dimmen genau ein GMMK Numpad und eine GMMK PRO ISO verbinden."));
                 else
                 {
                     await using var pad = (open ?? OnboardClient.Open)(pads[0]);
@@ -55,12 +55,12 @@ public sealed class SharedBrightnessService(Func<IReadOnlyList<OnboardDevice>>? 
                         {
                             var source = await pad.GetRuntimeBrightnessAsync(cancellation).ConfigureAwait(false);
                             if (source.SliderMode != 3)
-                            { last = null; SetStatus(L.T("Am Numpad „Beleuchtung dimmen“ wählen und auf die Tastatur übertragen.")); }
+                            { last = null; SetStatus(L.T("Am GMMK Numpad „Beleuchtung dimmen“ wählen und auf die Tastatur übertragen.")); }
                             else
                             {
                                 if (last != source.Brightness)
                                 { await pro.SetRuntimeBrightnessAsync(source.Brightness, cancellation).ConfigureAwait(false); last = source.Brightness; }
-                                SetStatus(L.T("Numpad und PRO werden gemeinsam gedimmt."));
+                                SetStatus(L.T("GMMK Numpad und GMMK PRO ISO werden gemeinsam gedimmt."));
                             }
                             await Task.Delay(100, cancellation).ConfigureAwait(false);
                         }

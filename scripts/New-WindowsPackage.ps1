@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$PublishDirectory,[Parameter(Mandatory)][string]$Destination,[string]$ExpectedVersion='0.6.40',[string]$ToolCatalogPath=(Join-Path $PSScriptRoot '../src/InGlorious.Core/SetupToolCatalog.json'),[switch]$Create)
+param([Parameter(Mandatory)][string]$PublishDirectory,[Parameter(Mandatory)][string]$Destination,[string]$ExpectedVersion='0.6.41',[string]$ToolCatalogPath=(Join-Path $PSScriptRoot '../src/InGlorious.Core/SetupToolCatalog.json'),[switch]$Create)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 function Assert-NoLink([string]$Path) {
@@ -79,7 +79,7 @@ $records=@(Get-ChildItem -LiteralPath $source -File -Recurse | Where-Object Exte
 })
 $installer=Join-Path $PSScriptRoot 'Install-InGlorious.ps1'
 $manifest=[ordered]@{schema=1;product='INGLORIOUS Advanced';version=$ExpectedVersion;platform='win-x64';entryPoint='INGLORIOUS Advanced.exe';installerSha256=(Get-FileHash -LiteralPath $installer).Hash;files=$records}
-if(-not$Create){[pscustomobject]@{mode='plan';destination=$target;version=$ExpectedVersion;files=$records.Count;hardwareAccess=$false;networkAccess=$false};return}
+if(-not$Create){[pscustomobject]@{mode='plan';destination=$target;version=$ExpectedVersion;files=$records.Count;verifiedFiles=$records;hardwareAccess=$false;networkAccess=$false};return}
 # Claim the destination itself before creating descendants; never merge another package tree.
 New-Item -ItemType Directory -Path $target -ErrorAction Stop | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $target 'application') | Out-Null

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -62,7 +62,7 @@ public partial class MainWindow
             button.Background = selected ? Brush("#2A2E33") : Brushes.Transparent;
             button.BorderBrush = selected ? Brush("#EF646B") : Brushes.Transparent;
             button.IsEnabled = !_connectionScanFailed;
-            button.ToolTip = device.Subtitle;
+            button.ToolTip = device.Name + "\n" + device.Subtitle;
             System.Windows.Automation.AutomationProperties.SetName(button, device.Name + (device.IsExperimentalFirmware ? " · " + L.T("Experimentell") : ""));
             var content = (Grid)button.Content;
             ((System.Windows.Shapes.Path)content.Children[0]).Stroke = Brush(selected ? "#EF646B" : "#A0A7B0");

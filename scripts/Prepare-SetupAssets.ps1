@@ -3,6 +3,7 @@
 param(
  [Parameter(Mandatory)][string]$AdapterDirectory,
  [Parameter(Mandatory)][string]$FirmwareDirectory,
+ [ValidateSet('win-x64','linux-x64','osx-x64','osx-arm64')][string]$Runtime='win-x64',
  [string]$Destination=(Join-Path $PSScriptRoot '../artifacts/setup-assets'),
  [string]$ToolCatalogPath=(Join-Path $PSScriptRoot '../src/InGlorious.Core/SetupToolCatalog.json'),
  [switch]$UpdateToolCatalog
@@ -26,7 +27,12 @@ $records=@(Get-ChildItem -LiteralPath $adapterRoot -File -Recurse|Where-Object E
  Assert-NoLink $_.FullName
  [ordered]@{path=[IO.Path]::GetRelativePath($adapterRoot,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash}
 })
-foreach($required in @('InGlorious.FirmwareAdapter.exe','InGlorious.FirmwareAdapter.dll','native/libusb-1.0.dll','native/dfu-util-static.exe','coreclr.dll')){
+$requiredFiles=switch($Runtime){
+ 'win-x64' {@('InGlorious.FirmwareAdapter.exe','native/libusb-1.0.dll','native/dfu-util-static.exe','coreclr.dll')}
+ 'linux-x64' {@('InGlorious.FirmwareAdapter','native/libusb-1.0.so.0','native/dfu-util','libcoreclr.so')}
+ default {@('InGlorious.FirmwareAdapter','native/libusb-1.0.dylib','native/dfu-util','libcoreclr.dylib')}
+}
+foreach($required in @('InGlorious.FirmwareAdapter.dll')+$requiredFiles){
  if($required-notin$records.path){throw ('Self-contained adapter file missing: '+$required)}
 }
 foreach($item in $firmwareCatalog.targets){
@@ -43,6 +49,7 @@ foreach($record in $records){
  $target=Join-Path $destinationPath ('Tools/FirmwareAdapter/'+$record.path)
  New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($target)) -Force|Out-Null
  Copy-Item -LiteralPath (Join-Path $adapterRoot $record.path) -Destination $target
+ if(-not$IsWindows){[IO.File]::SetUnixFileMode($target,[IO.File]::GetUnixFileMode((Join-Path $adapterRoot $record.path)))}
  if((Get-FileHash -LiteralPath $target).Hash-cne$record.sha256){throw 'Adapter copy differs.'}
 }
 New-Item -ItemType Directory -Path (Join-Path $destinationPath 'Firmware')|Out-Null

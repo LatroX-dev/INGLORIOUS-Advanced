@@ -1,4 +1,4 @@
-{
+﻿{
   "Anleitung": {
     "en": "Guide",
     "es": "Guía",
@@ -311,18 +311,18 @@
     "ko": "앱과 키보드",
     "zh-Hans": "应用与键盘"
   },
-  "Verbinde die Geräte per USB. Bei INGLORIOUS-Firmware liest die App zuerst die aktuellen Einstellungen. Mit Original-Firmware ist zuerst die Einrichtung nötig. Danach bearbeitest du Tastatur und Numpad getrennt. Ist ein Gerät nicht eindeutig erreichbar, bleibt ein lokales Profil mit einem Hinweis geöffnet.": {
-    "en": "Connect the devices by USB. With INGLORIOUS firmware, the app first reads their current settings. Original firmware needs setup first. You can then edit the keyboard and Numpad separately. If a device cannot be identified or reached, a local profile stays open with a notice.",
-    "es": "Conecta los dispositivos por USB. Si tienen firmware INGLORIOUS, la app lee primero sus ajustes actuales. Con el firmware original, primero hay que configurarlos. Después puedes editar el teclado y el Numpad por separado. Si no se puede identificar o conectar un dispositivo, queda abierto un perfil local con un aviso.",
-    "fr": "Branchez les appareils en USB. Avec le firmware INGLORIOUS, l’application lit d’abord leurs réglages actuels. Le firmware d’origine nécessite une installation préalable. Vous pouvez ensuite modifier le clavier et le Numpad séparément. Si un appareil est inaccessible ou ambigu, un profil local reste ouvert avec un message.",
-    "it": "Collega i dispositivi tramite USB. Con il firmware INGLORIOUS, l’app legge prima le impostazioni attuali. Con il firmware originale serve prima la configurazione iniziale. Puoi poi modificare tastiera e Numpad separatamente. Se un dispositivo non è raggiungibile o identificabile con certezza, resta aperto un profilo locale con un avviso.",
-    "pt-BR": "Conecte os dispositivos por USB. Com o firmware INGLORIOUS, o app primeiro lê as configurações atuais. O firmware original exige a configuração inicial. Depois, você pode editar o teclado e o Numpad separadamente. Se um dispositivo não puder ser identificado ou acessado, um perfil local fica aberto com um aviso.",
-    "pl": "Podłącz urządzenia przez USB. Przy firmware INGLORIOUS aplikacja najpierw odczytuje ich bieżące ustawienia. Oryginalny firmware wymaga najpierw konfiguracji początkowej. Potem możesz edytować klawiaturę i Numpad osobno. Jeśli urządzenie jest niedostępne lub niejednoznacznie rozpoznane, pozostaje otwarty lokalny profil z komunikatem.",
-    "tr": "Cihazları USB ile bağlayın. INGLORIOUS ürün yazılımı varsa uygulama önce mevcut ayarları okur. Orijinal ürün yazılımı için önce kurulum gerekir. Ardından klavyeyi ve Numpad’i ayrı ayrı düzenleyebilirsiniz. Bir cihaza ulaşılamazsa veya cihaz kesin olarak belirlenemezse yerel profil bir uyarıyla açık kalır.",
-    "ru": "Подключите устройства по USB. Если установлена прошивка INGLORIOUS, приложение сначала прочитает текущие настройки. Для оригинальной прошивки сначала нужна настройка. Затем клавиатуру и Numpad можно редактировать отдельно. Если устройство недоступно или не определено однозначно, останется открытым локальный профиль с уведомлением.",
-    "ja": "機器をUSBで接続します。INGLORIOUSファームウェアの場合、アプリが現在の設定を読み取ります。元のファームウェアの場合は、先にセットアップが必要です。その後、キーボードとNumpadを別々に編集できます。機器を特定できない、または接続できない場合は、通知とともにローカルのプロファイルが開きます。",
-    "ko": "장치를 USB로 연결하세요. INGLORIOUS 펌웨어가 설치되어 있으면 앱이 현재 설정을 먼저 읽습니다. 원본 펌웨어라면 먼저 초기 설정이 필요합니다. 이후 키보드와 Numpad를 각각 편집할 수 있습니다. 장치를 정확히 식별하거나 연결할 수 없으면 안내와 함께 로컬 프로필이 열립니다.",
-    "zh-Hans": "通过 USB 连接设备。使用 INGLORIOUS 固件时，应用会先读取当前设置；使用原厂固件时，需要先完成初始设置。之后可分别编辑键盘和 Numpad。若无法明确识别或连接设备，应用会保留本地配置文件并显示提示。"
+  "Verbinde die Geräte per USB. Bei INGLORIOUS-Firmware liest die App zuerst die aktuellen Einstellungen. Mit Original-Firmware ist zuerst die Einrichtung nötig. Danach bearbeitest du Tastatur und GMMK Numpad getrennt. Ist ein Gerät nicht eindeutig erreichbar, bleibt ein lokales Profil mit einem Hinweis geöffnet.": {
+    "en": "Connect the devices by USB. With INGLORIOUS firmware, the app first reads their current settings. Original firmware needs setup first. You can then edit the keyboard and GMMK Numpad separately. If a device cannot be identified or reached, a local profile stays open with a notice.",
+    "es": "Conecta los dispositivos por USB. Si tienen firmware INGLORIOUS, la app lee primero sus ajustes actuales. Con el firmware original, primero hay que configurarlos. Después puedes editar el teclado y el GMMK Numpad por separado. Si no se puede identificar o conectar un dispositivo, queda abierto un perfil local con un aviso.",
+    "fr": "Branchez les appareils en USB. Avec le firmware INGLORIOUS, l’application lit d’abord leurs réglages actuels. Le firmware d’origine nécessite une installation préalable. Vous pouvez ensuite modifier le clavier et le GMMK Numpad séparément. Si un appareil est inaccessible ou ambigu, un profil local reste ouvert avec un message.",
+    "it": "Collega i dispositivi tramite USB. Con il firmware INGLORIOUS, l’app legge prima le impostazioni attuali. Con il firmware originale serve prima la configurazione iniziale. Puoi poi modificare tastiera e GMMK Numpad separatamente. Se un dispositivo non è raggiungibile o identificabile con certezza, resta aperto un profilo locale con un avviso.",
+    "pt-BR": "Conecte os dispositivos por USB. Com o firmware INGLORIOUS, o app primeiro lê as configurações atuais. O firmware original exige a configuração inicial. Depois, você pode editar o teclado e o GMMK Numpad separadamente. Se um dispositivo não puder ser identificado ou acessado, um perfil local fica aberto com um aviso.",
+    "pl": "Podłącz urządzenia przez USB. Przy firmware INGLORIOUS aplikacja najpierw odczytuje ich bieżące ustawienia. Oryginalny firmware wymaga najpierw konfiguracji początkowej. Potem możesz edytować klawiaturę i GMMK Numpad osobno. Jeśli urządzenie jest niedostępne lub niejednoznacznie rozpoznane, pozostaje otwarty lokalny profil z komunikatem.",
+    "tr": "Cihazları USB ile bağlayın. INGLORIOUS ürün yazılımı varsa uygulama önce mevcut ayarları okur. Orijinal ürün yazılımı için önce kurulum gerekir. Ardından klavyeyi ve GMMK Numpad’i ayrı ayrı düzenleyebilirsiniz. Bir cihaza ulaşılamazsa veya cihaz kesin olarak belirlenemezse yerel profil bir uyarıyla açık kalır.",
+    "ru": "Подключите устройства по USB. Если установлена прошивка INGLORIOUS, приложение сначала прочитает текущие настройки. Для оригинальной прошивки сначала нужна настройка. Затем клавиатуру и GMMK Numpad можно редактировать отдельно. Если устройство недоступно или не определено однозначно, останется открытым локальный профиль с уведомлением.",
+    "ja": "機器をUSBで接続します。INGLORIOUSファームウェアの場合、アプリが現在の設定を読み取ります。元のファームウェアの場合は、先にセットアップが必要です。その後、キーボードとGMMK Numpadを別々に編集できます。機器を特定できない、または接続できない場合は、通知とともにローカルのプロファイルが開きます。",
+    "ko": "장치를 USB로 연결하세요. INGLORIOUS 펌웨어가 설치되어 있으면 앱이 현재 설정을 먼저 읽습니다. 원본 펌웨어라면 먼저 초기 설정이 필요합니다. 이후 키보드와 GMMK Numpad를 각각 편집할 수 있습니다. 장치를 정확히 식별하거나 연결할 수 없으면 안내와 함께 로컬 프로필이 열립니다.",
+    "zh-Hans": "通过 USB 连接设备。使用 INGLORIOUS 固件时，应用会先读取当前设置；使用原厂固件时，需要先完成初始设置。之后可分别编辑键盘和 GMMK Numpad。若无法明确识别或连接设备，应用会保留本地配置文件并显示提示。"
   },
   "Bearbeite die gewünschte Einstellung und bestätige sie mit „Übernehmen“. „Auf Tastatur übertragen“ speichert den gesamten Arbeitsstand auf dem ausgewählten Gerät. Warte auf die Bestätigung. Anschließend funktionieren Farben, Belegungen und Makros auch ohne App.": {
     "en": "Edit the setting you want and confirm with “Apply”. “Transfer to keyboard” saves the entire working configuration on the selected device. Wait for confirmation. Colors, bindings and macros will then work without the app.",
@@ -480,18 +480,18 @@
     "ko": "프로필에는 장치 한 대의 설정이 들어 있습니다. “프로필 저장”은 컴퓨터의 파일로, “키보드로 전송”은 장치에 저장합니다. 두 작업은 별개입니다. 앱 시작 시 읽은 설정은 프로필 파일을 덮어쓰지 않습니다.",
     "zh-Hans": "一个配置文件包含一台设备的设置。“保存配置文件”将其存为电脑上的文件，“传输到键盘”则将其保存到设备。这是两个独立步骤。应用启动时读取的设置不会覆盖已有配置文件。"
   },
-  "Im Bereich „Profile“ öffnest du gespeicherte Arbeitsstände oder legst neue an. Tastatur und Numpad behalten getrennte Arbeitsstände. Prüfe das ausgewählte Gerät, bevor du ein Profil überträgst.": {
-    "en": "In “Profiles”, open saved configurations or create new ones. The keyboard and Numpad keep separate working configurations. Check the selected device before transferring a profile.",
-    "es": "En «Perfiles», abre configuraciones guardadas o crea otras nuevas. El teclado y el Numpad mantienen configuraciones de trabajo separadas. Comprueba el dispositivo seleccionado antes de transferir un perfil.",
-    "fr": "Dans « Profils », ouvrez une configuration enregistrée ou créez-en une nouvelle. Le clavier et le Numpad conservent des configurations de travail séparées. Vérifiez l’appareil sélectionné avant de transférer un profil.",
-    "it": "In «Profili» puoi aprire configurazioni salvate o crearne di nuove. Tastiera e Numpad mantengono configurazioni di lavoro separate. Controlla il dispositivo selezionato prima di trasferire un profilo.",
-    "pt-BR": "Em “Perfis”, abra configurações salvas ou crie novas. O teclado e o Numpad mantêm configurações de trabalho separadas. Confira o dispositivo selecionado antes de transferir um perfil.",
-    "pl": "W „Profile” otwierasz zapisane zestawy ustawień lub tworzysz nowe. Klawiatura i Numpad zachowują osobne robocze ustawienia. Sprawdź wybrane urządzenie przed przesłaniem profilu.",
-    "tr": "“Profiller” bölümünde kayıtlı yapılandırmaları açabilir veya yenilerini oluşturabilirsiniz. Klavye ve Numpad ayrı çalışma yapılandırmalarını korur. Profil aktarmadan önce seçili cihazı kontrol edin.",
-    "ru": "В «Профили» можно открыть сохранённые настройки или создать новые. Клавиатура и Numpad сохраняют отдельные рабочие конфигурации. Перед передачей профиля проверьте выбранное устройство.",
-    "ja": "「プロファイル」では保存済みの設定を開いたり、新しく作成したりできます。キーボードとNumpadの編集内容は別々に保持されます。転送前に選択した機器を確認してください。",
-    "ko": "“프로필”에서 저장된 설정을 열거나 새로 만들 수 있습니다. 키보드와 Numpad의 편집 상태는 따로 유지됩니다. 프로필을 전송하기 전에 선택한 장치를 확인하세요.",
-    "zh-Hans": "在“配置文件”中可打开已保存的设置或新建配置。键盘和 Numpad 的编辑状态分别保留。传输配置文件前，请确认所选设备。"
+  "Im Bereich „Profile“ öffnest du gespeicherte Arbeitsstände oder legst neue an. Tastatur und GMMK Numpad behalten getrennte Arbeitsstände. Prüfe das ausgewählte Gerät, bevor du ein Profil überträgst.": {
+    "en": "In “Profiles”, open saved configurations or create new ones. The keyboard and GMMK Numpad keep separate working configurations. Check the selected device before transferring a profile.",
+    "es": "En «Perfiles», abre configuraciones guardadas o crea otras nuevas. El teclado y el GMMK Numpad mantienen configuraciones de trabajo separadas. Comprueba el dispositivo seleccionado antes de transferir un perfil.",
+    "fr": "Dans « Profils », ouvrez une configuration enregistrée ou créez-en une nouvelle. Le clavier et le GMMK Numpad conservent des configurations de travail séparées. Vérifiez l’appareil sélectionné avant de transférer un profil.",
+    "it": "In «Profili» puoi aprire configurazioni salvate o crearne di nuove. Tastiera e GMMK Numpad mantengono configurazioni di lavoro separate. Controlla il dispositivo selezionato prima di trasferire un profilo.",
+    "pt-BR": "Em “Perfis”, abra configurações salvas ou crie novas. O teclado e o GMMK Numpad mantêm configurações de trabalho separadas. Confira o dispositivo selecionado antes de transferir um perfil.",
+    "pl": "W „Profile” otwierasz zapisane zestawy ustawień lub tworzysz nowe. Klawiatura i GMMK Numpad zachowują osobne robocze ustawienia. Sprawdź wybrane urządzenie przed przesłaniem profilu.",
+    "tr": "“Profiller” bölümünde kayıtlı yapılandırmaları açabilir veya yenilerini oluşturabilirsiniz. Klavye ve GMMK Numpad ayrı çalışma yapılandırmalarını korur. Profil aktarmadan önce seçili cihazı kontrol edin.",
+    "ru": "В «Профили» можно открыть сохранённые настройки или создать новые. Клавиатура и GMMK Numpad сохраняют отдельные рабочие конфигурации. Перед передачей профиля проверьте выбранное устройство.",
+    "ja": "「プロファイル」では保存済みの設定を開いたり、新しく作成したりできます。キーボードとGMMK Numpadの編集内容は別々に保持されます。転送前に選択した機器を確認してください。",
+    "ko": "“프로필”에서 저장된 설정을 열거나 새로 만들 수 있습니다. 키보드와 GMMK Numpad의 편집 상태는 따로 유지됩니다. 프로필을 전송하기 전에 선택한 장치를 확인하세요.",
+    "zh-Hans": "在“配置文件”中可打开已保存的设置或新建配置。键盘和 GMMK Numpad 的编辑状态分别保留。传输配置文件前，请确认所选设备。"
   },
   "Speichere häufige Farben als Favoriten. Beleuchtungsvorlagen übernehmen Farben und Effekte auf die aktuelle Ebene; Tastenbelegungen und Makros bleiben erhalten. Eigene Vorlagen lassen sich speichern, importieren und exportieren.": {
     "en": "Save frequently used colors as favorites. Lighting presets apply colors and effects to the current layer while keeping bindings and macros. You can save, import and export your own presets.",
@@ -506,31 +506,31 @@
     "ko": "자주 쓰는 색상을 즐겨찾기로 저장하세요. 조명 프리셋은 현재 레이어에 색상과 효과를 적용하며 키 할당과 매크로는 유지합니다. 나만의 프리셋을 저장하거나 가져오고 내보낼 수 있습니다.",
     "zh-Hans": "将常用颜色保存为收藏。灯光预设会把颜色和效果应用到当前层，同时保留按键分配和宏。自定义预设可以保存、导入和导出。"
   },
-  "Wähle beim Numpad den Schieberegler in der Vorschau. Er kann Lautstärke, Helligkeit oder MIDI steuern. Unter „Gerät“ findest du USB-Abfragerate und Entprellzeit. Diese gelten für alle Ebenen.": {
-    "en": "Select the Numpad slider in the preview. It can control volume, lighting brightness or MIDI. “Device” contains the USB polling interval and debounce time. These apply to every layer.",
-    "es": "Selecciona el deslizador del Numpad en la vista previa. Puede controlar volumen, brillo o MIDI. En «Dispositivo» están el intervalo de sondeo USB y el tiempo antirrebote. Se aplican a todas las capas.",
-    "fr": "Sélectionnez le curseur du Numpad dans l’aperçu. Il peut régler le volume, la luminosité ou le MIDI. « Appareil » contient l’intervalle d’interrogation USB et le délai d’anti-rebond. Ces réglages concernent toutes les couches.",
-    "it": "Seleziona il cursore del Numpad nell’anteprima. Può controllare volume, luminosità o MIDI. In «Dispositivo» trovi l’intervallo di polling USB e il tempo antirimbalzo. Valgono per tutti i livelli.",
-    "pt-BR": "Selecione o controle deslizante do Numpad na prévia. Ele pode controlar volume, brilho ou MIDI. Em “Dispositivo” ficam o intervalo de consulta USB e o tempo de debounce. Eles valem para todas as camadas.",
-    "pl": "Wybierz suwak Numpada w podglądzie. Może sterować głośnością, jasnością lub MIDI. W „Urządzenie” znajdziesz interwał odpytywania USB i czas eliminacji drgań styków. Obowiązują one na wszystkich warstwach.",
-    "tr": "Önizlemede Numpad sürgüsünü seçin. Ses düzeyini, aydınlatma parlaklığını veya MIDI’yi kontrol edebilir. “Cihaz” altında USB sorgulama aralığını ve tuş sıçraması önleme süresini bulabilirsiniz. Bunlar tüm katmanlar için geçerlidir.",
-    "ru": "Выберите ползунок Numpad в предпросмотре. Он может управлять громкостью, яркостью или MIDI. В «Устройство» находятся интервал опроса USB и время подавления дребезга. Они действуют на всех слоях.",
-    "ja": "プレビューでNumpadのスライダーを選びます。音量、照明の明るさ、MIDIを操作できます。「デバイス」にはUSBポーリング間隔とデバウンス時間があります。これらは全レイヤー共通です。",
-    "ko": "미리보기에서 Numpad 슬라이더를 선택하세요. 음량, 조명 밝기 또는 MIDI를 제어할 수 있습니다. “장치”에서 USB 폴링 간격과 디바운스 시간을 설정합니다. 이 설정은 모든 레이어에 적용됩니다.",
-    "zh-Hans": "在预览中选择 Numpad 的滑块。它可控制音量、灯光亮度或 MIDI。“设备”中提供 USB 轮询间隔和消抖时间，这些设置对所有层生效。"
+  "Wähle beim GMMK Numpad den Schieberegler in der Vorschau. Er kann Lautstärke, Helligkeit oder MIDI steuern. Unter „Gerät“ findest du USB-Abfragerate und Entprellzeit. Diese gelten für alle Ebenen.": {
+    "en": "Select the GMMK Numpad slider in the preview. It can control volume, lighting brightness or MIDI. “Device” contains the USB polling interval and debounce time. These apply to every layer.",
+    "es": "Selecciona el deslizador del GMMK Numpad en la vista previa. Puede controlar volumen, brillo o MIDI. En «Dispositivo» están el intervalo de sondeo USB y el tiempo antirrebote. Se aplican a todas las capas.",
+    "fr": "Sélectionnez le curseur du GMMK Numpad dans l’aperçu. Il peut régler le volume, la luminosité ou le MIDI. « Appareil » contient l’intervalle d’interrogation USB et le délai d’anti-rebond. Ces réglages concernent toutes les couches.",
+    "it": "Seleziona il cursore del GMMK Numpad nell’anteprima. Può controllare volume, luminosità o MIDI. In «Dispositivo» trovi l’intervallo di polling USB e il tempo antirimbalzo. Valgono per tutti i livelli.",
+    "pt-BR": "Selecione o controle deslizante do GMMK Numpad na prévia. Ele pode controlar volume, brilho ou MIDI. Em “Dispositivo” ficam o intervalo de consulta USB e o tempo de debounce. Eles valem para todas as camadas.",
+    "pl": "Wybierz suwak GMMK Numpad w podglądzie. Może sterować głośnością, jasnością lub MIDI. W „Urządzenie” znajdziesz interwał odpytywania USB i czas eliminacji drgań styków. Obowiązują one na wszystkich warstwach.",
+    "tr": "Önizlemede GMMK Numpad sürgüsünü seçin. Ses düzeyini, aydınlatma parlaklığını veya MIDI’yi kontrol edebilir. “Cihaz” altında USB sorgulama aralığını ve tuş sıçraması önleme süresini bulabilirsiniz. Bunlar tüm katmanlar için geçerlidir.",
+    "ru": "Выберите ползунок GMMK Numpad в предпросмотре. Он может управлять громкостью, яркостью или MIDI. В «Устройство» находятся интервал опроса USB и время подавления дребезга. Они действуют на всех слоях.",
+    "ja": "プレビューでGMMK Numpadのスライダーを選びます。音量、照明の明るさ、MIDIを操作できます。「デバイス」にはUSBポーリング間隔とデバウンス時間があります。これらは全レイヤー共通です。",
+    "ko": "미리보기에서 GMMK Numpad 슬라이더를 선택하세요. 음량, 조명 밝기 또는 MIDI를 제어할 수 있습니다. “장치”에서 USB 폴링 간격과 디바운스 시간을 설정합니다. 이 설정은 모든 레이어에 적용됩니다.",
+    "zh-Hans": "在预览中选择 GMMK Numpad 的滑块。它可控制音量、灯光亮度或 MIDI。“设备”中提供 USB 轮询间隔和消抖时间，这些设置对所有层生效。"
   },
-  "Mit „Beleuchtung dimmen“ steuert der Numpad-Regler sein eigenes Licht ohne App. Soll er auch die PRO dimmen, aktiviere das gemeinsame Dimmen und lasse INGLORIOUS im Hintergrund geöffnet.": {
-    "en": "With “Dim lighting”, the Numpad slider controls its own lighting without the app. To dim the PRO as well, enable shared brightness and keep INGLORIOUS running in the background.",
-    "es": "Con «Atenuar iluminación», el deslizador controla la iluminación del Numpad sin la app. Para atenuar también la PRO, activa el brillo compartido y deja INGLORIOUS abierto en segundo plano.",
-    "fr": "Avec « Régler la luminosité », le curseur règle l’éclairage du Numpad sans l’application. Pour régler aussi celui de la PRO, activez la luminosité partagée et laissez INGLORIOUS ouvert en arrière-plan.",
-    "it": "Con «Regola luminosità», il cursore controlla l’illuminazione del Numpad senza l’app. Per regolare anche la PRO, attiva la luminosità condivisa e lascia INGLORIOUS aperto in background.",
-    "pt-BR": "Com “Regular iluminação”, o controle deslizante ajusta a iluminação do Numpad sem o app. Para ajustar também a PRO, ative o brilho compartilhado e mantenha o INGLORIOUS aberto em segundo plano.",
-    "pl": "Przy „Przyciemnij podświetlenie” suwak steruje oświetleniem Numpada bez aplikacji. Aby ściemniał również PRO, włącz wspólne sterowanie jasnością i pozostaw INGLORIOUS uruchomiony w tle.",
-    "tr": "“Aydınlatmayı kıs” ile Numpad sürgüsü kendi aydınlatmasını uygulama olmadan kontrol eder. PRO’yu da kısmak için ortak parlaklık kontrolünü etkinleştirin ve INGLORIOUS’u arka planda açık tutun.",
-    "ru": "В режиме «Регулировка яркости» ползунок управляет подсветкой Numpad без приложения. Чтобы регулировать и PRO, включите общую яркость и оставьте INGLORIOUS работающим в фоне.",
-    "ja": "「照明の調光」では、アプリなしでスライダーからNumpadの照明を調節できます。PROも一緒に調節するには、明るさの連動を有効にしてINGLORIOUSをバックグラウンドで起動したままにしてください。",
-    "ko": "“조명 밝기 조절” 모드에서는 앱 없이 Numpad 슬라이더로 자체 조명을 조절합니다. PRO도 함께 조절하려면 밝기 연동을 켜고 INGLORIOUS를 백그라운드에서 실행해 두세요.",
-    "zh-Hans": "使用“调节灯光亮度”时，Numpad 滑块可在没有应用运行的情况下调节自身灯光。若要同时调节 PRO，请启用亮度联动，并保持 INGLORIOUS 在后台运行。"
+  "Mit „Beleuchtung dimmen“ steuert der GMMK Numpad-Regler sein eigenes Licht ohne App. Soll er auch die GMMK PRO ISO dimmen, aktiviere das gemeinsame Dimmen und lasse INGLORIOUS Advanced im Hintergrund geöffnet.": {
+    "en": "With “Dim lighting”, the GMMK Numpad slider controls its own lighting without the app. To dim the GMMK PRO ISO as well, enable shared brightness and keep INGLORIOUS Advanced running in the background.",
+    "es": "Con «Atenuar iluminación», el deslizador controla la iluminación del GMMK Numpad sin la app. Para atenuar también la GMMK PRO ISO, activa el brillo compartido y deja INGLORIOUS Advanced abierto en segundo plano.",
+    "fr": "Avec « Régler la luminosité », le curseur règle l’éclairage du GMMK Numpad sans l’application. Pour régler aussi celui de la GMMK PRO ISO, activez la luminosité partagée et laissez INGLORIOUS Advanced ouvert en arrière-plan.",
+    "it": "Con «Regola luminosità», il cursore controlla l’illuminazione del GMMK Numpad senza l’app. Per regolare anche la GMMK PRO ISO, attiva la luminosità condivisa e lascia INGLORIOUS Advanced aperto in background.",
+    "pt-BR": "Com “Regular iluminação”, o controle deslizante ajusta a iluminação do GMMK Numpad sem o app. Para ajustar também a GMMK PRO ISO, ative o brilho compartilhado e mantenha o INGLORIOUS Advanced aberto em segundo plano.",
+    "pl": "Przy „Przyciemnij podświetlenie” suwak steruje oświetleniem GMMK Numpad bez aplikacji. Aby ściemniał również GMMK PRO ISO, włącz wspólne sterowanie jasnością i pozostaw INGLORIOUS Advanced uruchomiony w tle.",
+    "tr": "“Aydınlatmayı kıs” ile GMMK Numpad sürgüsü kendi aydınlatmasını uygulama olmadan kontrol eder. GMMK PRO ISO’yu da kısmak için ortak parlaklık kontrolünü etkinleştirin ve INGLORIOUS Advanced’u arka planda açık tutun.",
+    "ru": "В режиме «Регулировка яркости» ползунок управляет подсветкой GMMK Numpad без приложения. Чтобы регулировать и GMMK PRO ISO, включите общую яркость и оставьте INGLORIOUS Advanced работающим в фоне.",
+    "ja": "「照明の調光」では、アプリなしでスライダーからGMMK Numpadの照明を調節できます。GMMK PRO ISOも一緒に調節するには、明るさの連動を有効にしてINGLORIOUS Advancedをバックグラウンドで起動したままにしてください。",
+    "ko": "“조명 밝기 조절” 모드에서는 앱 없이 GMMK Numpad 슬라이더로 자체 조명을 조절합니다. GMMK PRO ISO도 함께 조절하려면 밝기 연동을 켜고 INGLORIOUS Advanced를 백그라운드에서 실행해 두세요.",
+    "zh-Hans": "使用“调节灯光亮度”时，GMMK Numpad 滑块可在没有应用运行的情况下调节自身灯光。若要同时调节 GMMK PRO ISO，请启用亮度联动，并保持 INGLORIOUS Advanced 在后台运行。"
   },
   "Die Windows-App bietet unter „Gerät“ Einrichtung, Updates und „Original-Firmware wiederherstellen“. Vor der Ersteinrichtung wird das Original automatisch gesichert; die Sicherung für den Rückwechsel bleibt auf dem Computer. Lasse die App währenddessen geöffnet. Die plattformübergreifende Vorschau bietet diesen Ablauf nicht.": {
     "en": "The Windows app offers setup, updates and “Restore original firmware” under “Device”. Before initial setup, the original firmware is backed up automatically; the backup stays on your computer so you can return to it. Keep the app open throughout. This workflow is unavailable in the cross-platform preview.",

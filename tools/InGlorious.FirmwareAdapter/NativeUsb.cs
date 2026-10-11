@@ -19,38 +19,48 @@ internal sealed class NativeUsb : IDisposable
     internal NativeLibraryEvidence Library { get; }
     internal const string DllSha256 = "3C3C1F47C8040D841A940218874BCF88A47E24F58A115A6BAFF0869D2532FB8E";
 
-    internal NativeUsb()
+    internal NativeUsb(bool inventoryOnly = false)
     {
-        if (!OperatingSystem.IsWindows() || !Environment.Is64BitProcess) throw new PlatformNotSupportedException("This audited native bundle targets Windows x64.");
+        if (!Environment.Is64BitProcess) throw new PlatformNotSupportedException("A 64-bit USB platform is required.");
         ValidateNativeLayouts();
         Library = VerifyBundledLibrary();
         libraryLock = Files.Lock(Library.Path, Library.Bytes, Library.Sha256).Stream;
-        NativeLibrary.SetDllImportResolver(Assembly.GetExecutingAssembly(), (name, _, _) => name == "inglorious_libusb" ? NativeLibrary.Load(Library.Path) : 0);
-        Check(Native.Init(out context), "libusb initialization");
-        long count = Native.GetDeviceList(context, out devices).ToInt64();
-        if (count < 0) throw new IOException($"libusb enumeration error {count}.");
-        for (int i = 0; i < count; i++)
+        try
         {
-            nint device = Marshal.ReadIntPtr(devices, checked(i * IntPtr.Size));
-            if (Native.GetDescriptor(device, out var descriptor) != 0 || !((descriptor.Vendor == 0x342D && descriptor.Product == 0xDFA0) || (descriptor.Vendor == 0x0483 && descriptor.Product == 0xDF11))) continue;
-            byte[] ports = new byte[8];
-            int portCount = Native.GetPortNumbers(device, ports, ports.Length);
-            if (portCount < 1 || portCount > ports.Length) continue;
-            string serial = "";
-            if (descriptor.SerialIndex != 0)
+            NativeLibrary.SetDllImportResolver(Assembly.GetExecutingAssembly(), (name, _, _) => name == "inglorious_libusb" ? NativeLibrary.Load(Library.Path) : 0);
+            Check(Native.Init(out context), "libusb initialization");
+            long count = Native.GetDeviceList(context, out devices).ToInt64();
+            if (count < 0 || count > 4096) throw new IOException($"libusb enumeration error {count}.");
+            for (int i = 0; i < count; i++)
             {
-                Check(Native.Open(device, out var temporaryHandle), "reading USB serial descriptor");
-                try
+                nint device = Marshal.ReadIntPtr(devices, checked(i * IntPtr.Size));
+                if (Native.GetDescriptor(device, out var descriptor) != 0) throw new IOException("USB descriptor could not be read.");
+                bool bootloader = (descriptor.Vendor, descriptor.Product) is (0x342D, 0xDFA0) or (0x0483, 0xDF11);
+                if (!bootloader && (!inventoryOnly || descriptor.Vendor is not (0x320F or 0x342D or 0xFEED))) continue;
+                byte[] ports = new byte[8];
+                int portCount = Native.GetPortNumbers(device, ports, ports.Length);
+                if (portCount < 1 || portCount > ports.Length || ports.Take(portCount).Any(port => port == 0))
+                    throw new IOException("USB physical port could not be identified.");
+                string serial = "";
+                // Inventory only uses descriptors provided by the OS; it never opens a device.
+                if (!inventoryOnly && descriptor.SerialIndex != 0)
                 {
-                    byte[] chars = new byte[256];
-                    int size = Native.GetString(temporaryHandle, descriptor.SerialIndex, chars, chars.Length);
-                    Check(size, "reading USB serial descriptor"); serial = Encoding.ASCII.GetString(chars, 0, size);
+                    Check(Native.Open(device, out var temporaryHandle), "reading USB serial descriptor");
+                    try
+                    {
+                        byte[] chars = new byte[256];
+                        int size = Native.GetString(temporaryHandle, descriptor.SerialIndex, chars, chars.Length);
+                        Check(size, "reading USB serial descriptor"); serial = Encoding.ASCII.GetString(chars, 0, size);
+                    }
+                    finally { Native.Close(temporaryHandle); }
                 }
-                finally { Native.Close(temporaryHandle); }
+                var identity = new DeviceIdentity(Native.GetBus(device), Native.GetAddress(device), descriptor.Vendor, descriptor.Product, descriptor.DeviceVersion, string.Join('.', ports.Take(portCount)), serial);
+                matching.Add((device, descriptor, identity));
             }
-            var identity = new DeviceIdentity(Native.GetBus(device), Native.GetAddress(device), descriptor.Vendor, descriptor.Product, descriptor.DeviceVersion, string.Join('.', ports.Take(portCount)), serial);
-            matching.Add((device, descriptor, identity));
+            if (matching.Select(item => (item.Identity.Bus, item.Identity.PortPath)).Distinct().Count() != matching.Count)
+                throw new IOException("USB physical port inventory is ambiguous.");
         }
+        catch { Dispose(); throw; }
     }
 
     internal WbConnection OpenSelected(Selection selection)
@@ -65,18 +75,7 @@ internal sealed class NativeUsb : IDisposable
 
     internal static NativeLibraryEvidence VerifyBundledLibrary()
     {
-        string basePath = Path.GetFullPath(AppContext.BaseDirectory);
-        string nativeDirectory = Path.GetFullPath(Path.Combine(basePath, "native"));
-        string path = Path.GetFullPath(Path.Combine(nativeDirectory, "libusb-1.0.dll"));
-        if (!path.StartsWith(Path.TrimEndingDirectorySeparator(basePath) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            || !Directory.Exists(nativeDirectory) || !File.Exists(path)) throw new IOException("Bundled libusb must exist inside this application's native directory.");
-        var directory = new DirectoryInfo(nativeDirectory);
-        var file = new FileInfo(path);
-        if ((directory.Attributes & FileAttributes.ReparsePoint) != 0 || (file.Attributes & FileAttributes.ReparsePoint) != 0)
-            throw new IOException("Bundled libusb path must not be a link or reparse point.");
-        string hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
-        if (hash != DllSha256) throw new IOException("Official bundled libusb DLL hash differs; library will not be loaded.");
-        return new NativeLibraryEvidence(path, file.Length, hash);
+        return NativeToolCatalog.Verify(NativeToolCatalog.LibraryName);
     }
 
     internal static void ValidateNativeLayouts()
@@ -85,7 +84,7 @@ internal sealed class NativeUsb : IDisposable
             || Marshal.SizeOf<UsbInterface>() != 16 || Marshal.SizeOf<InterfaceDescriptor>() != 40 || Marshal.SizeOf<EndpointDescriptor>() != 32
             || Marshal.OffsetOf<ConfigDescriptor>(nameof(ConfigDescriptor.Interfaces)).ToInt32() != 16
             || Marshal.OffsetOf<InterfaceDescriptor>(nameof(InterfaceDescriptor.Endpoints)).ToInt32() != 16)
-            throw new PlatformNotSupportedException("Native USB descriptor layout is not the audited Windows x64 layout.");
+            throw new PlatformNotSupportedException("Native USB descriptor layout is not the required 64-bit ABI.");
     }
 
     private static void ValidateInterfaces(nint device)

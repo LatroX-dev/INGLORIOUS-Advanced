@@ -1,11 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><TargetFramework>net9.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><RootNamespace>InGlorious.Core</RootNamespace></PropertyGroup>
+  <PropertyGroup><TargetFramework>net9.0</TargetFramework><RuntimeIdentifiers>win-x64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><RootNamespace>InGlorious.Core</RootNamespace></PropertyGroup>
+  <PropertyGroup>
+    <SetupFirmwareCatalogPath Condition="'$(SetupFirmwareCatalogPath)' == ''">$(MSBuildThisFileDirectory)../../InGlorious.Core/SetupFirmwareCatalog.json</SetupFirmwareCatalogPath>
+    <SetupToolCatalogPath Condition="'$(SetupToolCatalogPath)' == ''">$(MSBuildThisFileDirectory)../../InGlorious.Core/SetupToolCatalog.json</SetupToolCatalogPath>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="HidSharp" Version="2.6.4" />
     <Compile Include="../../InGlorious.Core/Models.cs" Link="Models.cs" />
     <Compile Include="../../InGlorious.Core/Localization.cs" Link="Localization.cs" />
     <Compile Include="../../InGlorious.Core/UserGuide.cs" Link="UserGuide.cs" />
     <Compile Include="../../InGlorious.Core/AppPreferences.cs" Link="AppPreferences.cs" />
+    <Compile Include="../../InGlorious.Core/AppAutostart.cs" Link="AppAutostart.cs" />
+    <Compile Include="../../InGlorious.Core/AppAutostartEditor.cs" Link="AppAutostartEditor.cs" />
+    <Compile Include="../../InGlorious.Core/WindowsInstallationGuard.cs" Link="WindowsInstallationGuard.cs" />
+    <Compile Include="../../InGlorious.Core/BackgroundApplicationSession.cs" Link="BackgroundApplicationSession.cs" />
+    <Compile Include="../../InGlorious.Core/ApplicationInstance.cs" Link="ApplicationInstance.cs" />
     <Compile Include="../../InGlorious.Core/ProfileLibrary.cs" Link="ProfileLibrary.cs" />
     <Compile Include="../../InGlorious.Core/ColorPaletteStore.cs" Link="ColorPaletteStore.cs" />
     <Compile Include="../../InGlorious.Core/SharedMacroLibrary.cs" Link="SharedMacroLibrary.cs" />
@@ -16,6 +25,22 @@
     <Compile Include="../../InGlorious.Core/StartupDeviceLoader.cs" Link="StartupDeviceLoader.cs" />
     <Compile Include="../../InGlorious.Core/FirmwareRelease.cs" Link="FirmwareRelease.cs" />
     <Compile Include="../../InGlorious.Core/FirmwareChangelog.cs" Link="FirmwareChangelog.cs" />
+    <Compile Include="../../InGlorious.Core/FirmwareMessages.cs" Link="FirmwareMessages.cs" />
+    <Compile Include="../../InGlorious.Core/DeviceScanner.cs" Link="DeviceScanner.cs" />
+    <Compile Include="../../InGlorious.Core/StockDeviceCatalog.cs" Link="StockDeviceCatalog.cs" />
+    <Compile Include="../../InGlorious.Core/StockFirmwareInspector.cs" Link="StockFirmwareInspector.cs" />
+    <Compile Include="../../InGlorious.Core/InstallationIdentity.cs" Link="InstallationIdentity.cs" />
+    <Compile Include="../../InGlorious.Core/KnownFirmwareImages.cs" Link="KnownFirmwareImages.cs" />
+    <Compile Include="../../InGlorious.Core/DeviceSetupService.cs" Link="DeviceSetupService.cs" />
+    <Compile Include="../../InGlorious.Core/DeviceSetupService.Storage.cs" Link="DeviceSetupService.Storage.cs" />
+    <Compile Include="../../InGlorious.Core/WindowsDeviceSetupEnvironment.cs" Link="WindowsDeviceSetupEnvironment.cs" />
+    <Compile Include="../../InGlorious.Core/PosixDeviceSetupEnvironment.cs" Link="PosixDeviceSetupEnvironment.cs" />
+    <Compile Include="../../InGlorious.Core/FirmwareAdapterProcess.cs" Link="FirmwareAdapterProcess.cs" />
+    <Compile Include="../../InGlorious.Core/PlatformUsbIdentity.cs" Link="PlatformUsbIdentity.cs" />
+    <Compile Include="../../InGlorious.Core/FirmwareLightingTestService.cs" Link="FirmwareLightingTestService.cs" />
+    <EmbeddedResource Include="$(SetupFirmwareCatalogPath)" LogicalName="InGlorious.Core.SetupFirmwareCatalog.json" />
+    <EmbeddedResource Include="$(SetupToolCatalogPath)" LogicalName="InGlorious.Core.SetupToolCatalog.json" />
+    <EmbeddedResource Include="../../InGlorious.Core/KnownFirmwareCatalog.json" LogicalName="InGlorious.Core.KnownFirmwareCatalog.json" />
     <Compile Include="../../InGlorious.Core/OsActionCatalog.cs" Link="OsActionCatalog.cs" />
     <Compile Include="../../InGlorious.Core/SharedBrightnessService.cs" Link="SharedBrightnessService.cs" />
     <Compile Include="../../InGlorious.Core/LightingPresetStore.cs" Link="LightingPresetStore.cs" />

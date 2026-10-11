@@ -6,6 +6,8 @@ This is a developer and tester checklist, not a statement that the checks have p
 
 Record model, ANSI/ISO layout, visible revision if available, operating system, USB connection, app version and explicitly reported firmware version. Keep original firmware and identifying diagnostics private.
 
+Run the checklist separately on Windows, Linux and macOS. On Linux, include access before and after installing the supplied USB rules while running the app as a normal user. On macOS, include launching the packaged app and any system permission prompts. Check both direct ports and a USB hub: ambiguous or unavailable port information must stop the operation, never select a device by name alone.
+
 ## First installation and return
 
 1. Save profiles and keep another keyboard available. Start with the Numpad when it is available.
@@ -29,4 +31,4 @@ An ambiguous model, changed connection, missing matching archive, disagreement b
 
 ## Current status
 
-The GMMK PRO revision 1 ISO and GMMK Numpad have historical physical-use evidence. The new general 0.6.40 workflow needs the above acceptance run. The other 13 variants remain experimental. Native macOS/Linux device, layout and permission testing is also pending. Automated checks and successful builds are reported separately.
+The GMMK PRO revision 1 ISO and GMMK Numpad have historical physical-use evidence. The general setup workflow in app 0.6.41 still needs the above acceptance run. The other 13 variants remain experimental. Native macOS/Linux package, device, layout and permission testing is also pending. Automated checks and successful builds are reported separately.

@@ -1,4 +1,4 @@
-namespace InGlorious.Core;
+﻿namespace InGlorious.Core;
 
 public sealed record GuideSection(string Heading, string Body);
 public sealed record GuideTopic(string Id, string Title, IReadOnlyList<GuideSection> Sections);
@@ -10,7 +10,7 @@ public static class UserGuide
     {
         new("start", "Erste Schritte", Array.AsReadOnly(new GuideSection[]
         {
-            new("Beim Öffnen", "Verbinde die Geräte per USB. Bei INGLORIOUS-Firmware liest die App zuerst die aktuellen Einstellungen. Mit Original-Firmware ist zuerst die Einrichtung nötig. Danach bearbeitest du Tastatur und Numpad getrennt. Ist ein Gerät nicht eindeutig erreichbar, bleibt ein lokales Profil mit einem Hinweis geöffnet."),
+            new("Beim Öffnen", "Verbinde die Geräte per USB. Bei INGLORIOUS-Firmware liest die App zuerst die aktuellen Einstellungen. Mit Original-Firmware ist zuerst die Einrichtung nötig. Danach bearbeitest du Tastatur und GMMK Numpad getrennt. Ist ein Gerät nicht eindeutig erreichbar, bleibt ein lokales Profil mit einem Hinweis geöffnet."),
             new("Änderungen speichern", "Bearbeite die gewünschte Einstellung und bestätige sie mit „Übernehmen“. „Auf Tastatur übertragen“ speichert den gesamten Arbeitsstand auf dem ausgewählten Gerät. Warte auf die Bestätigung. Anschließend funktionieren Farben, Belegungen und Makros auch ohne App.")
         })),
         new("lighting", "Beleuchtung", Array.AsReadOnly(new GuideSection[]
@@ -38,13 +38,13 @@ public static class UserGuide
         new("profiles", "Profile", Array.AsReadOnly(new GuideSection[]
         {
             new("Datei und Gerät", "Ein Profil enthält die Einstellungen für ein Gerät. „Profil speichern“ bewahrt sie als Datei auf dem Computer. „Auf Tastatur übertragen“ speichert sie im Gerät. Das sind zwei getrennte Schritte. Beim App-Start ausgelesene Einstellungen überschreiben deine Profildateien nicht."),
-            new("Öffnen und wiederverwenden", "Im Bereich „Profile“ öffnest du gespeicherte Arbeitsstände oder legst neue an. Tastatur und Numpad behalten getrennte Arbeitsstände. Prüfe das ausgewählte Gerät, bevor du ein Profil überträgst."),
+            new("Öffnen und wiederverwenden", "Im Bereich „Profile“ öffnest du gespeicherte Arbeitsstände oder legst neue an. Tastatur und GMMK Numpad behalten getrennte Arbeitsstände. Prüfe das ausgewählte Gerät, bevor du ein Profil überträgst."),
             new("Farben und Vorlagen", "Speichere häufige Farben als Favoriten. Beleuchtungsvorlagen übernehmen Farben und Effekte auf die aktuelle Ebene; Tastenbelegungen und Makros bleiben erhalten. Eigene Vorlagen lassen sich speichern, importieren und exportieren.")
         })),
         new("device", "Gerät", Array.AsReadOnly(new GuideSection[]
         {
-            new("Regler und USB", "Wähle beim Numpad den Schieberegler in der Vorschau. Er kann Lautstärke, Helligkeit oder MIDI steuern. Unter „Gerät“ findest du USB-Abfragerate und Entprellzeit. Diese gelten für alle Ebenen."),
-            new("Gemeinsames Dimmen", "Mit „Beleuchtung dimmen“ steuert der Numpad-Regler sein eigenes Licht ohne App. Soll er auch die PRO dimmen, aktiviere das gemeinsame Dimmen und lasse INGLORIOUS im Hintergrund geöffnet."),
+            new("Regler und USB", "Wähle beim GMMK Numpad den Schieberegler in der Vorschau. Er kann Lautstärke, Helligkeit oder MIDI steuern. Unter „Gerät“ findest du USB-Abfragerate und Entprellzeit. Diese gelten für alle Ebenen."),
+            new("Gemeinsames Dimmen", "Mit „Beleuchtung dimmen“ steuert der GMMK Numpad-Regler sein eigenes Licht ohne App. Soll er auch die GMMK PRO ISO dimmen, aktiviere das gemeinsame Dimmen und lasse INGLORIOUS Advanced im Hintergrund geöffnet."),
             new("Firmware und Rückkehr", "Die Windows-App bietet unter „Gerät“ Einrichtung, Updates und „Original-Firmware wiederherstellen“. Vor der Ersteinrichtung wird das Original automatisch gesichert; die Sicherung für den Rückwechsel bleibt auf dem Computer. Lasse die App währenddessen geöffnet. Die plattformübergreifende Vorschau bietet diesen Ablauf nicht."),
         })),
         new("standby", "Standby", Array.AsReadOnly(new GuideSection[]

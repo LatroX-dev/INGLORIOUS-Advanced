@@ -27,7 +27,7 @@ internal static class Files
         if (Path.IsPathRooted(relative) || relative.Contains(':')) throw new IOException("Artifact must use a relative path.");
         string folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
         string full = Path.GetFullPath(Path.Combine(folder, relative));
-        if (!full.StartsWith(folder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) throw new IOException("Artifact escapes its directory.");
+        if (!full.StartsWith(folder + Path.DirectorySeparatorChar, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)) throw new IOException("Artifact escapes its directory.");
         NoLinks(full); return full;
     }
     internal static Artifact New(string folder, string name, byte[] bytes, string kind)

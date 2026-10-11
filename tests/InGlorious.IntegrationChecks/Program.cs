@@ -1,4 +1,4 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
@@ -156,7 +156,7 @@ try
     var guideText = UserGuide.Topics.SelectMany(topic => new[] { topic.Title }.Concat(topic.Sections.SelectMany(section => new[] { section.Heading, section.Body })))
         .Concat(new[] { "Anleitung", "Themen", "Schließen", "Funktion", "Reglerbereich", "Kanal", "Controller", "Minimum", "Maximum",
             "Nur anpassen, wenn der Regler nicht den gesamten Bereich erreicht.", "Steuert einen MIDI-Controller in einer kompatiblen Anwendung.",
-            "Ändert die Lautstärke durch Bewegen des Reglers.", "Regelt die Helligkeit der Numpad-Beleuchtung.", "Keine Aktion beim Bewegen des Reglers." }).Distinct().ToArray();
+            "Ändert die Lautstärke durch Bewegen des Reglers.", "Regelt die Helligkeit der GMMK Numpad-Beleuchtung.", "Keine Aktion beim Bewegen des Reglers." }).Distinct().ToArray();
     var priorLanguage = L.CurrentLanguage;
     foreach (var language in L.SupportedLanguages)
     {

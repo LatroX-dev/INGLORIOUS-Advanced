@@ -1,4 +1,4 @@
-{
+﻿{
   "Systemtaste": {
     "en": "System key",
     "es": "Tecla del sistema",
@@ -454,44 +454,44 @@
     "ko": "기기 설정을 적용했습니다.",
     "zh-Hans": "已应用设备设置。"
   },
-  "Numpad und Tastatur gemeinsam dimmen": {
-    "en": "Dim numpad and keyboard together",
-    "es": "Atenuar teclado numérico y teclado juntos",
-    "fr": "Régler ensemble la luminosité du pavé et du clavier",
-    "it": "Regola insieme la luminosità di tastierino e tastiera",
-    "pt-BR": "Ajustar juntos o brilho do teclado numérico e do teclado",
-    "pl": "Przyciemniaj wspólnie klawiaturę i blok numeryczny",
-    "tr": "Numpad ve klavyeyi birlikte karart",
-    "ru": "Общая яркость клавиатуры и цифрового блока",
-    "ja": "テンキーとキーボードを同時に調光",
-    "ko": "숫자패드와 키보드 함께 밝기 조절",
-    "zh-Hans": "同时调节数字键盘和主键盘亮度"
+  "GMMK Numpad und Tastatur gemeinsam dimmen": {
+    "en": "Dim GMMK Numpad and keyboard together",
+    "es": "Atenuar GMMK Numpad y teclado juntos",
+    "fr": "Régler ensemble la luminosité du GMMK Numpad et du clavier",
+    "it": "Regola insieme la luminosità di GMMK Numpad e tastiera",
+    "pt-BR": "Ajustar juntos o brilho do GMMK Numpad e do teclado",
+    "pl": "Przyciemniaj wspólnie klawiaturę i GMMK Numpad",
+    "tr": "GMMK Numpad ve klavyeyi birlikte karart",
+    "ru": "Общая яркость клавиатуры и GMMK Numpad",
+    "ja": "GMMK Numpadとキーボードを同時に調光",
+    "ko": "GMMK Numpad와 키보드 함께 밝기 조절",
+    "zh-Hans": "同时调节GMMK Numpad和主键盘亮度"
   },
-  "Gemeinsames Dimmen von Numpad und Tastatur benötigt INGLORIOUS im Hintergrund. Nur das Numpad dimmt auch ohne laufende App. Farben, Effekte und Belegungen bleiben auf den Geräten gespeichert.": {
-    "en": "Dimming both devices together requires INGLORIOUS running in the background. The numpad can dim itself with the app closed. Colors, effects and key bindings stay stored on the devices.",
-    "es": "Para atenuar ambos dispositivos juntos, INGLORIOUS debe ejecutarse en segundo plano. El teclado numérico puede atenuarse con la app cerrada. Colores, efectos y asignaciones permanecen guardados en los dispositivos.",
-    "fr": "Pour régler les deux appareils ensemble, INGLORIOUS doit fonctionner en arrière-plan. Le pavé numérique peut régler sa propre luminosité sans l’app. Couleurs, effets et affectations restent enregistrés dans les appareils.",
-    "it": "Per regolare entrambi i dispositivi insieme, INGLORIOUS deve essere attivo in background. Il tastierino può regolare la propria luminosità anche ad app chiusa. Colori, effetti e assegnazioni restano nei dispositivi.",
-    "pt-BR": "Para ajustar ambos os dispositivos juntos, INGLORIOUS precisa rodar em segundo plano. O teclado numérico ajusta seu próprio brilho com o app fechado. Cores, efeitos e atribuições ficam salvos nos dispositivos.",
-    "pl": "Wspólne przyciemnianie wymaga działania INGLORIOUS w tle. Sam blok numeryczny działa także po zamknięciu aplikacji. Kolory, efekty i przypisania pozostają zapisane w urządzeniach.",
-    "tr": "İki cihazın birlikte karartılması için INGLORIOUS arka planda çalışmalıdır. Numpad, uygulama kapalıyken de kendi ışığını kısabilir. Renkler, efektler ve tuş atamaları cihazlarda kayıtlı kalır.",
-    "ru": "Для общей регулировки INGLORIOUS должен работать в фоне. Цифровой блок регулирует свою яркость и при закрытом приложении. Цвета, эффекты и назначения остаются на устройствах.",
-    "ja": "両方のデバイスを同時に調光するにはINGLORIOUSをバックグラウンドで動かす必要があります。テンキー単体の調光はアプリを閉じても使えます。色・エフェクト・キー割り当てはデバイスに保存されます。",
-    "ko": "두 기기를 함께 조절하려면 INGLORIOUS가 백그라운드에서 실행되어야 합니다. 숫자패드 자체의 밝기는 앱을 닫아도 조절할 수 있습니다. 색상, 효과, 키 할당은 기기에 저장됩니다.",
-    "zh-Hans": "同时调节两个设备的亮度需要 INGLORIOUS 在后台运行。数字键盘自身的调光无需运行应用。颜色、效果和按键分配仍保存在设备上。"
+  "Gemeinsames Dimmen von GMMK Numpad und Tastatur benötigt INGLORIOUS Advanced im Hintergrund. Nur das GMMK Numpad dimmt auch ohne laufende App. Farben, Effekte und Belegungen bleiben auf den Geräten gespeichert.": {
+    "en": "Dimming both devices together requires INGLORIOUS Advanced running in the background. The GMMK Numpad can dim itself with the app closed. Colors, effects and key bindings stay stored on the devices.",
+    "es": "Para atenuar ambos dispositivos juntos, INGLORIOUS Advanced debe ejecutarse en segundo plano. El GMMK Numpad puede atenuarse con la app cerrada. Colores, efectos y asignaciones permanecen guardados en los dispositivos.",
+    "fr": "Pour régler les deux appareils ensemble, INGLORIOUS Advanced doit fonctionner en arrière-plan. Le GMMK Numpad peut régler sa propre luminosité sans l’app. Couleurs, effets et affectations restent enregistrés dans les appareils.",
+    "it": "Per regolare entrambi i dispositivi insieme, INGLORIOUS Advanced deve essere attivo in background. Il GMMK Numpad può regolare la propria luminosità anche ad app chiusa. Colori, effetti e assegnazioni restano nei dispositivi.",
+    "pt-BR": "Para ajustar ambos os dispositivos juntos, INGLORIOUS Advanced precisa rodar em segundo plano. O GMMK Numpad ajusta seu próprio brilho com o app fechado. Cores, efeitos e atribuições ficam salvos nos dispositivos.",
+    "pl": "Wspólne przyciemnianie wymaga działania INGLORIOUS Advanced w tle. Sam GMMK Numpad działa także po zamknięciu aplikacji. Kolory, efekty i przypisania pozostają zapisane w urządzeniach.",
+    "tr": "İki cihazın birlikte karartılması için INGLORIOUS Advanced arka planda çalışmalıdır. GMMK Numpad, uygulama kapalıyken de kendi ışığını kısabilir. Renkler, efektler ve tuş atamaları cihazlarda kayıtlı kalır.",
+    "ru": "Для общей регулировки INGLORIOUS Advanced должен работать в фоне. GMMK Numpad регулирует свою яркость и при закрытом приложении. Цвета, эффекты и назначения остаются на устройствах.",
+    "ja": "両方のデバイスを同時に調光するにはINGLORIOUS Advancedをバックグラウンドで動かす必要があります。GMMK Numpad単体の調光はアプリを閉じても使えます。色・エフェクト・キー割り当てはデバイスに保存されます。",
+    "ko": "두 기기를 함께 조절하려면 INGLORIOUS Advanced가 백그라운드에서 실행되어야 합니다. GMMK Numpad 자체의 밝기는 앱을 닫아도 조절할 수 있습니다. 색상, 효과, 키 할당은 기기에 저장됩니다.",
+    "zh-Hans": "同时调节两个设备的亮度需要 INGLORIOUS Advanced 在后台运行。GMMK Numpad自身的调光无需运行应用。颜色、效果和按键分配仍保存在设备上。"
   },
-  "Zum gemeinsamen Dimmen genau ein Numpad und eine PRO verbinden.": {
-    "en": "Connect one numpad and one PRO for shared dimming.",
-    "es": "Conecta un teclado numérico y una PRO para atenuarlos juntos.",
-    "fr": "Connectez un pavé numérique et une PRO pour régler leur luminosité ensemble.",
-    "it": "Collega un tastierino e una PRO per la regolazione comune.",
-    "pt-BR": "Conecte um teclado numérico e uma PRO para o ajuste conjunto.",
-    "pl": "Podłącz jeden blok numeryczny i jedną PRO do wspólnej regulacji.",
-    "tr": "Ortak karartma için bir Numpad ve bir PRO bağlayın.",
-    "ru": "Для общей регулировки подключите один цифровой блок и одну PRO.",
-    "ja": "同時調光にはテンキー1台とPRO1台を接続してください。",
-    "ko": "함께 조절하려면 숫자패드 한 대와 PRO 한 대를 연결하세요.",
-    "zh-Hans": "共同调光需要连接一台数字键盘和一台 PRO。"
+  "Zum gemeinsamen Dimmen genau ein GMMK Numpad und eine GMMK PRO ISO verbinden.": {
+    "en": "Connect one GMMK Numpad and one GMMK PRO ISO for shared dimming.",
+    "es": "Conecta un GMMK Numpad y una GMMK PRO ISO para atenuarlos juntos.",
+    "fr": "Connectez un GMMK Numpad et une GMMK PRO ISO pour régler leur luminosité ensemble.",
+    "it": "Collega un GMMK Numpad e una GMMK PRO ISO per la regolazione comune.",
+    "pt-BR": "Conecte um GMMK Numpad e uma GMMK PRO ISO para o ajuste conjunto.",
+    "pl": "Podłącz jeden GMMK Numpad i jedną GMMK PRO ISO do wspólnej regulacji.",
+    "tr": "Ortak karartma için bir GMMK Numpad ve bir GMMK PRO ISO bağlayın.",
+    "ru": "Для общей регулировки подключите один GMMK Numpad и одну GMMK PRO ISO.",
+    "ja": "同時調光にはGMMK Numpad1台とGMMK PRO ISO1台を接続してください。",
+    "ko": "함께 조절하려면 GMMK Numpad 한 대와 GMMK PRO ISO 한 대를 연결하세요.",
+    "zh-Hans": "共同调光需要连接一台GMMK Numpad和一台 GMMK PRO ISO。"
   },
   "Gemeinsames Dimmen benötigt Firmware 0.5 oder neuer auf beiden Geräten.": {
     "en": "Shared dimming requires firmware 0.5 or later on both devices.",
@@ -506,31 +506,31 @@
     "ko": "함께 조절하려면 두 기기 모두 펌웨어 0.5 이상이 필요합니다.",
     "zh-Hans": "共同调光需要两个设备均安装 0.5 或更高版本固件。"
   },
-  "Am Numpad „Beleuchtung dimmen“ wählen und auf die Tastatur übertragen.": {
-    "en": "Select “Dim lighting” for the numpad and transfer it to the device.",
-    "es": "Selecciona «Atenuar iluminación» para el teclado numérico y transfiérelo al dispositivo.",
-    "fr": "Choisissez « Régler la luminosité » pour le pavé numérique, puis transférez sur l’appareil.",
-    "it": "Seleziona «Regola luminosità» per il tastierino e trasferisci al dispositivo.",
-    "pt-BR": "Selecione “Ajustar brilho” para o teclado numérico e transfira ao dispositivo.",
-    "pl": "Wybierz przyciemnianie dla bloku numerycznego i prześlij do urządzenia.",
-    "tr": "Numpad için “Aydınlatmayı kıs” seçeneğini belirleyip cihaza aktarın.",
-    "ru": "Выберите регулировку подсветки цифрового блока и передайте на устройство.",
-    "ja": "テンキーで「照明を調光」を選び、デバイスに転送してください。",
-    "ko": "숫자패드에서 조명 밝기 조절을 선택한 후 기기로 전송하세요.",
-    "zh-Hans": "为数字键盘选择“调节照明亮度”并传输到设备。"
+  "Am GMMK Numpad „Beleuchtung dimmen“ wählen und auf die Tastatur übertragen.": {
+    "en": "Select “Dim lighting” for the GMMK Numpad and transfer it to the device.",
+    "es": "Selecciona «Atenuar iluminación» para el GMMK Numpad y transfiérelo al dispositivo.",
+    "fr": "Choisissez « Régler la luminosité » pour le GMMK Numpad, puis transférez sur l’appareil.",
+    "it": "Seleziona «Regola luminosità» per il GMMK Numpad e trasferisci al dispositivo.",
+    "pt-BR": "Selecione “Ajustar brilho” para o GMMK Numpad e transfira ao dispositivo.",
+    "pl": "Wybierz przyciemnianie dla GMMK Numpad i prześlij do urządzenia.",
+    "tr": "GMMK Numpad için “Aydınlatmayı kıs” seçeneğini belirleyip cihaza aktarın.",
+    "ru": "Выберите регулировку подсветки GMMK Numpad и передайте на устройство.",
+    "ja": "GMMK Numpadで「照明を調光」を選び、デバイスに転送してください。",
+    "ko": "GMMK Numpad에서 조명 밝기 조절을 선택한 후 기기로 전송하세요.",
+    "zh-Hans": "为GMMK Numpad选择“调节照明亮度”并传输到设备。"
   },
-  "Numpad und PRO werden gemeinsam gedimmt.": {
-    "en": "Numpad and PRO dim together.",
-    "es": "Teclado numérico y PRO se atenúan juntos.",
-    "fr": "Le pavé numérique et la PRO sont réglés ensemble.",
-    "it": "Tastierino e PRO si regolano insieme.",
-    "pt-BR": "Teclado numérico e PRO ajustam o brilho juntos.",
-    "pl": "Blok numeryczny i PRO są wspólnie przyciemniane.",
-    "tr": "Numpad ve PRO birlikte karartılıyor.",
-    "ru": "Яркость цифрового блока и PRO регулируется совместно.",
-    "ja": "テンキーとPROを同時に調光しています。",
-    "ko": "숫자패드와 PRO의 밝기를 함께 조절합니다.",
-    "zh-Hans": "数字键盘和 PRO 正在共同调光。"
+  "GMMK Numpad und GMMK PRO ISO werden gemeinsam gedimmt.": {
+    "en": "GMMK Numpad and GMMK PRO ISO dim together.",
+    "es": "GMMK Numpad y GMMK PRO ISO se atenúan juntos.",
+    "fr": "Le GMMK Numpad et la GMMK PRO ISO sont réglés ensemble.",
+    "it": "GMMK Numpad e GMMK PRO ISO si regolano insieme.",
+    "pt-BR": "GMMK Numpad e GMMK PRO ISO ajustam o brilho juntos.",
+    "pl": "GMMK Numpad i GMMK PRO ISO są wspólnie przyciemniane.",
+    "tr": "GMMK Numpad ve GMMK PRO ISO birlikte karartılıyor.",
+    "ru": "Яркость GMMK Numpad и GMMK PRO ISO регулируется совместно.",
+    "ja": "GMMK NumpadとGMMK PRO ISOを同時に調光しています。",
+    "ko": "GMMK Numpad와 GMMK PRO ISO의 밝기를 함께 조절합니다.",
+    "zh-Hans": "GMMK Numpad和 GMMK PRO ISO 正在共同调光。"
   },
   "Gemeinsames Dimmen wartet auf die Geräte: ": {
     "en": "Shared dimming is waiting for the devices: ",

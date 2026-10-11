@@ -1,4 +1,4 @@
-{
+﻿{
   "1. Glorious CORE und andere Firmware-Programme schließen.": {
     "en": "1. Close Glorious CORE and other firmware tools.",
     "es": "1. Cierra Glorious CORE y otros programas de firmware.",
@@ -12,31 +12,31 @@
     "ko": "1. Glorious CORE와 다른 펌웨어 도구를 닫으세요.",
     "zh-Hans": "1. 关闭 Glorious CORE 和其他固件工具。"
   },
-  "2. Nur das Numpad vom USB-Kabel trennen.": {
-    "en": "2. Disconnect only the Numpad from its USB cable.",
-    "es": "2. Desconecta solo el Numpad del cable USB.",
-    "fr": "2. Débranchez uniquement le Numpad du câble USB.",
-    "it": "2. Scollega solo il Numpad dal cavo USB.",
-    "pt-BR": "2. Desconecte apenas o Numpad do cabo USB.",
-    "pl": "2. Odłącz kabel USB tylko od Numpada.",
-    "tr": "2. USB kablosunu yalnızca Numpad'den çıkarın.",
-    "ru": "2. Отсоедините USB-кабель только от Numpad.",
-    "ja": "2. NumpadだけをUSBケーブルから取り外してください。",
-    "ko": "2. Numpad에서만 USB 케이블을 분리하세요.",
-    "zh-Hans": "2. 仅拔下 Numpad 的 USB 线。"
+  "2. Nur das GMMK Numpad vom USB-Kabel trennen.": {
+    "en": "2. Disconnect only the GMMK Numpad from its USB cable.",
+    "es": "2. Desconecta solo el GMMK Numpad del cable USB.",
+    "fr": "2. Débranchez uniquement le GMMK Numpad du câble USB.",
+    "it": "2. Scollega solo il GMMK Numpad dal cavo USB.",
+    "pt-BR": "2. Desconecte apenas o GMMK Numpad do cabo USB.",
+    "pl": "2. Odłącz kabel USB tylko od GMMK Numpad.",
+    "tr": "2. USB kablosunu yalnızca GMMK Numpad'den çıkarın.",
+    "ru": "2. Отсоедините USB-кабель только от GMMK Numpad.",
+    "ja": "2. GMMK NumpadだけをUSBケーブルから取り外してください。",
+    "ko": "2. GMMK Numpad에서만 USB 케이블을 분리하세요.",
+    "zh-Hans": "2. 仅拔下 GMMK Numpad 的 USB 线。"
   },
-  "2. Nur die PRO vom USB-Kabel trennen.": {
-    "en": "2. Disconnect only the PRO from its USB cable.",
-    "es": "2. Desconecta solo el PRO del cable USB.",
-    "fr": "2. Débranchez uniquement le PRO du câble USB.",
-    "it": "2. Scollega solo la PRO dal cavo USB.",
-    "pt-BR": "2. Desconecte apenas o PRO do cabo USB.",
-    "pl": "2. Odłącz kabel USB tylko od PRO.",
-    "tr": "2. USB kablosunu yalnızca PRO'dan çıkarın.",
-    "ru": "2. Отсоедините USB-кабель только от PRO.",
-    "ja": "2. PROだけをUSBケーブルから取り外してください。",
-    "ko": "2. PRO에서만 USB 케이블을 분리하세요.",
-    "zh-Hans": "2. 仅拔下 PRO 的 USB 线。"
+  "2. Nur die GMMK PRO ISO vom USB-Kabel trennen.": {
+    "en": "2. Disconnect only the GMMK PRO ISO from its USB cable.",
+    "es": "2. Desconecta solo el GMMK PRO ISO del cable USB.",
+    "fr": "2. Débranchez uniquement le GMMK PRO ISO du câble USB.",
+    "it": "2. Scollega solo la GMMK PRO ISO dal cavo USB.",
+    "pt-BR": "2. Desconecte apenas o GMMK PRO ISO do cabo USB.",
+    "pl": "2. Odłącz kabel USB tylko od GMMK PRO ISO.",
+    "tr": "2. USB kablosunu yalnızca GMMK PRO ISO'dan çıkarın.",
+    "ru": "2. Отсоедините USB-кабель только от GMMK PRO ISO.",
+    "ja": "2. GMMK PRO ISOだけをUSBケーブルから取り外してください。",
+    "ko": "2. GMMK PRO ISO에서만 USB 케이블을 분리하세요.",
+    "zh-Hans": "2. 仅拔下 GMMK PRO ISO 的 USB 线。"
   },
   "3. Diese Tasten gedrückt halten und USB am selben Anschluss wieder einstecken. Nach etwa 3 Sekunden loslassen.": {
     "en": "3. Hold these keys and reconnect USB to the same port. Release after about 3 seconds.",

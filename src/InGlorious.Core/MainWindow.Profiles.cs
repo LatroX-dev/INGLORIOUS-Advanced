@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -23,7 +23,7 @@ public partial class MainWindow
         }
         else
         {
-            _profileEntries = [new("preview-pro.json", "GMMK PRO", "pro-iso", new DateTime(2026, 10, 10, 12, 0, 0), 4, 2),
+            _profileEntries = [new("preview-pro.json", "GMMK PRO ISO", "pro-iso", new DateTime(2026, 10, 10, 12, 0, 0), 4, 2),
                 new("preview-pad.json", "GMMK Numpad", "numpad", new DateTime(2026, 10, 10, 11, 0, 0), 4, 1)];
         }
         FilterProfiles();

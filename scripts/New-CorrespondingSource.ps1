@@ -66,7 +66,7 @@ foreach($archive in $catalog.archives){
     $path=Safe-Child $cache $archive.file
     if(-not(Test-Path -LiteralPath $path)){
         if(-not$Download){throw ('Source archive is missing; use -Download or populate the cache: '+$archive.file)}
-        if($archive.url-cnotmatch'^https://(dfu-util\.sourceforge\.net/releases/|codeload\.github\.com/)'){throw 'Unapproved source archive origin.'}
+        if($archive.url-cnotmatch'^https://(dfu-util\.sourceforge\.net/releases/|codeload\.github\.com/)'-and$archive.url-cne'https://github.com/libusb/libusb/releases/download/v1.0.29/libusb-1.0.29.tar.bz2'){throw 'Unapproved source archive origin.'}
         New-Item -ItemType Directory -Path $cache -Force|Out-Null
         Invoke-WebRequest -Uri $archive.url -OutFile $path
     }

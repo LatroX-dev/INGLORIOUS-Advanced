@@ -1,4 +1,4 @@
-{
+﻿{
   "Statisch": {
     "en": "Static",
     "es": "Estático",
@@ -1285,5 +1285,18 @@
     "ja": "プロファイルファイルが空です。",
     "ko": "프로필 파일이 비어 있습니다.",
     "zh-Hans": "配置文件为空。"
+  },
+  "Basis": {
+    "en": "Base",
+    "es": "Base",
+    "fr": "Base",
+    "it": "Base",
+    "pt-BR": "Base",
+    "pl": "Podstawowa",
+    "tr": "Temel",
+    "ru": "Основной",
+    "ja": "基本",
+    "ko": "기본",
+    "zh-Hans": "基础"
   }
 }

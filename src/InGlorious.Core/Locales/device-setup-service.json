@@ -1,4 +1,4 @@
-{
+﻿{
   "Beide vollständigen Sicherungen stimmen überein.": {
     "en": "Both complete backups match.",
     "es": "Las dos copias de seguridad completas coinciden.",
@@ -506,18 +506,18 @@
     "ko": "먼저 기기에서 USB 케이블을 분리하세요.",
     "zh-Hans": "请先拔下设备的 USB 线。"
   },
-  "USB angeschlossen und INGLORIOUS ADVANCED geöffnet lassen.": {
-    "en": "Keep USB connected and INGLORIOUS ADVANCED open.",
-    "es": "Mantén el USB conectado e INGLORIOUS ADVANCED abierto.",
-    "fr": "Laisse l’USB branché et INGLORIOUS ADVANCED ouvert.",
-    "it": "Mantieni l’USB collegato e INGLORIOUS ADVANCED aperto.",
-    "pt-BR": "Mantenha o USB conectado e o INGLORIOUS ADVANCED aberto.",
-    "pl": "Pozostaw USB podłączone i INGLORIOUS ADVANCED otwarte.",
-    "tr": "USB bağlantısını ve INGLORIOUS ADVANCED uygulamasını açık tutun.",
-    "ru": "Не отключайте USB и не закрывайте INGLORIOUS ADVANCED.",
-    "ja": "USBを接続したまま、INGLORIOUS ADVANCEDを開いておいてください。",
-    "ko": "USB 연결과 INGLORIOUS ADVANCED를 유지하세요.",
-    "zh-Hans": "请保持 USB 连接并让 INGLORIOUS ADVANCED 保持打开。"
+  "USB angeschlossen und INGLORIOUS Advanced geöffnet lassen.": {
+    "en": "Keep USB connected and INGLORIOUS Advanced open.",
+    "es": "Mantén el USB conectado e INGLORIOUS Advanced abierto.",
+    "fr": "Laisse l’USB branché et INGLORIOUS Advanced ouvert.",
+    "it": "Mantieni l’USB collegato e INGLORIOUS Advanced aperto.",
+    "pt-BR": "Mantenha o USB conectado e o INGLORIOUS Advanced aberto.",
+    "pl": "Pozostaw USB podłączone i INGLORIOUS Advanced otwarte.",
+    "tr": "USB bağlantısını ve INGLORIOUS Advanced uygulamasını açık tutun.",
+    "ru": "Не отключайте USB и не закрывайте INGLORIOUS Advanced.",
+    "ja": "USBを接続したまま、INGLORIOUS Advancedを開いておいてください。",
+    "ko": "USB 연결과 INGLORIOUS Advanced를 유지하세요.",
+    "zh-Hans": "请保持 USB 连接并让 INGLORIOUS Advanced 保持打开。"
   },
   "Ungültiger Pfad im Firmware-Paket.": {
     "en": "Invalid path in the firmware package.",

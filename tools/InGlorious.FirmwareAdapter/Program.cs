@@ -2,6 +2,20 @@ using InGlorious.FirmwareAdapter;
 
 if (args.SequenceEqual(new[] { "--self-test" })) return SelfTests.Run();
 if (args.Length == 3 && args[0] == "--self-test" && args[1] == "--firmware-directory") return SelfTests.Run(args[2]);
+if (args.SequenceEqual(new[] { "--discover" }))
+{
+    try
+    {
+        using var usb = new NativeUsb(inventoryOnly: true);
+        Console.WriteLine(System.Text.Encoding.UTF8.GetString(Json.Bytes(new { schema = 1, operation = "discover", status = "ok", devices = usb.Devices })));
+        return 0;
+    }
+    catch (Exception error)
+    {
+        Console.Error.WriteLine(error.GetType().Name + ": " + error.Message);
+        return 1;
+    }
+}
 if (args.Length != 4 || args[0] != "--request" || args[2] != "--response")
 {
     Console.Error.WriteLine("Usage: InGlorious.FirmwareAdapter --request REQUEST.json --response NEW_RESPONSE.json; --self-test runs offline checks only.");

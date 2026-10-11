@@ -4,9 +4,9 @@ Configure Glorious keyboards with per-key lighting, effects, key assignments, ma
 
 I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
 
-**Windows alpha · App 0.6.40 · Firmware 0.11.0**
+**Source preview · App 0.6.41 · Firmware 0.11.0**
 
-**Source preview:** Public downloads are not available yet. The Windows package is awaiting its final hardware checks.
+Public downloads are not available yet. Release and hardware checks are still in progress.
 
 INGLORIOUS Advanced is an independent project. It is not affiliated with or endorsed by Glorious. Product names identify compatible hardware.
 
@@ -16,12 +16,12 @@ INGLORIOUS Advanced is an independent project. It is not affiliated with or endo
 
 For now, use the [source build instructions](docs/public-release.md). Once downloads are available:
 
-1. Download the Windows x64 package from this repository's Releases page and extract the whole ZIP.
-2. Run **Install.cmd**, then open **INGLORIOUS Advanced** from the Start menu.
+1. Download the installer or package for your operating system from this repository's Releases page.
+2. On Windows, run **INGLORIOUS-Advanced-\<version\>-Setup.exe**. On macOS, extract the package and move **INGLORIOUS Advanced.app** to Applications. On Linux, extract the package and open **application/INGLORIOUS Advanced**; the [setup guide](docs/getting-started.md) explains USB permissions.
 3. Connect a supported keyboard by USB. The app loads an existing INGLORIOUS configuration automatically. For original firmware, open **Settings → Set up device** and follow the guide.
 4. Make your changes and select **Send to keyboard** at the bottom.
 
-The installer includes the runtime; you do not need to install .NET separately. Firmware installation is a separate, explicitly confirmed step. Keep the cable connected and INGLORIOUS Advanced open while firmware is being written.
+The packages include the runtime and the matching firmware for all supported models; you do not need to install .NET separately or download firmware files. Firmware installation is a separate, explicitly confirmed step. Keep the cable connected and INGLORIOUS Advanced open while firmware is being written.
 
 Read the [setup and recovery guide](docs/getting-started.md). The **?** button opens offline help in your selected language.
 
@@ -53,7 +53,7 @@ Both screenshots show the Windows editor with offline demo data. They do not dem
 - Adjustable USB polling rate and debounce time.
 - Standby lighting and an optional INGLORIOUS screensaver.
 - Numpad slider: disabled, lighting brightness, relative volume or MIDI control.
-- Guided firmware setup, update and original-firmware recovery on Windows.
+- Guided firmware setup, update and original-firmware recovery on Windows, macOS and Linux.
 
 Ordinary configuration changes do not require a firmware update. Shared dimming between devices is optional and needs the app running. The Numpad's own dimmer works without the app. Lighting colors are previews, not calibrated measurements of the LEDs.
 
@@ -80,10 +80,10 @@ Use the firmware for your exact model, layout and hardware revision. For GMMK 3 
 | Platform | Availability |
 | --- | --- |
 | Windows x64 | Main WPF app, configuration and guided firmware management |
-| macOS | Avalonia source/build preview; native device and recovery tests pending |
-| Linux | Avalonia source/build preview; native device and recovery tests pending |
+| macOS, Intel and Apple Silicon | Avalonia app with configuration and guided firmware management; native validation pending |
+| Linux x64 | Avalonia app with configuration and guided firmware management; native validation pending |
 
-Firmware installation is currently Windows-only. macOS and Linux previews are not production releases. Windows packages are currently unsigned.
+Native package and hardware checks for macOS and Linux are still pending. Windows packages are unsigned; macOS packages use ad-hoc signing and are not Apple notarized.
 
 ## Build and contribute
 

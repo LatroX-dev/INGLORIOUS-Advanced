@@ -64,7 +64,7 @@ public sealed partial class MainWindow : Window
         _animation.Tick += (_, _) => Animate(); _animation.Start();
         Closing += OnClosing; Closed += (_, _) => { _startupWindowClosed = true; _startupCancellation?.Cancel(); _animation.Stop(); StopConnections(); SaveWindowPreferences(); };
         KeyDown += OnKeyDown;
-        Opened += async (_, _) => { await OnOpened(); await StartConnectionsAsync(); };
+        Opened += (_, _) => InitializeWindowOnce();
     }
     private EditorState OpenSession(string id, bool allowLocalProfile = true)
     {
@@ -253,17 +253,17 @@ public sealed partial class MainWindow : Window
         {
             var cap = new Grid();
             var legendScale = Width < 1280 ? 1.4 : 1;
-            var displayLabel = key.Label == "Knob" ? L.T("Knopf") : key.Label;
-            var label = Text(displayLabel, size: (displayLabel.Length > 3 ? 11 : 14) * legendScale);
+            var displayLabel = key.DisplayLabel;
+            var label = Text(displayLabel, size: key.Label == "Knob" ? (displayLabel.Length > 8 ? 8 : 9) : (displayLabel.Length > 3 ? 11 : 14) * legendScale);
             label.TextWrapping = TextWrapping.NoWrap;
-            cap.Children.Add(key.IsEncoder ? (Control)ButtonContent(key.Label) : label);
+            cap.Children.Add(key.IsEncoder ? (Control)ButtonContent(key.Label) : key.Label == "Knob" ? new Viewbox { Child = label, Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, VerticalAlignment = VerticalAlignment.Center } : label);
             if (key.LedIndex is { } led)
             {
                 var light = new Border { Height = 3, Background = Brush(_state.ColorAt(led)), VerticalAlignment = VerticalAlignment.Bottom };
                 cap.Children.Add(light); _ledViews[led] = light;
             }
             var chosen = showSelection && _state.Surface == "keys" && _state.SelectedKeys.Contains(key.Id);
-            var button = new Button { Content = cap, Width = (key.W + (key.IsIsoEnter ? .25 : 0)) * unit - 4, Height = key.H * unit - 4, Padding = new Thickness(4), Background = Brush("#252A2F"), BorderBrush = Brush(chosen ? "#EF646B" : "#424950"), BorderThickness = new Thickness(chosen ? 2 : 1), FontSize = 11 };
+            var button = new Button { Content = cap, Width = (key.W + (key.IsIsoEnter ? .25 : 0)) * unit - 4, Height = key.H * unit - 4, Padding = new Thickness(key.IsEncoder ? 0 : 4), Background = Brush("#252A2F"), BorderBrush = Brush(chosen ? "#EF646B" : "#424950"), BorderThickness = new Thickness(chosen ? 2 : 1), FontSize = 11 };
             if (key.Label == "Knob") { button.CornerRadius = new CornerRadius(99); label.VerticalAlignment = VerticalAlignment.Center; label.HorizontalAlignment = HorizontalAlignment.Center; }
             if (key.IsIsoEnter)
             {
@@ -276,7 +276,8 @@ public sealed partial class MainWindow : Window
             var multiple = false;
             button.PointerPressed += (_, e) => multiple = (e.KeyModifiers & (KeyModifiers.Shift | KeyModifiers.Control)) != 0;
             button.Click += async (_, _) => { if (!await GuardNavigation()) return; _state.SelectKey(key.Id, multiple); SimulateKey(key); _globalEffect = false; _editingSlider = false; Build(); };
-            ToolTip.SetTip(button, key.Label + " · " + BindingCatalog.FunctionLabel(_state.Layer.Keys[key.Id].Binding));
+            ToolTip.SetTip(button, key.AccessibleLabel + " · " + BindingCatalog.FunctionLabel(_state.Layer.Keys[key.Id].Binding));
+            Avalonia.Automation.AutomationProperties.SetName(button, key.AccessibleLabel);
             Canvas.SetLeft(button, edge + (key.X - (key.IsIsoEnter ? .25 : 0)) * unit); Canvas.SetTop(button, topInset + key.Y * unit); _keyboard.Children.Add(button); _keyButtons[key.Id] = button;
         }
         foreach (var (indices, x) in new[] { (_state.Device.LeftSideLedIndices, 0d), (_state.Device.RightSideLedIndices, _keyboard.Width - 17) })
@@ -339,7 +340,7 @@ public sealed partial class MainWindow : Window
     }
     private void Animate()
     {
-        if (_scene is null || !_previewRunning || _page != "Beleuchtung") return;
+        if (!IsVisible || WindowState == WindowState.Minimized || _scene is null || !_previewRunning || _page != "Beleuchtung") return;
         RenderLightingPreviewFrame((uint)_clock.ElapsedMilliseconds);
     }
     private void RenderLightingPreviewFrame(uint time)

@@ -103,7 +103,7 @@ public partial class MainWindow
     private void StartSharedBrightnessIfReady()
     {
         if (_startupComplete && !_startupFinishing && !_startupClosed && !_readingDevice && !_checkingFirmwareGuide
-            && !_screenshotMode && IsVisible && _preferences.SharedBrightness)
+            && !_screenshotMode && (IsVisible || _backgroundSession) && _preferences.SharedBrightness)
             _sharedBrightness.Start();
     }
 }

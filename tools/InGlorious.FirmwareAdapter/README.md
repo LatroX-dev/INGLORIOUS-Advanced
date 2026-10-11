@@ -1,4 +1,4 @@
-# Generic firmware adapter (Windows x64)
+# Generic firmware adapter
 
 This adapter is independent of the original device-bound updater wrappers. It contains no
 user serial number, private port, original-image hash or private binding file. It uses the
@@ -11,6 +11,7 @@ No operation runs on launch or from help. The executable accepts only:
 ```
 InGlorious.FirmwareAdapter --request REQUEST.json --response NEW_RESPONSE.json
 InGlorious.FirmwareAdapter --self-test
+InGlorious.FirmwareAdapter --discover
 ```
 
 `--self-test` uses emulated transports and temporary files only. It neither loads libusb nor
@@ -18,6 +19,11 @@ runs dfu-util. Request/response use UTF-8 JSON with exact camelCase property nam
 request, selection, bundle and capture-manifest properties are rejected. An operation failure,
 missing response or nonzero exit must never be interpreted as successful flashing. `errorCode`
 and the diagnostic files are technical evidence, not UI text.
+
+`--discover` returns USB descriptors, bus, address and full port chains without opening or
+claiming a device. The macOS and Linux coordinator uses this inventory for the observed
+normal-device → disconnect → bootloader transition. Discovery is not proof of read/write
+permission; a separate selected-device probe must succeed before capture becomes available.
 
 ## Request contract, schema 1
 
@@ -156,8 +162,24 @@ the installed `Firmware` folder or this repository's reviewed candidate output. 
 only these local files, fake transports and disposable temporary directories.
 
 The tool has no third-party NuGet dependency. Copy its apphost, DLL, deps/runtimeconfig files
-and `native/` together under `Tools/FirmwareAdapter/`, or publish self-contained for win-x64.
-Its native assets are copied from the already verified official dfu-util archive. The DLL and
-EXE hashes are enforced in code before loading/execution. Keep upstream licenses with any
-distributed package. None of the synthetic checks demonstrates physical acceptance of the
+and `native/` together under `Tools/FirmwareAdapter/`, or publish self-contained for the target runtime.
+Windows native assets come from the verified official dfu-util archive. Linux x64 and macOS
+x64/arm64 packages build libusb and dfu-util from pinned official source archives. The adapter
+embeds a `NativeToolCatalog.json` for its exact runtime, with the byte size and SHA-256 of both
+native files; a missing, changed or wrong-runtime catalog blocks native access. Tools are loaded
+only from the package's `native` directory, never from PATH or a system-installed fallback.
+Keep upstream licenses with any distributed package. None of the synthetic checks demonstrates physical acceptance of the
 thirteen experimental board models.
+
+The portable coordinator also pins the complete adapter package before each invocation.
+Linux HID runtime identity follows the exact HidSharp sysfs path to its USB parent. macOS
+identity follows the exact HidSharp IOKit service to its USB ancestors, using the same
+`PortNum`/`port` hierarchy and `locationID` bus namespace as libusb's Darwin backend.
+Missing port identity, inaccessible interfaces and ambiguous devices stop the operation.
+No automatic privilege escalation, kernel-driver detachment or protection unlock is used.
+
+USB namespace references:
+[libusb device handling](https://libusb.sourceforge.io/api-1.0/group__libusb__dev.html),
+[libusb Darwin backend](https://github.com/libusb/libusb/blob/v1.0.29/libusb/os/darwin_usb.c),
+[HidSharp macOS device paths](https://github.com/IntergatedCircuits/HidSharp/blob/master/HidSharp/Platform/MacOS/MacHidDevice.cs),
+[HidSharp Linux device paths](https://github.com/IntergatedCircuits/HidSharp/blob/master/HidSharp/Platform/Linux/LinuxHidDevice.cs).

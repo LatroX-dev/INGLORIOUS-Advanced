@@ -8,6 +8,10 @@
         "resolved": "2.6.4",
         "contentHash": "UcGvtnXFcatwHBXr+ei8GEXvg//wjGmDGQ6Xvb+7M4vHjURAhSLIJ+dSZv0BnAhQEpNlH8G4P7JxYnMH8Aph4g=="
       }
-    }
+    },
+    "net9.0/linux-x64": {},
+    "net9.0/osx-arm64": {},
+    "net9.0/osx-x64": {},
+    "net9.0/win-x64": {}
   }
 }

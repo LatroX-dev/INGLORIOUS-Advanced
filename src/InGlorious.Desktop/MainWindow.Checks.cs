@@ -1,4 +1,4 @@
-using InGlorious.Core;
+﻿using InGlorious.Core;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
@@ -16,10 +16,15 @@ public sealed partial class MainWindow
         var count = 0;
         void Check(bool condition, string name) { count++; if (!condition) throw new InvalidOperationException("Check failed: " + name); }
         void Reject(Action action, string name) { var rejected = false; try { action(); } catch (InvalidDataException) { rejected = true; } Check(rejected, name); }
-        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.40", "visible product assembly metadata uses INGLORIOUS 0.6.40");
+        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.41", "visible product assembly metadata uses INGLORIOUS 0.6.41");
         await RunConnectionsChecksAsync(Check);
         RunExperimentalLabelsChecks(Check);
         RunLanguagePreferenceChecks(Check);
+        AppAutostartEditor.RunOfflineChecks(Check);
+        var settingsPreview = CreateSettingsWindow(_preferences, offlinePreview: true);
+        var startupPreview = settingsPreview.GetLogicalDescendants().OfType<CheckBox>().Single(control => control.Name == "AutostartCheck");
+        Check(startupPreview.IsChecked == false && !startupPreview.IsEnabled && !settingsPreview.GetLogicalDescendants().OfType<Button>().Single(control => control.Name == "SaveSettings").IsEnabled,
+            "Settings: offline startup switch is neutral and cannot modify the system");
         RunStartupSessionChecks(Check);
         RunHelpChecks(Check);
         Check(ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark, "window inherits dark application theme");
@@ -202,9 +207,9 @@ public sealed partial class MainWindow
         RunLightingPreviewChecks(Check);
         RunStandbyEditorChecks(Check);
         _state = new EditorState("pro-iso");
-        var guide = CreateFirmwareGuide("INGLORIOUS erkannt · Aktualisierung erforderlich");
-        Check(guide.Title == L.T("Firmware") + " · " + FirmwareRelease.DisplayVersion, "portable guide uses central target release");
-        Check(guide.GetLogicalDescendants().OfType<Button>().Count() == 1 && guide.GetLogicalDescendants().OfType<Button>().Single().IsCancel, "portable firmware guide only offers close and performs no scan or flash");
+        foreach (var operation in Enum.GetValues<SetupOperation>())
+            new DeviceSetupWindow("gmmk3-75-iso", operation, offlinePreview: true).RunOfflineChecks(Check);
+        RunSetupRoutingChecks(Check);
         var versionPanel = BuildFirmwareVersionPanel();
         Check(versionPanel.GetLogicalDescendants().OfType<TextBlock>().Single(x => x.Name == "FirmwareVersionStatus").Text == L.T("Version noch nicht geprüft")
             && versionPanel.GetLogicalDescendants().OfType<Button>().Any(x => x.Name == "ReadFirmwareVersion"), "opening version panel neither queries hardware nor invents an installed version");
@@ -223,8 +228,7 @@ public sealed partial class MainWindow
                 ApplyConnectionSnapshot([device.Id]);
                 Check(_root!.GetLogicalDescendants().OfType<Button>().Where(b => b.Name is "ReadDeviceButton" or "TransferButton").All(b => b.IsEnabled), "connected candidate can read and transfer its own configuration");
                 Check(BuildFirmwareVersionPanel().GetLogicalDescendants().OfType<Button>().Any(b => b.Name == "ReadFirmwareVersion"), "candidate has a real runtime version query action");
-                var candidateGuide = CreateFirmwareGuide("Firmware ist aktuell");
-                Check(candidateGuide.GetLogicalDescendants().OfType<Button>().Count() == 1 && candidateGuide.GetLogicalDescendants().OfType<TextBlock>().Any(t => t.Text == L.T("Firmware-Installation und Originalwiederherstellung sind in dieser plattformübergreifenden Ausgabe noch nicht verfügbar.")), "candidate guide explains platform limitation and offers no installation or restore path");
+                Check(BuildDeviceWorkspace().GetLogicalDescendants().OfType<Button>().Any(b => Equals(b.Content, L.T("Gerät einrichten"))), "experimental devices retain first installation");
                 ApplyConnectionSnapshot([]);
                 continue;
             }
@@ -233,12 +237,55 @@ public sealed partial class MainWindow
             Check(noteText.Contains("New lighting test after firmware updates.") && noteText.Contains("Optional screensaver."), "release notes stay brief for supported hardware " + device.Id);
             ShowFirmwareChangelog(notesPanel, device.Id, null);
             Check(!notesPanel.IsVisible && notesPanel.Children.Count == 0, "unknown refreshed version clears prior release notes");
-            ShowFirmwareChangelog(notesPanel, device.Id, FirmwareRelease.CurrentVersion);
+            FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var targetRelease);
+            ShowFirmwareChangelog(notesPanel, device.Id, targetRelease);
             Check(!notesPanel.IsVisible, "current firmware shows no pending changes");
         }
         _state = OpenSession(Program.Arguments.Contains("--numpad") ? "numpad" : "pro-iso"); _page = "Beleuchtung"; _showEffects = false; Build();
         return $"PASS {count} offline desktop checks; no device discovery, HID, process, or user-data writes.\n";
     }
+    private void RunSetupRoutingChecks(Action<bool, string> check)
+    {
+        FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var target);
+        var savedState = _state;
+        foreach (var board in BoardDescriptorRegistry.All)
+        {
+            var id = board.DeviceId;
+            var info = new OnboardInfo(id, 249, 128, 1, 0, 0, 3);
+            var report = new OnboardFirmwareVersion(id, target, 1);
+            check(ClassifySetupFirmware(id, info, report) == SetupRuntimeState.Current, "Setup routing: validated current target " + id);
+            check(ClassifySetupFirmware(id, info, report with { Version = new(0, 0, 1) }) == SetupRuntimeState.UpdateAvailable, "Setup routing: actual older version enables update " + id);
+            check(ClassifySetupFirmware(id, info, report with { Version = new(ushort.MaxValue, 0, 0) }) == SetupRuntimeState.Newer, "Setup routing: newer version never offers downgrade " + id);
+            check(ClassifySetupFirmware(id, info, null) == SetupRuntimeState.Unknown && ClassifySetupFirmware(id, null, report) == SetupRuntimeState.Unknown &&
+                ClassifySetupFirmware(id, info, report with { BuildId = 0 }) == SetupRuntimeState.Unknown &&
+                ClassifySetupFirmware(id, info, report with { DeviceId = "foreign-device" }) == SetupRuntimeState.Unknown &&
+                ClassifySetupFirmware(id, info with { Flags = 0 }, report) == SetupRuntimeState.Unknown &&
+                ClassifySetupFirmware(id, info with { Flags = 253 }, report) == SetupRuntimeState.Unknown &&
+                ClassifySetupFirmware(id, info with { StagingBytes = 1 }, report) == SetupRuntimeState.Unknown,
+                "Setup routing: incomplete, mismatched, nonpersistent or staged reports never enable update " + id);
+            _state = new EditorState(id);
+            foreach (var state in Enum.GetValues<SetupRuntimeState>())
+            {
+                _firmwareAssessments[id] = new(state, state == SetupRuntimeState.Unknown ? null : report);
+                var panel = BuildFirmwareVersionPanel();
+                check(panel.GetLogicalDescendants().OfType<Button>().Single(button => button.Name == "UpdateFirmware").IsVisible == (state == SetupRuntimeState.UpdateAvailable),
+                    "Setup routing: update action follows the verified assessment " + id + "/" + state);
+            }
+            _firmwareAssessments.Remove(id);
+        }
+        _state = savedState;
+        var settings = BuildSetupSettingsSection(this, new TextBlock());
+        var names = settings.GetLogicalDescendants().OfType<Button>().Select(button => button.Name).ToArray();
+        check(names.Contains("SetupFromSettings") && names.Contains("RestoreFromSettings") && names.Contains("OpenRecoveryFolder"), "Setup settings: first installation, restore and recovery folder are accessible");
+        byte[] command = [(byte)'I', (byte)'G', 1, OnboardProtocol.LightingTest, 0, 0, 1, 0, .. new byte[24]];
+        bool Valid(byte[] bytes) { try { OnboardHidTransport.ValidateOutbound(bytes); return true; } catch (InvalidDataException) { return false; } }
+        foreach (byte action in new byte[] { 0, 1, 2 }) { command[8] = action; check(Valid(command), "Setup lighting: defined RAW12 action accepted " + action); }
+        command[8] = 3; check(!Valid(command), "Setup lighting: unknown RAW12 action rejected");
+        command[8] = 0; command[6] = 0; check(!Valid(command), "Setup lighting: missing RAW12 action rejected");
+        command[6] = 2; check(!Valid(command), "Setup lighting: oversized RAW12 payload rejected");
+        command[6] = 1; command[31] = 1; check(!Valid(command), "Setup lighting: reserved RAW12 data rejected");
+    }
+
     private void RunExperimentalLabelsChecks(Action<bool, string> check)
     {
         var original = _state; var page = _page; var connected = _connectedDeviceIds.ToArray(); var failed = _connectionsFailed;
@@ -259,8 +306,9 @@ public sealed partial class MainWindow
                 check(buttonLabels.Length == (device.IsExperimentalFirmware ? 1 : 0), "only experimental connected buttons receive a label");
                 check(labels.Count(label => label.Name == "ExperimentalHeaderBadge") == (device.IsExperimentalFirmware ? 1 : 0), "active header distinguishes experimental from stable models");
                 check(labels.Count(label => label.Name == "ExperimentalDeviceNotice") == (device.IsExperimentalFirmware ? 1 : 0), "device page explains missing model hardware testing only where relevant");
-                check(labels.Any(label => label.Text == L.T("Firmware-Installation und Originalwiederherstellung sind in dieser plattformübergreifenden Ausgabe noch nicht verfügbar.")),
-                    "every device page describes the portable platform limitation rather than model availability");
+                check(_root.GetLogicalDescendants().OfType<Button>().Any(button => Equals(button.Content, L.T("Gerät einrichten"))) &&
+                    _root.GetLogicalDescendants().OfType<Button>().Any(button => Equals(button.Content, L.T("Original-Firmware wiederherstellen"))),
+                    "every device page exposes installation and original restore");
                 check(_readDeviceButton!.IsEnabled && _transferButton!.IsEnabled && button.IsEnabled && device.SupportsOnboardConfiguration,
                     "experimental label does not add opt-in or disable connected runtime configuration");
                 check(OnboardSerializer.Prepare(_state.Project).Payload.Length > 0 && !_state.Dirty && EditorState.Fingerprint(_state.Project) == before,

@@ -16,9 +16,10 @@ internal static class SelfTests
         {
             NativeUsb.ValidateNativeLayouts(); checks++;
             var native = NativeUsb.VerifyBundledLibrary();
-            Check(native.Sha256 == NativeUsb.DllSha256, "native dependency pin without loading");
-            string dfu = Path.Combine(AppContext.BaseDirectory, "native", "dfu-util-static.exe");
-            using (Files.Lock(dfu, new FileInfo(dfu).Length, Stm32Device.ToolHash).Stream) checks++;
+            Check(native.Bytes > 0 && native.Sha256.Length == 64, "native dependency pin without loading");
+            var dfu = NativeToolCatalog.Verify(NativeToolCatalog.DfuName);
+            using (Files.Lock(dfu.Path, dfu.Bytes, dfu.Sha256).Stream) checks++;
+            NativeCatalogChecks();
             PacketChecks(); PageWriteChecks(); FileChecks(root); RequestChecks(root); StmChecks();
             string[] ids = ["pro-iso", "numpad", "pro-ansi", "pro-rev2-ansi", "pro-rev2-iso", "gmmk2-65-ansi", "gmmk2-65-iso", "gmmk2-96-ansi", "gmmk2-96-iso", "gmmk3-65-ansi", "gmmk3-65-iso", "gmmk3-75-ansi", "gmmk3-75-iso", "gmmk3-100-ansi", "gmmk3-100-iso"];
             foreach (string id in ids) EngineChecks(root, id);
@@ -35,6 +36,20 @@ internal static class SelfTests
     }
     private static void Check(bool condition, string label) { checks++; if (!condition) throw new Exception("Check failed: " + label); }
     private static void Reject(Action action, string label) { bool rejected = false; try { action(); } catch { rejected = true; } Check(rejected, label); }
+    private static void NativeCatalogChecks()
+    {
+        foreach (string rid in new[] { "win-x64", "linux-x64", "osx-x64", "osx-arm64" })
+        {
+            var names = rid == "win-x64" ? new[] { "libusb-1.0.dll", "dfu-util-static.exe" } : new[] { rid.StartsWith("osx") ? "libusb-1.0.dylib" : "libusb-1.0.so.0", "dfu-util" };
+            var records = names.Select(name => new { path = name, bytes = 123, sha256 = new string('A', 64) }).ToArray();
+            using var document = System.Text.Json.JsonDocument.Parse(Json.Bytes(new { schema = 1, runtimeIdentifier = rid, files = records }));
+            NativeToolCatalog.Validate(document.RootElement, rid, names[0], 123, new string('A', 64)); checks++;
+            Reject(() => NativeToolCatalog.Validate(document.RootElement, rid, names[0], 124, new string('A', 64)), "native tool length mismatch");
+            Reject(() => NativeToolCatalog.Validate(document.RootElement, rid, names[0], 123, new string('B', 64)), "native tool digest mismatch");
+            Reject(() => NativeToolCatalog.Validate(document.RootElement, rid + "-wrong", names[0], 123, new string('A', 64)), "native RID mismatch");
+            Reject(() => NativeToolCatalog.Validate(document.RootElement, rid, "../dfu-util", 123, new string('A', 64)), "native path injection");
+        }
+    }
     private static void PacketChecks()
     {
         var info = new Echo(); var data = WbProtocol.GetInfo(info);

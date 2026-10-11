@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>InGlorious.SetupChecks</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/InGlorious.Desktop/Shared/InGlorious.Shared.csproj" />
+    <Compile Include="../InGlorious.SetupChecks/Program.cs" Link="Program.cs" />
+    <Compile Include="../InGlorious.SetupChecks/IdentityChecks.cs" Link="IdentityChecks.cs" />
+    <Compile Include="../InGlorious.SetupChecks/StockFirmwareChecks.cs" Link="StockFirmwareChecks.cs" />
+    <Compile Include="../InGlorious.SetupChecks/CoordinatorChecks.cs" Link="CoordinatorChecks.cs" />
+    <Compile Include="../InGlorious.SetupChecks/PortableUsbChecks.cs" Link="PortableUsbChecks.cs" />
+  </ItemGroup>
+</Project>

@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Security.Cryptography;
 using System.Text.Json;
 
@@ -109,7 +109,7 @@ public sealed partial class DeviceSetupService
             await CheckBoundBootloader(session);
             session.Consumed = true; // No automatic or duplicate retry, including uncertain outcomes.
             session.OutcomeUncertain = true;
-            log?.Report(L.T("USB angeschlossen und INGLORIOUS ADVANCED geöffnet lassen."));
+            log?.Report(L.T("USB angeschlossen und INGLORIOUS Advanced geöffnet lassen."));
             var adapterOperation = operation switch { SetupOperation.Install => "install", SetupOperation.Restore => "restore", _ => "update" };
             var response = await Adapter(session, adapterOperation, confirmWrite: true);
             ValidateAdapterIdentity(response, session, adapterOperation);
@@ -170,7 +170,7 @@ public sealed partial class DeviceSetupService
         await AssertCoreClosed();
         var boot = (await _environment.ScanAsync()).Where(IsBootloader).ToArray();
         if (boot.Length != 1 || session.Bootloader is null || boot[0].InstanceId != session.Bootloader.InstanceId ||
-            !SamePort(boot[0].LocationPaths, session.Device.LocationPaths) || !string.Equals(boot[0].Service, "WinUSB", StringComparison.OrdinalIgnoreCase))
+            !SamePort(boot[0].LocationPaths, session.Device.LocationPaths) || !HasUsableUsbTransport(boot[0]))
             throw Error("Die USB-Verbindung hat sich geändert. Starte die Einrichtung erneut.");
     }
 
@@ -272,7 +272,7 @@ public sealed partial class DeviceSetupService
     private static string RequiredEvidenceDirectory(JsonElement response, string root)
     {
         var path = Path.GetFullPath(response.GetProperty("evidenceDirectory").GetString()!);
-        if (!path.StartsWith(Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        if (!path.StartsWith(Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
             throw Error("Der Prüfbericht liegt außerhalb des Sicherungsordners.");
         AssertNoLinks(path); return path;
     }
@@ -280,7 +280,7 @@ public sealed partial class DeviceSetupService
     {
         var fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         var path = Path.GetFullPath(Path.Combine(fullRoot, relative));
-        if (Path.IsPathRooted(relative) || relative.Contains(':') || !path.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+        if (Path.IsPathRooted(relative) || relative.Contains(':') || !path.StartsWith(fullRoot, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
             throw Error("Ungültiger Pfad im Firmware-Paket.");
         AssertNoLinks(path); return path;
     }

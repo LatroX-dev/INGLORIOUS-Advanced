@@ -6,7 +6,7 @@ This document is for maintainers. The [getting-started guide](getting-started.md
 
 The public repository contains reviewed source, public reference definitions, documentation and licenses. It does not contain original firmware, personal profiles, device bindings, captures, local update scripts, toolchains or built binaries. Use the source export to produce that tree from a development workspace; do not push a development workspace wholesale.
 
-Requirements: Windows x64 for the main package, PowerShell 7.2+, Git, Python 3, `tar` and the exact .NET SDK in `global.json`. Reserve several gigabytes of free disk space. The first full build downloads about 600 MB for QMK MSYS, plus other dependencies; extracting the toolchain and building all firmware variants takes time. Native firmware dependencies are pinned in `scripts/build-dependencies.json`; source archive pins are in `reference/source-distribution.json`.
+Requirements: PowerShell 7.2+, Git, Python 3, `tar` and the exact .NET SDK in `global.json`. Build each desktop package on its matching operating system and architecture. The full firmware build currently runs on Windows x64; its reviewed output is shared by all app platforms. Reserve several gigabytes of free disk space. The first full build downloads about 600 MB for QMK MSYS, plus other dependencies; extracting the toolchain and building all firmware variants takes time. Windows dependencies are pinned in `scripts/build-dependencies.json`, native Linux/macOS sources in `scripts/posix-native-dependencies.json`, and corresponding source archives in `reference/source-distribution.json`.
 
 ```powershell
 pwsh -NoProfile -File scripts/Build-PublicRelease.ps1 -Mode SourceChecks -OutputDirectory artifacts/source-checks
@@ -18,6 +18,8 @@ Use new output directories. The full Windows build obtains the pinned dependenci
 `Initialize-BuildDependencies.ps1 -Scope Native`, `-Scope Firmware` or `-Scope All` can prepare dependencies separately. Public builds do not require a private device, original backup or machine-specific path. Configuration files and generated tool catalogs belong to the build output.
 
 The application uses the firmware included in its app package. GitHub release creation does not make an online app updater; runtime firmware version filtering remains local to the included catalog.
+
+The Windows build produces `INGLORIOUS-Advanced-<version>-Setup.exe` with the pinned Inno Setup compiler. It installs for the current user, adds a Start menu entry and registers the uninstaller in Windows Settings. The installer checks for a running app or firmware operation before replacing files. Test installation, upgrades, default background startup and both data-retention choices with `scripts/Test-NativeWindowsInstaller.ps1`. Its test build uses a separate application identity and synthetic data directory. The intermediate Windows ZIP is for build verification, not an end-user download.
 
 ## Source export
 
@@ -34,7 +36,7 @@ The exporter uses an exact reviewed allowlist, checks content for private local 
 pwsh -NoProfile -File scripts/New-CorrespondingSource.ps1 `
   -PublicSourceDirectory <reviewed-public-folder> `
   -QmkDirectory firmware/qmk_firmware `
-  -Destination artifacts/corresponding-source `
+  -Destination artifacts/INGLORIOUS-Advanced-0.6.41-Source `
   -Download
 ```
 
@@ -42,11 +44,26 @@ The source package combines the reviewed export with exact upstream source archi
 
 Keep this source package downloadable beside the matching app package. A link to a changing upstream branch is not a replacement for the matching sources. Inspect the final firmware catalog, native binary pins and source versions together.
 
-## Platform previews
+## Native macOS and Linux packages
 
-The Avalonia project can be built from source on Windows, macOS and Linux. Preview packages are separate from the main Windows WPF app. They do not install or restore firmware. Building or taking screenshots on another host does not demonstrate native USB behavior on the target operating system.
+The Avalonia app includes the same first-installation, backup, update and original-firmware restoration workflow as the Windows WPF app. Its adapter and native USB dependencies are built for Linux x64, macOS Intel or macOS Apple silicon. The package contains the reviewed firmware images, tools and license notices; no separate developer tool installation is required to use its firmware guide.
 
-`Licenses/Desktop-ThirdParty.txt` preserves the locked preview dependencies' license texts and notices. `reference/desktop-license-inventory.json` records their versions and provenance. After a deliberate dependency change, restore the locked packages, run `Collect-DesktopLicenses.ps1`, review the changes and rebuild the preview package. Runtime licenses must be retained in self-contained output.
+On Linux, install the build tools `build-essential`, `pkg-config`, `patchelf` and `xvfb` in addition to the common prerequisites. On macOS, install Xcode Command Line Tools. Run this on the matching host, using the 15 binaries produced by the reviewed firmware build:
+
+```powershell
+pwsh -NoProfile -File scripts/Build-DesktopRelease.ps1 `
+  -Runtime linux-x64 `
+  -FirmwareDirectory <reviewed-firmware-folder> `
+  -OutputDirectory artifacts/linux-release
+```
+
+Use `osx-x64` or `osx-arm64` on the corresponding Mac. The script rejects a mismatched host architecture or firmware catalog. It builds pinned libusb 1.0.29 and dfu-util 0.11 sources, generates a native-tool catalog, publishes the adapter, prepares the setup assets and runs offline checks before packaging. All builds and tests in this script avoid device I/O.
+
+Packages are named `INGLORIOUS-Advanced-0.6.41-<runtime>.tar.gz` and have matching SHA-256 files. macOS packages contain `INGLORIOUS Advanced.app`; Linux packages contain `application/INGLORIOUS Advanced` plus a USB-permission helper. macOS builds use ad-hoc signatures and are not notarized. Sign native tools before generating their catalog and the adapter before generating the setup-tool catalog; do not recursively re-sign pinned files afterward.
+
+`Licenses/Desktop-ThirdParty.txt` preserves the locked desktop dependencies' license texts and notices. `reference/desktop-license-inventory.json` records their versions and provenance. After a deliberate dependency change, restore the locked packages, run `Collect-DesktopLicenses.ps1`, review the changes and rebuild the package. Runtime licenses must be retained in self-contained output.
+
+The native package pipeline and its physical USB workflows still require validation. A cross-published executable, screenshot or simulated test does not establish behavior on the target operating system. Record native build results separately from [physical acceptance](hardware-acceptance.md).
 
 ## Publishing checklist
 
@@ -54,8 +71,8 @@ The Avalonia project can be built from source on Windows, macOS and Linux. Previ
 2. Run offline verification and package tests. Keep their results outside the normal user interface.
 3. Complete and record the [hardware acceptance run](hardware-acceptance.md). Additional variants remain marked experimental until individually tested.
 4. Create a version tag and a **prerelease**, with short English notes from `CHANGELOG.md`. Do not claim unperformed hardware or native-platform tests.
-5. Attach the Windows ZIP, matching source ZIP and checksums. Attach macOS/Linux packages only as clearly identified previews with their license files.
+5. Attach `INGLORIOUS-Advanced-<version>-Setup.exe`, validated native macOS/Linux archives, `INGLORIOUS-Advanced-<version>-Source.zip` and their checksums. Do not attach the internal Windows verification ZIP. State the tested platforms and remaining hardware limitations in the release notes.
 6. Enable private vulnerability reporting and keep issue templates available.
 7. Download the release assets again and check their hashes before announcing the release.
 
-CI builds and tests are configured separately in `.github/workflows`. Draft release creation must not be described as a public release. The current Windows build is unsigned: checksum verification detects altered files but does not authenticate a publisher.
+CI builds and tests are configured separately in `.github/workflows`. Native app jobs consume only the reviewed firmware outputs from the Windows build. Draft release creation must not be described as a public release. Windows builds are unsigned and macOS builds are not notarized: checksum verification detects altered files but does not authenticate a publisher.

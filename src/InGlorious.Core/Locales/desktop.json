@@ -1,4 +1,26 @@
 {
+  "Nach links drehen": {
+    "en": "Turn left", "es": "Girar a la izquierda", "fr": "Tourner à gauche", "it": "Ruota a sinistra", "pt-BR": "Girar para a esquerda", "pl": "Obróć w lewo", "tr": "Sola çevir", "ru": "Повернуть влево", "ja": "左に回す", "ko": "왼쪽으로 돌리기", "zh-Hans": "向左旋转"
+  },
+  "Nach rechts drehen": {
+    "en": "Turn right", "es": "Girar a la derecha", "fr": "Tourner à droite", "it": "Ruota a destra", "pt-BR": "Girar para a direita", "pl": "Obróć w prawo", "tr": "Sağa çevir", "ru": "Повернуть вправо", "ja": "右に回す", "ko": "오른쪽으로 돌리기", "zh-Hans": "向右旋转"
+  },
+  "Drehregler drücken": {
+    "en": "Press the knob", "es": "Pulsar el mando", "fr": "Appuyer sur la molette", "it": "Premi la manopola", "pt-BR": "Pressionar o botão giratório", "pl": "Naciśnij pokrętło", "tr": "Döner düğmeye bas", "ru": "Нажать на ручку", "ja": "ノブを押す", "ko": "노브 누르기", "zh-Hans": "按下旋钮"
+  },
+  "Der USB-Zugriff ist nicht freigegeben. Prüfe die USB-Berechtigungen für INGLORIOUS Advanced.": {
+    "en": "USB access is not allowed. Check the USB permissions for INGLORIOUS Advanced.",
+    "es": "El acceso USB no está permitido. Comprueba los permisos USB de INGLORIOUS Advanced.",
+    "fr": "L’accès USB n’est pas autorisé. Vérifiez les autorisations USB d’INGLORIOUS Advanced.",
+    "it": "L’accesso USB non è consentito. Controlla le autorizzazioni USB per INGLORIOUS Advanced.",
+    "pt-BR": "O acesso USB não está permitido. Verifique as permissões USB do INGLORIOUS Advanced.",
+    "pl": "Brak dostępu do USB. Sprawdź uprawnienia USB dla INGLORIOUS Advanced.",
+    "tr": "USB erişimine izin verilmiyor. INGLORIOUS Advanced için USB izinlerini kontrol edin.",
+    "ru": "Доступ к USB запрещён. Проверьте разрешения USB для INGLORIOUS Advanced.",
+    "ja": "USBへのアクセスが許可されていません。INGLORIOUS AdvancedのUSBアクセス権限を確認してください。",
+    "ko": "USB 접근이 허용되지 않았습니다. INGLORIOUS Advanced의 USB 접근 권한을 확인하세요.",
+    "zh-Hans": "USB访问未获授权。请检查INGLORIOUS Advanced的USB权限。"
+  },
   "Aktuelles Makro speichern": {
     "en": "Save current macro",
     "es": "Guardar macro actual",

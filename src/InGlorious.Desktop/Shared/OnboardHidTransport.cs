@@ -73,9 +73,11 @@ public sealed class OnboardHidTransport : IOnboardTransport
     public static void ValidateOutbound(byte[] packet)
     {
         if (packet.Length != 32 || packet[0] != 'I' || packet[1] != 'G' || packet[2] != 1 ||
-            (packet[3] is < 1 or > 6 && packet[3] is not OnboardProtocol.ReconnectUsb and not OnboardProtocol.ReadRuntimeBrightness and not OnboardProtocol.SetRuntimeBrightness and not OnboardProtocol.GetExtensions and not OnboardProtocol.GetFirmwareVersion) ||
+            (packet[3] is < 1 or > 6 && packet[3] is not OnboardProtocol.ReconnectUsb and not OnboardProtocol.ReadRuntimeBrightness and not OnboardProtocol.SetRuntimeBrightness and not OnboardProtocol.GetExtensions and not OnboardProtocol.LightingTest and not OnboardProtocol.GetFirmwareVersion) ||
             (packet[3] is OnboardProtocol.ReconnectUsb or OnboardProtocol.ReadRuntimeBrightness or OnboardProtocol.GetExtensions or OnboardProtocol.GetFirmwareVersion && packet[6] != 0) ||
-            (packet[3] == OnboardProtocol.SetRuntimeBrightness && packet[6] != 1) || packet[6] > 24 || packet[5] != 0 || packet[7] != 0 || packet.AsSpan(8 + packet[6]).IndexOfAnyExcept((byte)0) >= 0)
+            (packet[3] == OnboardProtocol.SetRuntimeBrightness && packet[6] != 1) ||
+            (packet[3] == OnboardProtocol.LightingTest && (packet[6] != 1 || packet[8] > 2)) ||
+            packet[6] > 24 || packet[5] != 0 || packet[7] != 0 || packet.AsSpan(8 + packet[6]).IndexOfAnyExcept((byte)0) >= 0)
             throw new InvalidDataException("Invalid INGLORIOUS configuration packet.");
     }
     private void Close() { if (Interlocked.Exchange(ref _closed, 1) == 0) _stream.Dispose(); }

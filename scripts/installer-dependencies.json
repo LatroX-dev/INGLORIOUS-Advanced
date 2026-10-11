@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "innoSetup": {
+    "version": "6.7.3",
+    "file": "innosetup-6.7.3.exe",
+    "url": "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe",
+    "bytes": 10592232,
+    "sha256": "9C73C3BAE7ED48D44112A0F48E66742C00090BDB5BEF71D9D3C056C66E97B732",
+    "publisher": "CN=Pyrsys B.V., O=Pyrsys B.V., S=Noord-Holland, C=NL",
+    "signerThumbprint": "E0AB19C8D38CBF9C44709925122A7A02F8C70CB7",
+    "compilerSha256": "0A8757031B33777E4C9CBFFEE40F11A5062B36D25CBE144C1DB73B6102B80AD7"
+  }
+}

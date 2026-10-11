@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -250,8 +250,11 @@ public sealed partial class MainWindow
         var body = _state.Device.IsOfflineOnly
             ? Column(Heading("Gerät"), Text(_state.Device.Name, size: 22), Heading("Offline-Profil"), BuildFirmwareVersionPanel())
             : Column(Heading("Gerät"), Text(_state.Device.Name, size: 22), Text(_state.Device.Subtitle, true),
-            Heading("Firmware"), BuildFirmwareVersionPanel(), Text(L.T("Firmware-Installation und Originalwiederherstellung sind in dieser plattformübergreifenden Ausgabe noch nicht verfügbar.")),
-            Text(L.T("Lesen und Übertragen funktionieren nur mit erkannter INGLORIOUS-Firmware. Die Hersteller-Firmware wird nicht beschrieben."), true));
+            Heading("Firmware"), BuildFirmwareVersionPanel(),
+            AsyncButton("Gerät einrichten", () => OpenDeviceSetupAsync(_state.Device.Id)),
+            Heading("Original-Firmware wiederherstellen"),
+            Text(L.T("Die Wiederherstellung verwendet ausschließlich die passende Original-Sicherung dieses Geräts."), true),
+            AsyncButton("Original-Firmware wiederherstellen", () => OpenDeviceSetupAsync(_state.Device.Id, SetupOperation.Restore)));
         if (_state.Device.IsExperimentalFirmware)
             body.Children.Insert(2, new TextBlock { Name = "ExperimentalDeviceNotice", Text = L.T("Experimentelle Unterstützung: noch nicht an diesem Modell getestet."), Foreground = Brush("#E9B86B"), FontSize = 12, TextWrapping = TextWrapping.Wrap });
         return body;
@@ -300,7 +303,7 @@ public sealed partial class MainWindow
             {
                 1 => "Steuert einen MIDI-Controller in einer kompatiblen Anwendung.",
                 2 => "Ändert die Lautstärke durch Bewegen des Reglers.",
-                3 => "Regelt die Helligkeit der Numpad-Beleuchtung.",
+                3 => "Regelt die Helligkeit der GMMK Numpad-Beleuchtung.",
                 _ => "Keine Aktion beim Bewegen des Reglers."
             });
         }
