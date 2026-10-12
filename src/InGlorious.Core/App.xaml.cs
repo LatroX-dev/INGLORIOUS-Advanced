@@ -13,12 +13,21 @@ public partial class App : Application
     private BackgroundApplicationSession? _backgroundSession;
     private ApplicationInstance? _instance;
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         // The installer checks this process-lifetime handle before replacing app files.
         _installationGuard = new WindowsInstallationGuard();
         EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
             new RoutedEventHandler((sender, _) => ApplyWindowFrame((Window)sender)));
+        bool offline = e.Args.Contains("--screenshot") || e.Args.Contains("--ui-smoke");
+        if (!offline && e.Args.Contains("--after-setup"))
+        {
+            // Inno's postinstall launch happens before Setup releases its marker.
+            // Keep the dispatcher responsive without constructing an editor or tray.
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            await _installationGuard.WaitForSetupExitAsync();
+            if (Dispatcher.HasShutdownStarted || _installationGuard is null) return;
+        }
         if (!_installationGuard.CanStart)
         {
             // MainWindow is constructed explicitly only after both startup guards succeed.
@@ -28,7 +37,6 @@ public partial class App : Application
             Shutdown();
             return;
         }
-        bool offline = e.Args.Contains("--screenshot") || e.Args.Contains("--ui-smoke");
         if (!offline)
         {
             try

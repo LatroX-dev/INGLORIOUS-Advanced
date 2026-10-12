@@ -23,6 +23,12 @@
 #ifndef UserDataDirectory
   #define UserDataDirectory "{localappdata}\INGLORIOUS Advanced"
 #endif
+#define LaunchAppParameters "--after-setup"
+#ifdef TestStartupProbe
+  #ifndef TestInstallerMode
+    #error Startup probes require an isolated test installer
+  #endif
+#endif
 [Setup]
 AppId={{#ApplicationId}
 AppName=INGLORIOUS Advanced
@@ -128,7 +134,11 @@ Name: "{group}\INGLORIOUS Advanced"; Filename: "{app}\INGLORIOUS Advanced.exe"; 
 Name: "{userdesktop}\INGLORIOUS Advanced"; Filename: "{app}\INGLORIOUS Advanced.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\INGLORIOUS Advanced.exe"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent unchecked
+#ifdef TestStartupProbe
+Filename: "{#TestStartupProbe}"; Parameters: "{#LaunchAppParameters} ""{#UserDataDirectory}"""; WorkingDir: "{app}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall; Check: TestLaunchRequested; AfterInstall: AwaitTestLaunch
+#else
+Filename: "{app}\INGLORIOUS Advanced.exe"; Parameters: "{#LaunchAppParameters}"; WorkingDir: "{app}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent unchecked
+#endif
 
 [Code]
 const StartupKey = '{#StartupRegistryKey}';
@@ -141,6 +151,28 @@ function NativeCreateMutex(Attributes: THandle; InitialOwner: Boolean; Name: Str
   external 'CreateMutexW@kernel32.dll stdcall';
 function NativeCloseHandle(Handle: THandle): Boolean;
   external 'CloseHandle@kernel32.dll stdcall';
+
+#ifdef TestStartupProbe
+function TestLaunchRequested: Boolean;
+begin
+  Result := ExpandConstant('{param:TESTLAUNCH|0}') = '1';
+end;
+
+procedure AwaitTestLaunch;
+var Waits: Integer; Prefix: String;
+begin
+  { Keep Setup alive until the isolated helper proves it is waiting on our
+    marker. This exercises Inno's real postinstall launch without an editor. }
+  Prefix := ExpandConstant('{#UserDataDirectory}');
+  Waits := 0;
+  while not FileExists(Prefix + '.setup-launch-waiting') do begin
+    Sleep(50); Waits := Waits + 1;
+    if Waits > 200 then RaiseException('The isolated startup probe did not wait for Setup.');
+  end;
+  if not CheckForMutexes('{#ApplicationMutex}') or FileExists(Prefix + '.setup-launch-result.json') then
+    RaiseException('The isolated startup probe bypassed the active Setup guard.');
+end;
+#endif
 
 function SafeDataTree(const Folder: String; Depth: Integer): Boolean;
 var Find: TFindRec; Child: String;

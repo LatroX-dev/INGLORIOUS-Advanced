@@ -5,11 +5,21 @@ param(
  [Parameter(Mandatory)][string]$ToolCatalogPath,
  [Parameter(Mandatory)][string]$OutputDirectory,
  [switch]$Offline,
- [switch]$TestInstaller
+ [switch]$TestInstaller,
+ [string]$TestStartupProbePath
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 if(-not$IsWindows){throw 'Build the Windows installer on Windows.'}
+if($TestStartupProbePath){
+ if(-not$TestInstaller){throw 'Startup probes require an isolated test installer.'}
+ if(-not[IO.Path]::IsPathFullyQualified($TestStartupProbePath)-or$TestStartupProbePath-match'["{}\x00-\x1f]'){throw 'Unsafe startup probe path.'}
+ $TestStartupProbePath=[IO.Path]::GetFullPath($TestStartupProbePath)
+ if(-not(Test-Path -LiteralPath $TestStartupProbePath -PathType Leaf)-or[IO.Path]::GetExtension($TestStartupProbePath)-ine'.exe'){throw 'An existing startup probe executable is required.'}
+ for($part=$TestStartupProbePath;$null-ne$part;$part=[IO.Path]::GetDirectoryName($part)){
+  if((Get-Item -LiteralPath $part -Force).Attributes-band[IO.FileAttributes]::ReparsePoint){throw 'Linked startup probe paths are not allowed.'}
+ }
+}
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $package=[IO.Path]::GetFullPath($PackageDirectory);$output=[IO.Path]::GetFullPath($OutputDirectory)
 if(Test-Path -LiteralPath $output){throw 'Installer output must be new.'}
@@ -60,6 +70,7 @@ try{
 }finally{$graphics.Dispose();$bitmap.Dispose();$logo.Dispose();$font.Dispose();$subfont.Dispose();$fonts.Dispose();$format.Dispose();$white.Dispose();$red.Dispose()}
 $arguments=@('/Qp',('/O'+$output),('/DAppVersion='+$version),('/DFileList='+$include),('/DBrandImage='+$image),('/DBrandSmallImage='+$small),('/DBrandIcon='+(Join-Path $root 'src/InGlorious.Core/Assets/inglorious.ico')))
 if($TestInstaller){$arguments+=@('/DApplicationId={D5748319-8891-40CE-9DB9-9FA2D1B189B8}','/DApplicationMutex=INGLORIOUS.Advanced.InstallerTest.Running','/DInstallationMutex=INGLORIOUS.Advanced.InstallerTest.Setup','/DStartupValueName=INGLORIOUS Advanced Installer Test','/DStartupRegistryKey=Software\INGLORIOUS-Installer-Checks\Run','/DStartupApprovalKey=Software\INGLORIOUS-Installer-Checks\StartupApproved\Run','/DTestInstallerMode=1',('/DUserDataDirectory='+(Join-Path $output 'fake-user-data')))}
+if($TestStartupProbePath){$arguments+=('/DTestStartupProbe='+$TestStartupProbePath)}
 & $compiler.compiler @arguments (Join-Path $root 'packaging/windows/INGLORIOUS-Advanced.iss') *> (Join-Path $output 'compile.log')
 if($LASTEXITCODE-ne0){Get-Content -LiteralPath (Join-Path $output 'compile.log') -Tail 30|Out-Host;throw 'Native installer compilation failed.'}
 $setup=Join-Path $output ('INGLORIOUS-Advanced-'+$version+'-win-x64-Setup.exe')

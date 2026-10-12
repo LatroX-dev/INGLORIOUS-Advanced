@@ -9,7 +9,8 @@ internal static class StartupFixture
 {
     internal static string Mode = "";
     internal static int GuardsCreated, GuardsDisposed, InstancesCreated, InstancesDisposed, WindowsCreated,
-        BackgroundInitializations, Opens, TrayAttempts, TraysDisposed, PreferenceReads, Notices;
+        BackgroundInitializations, Opens, TrayAttempts, TraysDisposed, PreferenceReads, Notices,
+        SetupWaits, DeferredBoundaryChecks;
     internal static bool? Activation;
     internal static Action? Open, Exit;
 }
@@ -18,13 +19,35 @@ public enum ApplicationStartupState { Ready, InstallerRunning, GuardUnavailable 
 public sealed class WindowsInstallationGuard : IDisposable
 {
     public WindowsInstallationGuard() => StartupFixture.GuardsCreated++;
-    public ApplicationStartupState State => StartupFixture.Mode switch
+    public ApplicationStartupState State { get; private set; } = StartupFixture.Mode switch
     {
-        "installer-running" => ApplicationStartupState.InstallerRunning,
-        "guard-unavailable" => ApplicationStartupState.GuardUnavailable,
+        "installer-running" or "after-setup-release" or "after-setup-background" or "after-setup-timeout" or "after-setup-shutdown" => ApplicationStartupState.InstallerRunning,
+        "guard-unavailable" or "after-setup-unavailable" => ApplicationStartupState.GuardUnavailable,
         _ => ApplicationStartupState.Ready
     };
     public bool CanStart => State == ApplicationStartupState.Ready;
+    public async Task WaitForSetupExitAsync()
+    {
+        StartupFixture.SetupWaits++;
+        if (State != ApplicationStartupState.InstallerRunning) return;
+        AssertDeferredBoundaries();
+        await Task.Delay(100);
+        AssertDeferredBoundaries();
+        if (StartupFixture.Mode == "after-setup-shutdown")
+        {
+            Application.Current.Shutdown();
+            await Task.Delay(25);
+        }
+        if (StartupFixture.Mode != "after-setup-timeout") State = ApplicationStartupState.Ready;
+    }
+    private static void AssertDeferredBoundaries()
+    {
+        if (!Application.Current.Dispatcher.CheckAccess() || Application.Current.ShutdownMode != ShutdownMode.OnExplicitShutdown ||
+            StartupFixture.WindowsCreated != 0 || StartupFixture.InstancesCreated != 0 || StartupFixture.TrayAttempts != 0 ||
+            StartupFixture.BackgroundInitializations != 0 || StartupFixture.PreferenceReads != 0 || StartupFixture.Notices != 0 || StartupFixture.GuardsDisposed != 0)
+            throw new InvalidOperationException("Waiting for setup must retain the guard on a responsive dispatcher without opening the editor, devices, tray, preferences or startup notices.");
+        StartupFixture.DeferredBoundaryChecks++;
+    }
     public void Dispose() => StartupFixture.GuardsDisposed++;
 }
 

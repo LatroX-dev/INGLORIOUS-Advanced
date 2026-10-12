@@ -27,7 +27,68 @@ foreach($case in @('empty','missing-firmware','extra','duplicate','wrong-hash','
  try{& (Join-Path $PSScriptRoot 'Build-WindowsInstaller.ps1') -PackageDirectory $manifestFixture -ToolCatalogPath $ToolCatalogPath -OutputDirectory $negativeOutput -TestInstaller -Offline|Out-Null}catch{$rejected=$true}
  if(-not$rejected-or(Test-Path -LiteralPath $negativeOutput)){throw ('Invalid manifest reached the compiler: '+$case)};$checks++
 }
-$built=& (Join-Path $PSScriptRoot 'Build-WindowsInstaller.ps1') -PackageDirectory $PackageDirectory -ToolCatalogPath $ToolCatalogPath -OutputDirectory (Join-Path $output 'build') -TestInstaller -Offline:$Offline
+# Run a harmless helper through Inno's real post-install action. It links the
+# production startup guard but never loads the editor, user settings or USB code.
+$probeRoot=Join-Path $output 'startup-probe'
+New-Item -ItemType Directory -Path $probeRoot|Out-Null
+$guardPath=[Security.SecurityElement]::Escape([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../src/InGlorious.Core/WindowsInstallationGuard.cs')))
+$probeProject=@"
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseAppHost>true</UseAppHost>
+    <AssemblyName>StartupProbe</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup><Compile Include="$guardPath" Link="WindowsInstallationGuard.cs" /></ItemGroup>
+</Project>
+"@
+[IO.File]::WriteAllText((Join-Path $probeRoot 'StartupProbe.csproj'),$probeProject)
+$probeSource=@'
+using System.Text.Json;
+using InGlorious.Core;
+
+if (args.Length != 2 || args[0] != "--after-setup") return 2;
+var resultPath = args[1] + ".setup-launch-result.json";
+try
+{
+    const string runningName = "INGLORIOUS.Advanced.InstallerTest.Running";
+    const string setupName = "INGLORIOUS.Advanced.InstallerTest.Setup";
+    using var guard = new WindowsInstallationGuard(runningName, setupName, true);
+    var initialState = guard.State.ToString();
+    if (guard.State == ApplicationStartupState.InstallerRunning)
+        File.WriteAllText(args[1] + ".setup-launch-waiting", "waiting");
+    await guard.WaitForSetupExitAsync();
+    var setupMarkerPresent = Mutex.TryOpenExisting(setupName, out var setup);
+    setup?.Dispose();
+    var runningMarkerPresent = Mutex.TryOpenExisting(runningName, out var running);
+    running?.Dispose();
+    var success = initialState == nameof(ApplicationStartupState.InstallerRunning)
+        && guard.CanStart && !setupMarkerPresent && runningMarkerPresent;
+    File.WriteAllText(resultPath, JsonSerializer.Serialize(new
+    {
+        success, afterSetup = true, initialState, finalState = guard.State.ToString(),
+        setupMarkerPresent, runningMarkerPresent, processId = Environment.ProcessId
+    }));
+    return success ? 0 : 3;
+}
+catch (Exception error)
+{
+    File.WriteAllText(resultPath, JsonSerializer.Serialize(new
+    {
+        success = false, errorType = error.GetType().Name, processId = Environment.ProcessId
+    }));
+    return 4;
+}
+'@
+[IO.File]::WriteAllText((Join-Path $probeRoot 'Program.cs'),$probeSource)
+& dotnet build (Join-Path $probeRoot 'StartupProbe.csproj') -c Release --nologo -o (Join-Path $probeRoot 'bin') *> (Join-Path $probeRoot 'build.log')
+if($LASTEXITCODE-ne0){throw 'Could not build the isolated startup helper.'}
+$probeExecutable=Join-Path $probeRoot 'bin/StartupProbe.exe'
+if(-not(Test-Path -LiteralPath $probeExecutable -PathType Leaf)){throw 'The isolated startup helper was not created.'}
+$built=& (Join-Path $PSScriptRoot 'Build-WindowsInstaller.ps1') -PackageDirectory $PackageDirectory -ToolCatalogPath $ToolCatalogPath -OutputDirectory (Join-Path $output 'build') -TestInstaller -TestStartupProbePath $probeExecutable -Offline:$Offline
 $expectedName='INGLORIOUS-Advanced-'+$built.version+'-win-x64-Setup.exe'
 if([IO.Path]::GetFileName($built.installer)-cne$expectedName){throw 'The Windows installer filename must identify its platform and architecture.'};$checks++
 $expectedChecksum=(Get-FileHash -LiteralPath $built.installer).Hash.ToLowerInvariant()+'  '+$expectedName+"`n"
@@ -69,6 +130,22 @@ function Run-Installer([string]$Executable,[string[]]$Arguments){
 }
 $common=@('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/NOICONS','/SP-',('/DIR='+$install))
 $dataRoot=Join-Path $output 'build/fake-user-data'
+function Assert-SetupLaunch([string]$CaseName){
+ $resultPath=$dataRoot+'.setup-launch-result.json';$waitingPath=$dataRoot+'.setup-launch-waiting'
+ $timer=[Diagnostics.Stopwatch]::StartNew()
+ while(-not(Test-Path -LiteralPath $resultPath)-and$timer.Elapsed.TotalSeconds-lt20){Start-Sleep -Milliseconds 50}
+ if(-not(Test-Path -LiteralPath $resultPath)){throw ('The post-install startup helper did not finish: '+$CaseName)}
+ $result=Get-Content -LiteralPath $resultPath -Raw|ConvertFrom-Json
+ if(-not$result.success-or-not$result.afterSetup-or$result.initialState-cne'InstallerRunning'-or$result.finalState-cne'Ready'-or$result.setupMarkerPresent-or-not$result.runningMarkerPresent-or-not(Test-Path -LiteralPath $waitingPath)){throw ('Post-install startup did not wait safely for Setup to exit: '+$CaseName)}
+ $helper=Get-Process -Id $result.processId -ErrorAction SilentlyContinue
+ if($helper){try{if(-not$helper.WaitForExit(10000)-or$helper.ExitCode-ne0){throw ('The startup helper did not exit successfully: '+$CaseName)}}finally{$helper.Dispose()}}
+ foreach($marker in @('INGLORIOUS.Advanced.InstallerTest.Running','INGLORIOUS.Advanced.InstallerTest.Setup')){
+  $handle=$null
+  if([Threading.Mutex]::TryOpenExisting($marker,[ref]$handle)){$handle.Dispose();throw ('Post-install startup retained its lifetime gate: '+$CaseName)}
+ }
+ Copy-Item -LiteralPath $resultPath -Destination (Join-Path $output ($CaseName+'-startup-result.json'))
+ Remove-Item -LiteralPath $resultPath,$waitingPath
+}
 $backup=Join-Path $dataRoot 'backups/original-firmware.bin'
 New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($backup)) -Force|Out-Null
 [IO.File]::WriteAllBytes($backup,[byte[]]::new(4096))
@@ -82,8 +159,9 @@ try{
  $blocked=Run-Installer $built.installer ($common+@('/LANG=english',('/LOG='+(Join-Path $output 'blocked.log'))))
  if($blocked-eq0-or(Test-Path -LiteralPath $install)-or(Test-Path -LiteralPath $key)){throw 'Running-app guard did not prevent installation.'};$checks++
 }finally{$mutex.Dispose()}
-$exitCode=Run-Installer $built.installer ($common+@('/LANG=english',('/LOG='+(Join-Path $output 'install.log'))))
+$exitCode=Run-Installer $built.installer ($common+@('/LANG=english','/TESTLAUNCH=1',('/LOG='+(Join-Path $output 'install.log'))))
 if($exitCode-ne0){throw ('Isolated installation failed: '+$exitCode)}
+Assert-SetupLaunch 'fresh-install';$checks++
 if(-not(Get-Content -LiteralPath (Join-Path $output 'install.log') -Raw).Contains('Test uninstall confirmation: Uninstall %1?',[StringComparison]::Ordinal)){throw 'The compiled English uninstall confirmation does not describe app removal.'};$checks++
 $source=Get-Content -LiteralPath (Join-Path $PackageDirectory 'package-manifest.json') -Raw|ConvertFrom-Json
 foreach($file in $source.files){if((Get-FileHash -LiteralPath (Join-Path $install $file.path)).Hash-cne$file.sha256){throw 'Installed file differs.'};$checks++}
@@ -98,8 +176,9 @@ $ownedCommand='"'+(Join-Path $install 'INGLORIOUS Advanced.exe')+'"'
 New-Item -Path $runKey -Force|Out-Null
 New-ItemProperty -LiteralPath $runKey -Name $runName -Value $ownedCommand -PropertyType String -Force|Out-Null
 $ownedCommand+=' --background'
-$exitCode=Run-Installer $built.installer ($common+@('/LANG=german',('/LOG='+(Join-Path $output 'update.log'))))
+$exitCode=Run-Installer $built.installer ($common+@('/LANG=german','/TESTLAUNCH=1',('/LOG='+(Join-Path $output 'update.log'))))
 if($exitCode-ne0-or(Get-FileHash -LiteralPath $sentinel).Hash-cne$sentinelHash){throw 'Reinstallation changed a user-owned file.'};$checks++
+Assert-SetupLaunch 'upgrade';$checks++
 if(-not(Get-Content -LiteralPath (Join-Path $output 'update.log') -Raw).Contains('Test uninstall confirmation: Möchtest du %1 deinstallieren?',[StringComparison]::Ordinal)){throw 'The compiled German uninstall confirmation does not describe app removal.'};$checks++
 if((Read-StartupValue)-cne$ownedCommand){throw 'Upgrade lost the current enabled autostart setting.'};$checks++
 if([Convert]::ToHexString([byte[]](Read-StartupApproval))-cne$approvalHex){throw 'Upgrade changed Windows startup approval.'};$checks++
@@ -179,7 +258,7 @@ if($exitCode-ne0){throw 'Could not reinstall the startup approval fixture.'}
 $uninstaller=(Get-ChildItem -LiteralPath (Join-Path $install 'Uninstall') -Filter 'unins*.exe' -File)[0].FullName
 $exitCode=Run-Installer $uninstaller @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/TESTREMOVEUSERDATA=1',('/LOG='+(Join-Path $output 'remove-startup-approval.log')))
 if($exitCode-ne0-or$null-ne(Read-StartupApproval)-or(Test-Path -LiteralPath $key)){throw 'Complete removal retained its own Windows startup approval.'};$checks++
-[pscustomobject]@{checks=$checks;isolatedRegistration=$true;hardwareAccess=$false;appLaunched=$false;userFilesPreserved=$true;autostartPreserved=$true;dataRemovalTested=$true;linksRejected=$true;uninstallRaceProtected=$true;languagesTested=@('english','german')}
+[pscustomobject]@{checks=$checks;isolatedRegistration=$true;hardwareAccess=$false;appLaunched=$false;userFilesPreserved=$true;autostartPreserved=$true;dataRemovalTested=$true;linksRejected=$true;uninstallRaceProtected=$true;setupLaunchHandoffTested=$true;setupLaunchTestCases=2;languagesTested=@('english','german')}
 }finally{
  Remove-ItemProperty -LiteralPath $runKey -Name $runName -ErrorAction SilentlyContinue
  Remove-ItemProperty -LiteralPath $approvalKey -Name $runName -ErrorAction SilentlyContinue

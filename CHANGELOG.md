@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.6.51
+
+- Fixed the app not opening after completing Windows setup.
+
 ## 0.6.50
 
 - Turn off global lighting effects while keeping individual effects.

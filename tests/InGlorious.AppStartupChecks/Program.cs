@@ -22,7 +22,8 @@ internal static class Program
         try
         {
             if (args.Length >= 2 && args[0] == "--case") return RunCase(args[1]);
-            var cases = new[] { "normal", "background", "no-tray", "offline-smoke", "offline-screenshot", "secondary", "secondary-background", "secondary-unreachable", "installer-running", "guard-unavailable", "instance-error" };
+            var cases = new[] { "normal", "background", "no-tray", "offline-smoke", "offline-screenshot", "secondary", "secondary-background", "secondary-unreachable", "installer-running", "guard-unavailable", "instance-error",
+                "after-setup-ready", "after-setup-release", "after-setup-background", "after-setup-timeout", "after-setup-unavailable", "after-setup-shutdown", "offline-after-setup" };
             int assertions = 0;
             foreach (string mode in cases)
             {
@@ -30,9 +31,11 @@ internal static class Program
                 { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
                 if (Path.GetFileNameWithoutExtension(start.FileName).Equals("dotnet", StringComparison.OrdinalIgnoreCase)) start.ArgumentList.Add(Assembly.GetExecutingAssembly().Location);
                 start.ArgumentList.Add("--case"); start.ArgumentList.Add(mode);
-                if (mode is "background" or "no-tray" or "secondary-background") start.ArgumentList.Add("--background");
+                if (mode is "background" or "no-tray" or "secondary-background" or "after-setup-background") start.ArgumentList.Add("--background");
                 if (mode == "offline-smoke") start.ArgumentList.Add("--ui-smoke");
                 if (mode == "offline-screenshot") start.ArgumentList.Add("--screenshot");
+                if (mode.StartsWith("after-setup", StringComparison.Ordinal) || mode == "offline-after-setup") start.ArgumentList.Add("--after-setup");
+                if (mode == "offline-after-setup") start.ArgumentList.Add("--ui-smoke");
                 using var process = Process.Start(start) ?? throw new IOException("Test helper did not start.");
                 var output = process.StandardOutput.ReadToEndAsync(); var error = process.StandardError.ReadToEndAsync();
                 if (!process.WaitForExit(15000)) throw new TimeoutException("Startup fixture did not exit: " + mode);
@@ -72,10 +75,11 @@ internal static class Program
                 reachedWindow = true;
                 var window = app.MainWindow as InGlorious.Core.MainWindow ?? throw new InvalidOperationException("Missing explicit MainWindow.");
                 bool offline = mode.StartsWith("offline", StringComparison.Ordinal);
+                bool background = mode is "background" or "after-setup-background";
                 Check(StartupFixture.WindowsCreated == 1, "Exactly one editor is constructed.");
                 Check(app.ShutdownMode == ShutdownMode.OnMainWindowClose, "The actual main window owns application lifetime.");
-                Check(window.IsVisible == (mode != "background"), "Normal/offline/no-tray shows the window; background starts hidden.");
-                Check(StartupFixture.BackgroundInitializations == (mode == "background" ? 1 : 0), "Hidden initialization runs only with a reachable tray.");
+                Check(window.IsVisible != background, "Normal/offline/no-tray shows the window; background starts hidden.");
+                Check(StartupFixture.BackgroundInitializations == (background ? 1 : 0), "Hidden initialization runs only with a reachable tray.");
                 Check(StartupFixture.TrayAttempts == (offline ? 0 : 1), "Offline startup cannot touch the native tray boundary.");
                 Check(StartupFixture.InstancesCreated == (offline ? 0 : 1), "Offline startup cannot claim the production instance boundary.");
                 Check(StartupFixture.PreferenceReads == 0, "Successful startup never reads settings from the notice boundary.");
@@ -94,17 +98,21 @@ internal static class Program
         if (failure is not null) throw failure;
         Check(exit == 0, "Startup and orderly exit succeed.");
         Check(StartupFixture.GuardsCreated == 1 && StartupFixture.GuardsDisposed == 1, "Startup guard lives until application exit, including rejected starts.");
-        bool rejects = mode is "secondary" or "secondary-background" or "secondary-unreachable" or "installer-running" or "guard-unavailable" or "instance-error";
+        bool rejects = mode is "secondary" or "secondary-background" or "secondary-unreachable" or "installer-running" or "guard-unavailable" or "instance-error" or "after-setup-timeout" or "after-setup-unavailable" or "after-setup-shutdown";
         Check(reachedWindow != rejects, "Rejected startup never reaches the editor branch.");
         if (rejects)
         {
             Check(StartupFixture.WindowsCreated == 0 && StartupFixture.TrayAttempts == 0 && StartupFixture.BackgroundInitializations == 0, "Rejected startup never constructs an editor or initializes devices/tray.");
-            int notices = mode is "secondary" or "secondary-background" ? 0 : 1;
+            int notices = mode is "secondary" or "secondary-background" or "after-setup-shutdown" ? 0 : 1;
             Check(StartupFixture.Notices == notices && StartupFixture.PreferenceReads == notices, "Only the expected startup error notice is shown.");
             if (mode.StartsWith("secondary", StringComparison.Ordinal)) Check(StartupFixture.Activation == (mode != "secondary-background"), "Second normal launch activates; background launch does not.");
         }
         Check(StartupFixture.InstancesDisposed == (StartupFixture.InstancesCreated - (mode == "instance-error" ? 1 : 0)), "All successfully acquired instance resources are released.");
-        Check(StartupFixture.TraysDisposed == (mode is "normal" or "background" ? 1 : 0), "All successfully created tray resources are released.");
+        bool acquiredTray = !rejects && !mode.StartsWith("offline", StringComparison.Ordinal) && mode != "no-tray";
+        Check(StartupFixture.TraysDisposed == (acquiredTray ? 1 : 0), "All successfully created tray resources are released.");
+        Check(StartupFixture.SetupWaits == (mode.StartsWith("after-setup", StringComparison.Ordinal) ? 1 : 0), "Only explicit non-offline post-setup launches await the installer.");
+        bool deferred = mode is "after-setup-release" or "after-setup-background" or "after-setup-timeout" or "after-setup-shutdown";
+        Check(StartupFixture.DeferredBoundaryChecks == (deferred ? 2 : 0), "Deferred startup preserves all guard boundaries before and after yielding the dispatcher.");
         Console.WriteLine($"PASS {_checks} {mode}");
         return 0;
     }
