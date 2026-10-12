@@ -5,33 +5,33 @@
       "file": "macos-pro-ansi.png",
       "operatingSystem": "macOS",
       "runtime": "osx-arm64",
-      "appVersion": "0.6.47",
+      "appVersion": "0.6.50",
       "deviceId": "pro-ansi",
       "language": "en",
       "synthetic": true,
       "hardwareAccess": false,
       "userSettingsAccess": false,
-      "bytes": 122962,
-      "sha256": "D2F47A447EE2AB5736F7A450A2C131CB4DA98A545F15A2F333C2CE769F44E3B3",
-      "commit": "471e69115d91ba7bef159b40cf6d1145f0eaaa8e",
-      "workflowRun": "https://github.com/LatroX-dev/INGLORIOUS-Advanced/actions/runs/38149739529",
-      "artifactId": 11707455928
+      "bytes": 123275,
+      "sha256": "6D3AA919080D9E16DD895E7E163C536F3A9B9E7D207B56752D8A6AC2D292BC6F",
+      "commit": "b23a92e0a20af1d261b528db8ce745d446c1f6ed",
+      "workflowRun": "https://github.com/LatroX-dev/INGLORIOUS-Advanced/actions/runs/38188742114",
+      "artifactId": 11721752830
     },
     {
       "file": "linux-numpad.png",
       "operatingSystem": "Linux",
       "runtime": "linux-x64",
-      "appVersion": "0.6.47",
+      "appVersion": "0.6.50",
       "deviceId": "numpad",
       "language": "en",
       "synthetic": true,
       "hardwareAccess": false,
       "userSettingsAccess": false,
-      "bytes": 111735,
-      "sha256": "9F939F8627CA233373D162C08586B2AED6746CBE02135F3CB6B0AF0EC002534B",
-      "commit": "471e69115d91ba7bef159b40cf6d1145f0eaaa8e",
-      "workflowRun": "https://github.com/LatroX-dev/INGLORIOUS-Advanced/actions/runs/38149739529",
-      "artifactId": 11706812862
+      "bytes": 111853,
+      "sha256": "6CBD4BF027B5860172859F1CFE09063964D1D7E872DBCAE57BDFC57E5B682A9A",
+      "commit": "b23a92e0a20af1d261b528db8ce745d446c1f6ed",
+      "workflowRun": "https://github.com/LatroX-dev/INGLORIOUS-Advanced/actions/runs/38188742114",
+      "artifactId": 11721413825
     }
   ]
 }
