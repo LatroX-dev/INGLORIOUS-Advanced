@@ -31,7 +31,7 @@ $app = @(
     'App.xaml','App.xaml.cs','AppPreferences.cs','AppSettingsWindow.xaml','AppSettingsWindow.xaml.cs','SoftwareUpdateService.cs','SoftwareUpdateWindow.cs','MainWindow.SoftwareUpdate.cs','BackupService.cs','ColorPaletteStore.cs','ColorPickerWindow.cs',
     'DeviceScanner.cs','StockDeviceCatalog.cs','StockFirmwareInspector.cs','InstallationIdentity.cs','KnownFirmwareImages.cs','DeviceSetupService.cs','DeviceSetupService.Storage.cs','WindowsDeviceSetupEnvironment.cs','DeviceSetupWindow.cs','DeviceSetupWindow.Checks.cs','DeviceSetupWindow.Completion.cs','MainWindow.Setup.cs','InGlorious.Core.csproj','MainWindow.xaml','MainWindow.xaml.cs','Models.cs','UserGuide.cs','HelpWindow.cs','MainWindow.Help.cs',
     'MainWindow.Startup.cs','MainWindow.StartupChecks.cs','MainWindow.Connections.cs','MainWindow.ConnectionChecks.cs','StartupDeviceLoader.cs','MainWindow.WorkflowChecks.cs','MainWindow.PendingEdits.cs','MainWindow.PendingEditsChecks.cs','PendingEditDecisionPolicy.cs',
-    'MainWindow.NavigationChecks.cs','MainWindow.Animation.cs','MainWindow.AnimationChecks.cs','LightingPreviewEngine.cs',
+    'MainWindow.NavigationChecks.cs','MainWindow.Animation.cs','MainWindow.GlobalEffect.cs','MainWindow.AnimationChecks.cs','LightingPreviewEngine.cs',
     'Localization.cs','LocalizationUi.cs','MainWindow.Localization.cs','MainWindow.EffectColors.cs','MainWindow.Favorites.cs',
     'MainWindow.MacroLibrary.cs','MainWindow.KeyBindings.cs','KeyBindingTransfer.cs','KeyBindingSelectionWindow.cs','MainWindow.OsActions.cs','MainWindow.Profiles.cs','MainWindow.ProfileChecks.cs','MainWindow.SharedBrightness.cs',
     'MacroLibraryWindow.cs','OsActionCatalog.cs','OsActionsWindow.cs','ProfileLibrary.cs','SharedBrightnessService.cs','SharedMacroLibrary.cs',
@@ -51,6 +51,7 @@ $allow.Add('src/InGlorious.Core/Locales/device-update.json')
 $allow.Add('src/InGlorious.Core/Locales/startup-settings.json')
 $allow.Add('src/InGlorious.Core/Locales/software-updates.json')
 $allow.Add('src/InGlorious.Core/Locales/layers-guidance.json')
+$allow.Add('src/InGlorious.Core/Locales/lighting-controls.json')
 $allow.Add('reference/glorious-stock-devices.json')
 $allow.Add('docs/setup-boot-gestures.md')
 $allow.Add('docs/device-setup.md')
@@ -127,7 +128,7 @@ foreach ($name in @('effect_oracle.c','Run-PreviewChecks.ps1')) { $allow.Add('te
 foreach ($name in @('sequence_oracle.c','Run-ColorSequenceChecks.ps1')) { $allow.Add('tests/InGlorious.ColorSequenceChecks/'+$name) }
 foreach ($name in @('.gitignore','.gitattributes','docs/public-release.md','docs/model-support.md','scripts/Test-ModelReferences.ps1','scripts/Export-PublicSource.ps1','scripts/Build-BrandIcon.ps1','scripts/Install-InGlorious.ps1','scripts/New-WindowsPackage.ps1','scripts/Test-WindowsInstaller.ps1')) { $allow.Add($name) }
 foreach ($name in @('README.md','LICENSE','COPYRIGHT.md','THIRD-PARTY-NOTICES.md','CONTRIBUTING.md','SECURITY.md','CHANGELOG.md','global.json','NuGet.Config','Directory.Build.props',
-    'docs/getting-started.md','docs/hardware-acceptance.md','docs/license-audit.md','docs/images/windows-lighting.png','docs/images/experimental-layout.png','docs/images/pro-ansi.png','docs/images/gmmk3-100-ansi.png','docs/images/linux-numpad.png','docs/images/macos-pro-ansi.png','docs/images/native-provenance.json',
+    'docs/getting-started.md','docs/hardware-acceptance.md','docs/license-audit.md','docs/images/windows-lighting.png','docs/images/windows-device.png','docs/images/experimental-layout.png','docs/images/pro-ansi.png','docs/images/gmmk3-100-ansi.png','docs/images/linux-numpad.png','docs/images/macos-pro-ansi.png','docs/images/native-provenance.json',
     'scripts/Initialize-BuildDependencies.ps1','scripts/build-dependencies.json','scripts/Build-PublicRelease.ps1','scripts/Test-PublicSourceExport.ps1','scripts/Copy-RuntimeNotices.ps1',
     '.github/workflows/build.yml','.github/ISSUE_TEMPLATE/bug_report.yml','.github/ISSUE_TEMPLATE/config.yml','.github/ISSUE_TEMPLATE/device_support.yml','.github/ISSUE_TEMPLATE/feature_request.yml',
     'src/InGlorious.Desktop/packages.lock.json','src/InGlorious.Desktop/Shared/packages.lock.json',

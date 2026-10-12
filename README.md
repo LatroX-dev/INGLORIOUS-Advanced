@@ -4,7 +4,7 @@ Configure Glorious keyboards with per-key lighting, effects, key assignments, ma
 
 I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
 
-**App 0.6.49 · Firmware 0.11.1**
+**App 0.6.50 · Firmware 0.11.1**
 
 Get installers and packages from the [Releases page](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases). macOS and Linux builds are Early Alpha; physical-device testing is still limited.
 
@@ -60,10 +60,14 @@ These screenshots show the Windows editor with offline demo data. They do not de
 - Import and export key bindings for selected layers, including assigned macros, without changing lighting. The Numpad slider can be included separately.
 - Local profiles for each device, with configuration readback after transfer.
 - Adjustable USB polling rate and debounce time.
-- Standby lighting and an optional INGLORIOUS screensaver.
+- Standby lighting and an optional INGLORIOUS screensaver, under Device.
 - Numpad slider: disabled, lighting brightness, relative volume or MIDI control.
 - Guided firmware setup, update and original-firmware recovery on Windows, macOS and Linux.
 - Software update notifications and verified downloads from GitHub.
+
+Switch the global lighting effect off to show stored colors while keeping individual LED effects. Use **Device** for response time, lighting during inactivity, firmware and backups.
+
+![Device settings with response time, lighting during inactivity, firmware and recovery](docs/images/windows-device.png)
 
 Ordinary configuration changes do not require a firmware update. Shared dimming between devices is optional and needs the app running. The Numpad's own dimmer works without the app. Lighting colors are previews, not calibrated measurements of the LEDs.
 

@@ -37,6 +37,7 @@ public partial class MainWindow
         var option = EffectChoice.SelectedItem as LightingEffectOption;
         return JsonSerializer.Serialize(new
         {
+            Enabled = GlobalEffectEnabled.IsChecked == true,
             Mode = option?.Id, Speed = option?.Id is 0 or 13 ? 128 : (int)Math.Round(EffectSpeed.Value),
             // Context changes are guarded before they happen; context itself is not an edited value.
             Brightness = (int)Math.Round(EffectBrightness.Value), Target = EffectTarget.SelectedIndex + 1,

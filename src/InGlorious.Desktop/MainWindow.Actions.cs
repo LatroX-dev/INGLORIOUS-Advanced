@@ -369,10 +369,11 @@ public sealed partial class MainWindow
                     if (page >= 0 && page + 1 < Program.Arguments.Length) _page = Program.Arguments[page + 1];
                     if (Program.Arguments.Contains("--slider") && _state.Device.Id == "numpad") { _page = "Tastenbelegung"; _editingSlider = true; }
                     if (Program.Arguments.Contains("--effects")) _showEffects = true;
-                    if (Program.Arguments.Contains("--standby")) { _showStandby = true; _showEffects = false; }
+                    if (Program.Arguments.Contains("--standby")) _page = "Gerät";
                     if (Program.Arguments.Contains("--sides")) _state.Surface = "left";
                     if (Program.Arguments.Contains("--badge")) { _state.SelectBadge(); _globalEffect = false; }
                     if (Program.Arguments.Contains("--preset")) { var candidate = LightingPresetStore.Apply(_state.Project, _state.LayerIndex, LightingPresetStore.CreateInGlorious(_state.Device.Id)); _state.Change(p => p.Layers = candidate.Layers); _showEffects = true; }
+                    if (Program.Arguments.Contains("--global-off")) { _page = "Beleuchtung"; _showEffects = _globalEffect = true; _state.Layer.LightingEffect = GlobalEffectSwitch.Disable(_state.Layer.LightingEffect); }
                     Build();
                     await Task.Delay(250); UpdateLayout();
                     using var bitmap = new RenderTargetBitmap(new PixelSize((int)ClientSize.Width, (int)ClientSize.Height), new Vector(96, 96));

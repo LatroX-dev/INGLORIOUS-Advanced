@@ -91,7 +91,7 @@ public partial class MainWindow
             await ScanDevicesAsync(scan: () => Snapshot(pro, pad));
             _project.Layers[0].Keys.First().Value.Color = "#A01337";
             var draft = Fingerprint(_project); var undoCount = _undo.Count; var path = _projectPath;
-            SetLightingEditor(true); EffectChoice.SelectedValue = 3; EffectSpeed.Value = 177;
+            SetLightingEditor(true); GlobalEffectEnabled.IsChecked = true; EffectChoice.SelectedValue = 3; EffectSpeed.Value = 177;
             ColorHex.Text = "#A0"; // Incomplete text must not be normalized by a background refresh.
             var decisions = 0;
             _pendingEditDecisionOverride = () => { decisions++; return PendingEditChoice.Cancel; };

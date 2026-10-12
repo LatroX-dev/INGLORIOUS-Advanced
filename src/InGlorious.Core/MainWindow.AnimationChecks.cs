@@ -121,7 +121,7 @@ public partial class MainWindow
         Layer.ExtraLedColors.Clear(); Layer.LedEffects.Clear(); Layer.SynchronizeSides = true;
         foreach (var led in Device.NonKeyLedIndices)
             Layer.LedEffects[led] = new() { Mode = 2, Speed = 200, Colors = ["#0000FF", "#FFFF00"] };
-        _previewHitCount = 0; _showLightingEffects = false; _showLightingStandby = false;
+        _previewHitCount = 0; _showLightingEffects = false;
         _effectForSelection = false; _lightingTarget = LightingTarget.Left; _wholeSideSelection = true;
         _selection.Clear(); RefreshAll(); RenderLightingPreviewFrame(0);
         var original = JsonSerializer.Serialize(_project); var history = _undo.Count;

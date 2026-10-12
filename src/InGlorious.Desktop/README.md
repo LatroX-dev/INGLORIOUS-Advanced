@@ -1,6 +1,6 @@
 # INGLORIOUS Advanced desktop app
 
-Avalonia app for macOS and Linux, app 0.6.49 with firmware 0.11.1. The separate Windows WPF app uses the same profiles, configuration models, firmware coordinator and validation rules. Native builds, packages and offline checks have passed for Linux x64, macOS Intel and macOS Apple silicon. Physical-device validation is still pending; a successful build or screenshot is not a hardware test.
+Avalonia app for macOS and Linux, app 0.6.50 with firmware 0.11.1. The separate Windows WPF app uses the same profiles, configuration models, firmware coordinator and validation rules. Native builds, packages and offline checks have passed for Linux x64, macOS Intel and macOS Apple silicon. Physical-device validation is still pending; a successful build or screenshot is not a hardware test.
 
 ## Features
 

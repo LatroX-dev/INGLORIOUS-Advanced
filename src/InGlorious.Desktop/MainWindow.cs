@@ -49,6 +49,13 @@ public sealed partial class MainWindow : Window
             Icon = new WindowIcon(icon);
         Height = preferences.RememberWindowSize ? preferences.WindowHeight : 900;
         MinWidth = 1150; MinHeight = 760;
+        if (Program.Offline && Program.Arguments.Contains("--screenshot"))
+        {
+            var widthOption = Array.IndexOf(Program.Arguments, "--width");
+            var heightOption = Array.IndexOf(Program.Arguments, "--height");
+            if (widthOption >= 0 && widthOption + 1 < Program.Arguments.Length && int.TryParse(Program.Arguments[widthOption + 1], out var width)) Width = Math.Clamp(width, MinWidth, 3840);
+            if (heightOption >= 0 && heightOption + 1 < Program.Arguments.Length && int.TryParse(Program.Arguments[heightOption + 1], out var height)) Height = Math.Clamp(height, MinHeight, 2160);
+        }
         if (Program.Arguments.Contains("--minimum")) { Width = MinWidth; Height = MinHeight; }
         var deviceArgument = Array.IndexOf(Program.Arguments, "--device");
         var initialDevice = Program.Arguments.Contains("--numpad") ? "numpad" : preferences.ResolveStartDevice();
@@ -137,7 +144,7 @@ public sealed partial class MainWindow : Window
             var utilities = Row(BuildSoftwareUpdateHint(), help, settings); Grid.SetColumn(utilities, 2); header.Children.Add(utilities);
             _root.Children.Add(header);
 
-            var body = new Grid { ColumnDefinitions = new("176,*,320") }; Grid.SetRow(body, 1); _root.Children.Add(body);
+            var body = new Grid { Name = "WorkspaceColumns", ColumnDefinitions = new(_page == "Gerät" ? "176,*" : "176,*,320") }; Grid.SetRow(body, 1); _root.Children.Add(body);
             var nav = new StackPanel { Spacing = 5, Margin = new Thickness(12) };
             _deviceButtonsPanel = new StackPanel { Name = "DeviceButtons", Spacing = 4 };
             _deviceButtons.Clear();
@@ -148,14 +155,14 @@ public sealed partial class MainWindow : Window
             nav.Children.Add(new Separator { Margin = new Thickness(0, 10) });
             foreach (var page in new[] { "Beleuchtung", "Tastenbelegung", "Ebenen", "Makros", "Profile", "Gerät" })
             {
-                var button = AsyncButton(page, async () => { if (!await GuardNavigation()) return; _page = page; Build(); });
+                var button = AsyncButton(page, () => ShowPageAsync(page));
                 button.HorizontalContentAlignment = HorizontalAlignment.Left;
                 button.Classes.Add("nav");
                 if (_page == page) button.Background = Brush("#3A252B"); nav.Children.Add(button);
             }
             body.Children.Add(new Border { Background = Brush("#1C1F22"), Child = nav });
             var workspace = new StackPanel { Spacing = 12, Margin = new Thickness(22, 18) };
-            var top = new Grid { ColumnDefinitions = new("*,220") };
+            var top = new Grid { Name = "WorkspaceHeader", ColumnDefinitions = new("*,220") };
             var heading = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
             heading.Children.Add(Text(_page == "Profile" ? L.T("Profile") : _state.Device.Name, size: 22));
             if (_page != "Profile" && _state.Device.IsExperimentalFirmware)
@@ -176,6 +183,7 @@ public sealed partial class MainWindow : Window
             var layerEditor = Column(Text(L.T("Ebene bearbeiten"), true, 11), _layerChoice);
             layerEditor.Name = "LayerEditorSelector"; layerEditor.IsVisible = _layerChoice.IsVisible;
             Grid.SetColumn(layerEditor, 1); top.Children.Add(layerEditor); workspace.Children.Add(top);
+
             if (_page is "Tastenbelegung" or "Ebenen")
             {
                 var editingHint = Text(LayerGuidance.EditingHint, true, 11); editingHint.Name = "LayerEditingHint"; workspace.Children.Add(editingHint);
@@ -195,27 +203,39 @@ public sealed partial class MainWindow : Window
             if (_page == "Makros") workspace.Children.Add(BuildMacroWorkspace());
             if (_page == "Profile") workspace.Children.Add(BuildProfilesWorkspace());
             if (_page == "Gerät") workspace.Children.Add(BuildDeviceWorkspace());
-            var workspaceScroll = new ScrollViewer { Content = workspace, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+            var workspaceScroll = new ScrollViewer { Name = "WorkspaceScroll", Content = workspace, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
             Grid.SetColumn(workspaceScroll, 1); body.Children.Add(workspaceScroll);
             _editor = new StackPanel { Spacing = 9, Margin = new Thickness(16) };
-            _editor.Children.Add(Heading(_page));
-            switch (_page)
+            if (_page != "Gerät")
             {
-                case "Beleuchtung": BuildLightingEditor(); break;
-                case "Tastenbelegung": BuildBindingEditor(); break;
-                case "Ebenen": BuildLayerEditor(); break;
-                case "Makros": BuildMacroEditor(); break;
-                case "Gerät": BuildDeviceEditor(); break;
-                default: _editor.Children.Add(Text(L.T("Ein Profil enthält Farben, Belegungen, Ebenen und Makros für ein Gerät."), true)); break;
+                var inspectorHeader = new Grid { Name = "InspectorHeader", ColumnDefinitions = new("*,Auto"), ColumnSpacing = 10 };
+                inspectorHeader.Children.Add(Heading(_page));
+                if (_page == "Beleuchtung")
+                {
+                    var presets = AsyncButton("Beleuchtungsvorlagen", OpenLightingPresetsAsync); presets.Name = "LightingPresetsButton";
+                    presets.Width = presets.Height = 32; presets.MinHeight = 0; presets.Padding = new Thickness(7); presets.VerticalAlignment = VerticalAlignment.Center;
+                    presets.Content = new Avalonia.Controls.Shapes.Path { Data = Geometry.Parse("M3 3 L10 3 L10 10 L3 10 Z M14 3 L21 3 L21 10 L14 10 Z M3 14 L10 14 L10 21 L3 21 Z M14 14 L21 14 L21 21 L14 21 Z"), Stroke = Brush("#E4E7EB"), Fill = Brushes.Transparent, StrokeThickness = 1.7, Stretch = Stretch.Uniform, Width = 16, Height = 16 };
+                    ToolTip.SetTip(presets, L.T("Beleuchtungsvorlagen"));
+                    Grid.SetColumn(presets, 1); inspectorHeader.Children.Add(presets);
+                }
+                _editor.Children.Add(inspectorHeader);
+                switch (_page)
+                {
+                    case "Beleuchtung": BuildLightingEditor(); break;
+                    case "Tastenbelegung": BuildBindingEditor(); break;
+                    case "Ebenen": BuildLayerEditor(); break;
+                    case "Makros": BuildMacroEditor(); break;
+                    default: _editor.Children.Add(Text(L.T("Ein Profil enthält Farben, Belegungen, Ebenen und Makros für ein Gerät."), true)); break;
+                }
+                var inspectorContent = new Grid { RowDefinitions = new("*,Auto") };
+                inspectorContent.Children.Add(new ScrollViewer { Content = _editor });
+                if (_page == "Tastenbelegung")
+                {
+                    var bindingFiles = BuildBindingFileActions(); Grid.SetRow(bindingFiles, 1); inspectorContent.Children.Add(bindingFiles);
+                }
+                var inspector = new Border { Name = "RightInspector", Background = Brush("#1C1F22"), Child = inspectorContent };
+                Grid.SetColumn(inspector, 2); body.Children.Add(inspector);
             }
-            var inspectorContent = new Grid { RowDefinitions = new("*,Auto") };
-            inspectorContent.Children.Add(new ScrollViewer { Content = _editor });
-            if (_page == "Tastenbelegung")
-            {
-                var bindingFiles = BuildBindingFileActions(); Grid.SetRow(bindingFiles, 1); inspectorContent.Children.Add(bindingFiles);
-            }
-            var inspector = new Border { Background = Brush("#1C1F22"), Child = inspectorContent };
-            Grid.SetColumn(inspector, 2); body.Children.Add(inspector);
             var footer = new Grid { ColumnDefinitions = new("*,Auto"), Margin = new Thickness(16, 7) };
             _statusText = Text(_status, true, 11); _deviceState = Text("", size: 12);
             footer.Children.Add(Column(_deviceState, _statusText));
@@ -318,7 +338,7 @@ public sealed partial class MainWindow : Window
             {
                 var light = new Border { Height = .28 * unit, Background = Brush(_state.ColorAt(led)), VerticalAlignment = VerticalAlignment.Bottom, CornerRadius = new CornerRadius(1) };
                 content.Children.Add(light); _ledViews[led] = light;
-                var button = AsyncButton("Logo", async () => { if (!await GuardNavigation()) return; _state.SelectBadge(); _page = "Beleuchtung"; _showStandby = false; _globalEffect = false; Build(); });
+                var button = AsyncButton("Logo", async () => { if (!await GuardNavigation()) return; _state.SelectBadge(); _page = "Beleuchtung"; _globalEffect = false; Build(); });
                 button.Name = "BadgeLed" + led; button.Content = content; button.Padding = new Thickness(3);
                 button.HorizontalContentAlignment = HorizontalAlignment.Stretch; button.VerticalContentAlignment = VerticalAlignment.Stretch;
                 button.BorderBrush = Brush(showSelection && _state.Surface == "badge" ? "#EF646B" : "#424950");

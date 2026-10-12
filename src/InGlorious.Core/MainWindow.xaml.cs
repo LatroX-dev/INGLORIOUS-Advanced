@@ -151,6 +151,7 @@ public partial class MainWindow : Window
             if (args.Contains("--side-leds")) SelectSideLed(Device.LeftSideLedIndices[0], toggle: false);
             if (args.Contains("--side-sync")) SetSideSynchronization(true);
             if (args.Contains("--effects")) SetLightingEditor(true);
+            if (args.Contains("--global-off")) { Layer.LightingEffect = GlobalEffectSwitch.Disable(Layer.LightingEffect); RefreshAll(); SetLightingEditor(true); SetEffectScope(false); }
             if (args.Contains("--standby")) { _project.Standby = new() { Enabled = true, Mode = args.Contains("--screensaver") ? (byte)2 : (byte)1 }; RefreshAll(); SetStandbyEditor(); }
             if (args.Contains("--whole-side")) SetWholeSideSelection(true);
             if (args.Contains("--effects-selected")) { SetLightingEditor(true); SetEffectScope(true); }
@@ -645,7 +646,8 @@ public partial class MainWindow : Window
         RefreshBindingFunctionHint();
         ApplyColorButton.IsEnabled = SelectedEffectLeds().Length > 0;
         ApplyEffectHost.Visibility = _activeTab == 0 && _showLightingEffects ? Visibility.Visible : Visibility.Collapsed;
-        RefreshStandbySurface();
+        RefreshLightingTabs();
+        RefreshGlobalEffectSurface();
         RefreshWorkspaceMode();
         if (_activeTab == 2)
         {
@@ -654,7 +656,7 @@ public partial class MainWindow : Window
         }
         if (_activeTab == 4)
         {
-            InspectorTitle.Text = L.T("Reaktionszeit");
+            InspectorTitle.Text = L.T("Geräteeinstellungen");
             InspectorSubtitle.Text = Device.Name + L.T(" · alle Ebenen");
         }
         RefreshBindingTarget();
@@ -782,7 +784,7 @@ public partial class MainWindow : Window
     {
         if (target == LightingTarget.Badge && Device.BadgeLedIndices.Count == 0) return;
         if (!ResolvePendingEdits()) return;
-        if (target == LightingTarget.Badge) { _selection.Clear(); _wholeSideSelection = false; _showLightingStandby = false; }
+        if (target == LightingTarget.Badge) { _selection.Clear(); _wholeSideSelection = false; }
         if (target is LightingTarget.Left or LightingTarget.Right or LightingTarget.Both)
         { _wholeSideSelection = true; _lastSideTarget = target; }
         SetLightingTarget(target);
@@ -850,12 +852,10 @@ public partial class MainWindow : Window
 
     private void SetLightingEditor(bool effects)
     {
-        if ((effects != _showLightingEffects || _showLightingStandby) && !ResolvePendingEdits()) return;
+        if ((effects != _showLightingEffects || _activeTab != 0) && !ResolvePendingEdits()) return;
         if (effects && !_showLightingEffects) _effectForSelection = SelectedEffectLeds().Length > 0;
         _showLightingEffects = effects;
-        _showLightingStandby = false;
-        RenderKeyboard();
-        RefreshInspector();
+        SetTab(0);
     }
 
     private void LightColors_Click(object sender, RoutedEventArgs e) => SetLightingEditor(false);
@@ -878,6 +878,7 @@ public partial class MainWindow : Window
         try
         {
             var effect = Layer.LightingEffect;
+            GlobalEffectEnabled.IsChecked = GlobalEffectSwitch.IsEnabled(effect);
             var leds = SelectedEffectLeds();
             var selectedEffects = leds.Select(i => Layer.LedEffects.GetValueOrDefault(i)).ToArray();
             var common = selectedEffects.Length > 0 && selectedEffects.All(e => JsonSerializer.Serialize(e) == JsonSerializer.Serialize(selectedEffects[0]));
@@ -901,7 +902,7 @@ public partial class MainWindow : Window
             EffectsPanel.Visibility = _showLightingEffects ? Visibility.Visible : Visibility.Collapsed;
             EffectScopeButtons.Visibility = EffectsPanel.Visibility;
             LightingSelectionPanel.Visibility = !_showLightingEffects || _effectForSelection ? Visibility.Visible : Visibility.Collapsed;
-            foreach (var (button, active) in new[] { (LightColorsTab, !_showLightingEffects), (LightEffectsTab, _showLightingEffects), (GlobalEffectButton, !_effectForSelection), (SelectedEffectButton, _effectForSelection) })
+            foreach (var (button, active) in new[] { (GlobalEffectButton, !_effectForSelection), (SelectedEffectButton, _effectForSelection) })
             {
                 button.Background = Brush(active ? "#3A252B" : "#252A2F");
                 button.BorderBrush = Brush(active ? "#A74B54" : "#353A40");
@@ -918,7 +919,7 @@ public partial class MainWindow : Window
 
     private void EffectChoice_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_refreshingEffects && EffectDescription is not null) UpdateEffectDescription();
+        if (!_refreshingEffects && EffectDescription is not null) { UpdateEffectDescription(); RefreshGlobalEffectSurface(); }
     }
 
     private void UpdateEffectDescription()
@@ -942,12 +943,7 @@ public partial class MainWindow : Window
     private bool TryApplyEffect()
     {
         if (EffectChoice.SelectedItem is not LightingEffectOption option) return false;
-        var effect = new LightingEffectSettings
-        {
-            Mode = option.Id, Speed = option.Id == 0 ? 128 : (int)Math.Round(EffectSpeed.Value),
-            Brightness = (int)Math.Round(EffectBrightness.Value), Target = EffectTarget.SelectedIndex + 1,
-            Reverse = option.HasDirection && EffectReverse.IsChecked == true, Colors = _effectColors.ToList()
-        };
+        var effect = EffectiveEffectInput();
         if (_effectForSelection)
         {
             var leds = SelectedEffectLeds();
@@ -962,7 +958,7 @@ public partial class MainWindow : Window
         if (effect.Target is < 1 or > 3) { Status(L.T("Bitte den Bereich für den Effekt auswählen.")); return false; }
         if (JsonSerializer.Serialize(effect) == JsonSerializer.Serialize(Layer.LightingEffect)) return true;
         BeginChange(); Layer.LightingEffect = effect;
-        FinishChange(L.F($"{option.Label} für Ebene {_layerIndex} übernommen."));
+        FinishChange(L.F($"{(GlobalEffectEnabled.IsChecked == true ? option.Label : L.T("Aus"))} für Ebene {_layerIndex} übernommen."));
         return true;
     }
 
@@ -1331,14 +1327,15 @@ public partial class MainWindow : Window
         MacroWorkspace.Visibility = _activeTab == 2 && !_macroAssigning ? Visibility.Visible : Visibility.Collapsed;
         DeviceOverview.Visibility = _activeTab == 4 ? Visibility.Visible : Visibility.Collapsed;
         ProfilesWorkspace.Visibility = _activeTab == 5 ? Visibility.Visible : Visibility.Collapsed;
-        InspectorHost.Visibility = _activeTab == 5 ? Visibility.Collapsed : Visibility.Visible;
-        Grid.SetColumnSpan((UIElement)WorkspaceScroll.Parent, _activeTab == 5 ? 2 : 1);
+        InspectorHost.Visibility = _activeTab >= 4 ? Visibility.Collapsed : Visibility.Visible;
+        Grid.SetColumnSpan((UIElement)WorkspaceScroll.Parent, _activeTab >= 4 ? 2 : 1);
         KeyboardWorkspace.Visibility = MacroWorkspace.Visibility == Visibility.Visible || _activeTab >= 4 ? Visibility.Collapsed : Visibility.Visible;
         var editingSlider = _activeTab == 1 && _editingSlider && Device.Id == "numpad";
-        CurrentLayerChoice.Visibility = editingSlider || _activeTab >= 4 || (_activeTab == 2 && !_macroAssigning) || (_activeTab == 0 && _showLightingStandby) ? Visibility.Collapsed : Visibility.Visible;
+        CurrentLayerChoice.Visibility = editingSlider || _activeTab >= 4 || (_activeTab == 2 && !_macroAssigning) ? Visibility.Collapsed : Visibility.Visible;
         CurrentLayerHost.Visibility = CurrentLayerChoice.Visibility;
+        LightingPresetsButton.Visibility = _activeTab == 0 ? Visibility.Visible : Visibility.Collapsed;
         LayerEditingHelp.Visibility = !editingSlider && (_activeTab is 1 or 3) ? Visibility.Visible : Visibility.Collapsed;
-        SelectionBar.Visibility = editingSlider || _activeTab == 0 && (_showLightingStandby || _showLightingEffects && !_effectForSelection) ? Visibility.Collapsed : KeyboardWorkspace.Visibility;
+        SelectionBar.Visibility = editingSlider || _activeTab == 0 && (_showLightingEffects && !_effectForSelection) ? Visibility.Collapsed : KeyboardWorkspace.Visibility;
         LayerOverview.Visibility = Visibility.Collapsed;
         BackToMacroButton.Visibility = _activeTab == 2 && _macroAssigning ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -2131,6 +2128,7 @@ public partial class MainWindow : Window
         RunNewFeaturesChecks(Check);
         RunProfileOpeningChecks(Check);
         RunStandbyChecks(Check);
+        RunGlobalEffectSwitchChecks(Check);
         RunHelpChecks(Check);
         RunDeviceSetupChecks(Check);
         RunBackgroundWindowChecks(Check);
@@ -2315,7 +2313,7 @@ public partial class MainWindow : Window
         for (var mode = 0; mode < 5; mode++)
         {
             SetTab(mode);
-            var panels = new[] { ColorPanel, BindingPanel, MacroPanel, LayerPanel, DeviceSettingsPanel };
+            var panels = new FrameworkElement[] { ColorPanel, BindingPanel, MacroPanel, LayerPanel, DeviceSettingsPanel };
             check(panels.Count(p => p.Visibility == Visibility.Visible) == 1 && panels[mode].Visibility == Visibility.Visible, "Section " + mode + " shows its own editing controls");
         }
         var oldName = Layer.Name; LayerName.Text = "Arbeit"; RenameLayer_Click(this, new RoutedEventArgs());
@@ -2401,7 +2399,7 @@ public partial class MainWindow : Window
             var before = Fingerprint(_project);
             var colors = JsonSerializer.Serialize(Layer.Keys) + JsonSerializer.Serialize(Layer.ExtraLedColors);
             var otherLayer = JsonSerializer.Serialize(_project.Layers[0]);
-            EffectChoice.SelectedValue = 3; EffectSpeed.Value = 201; EffectBrightness.Value = 123; EffectReverse.IsChecked = true; EffectTarget.SelectedIndex = 0;
+            GlobalEffectEnabled.IsChecked = true; EffectChoice.SelectedValue = 3; EffectSpeed.Value = 201; EffectBrightness.Value = 123; EffectReverse.IsChecked = true; EffectTarget.SelectedIndex = 0;
             ApplyEffect_Click(this, new RoutedEventArgs());
             check(Layer.LightingEffect is { Mode: 3, Speed: 201, Brightness: 123, Target: 1, Reverse: true } && IsDirty, id + ": global effect controls persist exact parameters in the selected layer");
             check(JsonSerializer.Serialize(Layer.Keys) + JsonSerializer.Serialize(Layer.ExtraLedColors) == colors && JsonSerializer.Serialize(_project.Layers[0]) == otherLayer, id + ": global effect preserves individual colors and other layers");

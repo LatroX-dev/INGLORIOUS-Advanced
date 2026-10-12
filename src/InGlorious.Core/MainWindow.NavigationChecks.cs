@@ -25,7 +25,8 @@ public partial class MainWindow
                     var showsKeys = area is 0 or 1 or 3;
                     check(_activeTab == area && KeyboardWorkspace.IsVisible == showsKeys && SelectionBar.IsVisible == showsKeys,
                         id + ": area " + area + " shows key selection only where it can be edited");
-                    check(ProfilesWorkspace.IsVisible == (area == 5) && InspectorHost.IsVisible == (area != 5) && MacroWorkspace.IsVisible == (area == 2) && DeviceOverview.IsVisible == (area == 4),
+                    check(LightingPresetsButton.IsVisible == (area == 0), id + ": lighting templates are available only in the lighting editor");
+                    check(ProfilesWorkspace.IsVisible == (area == 5) && InspectorHost.IsVisible == (area < 4) && MacroWorkspace.IsVisible == (area == 2) && DeviceOverview.IsVisible == (area == 4),
                         id + ": area " + area + " has its intended workspace and inspector visibility");
                     check(panels.Count(panel => panel.IsVisible) == (area == 5 ? 0 : 1) && (area == 5 || panels[area].IsVisible),
                         id + ": area " + area + " exposes no controls from another editor");
@@ -35,7 +36,7 @@ public partial class MainWindow
 
                 ResetWorkflowFixture(id); SetLightingEditor(true); SetEffectScope(false);
                 var before = Fingerprint(_project); var history = _undo.Count;
-                EffectChoice.SelectedValue = 3; EffectSpeed.Value = 174;
+                GlobalEffectEnabled.IsChecked = true; EffectChoice.SelectedValue = 3; EffectSpeed.Value = 174;
                 _pendingEditDecisionOverride = () => PendingEditChoice.Cancel;
                 CurrentLayerChoice.SelectedIndex = 2;
                 check(_layerIndex == 0 && CurrentLayerChoice.SelectedIndex == 0 && HasPendingEffect && Fingerprint(_project) == before && _undo.Count == history,
@@ -55,12 +56,12 @@ public partial class MainWindow
                 CurrentLayerChoice.SelectedIndex = 2;
                 check(_layerIndex == 2 && CurrentLayerChoice.SelectedIndex == 2 && _project.Layers[0].LightingEffect is { Mode: 3, Speed: 174, Target: 1 } && _project.Layers[2].LightingEffect.Mode == 0 && !HasPendingEdits,
                     id + ": valid apply commits to the old layer before selecting the requested new layer");
-                EffectChoice.SelectedValue = 6; EffectSpeed.Value = 88;
+                GlobalEffectEnabled.IsChecked = true; EffectChoice.SelectedValue = 6; EffectSpeed.Value = 88;
                 before = Fingerprint(_project); _pendingEditDecisionOverride = () => PendingEditChoice.Discard;
                 SetTab(5); UpdateLayout();
                 check(_activeTab == 5 && ProfilesWorkspace.IsVisible && !HasPendingEdits && Fingerprint(_project) == before,
                     id + ": discard opens Profiles while preserving the saved model values");
-                SetTab(0); EffectChoice.SelectedValue = 5; EffectSpeed.Value = 143;
+                SetTab(0); GlobalEffectEnabled.IsChecked = true; EffectChoice.SelectedValue = 5; EffectSpeed.Value = 143;
                 _pendingEditDecisionOverride = () => PendingEditChoice.Apply;
                 SetTab(5); UpdateLayout();
                 check(_activeTab == 5 && ProfilesWorkspace.IsVisible && Layer.LightingEffect is { Mode: 5, Speed: 143 } && !HasPendingEdits,
@@ -87,6 +88,11 @@ public partial class MainWindow
                 "App settings remain directly reachable in the top toolbar at minimum size");
             check(TryFindResource("HelpVisibility") is Visibility help && help == Visibility.Visible,
                 "Optional operating help is visible by default in offline mode");
+            SetTab(0); UpdateLayout();
+            var presetsBounds = NavigationBounds(LightingPresetsButton); var inspectorBounds = NavigationBounds(InspectorHost);
+            check(LightingPresetsButton.IsVisible && presetsBounds.Width >= 32 && presetsBounds.Left >= NavigationBounds(InspectorTitle).Right && presetsBounds.Right <= inspectorBounds.Right && presetsBounds.Bottom <= NavigationBounds(LightingEditorTabs).Top &&
+                Equals(LightingPresetsButton.ToolTip, "Beleuchtungsvorlagen") && System.Windows.Automation.AutomationProperties.GetName(LightingPresetsButton) == "Beleuchtungsvorlagen",
+                "Lighting templates remain labeled and reachable beside the inspector heading at minimum width");
             var previewPreferences = new AppPreferences { StartDevice = "numpad", ShowHelp = false };
             var settingsPreview = new AppSettingsWindow(previewPreferences, offlinePreview: true);
             try
@@ -115,6 +121,9 @@ public partial class MainWindow
         bool Unchanged() => Fingerprint(_project) == before && _undo.Count == history && !IsDirty;
 
         UpdateLayout();
+        check(LightingEditorTabs.Children.Count == 2 && ReferenceEquals(LightColorsTab.Parent, LightingEditorTabs) && ReferenceEquals(LightEffectsTab.Parent, LightingEditorTabs) &&
+            ReferenceEquals(EffectScopeButtons.Parent, LightingEditorContent) && ReferenceEquals(StaticColorsPanel.Parent, LightingEditorContent) && ReferenceEquals(EffectsPanel.Parent, LightingEditorContent) && !StandbyPanel.IsVisible,
+            id + ": Colors and Effects share one tab body while standby belongs to Device");
         check(KeysLightButton.IsVisible && SidesLightButton.IsVisible && LightingSelectionPanel.IsVisible &&
             !SideChoicePanel.IsVisible && !WholeSideToggle.IsVisible && !SideLedSelectionPanel.IsVisible && !EffectScopeButtons.IsVisible,
             id + ": color editing starts with two lighting surfaces and no irrelevant side or effect controls");

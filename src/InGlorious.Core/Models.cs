@@ -148,6 +148,21 @@ public sealed class LightingEffectSettings
     public bool Reverse { get; set; }
     public List<string> Colors { get; set; } = [];
 }
+public static class GlobalEffectSwitch
+{
+    // Off uses the existing static, full-brightness format so it survives a device read.
+    // It is not a paused effect: enabling an applied static setting starts with breathing.
+    public static bool IsEnabled(LightingEffectSettings effect) => effect.Mode != 0 || effect.Brightness != 255;
+    public static LightingEffectSettings Disable(LightingEffectSettings effect) => Copy(effect, 0, 255);
+    public static LightingEffectSettings Enable(LightingEffectSettings effect) =>
+        IsEnabled(effect) ? Copy(effect, effect.Mode, effect.Brightness) : Copy(effect, 1, 255);
+
+    private static LightingEffectSettings Copy(LightingEffectSettings effect, int mode, int brightness) => new()
+    {
+        Mode = mode, Speed = effect.Speed, Brightness = brightness, Target = effect.Target,
+        Reverse = effect.Reverse, Colors = [.. effect.Colors]
+    };
+}
 public static class ColorSequenceRules
 {
     public const int MaximumColors = 8, MaximumSequences = 8;

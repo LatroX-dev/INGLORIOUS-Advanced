@@ -19,7 +19,7 @@ public sealed partial class MainWindow
         var candidate = LightingPresetStore.Apply(_state.Project, _state.LayerIndex, preset);
         OnboardSerializer.ValidateEditorProject(candidate);
         _state.Change(p => p.Layers = candidate.Layers);
-        _page = "Beleuchtung"; _showStandby = false; _globalEffect = true;
+        _page = "Beleuchtung"; _globalEffect = true;
         _showEffects = _state.Layer.LightingEffect.Mode != 0 || _state.Layer.LightingEffect.Brightness != 255 || _state.Layer.LedEffects.Count > 0;
         Changed(); Build();
     }

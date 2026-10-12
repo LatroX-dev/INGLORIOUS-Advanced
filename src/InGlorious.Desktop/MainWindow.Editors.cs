@@ -10,13 +10,17 @@ public sealed partial class MainWindow
 {
     private string _lastSide = "left";
     private bool _editingSlider;
-    private bool _showStandby;
     private async Task ShowLightingSectionAsync(string section)
     {
         if (!await GuardNavigation()) return;
-        _showStandby = section == "Standby"; _showEffects = section == "Effekte";
+        _page = "Beleuchtung"; _showEffects = section == "Effekte";
         if (_showEffects) _globalEffect = _state.SelectedLeds().Length == 0;
         Build();
+    }
+    private async Task ShowPageAsync(string page)
+    {
+        if (!await GuardNavigation()) return;
+        _page = page; Build();
     }
     private async Task ShowBindingEditorAsync(bool slider)
     {
@@ -40,17 +44,35 @@ public sealed partial class MainWindow
     }
     private void BuildLightingEditor()
     {
-        _editor.Children.Add(AsyncButton("Beleuchtungsvorlagen …", OpenLightingPresetsAsync));
-        var sections = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Stretch };
-        foreach (var section in new[] { "Farbe", "Effekte", "Standby" })
+        var body = new StackPanel { Spacing = 9, Margin = new Thickness(0, 10, 0, 0) };
+        var colors = new TabItem { Name = "LightingColorTab", Header = L.T("Farben") };
+        var effects = new TabItem { Name = "LightingEffectsTab", Header = L.T("Effekte") };
+        (_showEffects ? effects : colors).Content = body;
+        var tabs = new TabControl { Name = "LightingTabs", HorizontalContentAlignment = HorizontalAlignment.Stretch, Items = { colors, effects }, SelectedIndex = _showEffects ? 1 : 0 };
+        tabs.SelectionChanged += async (_, e) =>
         {
-            var button = AsyncButton(section, () => ShowLightingSectionAsync(section)); button.Name = "Lighting" + (section == "Farbe" ? "Color" : section == "Effekte" ? "Effects" : "Standby") + "Tab";
-            button.Margin = new Thickness(0, 0, 6, 5);
-            if (section == (_showStandby ? "Standby" : _showEffects ? "Effekte" : "Farbe")) button.BorderBrush = Brush("#EF646B");
-            sections.Children.Add(button);
+            if (_building || !ReferenceEquals(e.Source, tabs)) return;
+            var selected = tabs.SelectedIndex;
+            if (selected == (_showEffects ? 1 : 0)) return;
+            await ShowLightingSectionAsync(selected == 1 ? "Effekte" : "Farbe");
+            if (ReferenceEquals(Content, _root) && tabs.SelectedIndex != (_showEffects ? 1 : 0)) tabs.SelectedIndex = _showEffects ? 1 : 0;
+        };
+        _editor.Children.Add(tabs);
+        var outerEditor = _editor;
+        try { _editor = body; BuildLightingSettings(); }
+        finally { _editor = outerEditor; }
+    }
+    private void BuildLightingSettings()
+    {
+        if (_showEffects)
+        {
+            var global = AsyncButton("Global", async () => { if (!await GuardNavigation()) return; _globalEffect = true; Build(); }); global.Name = "GlobalEffectScope";
+            var selectionScope = AsyncButton("Auswahl", async () => { if (!await GuardNavigation()) return; _globalEffect = false; Build(); }); selectionScope.Name = "SelectedEffectScope";
+            var scope = new Grid { Name = "EffectScope", ColumnDefinitions = new("*,*"), ColumnSpacing = 6 };
+            foreach (var button in new[] { global, selectionScope }) { button.HorizontalAlignment = HorizontalAlignment.Stretch; button.HorizontalContentAlignment = HorizontalAlignment.Center; }
+            var active = _globalEffect ? global : selectionScope; active.BorderBrush = Brush("#B9535D"); active.Background = Brush("#3A252B");
+            scope.Children.Add(global); Grid.SetColumn(selectionScope, 1); scope.Children.Add(selectionScope); _editor.Children.Add(scope);
         }
-        _editor.Children.Add(sections);
-        if (_showStandby) { BuildStandbyEditor(); return; }
         if (!_showEffects || !_globalEffect)
         {
             var surfaces = Row(AsyncButton("Tasten", async () => { if (!await GuardNavigation()) return; _state.Surface = "keys"; _globalEffect = false; Build(); }),
@@ -161,44 +183,64 @@ public sealed partial class MainWindow
     }
     private void BuildEffectsEditor()
     {
-        _editor.Children.Add(Row(AsyncButton("Gesamte Ebene", async () => { if (!await GuardNavigation()) return; _globalEffect = true; Build(); }),
-            AsyncButton("Auswahl", async () => { if (!await GuardNavigation()) return; _globalEffect = false; Build(); })));
         var effect = _state.Layer.LightingEffect;
         if (!_globalEffect && _state.SelectedLeds().FirstOrDefault(-1) is var led && _state.Layer.LedEffects.TryGetValue(led, out var own))
             effect = new() { Mode = own.Mode, Speed = own.Speed, Brightness = own.Brightness, Reverse = own.Reverse, Colors = [.. own.Colors] };
-        _editor.Children.Add(Text(L.T(_globalEffect ? "Gesamte Ebene" : "Auswahl"), true));
-        var mode = Choice(LightingEffects.All.Select(e => e.Label), LightingEffects.All.ToList().FindIndex(e => e.Id == effect.Mode));
-        var speed = Number(effect.Speed, 0, 255); var brightness = Number(effect.Brightness, 0, 255);
+        var enabled = new CheckBox { Name = "GlobalEffectEnabled", Content = L.T("Globaler Effekt"), IsChecked = GlobalEffectSwitch.IsEnabled(effect) };
+        var offHint = Text(L.T("LEDs ohne eigenen Effekt zeigen ihre festen Farben."), true, 11); offHint.Name = "GlobalEffectDisabledHint";
+        if (_globalEffect) { _editor.Children.Add(enabled); _editor.Children.Add(offHint); }
+        var mode = Choice(LightingEffects.All.Select(e => e.Label), LightingEffects.All.ToList().FindIndex(e => e.Id == effect.Mode)); mode.Name = "EffectMode";
+        var speed = Number(effect.Speed, 0, 255); speed.Name = "EffectSpeed";
+        var brightness = Number(effect.Brightness, 0, 255); brightness.Name = "EffectBrightness";
         var reverse = new CheckBox { Content = L.T("Richtung umkehren"), IsChecked = effect.Reverse };
-        var target = Choice(new[] { L.T("Tasten"), L.T("Seitenleisten"), L.T("Alle LEDs") }, effect.Target - 1); target.IsVisible = _globalEffect;
-        var colors = Input(string.Join(", ", effect.Colors), "#FF0000, #00FF00, #0000FF"); colors.AcceptsReturn = true; colors.MinHeight = 64;
+        var target = Choice(new[] { L.T("Tasten"), L.T("Seitenleisten"), L.T("Alle LEDs") }, effect.Target - 1); target.IsVisible = _globalEffect; target.Name = "EffectTarget";
+        var colors = Input(string.Join(", ", effect.Colors), "#FF0000, #00FF00, #0000FF"); colors.AcceptsReturn = true; colors.MinHeight = 64; colors.Name = "EffectColors";
         var sequencePanel = Column(Heading("Farbfolge"), colors, Text(L.T("Bis zu 8 Farben. Leer verwendet den normalen Farbwechsel."), true, 11));
         var description = Text("", true, 11);
+        var settings = Column(mode, description, Heading("Geschwindigkeit"), speed, Heading("Helligkeit"), brightness, reverse, target, sequencePanel); settings.Name = "EffectSettings";
         void UpdateEffectControls()
         {
             if (mode.SelectedIndex < 0) return;
             var option = LightingEffects.All[mode.SelectedIndex]; reverse.IsEnabled = option.HasDirection;
             sequencePanel.IsVisible = option.Id == 2; description.Text = option.Description;
+            settings.IsVisible = !_globalEffect || enabled.IsChecked == true;
+            offHint.IsVisible = _globalEffect && enabled.IsChecked != true;
         }
+        enabled.IsCheckedChanged += (_, _) =>
+        {
+            if (enabled.IsChecked == true)
+            {
+                var resumed = GlobalEffectSwitch.Enable(new() { Mode = LightingEffects.All[mode.SelectedIndex].Id, Brightness = (int)(brightness.Value ?? 255) });
+                mode.SelectedIndex = LightingEffects.All.ToList().FindIndex(option => option.Id == resumed.Mode);
+                brightness.Value = resumed.Brightness;
+            }
+            UpdateEffectControls();
+        };
         mode.SelectionChanged += (_, _) => UpdateEffectControls(); UpdateEffectControls();
         bool ApplyEffect()
         {
             var value = new LightingEffectSettings { Mode = LightingEffects.All[mode.SelectedIndex].Id, Speed = (int)(speed.Value ?? 128), Brightness = (int)(brightness.Value ?? 255), Reverse = reverse.IsChecked == true, Target = target.SelectedIndex + 1,
                 Colors = (colors.Text ?? "").Split(new[] { ',', ';', ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Select(ColorPaletteStore.NormalizeColor).ToList() };
+            if (_globalEffect && enabled.IsChecked != true) value = GlobalEffectSwitch.Disable(value);
             var test = new EditorState(_state.Project, null) { LayerIndex = _state.LayerIndex, Surface = _state.Surface }; test.SelectedKeys.UnionWith(_state.SelectedKeys); test.SelectedSideLeds.UnionWith(_state.SelectedSideLeds);
             test.SetEffect(value, _globalEffect); OnboardSerializer.ValidateEditorProject(test.Project);
             _state.SetEffect(value, _globalEffect); return true;
         }
-        Watch(ApplyEffect, mode, speed, brightness, reverse, target, colors);
-        _editor.Children.Add(mode); _editor.Children.Add(description); _editor.Children.Add(Heading("Geschwindigkeit")); _editor.Children.Add(speed);
-        _editor.Children.Add(Heading("Helligkeit")); _editor.Children.Add(brightness); _editor.Children.Add(reverse); _editor.Children.Add(target);
-        _editor.Children.Add(sequencePanel);
-        _editor.Children.Add(Button("Übernehmen", () => ApplyEdited(ApplyEffect), true));
+        Watch(ApplyEffect, mode, speed, brightness, reverse, target, colors, enabled);
+        _editor.Children.Add(settings);
+        var apply = Button("Übernehmen", () => ApplyEdited(ApplyEffect), true); apply.Name = "ApplyEffect"; _editor.Children.Add(apply);
         if (!_globalEffect) _editor.Children.Add(AsyncButton("Globalen Effekt übernehmen", async () =>
         {
             if (!await GuardNavigation()) return; var leds = _state.SelectedLeds(); _state.Change(p => { foreach (var id in leds) p.Layers[_state.LayerIndex].LedEffects.Remove(id); }); Changed(); Build();
         }));
-        _editor.Children.Add(Button(_previewRunning ? "Vorschau pausieren" : "Vorschau fortsetzen", () => { _previewRunning = !_previewRunning; Build(); }));
+        Button preview = null!;
+        preview = Button(_previewRunning ? "Vorschau pausieren" : "Vorschau fortsetzen", () =>
+        {
+            _previewRunning = !_previewRunning;
+            var label = _previewRunning ? "Vorschau pausieren" : "Vorschau fortsetzen";
+            preview.Content = ButtonContent(label); Avalonia.Automation.AutomationProperties.SetName(preview, L.T(label));
+        });
+        preview.Name = "EffectPreviewToggle"; _editor.Children.Add(preview);
     }
     private Control BuildBindingFileActions()
     {
@@ -318,31 +360,66 @@ public sealed partial class MainWindow
     }
     private Control BuildDeviceWorkspace()
     {
-        var body = _state.Device.IsOfflineOnly
-            ? Column(Heading("Gerät"), Text(_state.Device.Name, size: 22), Heading("Offline-Profil"), BuildFirmwareVersionPanel())
-            : Column(Heading("Gerät"), Text(_state.Device.Name, size: 22), Text(_state.Device.Subtitle, true),
-            Heading("Firmware"), BuildFirmwareVersionPanel(),
-            AsyncButton("Gerät einrichten", () => OpenDeviceSetupAsync(_state.Device.Id)),
-            Heading("Original-Firmware wiederherstellen"),
-            Text(L.T("Die Wiederherstellung verwendet ausschließlich die passende Original-Sicherung dieses Geräts."), true),
-            AsyncButton("Original-Firmware wiederherstellen", () => OpenDeviceSetupAsync(_state.Device.Id, SetupOperation.Restore)));
+        var body = Column(BuildDeviceSettings()); body.Name = "DeviceWorkspace"; body.Spacing = 18;
         if (_state.Device.IsExperimentalFirmware)
-            body.Children.Insert(2, new TextBlock { Name = "ExperimentalDeviceNotice", Text = L.T("Experimentelle Unterstützung: noch nicht an diesem Modell getestet."), Foreground = Brush("#E9B86B"), FontSize = 12, TextWrapping = TextWrapping.Wrap });
+            body.Children.Insert(0, new TextBlock { Name = "ExperimentalDeviceNotice", Text = L.T("Experimentelle Unterstützung: noch nicht an diesem Modell getestet."), Foreground = Brush("#E9B86B"), FontSize = 12, TextWrapping = TextWrapping.Wrap });
+        body.Children.Add(new Separator());
+        var firmware = Column(Heading(_state.Device.IsOfflineOnly ? "Offline-Profil" : "Firmware"), BuildFirmwareVersionPanel()); firmware.Name = "DeviceFirmwareSection";
+        if (_state.Device.IsOfflineOnly) { body.Children.Add(firmware); return body; }
+        firmware.Children.Add(AsyncButton("Gerät einrichten", () => OpenDeviceSetupAsync(_state.Device.Id)));
+        var restore = AsyncButton("Original-Firmware wiederherstellen", () => OpenDeviceSetupAsync(_state.Device.Id, SetupOperation.Restore)); restore.Name = "RestoreOriginalFirmware";
+        var folder = AsyncButton("Sicherungsordner öffnen", () => OpenRecoveryFolderAsync(Status)); folder.Name = "OpenDeviceRecoveryFolder";
+        var recovery = Column(Heading("Sicherungen"),
+            Text(L.T("Deine Original-Firmware wird bei der Einrichtung auf diesem Computer gesichert."), true, 11),
+            Text(L.T("Die Wiederherstellung verwendet ausschließlich die passende Original-Sicherung dieses Geräts."), true, 11),
+            folder, restore); recovery.Name = "DeviceRecoverySection";
+        var maintenance = new Grid { Name = "DeviceMaintenance", ColumnDefinitions = new("*,*"), ColumnSpacing = 36 };
+        maintenance.Children.Add(firmware); Grid.SetColumn(recovery, 1); maintenance.Children.Add(recovery); body.Children.Add(maintenance);
         return body;
     }
-    private void BuildDeviceEditor()
+    private Control BuildDeviceSettings()
     {
-        var polling = Choice(new[] { "1000 Hz · 1 ms", "500 Hz · 2 ms", "250 Hz · 4 ms", "125 Hz · 8 ms" }, Array.IndexOf(new[] { 1, 2, 4, 8 }, _state.Project.DeviceSettings.UsbPollingIntervalMs));
-        polling.Name = "PollingInterval";
+        var polling = Choice(new[] { "1000 Hz · 1 ms", "500 Hz · 2 ms", "250 Hz · 4 ms", "125 Hz · 8 ms" }, Array.IndexOf(new[] { 1, 2, 4, 8 }, _state.Project.DeviceSettings.UsbPollingIntervalMs)); polling.Name = "PollingInterval";
         var debounce = Number(_state.Project.DeviceSettings.DebounceMs, 0, 40); debounce.Name = "DebounceMs";
-        _editor.Children.Add(Heading("USB-Abfragerate")); _editor.Children.Add(polling); _editor.Children.Add(Heading("Entprellzeit (ms)")); _editor.Children.Add(debounce);
+        var timingFields = new Grid { ColumnDefinitions = new("*,*"), ColumnSpacing = 12 };
+        timingFields.Children.Add(Column(Text(L.T("USB-Abfragerate"), true, 12), polling));
+        var debounceField = Column(Text(L.T("Entprellzeit (ms)"), true, 12), debounce); Grid.SetColumn(debounceField, 1); timingFields.Children.Add(debounceField);
+        var timing = Column(Heading("Reaktionszeit"), timingFields,
+            Text(L.T("Eine geänderte USB-Abfragerate wird nach der USB-Neuanmeldung aktiv."), true, 11)); timing.Name = "DeviceTimingSection";
+        var value = _state.Project.Standby;
+        var enabled = new CheckBox { Name = "StandbyEnabled", Content = L.T("Standby aktivieren"), IsChecked = value.Enabled };
+        var presets = new[] { 30, 60, 120, 300, 600, 1800, 3600 };
+        var preset = Choice(new[] { L.T("30 Sekunden"), L.T("1 Minute"), L.T("2 Minuten"), L.T("5 Minuten"), L.T("10 Minuten"), L.T("30 Minuten"), L.T("60 Minuten"), L.T("Eigene Zeit") }, Array.IndexOf(presets, value.TimeoutSeconds) is var index && index >= 0 ? index : presets.Length); preset.Name = "StandbyDelayPreset";
+        var timeout = Number(value.TimeoutSeconds, 10, 3600); timeout.Name = "StandbyTimeoutSeconds";
+        var customTime = Column(Text(L.T("Sekunden"), true, 11), timeout); customTime.IsVisible = preset.SelectedIndex == presets.Length;
+        var mode = Choice(new[] { L.T("Aus"), L.T("Dimmen"), L.T("Screensaver") }, value.Mode); mode.Name = "StandbyMode";
+        var brightness = Number(value.DimBrightnessPercent, 1, 100); brightness.Name = "StandbyBrightness";
+        var dimming = Column(Text(L.T("Helligkeit (%)"), true, 11), brightness);
+        var screensaverHint = Text(L.T("Nach der Wartezeit wiederholt sich die vollständige Lichtsequenz bis zur nächsten Eingabe."), true, 11); screensaverHint.Name = "StandbyScreensaverHint";
+        var fields = new Grid { ColumnDefinitions = new("*,*"), ColumnSpacing = 12 };
+        fields.Children.Add(Column(Text(L.T("Wartezeit"), true, 12), preset, customTime));
+        var action = Column(Text(L.T("Aktion"), true, 12), mode, dimming); Grid.SetColumn(action, 1); fields.Children.Add(action);
+        var settings = Column(fields, Text(L.T("Nach der letzten Eingabe an diesem Gerät."), true, 11), screensaverHint);
+        void UpdateControls() { settings.IsEnabled = enabled.IsChecked == true; dimming.IsVisible = mode.SelectedIndex == 1; screensaverHint.IsVisible = mode.SelectedIndex == 2; }
+        preset.SelectionChanged += (_, _) => { customTime.IsVisible = preset.SelectedIndex == presets.Length; if (preset.SelectedIndex >= 0 && preset.SelectedIndex < presets.Length) timeout.Value = presets[preset.SelectedIndex]; };
+        mode.SelectionChanged += (_, _) => UpdateControls(); enabled.IsCheckedChanged += (_, _) => UpdateControls(); UpdateControls();
+        var standbyHeading = Heading("Beleuchtung bei Inaktivität"); standbyHeading.Name = "StandbyHeading";
+        var standby = Column(standbyHeading, enabled, settings,
+            Text(L.T("Gilt für das gesamte Gerät und läuft ohne geöffnete App.") + " " + L.T("Tasten, Drehknopf oder Schieberegler wecken die Beleuchtung wieder auf."), true, 11),
+            Text(L.T("Im USB-Ruhezustand bleibt die Beleuchtung aus.") + " " + L.T("Standby benötigt passende INGLORIOUS-Firmware."), true, 11)); standby.Name = "DeviceStandbySection";
         bool ApplySettings()
         {
-            CommitCandidate(p => p.DeviceSettings = new() { UsbPollingIntervalMs = new[] { 1, 2, 4, 8 }[polling.SelectedIndex], DebounceMs = (int)(debounce.Value ?? 5) }); return true;
+            CommitCandidate(p =>
+            {
+                p.DeviceSettings = new() { UsbPollingIntervalMs = new[] { 1, 2, 4, 8 }[polling.SelectedIndex], DebounceMs = (int)(debounce.Value ?? 5) };
+                p.Standby = new() { Enabled = enabled.IsChecked == true, TimeoutSeconds = (int)(timeout.Value ?? value.TimeoutSeconds), Mode = mode.SelectedIndex, DimBrightnessPercent = (int)(brightness.Value ?? value.DimBrightnessPercent) };
+            }); return true;
         }
-        Watch(ApplySettings, polling, debounce);
-        _editor.Children.Add(Button("Übernehmen", () => ApplyEdited(ApplySettings), true));
-        _editor.Children.Add(Text(L.T("Eine geänderte USB-Abfragerate wird nach der USB-Neuanmeldung aktiv."), true));
+        Watch(ApplySettings, polling, debounce, enabled, preset, timeout, mode, brightness);
+        var sections = new Grid { Name = "DeviceSettingsSections", ColumnDefinitions = new("*,*"), ColumnSpacing = 36 };
+        sections.Children.Add(timing); Grid.SetColumn(standby, 1); sections.Children.Add(standby);
+        var apply = Button("Übernehmen", () => ApplyEdited(ApplySettings), true); apply.Name = "ApplyDeviceSettings";
+        return Column(sections, apply);
     }
     private void BuildSliderEditor()
     {
@@ -395,34 +472,5 @@ public sealed partial class MainWindow
         Watch(ApplySlider, mode, minimum, maximum, channel, cc);
         var apply = Button("Regler übernehmen", () => ApplyEdited(ApplySlider), true); apply.Name = "SliderApply";
         _editor.Children.Add(apply); _editor.Children.Add(Text(L.T("Eine Funktion für alle Ebenen."), true, 11));
-    }
-    private void BuildStandbyEditor()
-    {
-        var value = _state.Project.Standby;
-        var enabled = new CheckBox { Name = "StandbyEnabled", Content = L.T("Standby aktivieren"), IsChecked = value.Enabled };
-        var presets = new[] { 30, 60, 120, 300, 600, 1800, 3600 };
-        var preset = Choice(new[] { L.T("30 Sekunden"), L.T("1 Minute"), L.T("2 Minuten"), L.T("5 Minuten"), L.T("10 Minuten"), L.T("30 Minuten"), L.T("60 Minuten"), L.T("Eigene Zeit") }, Array.IndexOf(presets, value.TimeoutSeconds) is var index && index >= 0 ? index : presets.Length);
-        preset.Name = "StandbyDelayPreset";
-        var timeout = Number(value.TimeoutSeconds, 10, 3600); timeout.Name = "StandbyTimeoutSeconds";
-        var customTime = Column(Text(L.T("Sekunden"), true), timeout); customTime.IsVisible = preset.SelectedIndex == presets.Length;
-        var mode = Choice(new[] { L.T("Aus"), L.T("Dimmen"), L.T("Screensaver") }, value.Mode); mode.Name = "StandbyMode";
-        var brightness = Number(value.DimBrightnessPercent, 1, 100); brightness.Name = "StandbyBrightness";
-        var dimming = Column(Heading("Helligkeit (%)"), brightness);
-        var screensaverHint = Text(L.T("Nach der Wartezeit wiederholt sich die vollständige Lichtsequenz bis zur nächsten Eingabe."), true, 11); screensaverHint.Name = "StandbyScreensaverHint";
-        var settings = Column(Heading("Wartezeit"), preset, customTime, Text(L.T("Nach der letzten Eingabe an diesem Gerät."), true, 11), Heading("Aktion"), mode, screensaverHint, dimming);
-        void UpdateControls() { settings.IsEnabled = enabled.IsChecked == true; dimming.IsVisible = mode.SelectedIndex == 1; screensaverHint.IsVisible = mode.SelectedIndex == 2; }
-        preset.SelectionChanged += (_, _) => { customTime.IsVisible = preset.SelectedIndex == presets.Length; if (preset.SelectedIndex >= 0 && preset.SelectedIndex < presets.Length) timeout.Value = presets[preset.SelectedIndex]; };
-        mode.SelectionChanged += (_, _) => UpdateControls(); enabled.IsCheckedChanged += (_, _) => UpdateControls(); UpdateControls();
-        bool ApplyStandby()
-        {
-            CommitCandidate(p => p.Standby = new LightingStandbySettings { Enabled = enabled.IsChecked == true, TimeoutSeconds = (int)(timeout.Value ?? value.TimeoutSeconds), Mode = mode.SelectedIndex, DimBrightnessPercent = (int)(brightness.Value ?? value.DimBrightnessPercent) }); return true;
-        }
-        Watch(ApplyStandby, enabled, preset, timeout, mode, brightness);
-        _editor.Children.Add(enabled); _editor.Children.Add(settings);
-        _editor.Children.Add(Button("Übernehmen", () => ApplyEdited(ApplyStandby), true));
-        _editor.Children.Add(Text(L.T("Gilt für das gesamte Gerät und läuft ohne geöffnete App."), true, 11));
-        _editor.Children.Add(Text(L.T("Tasten, Drehknopf oder Schieberegler wecken die Beleuchtung wieder auf."), true, 11));
-        _editor.Children.Add(Text(L.T("Im USB-Ruhezustand bleibt die Beleuchtung aus."), true, 11));
-        _editor.Children.Add(Text(L.T("Standby benötigt passende INGLORIOUS-Firmware."), true, 11));
     }
 }

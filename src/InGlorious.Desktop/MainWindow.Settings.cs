@@ -126,21 +126,23 @@ public sealed partial class MainWindow
     {
         var install = AsyncButton("Gerät einrichten", () => OpenDeviceSetupAsync(owner: owner)); install.Name = "SetupFromSettings";
         var restore = AsyncButton("Original-Firmware wiederherstellen", () => OpenDeviceSetupAsync(operation: SetupOperation.Restore, owner: owner)); restore.Name = "RestoreFromSettings";
-        var folder = AsyncButton("Sicherungsordner öffnen", async () =>
-        {
-            if (Program.Offline || _firmwareFlow) return;
-            try
-            {
-                Directory.CreateDirectory(DeviceSetupService.RecoveryDirectory);
-                if (!await Launcher.LaunchUriAsync(new Uri(DeviceSetupService.RecoveryDirectory + Path.DirectorySeparatorChar)))
-                    error.Text = L.T("Der Sicherungsordner konnte nicht geöffnet werden.");
-            }
-            catch { error.Text = L.T("Der Sicherungsordner konnte nicht geöffnet werden."); }
-        });
+        var folder = AsyncButton("Sicherungsordner öffnen", () => OpenRecoveryFolderAsync(message => error.Text = message));
         folder.Name = "OpenRecoveryFolder";
         install.IsEnabled = restore.IsEnabled = folder.IsEnabled = !offlinePreview;
         return Column(Text(L.T("Firmware"), true), install, restore,
             Text(L.T("Deine Original-Firmware wird bei der Einrichtung auf diesem Computer gesichert."), true), folder);
+    }
+
+    private async Task OpenRecoveryFolderAsync(Action<string> reportError)
+    {
+        if (Program.Offline || _firmwareFlow) return;
+        try
+        {
+            Directory.CreateDirectory(DeviceSetupService.RecoveryDirectory);
+            if (!await Launcher.LaunchUriAsync(new Uri(DeviceSetupService.RecoveryDirectory + Path.DirectorySeparatorChar)))
+                reportError(L.T("Der Sicherungsordner konnte nicht geöffnet werden."));
+        }
+        catch { reportError(L.T("Der Sicherungsordner konnte nicht geöffnet werden.")); }
     }
 
     private static Control[] SettingsControls(Window window)

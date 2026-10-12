@@ -11,7 +11,7 @@ public partial class MainWindow
     private bool IsHelpTakingFocus => _helpOpen || Keyboard.FocusedElement == HelpButton;
     private string ContextHelpTopic => _activeTab switch
     {
-        0 => _showLightingStandby ? "standby" : "lighting",
+        0 => "lighting",
         1 => _editingSlider && Device.Id == "numpad" ? "device" : "bindings",
         2 => "macros", 3 => "layers", 4 => "device", 5 => "profiles", _ => "start"
     };
@@ -45,8 +45,8 @@ public partial class MainWindow
             check(ContextHelpTopic == "device", "Help: slider settings open the article explaining slider functions");
             ShowBindingTarget(false);
             check(ContextHelpTopic == "bindings", "Help: returning to keys restores the bindings article");
-            SetTab(0); SetStandbyEditor(); check(ContextHelpTopic == "standby", "Help: standby editor has its own contextual article");
-            SetLightingEditor(true); SetEffectScope(false); EffectSpeed.Value = 177; EffectChoice.SelectedValue = 3;
+            SetTab(0); SetStandbyEditor(); check(ContextHelpTopic == "device", "Help: standby settings are part of the Device article context");
+            SetLightingEditor(true); SetEffectScope(false); GlobalEffectEnabled.IsChecked = true; EffectSpeed.Value = 177; EffectChoice.SelectedValue = 3;
             ProjectName.Text = "Uncommitted profile name";
             var fingerprint = Fingerprint(_project); var inputs = EffectInputFingerprint(); var undo = _undo.Count;
             var pendingPrompts = 0; _pendingEditDecisionOverride = () => { pendingPrompts++; return PendingEditChoice.Discard; };

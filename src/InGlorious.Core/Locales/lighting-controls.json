@@ -1,0 +1,41 @@
+{
+  "Beleuchtung bei Inaktivität": {
+    "en": "Lighting when inactive",
+    "es": "Iluminación durante la inactividad",
+    "fr": "Éclairage en cas d’inactivité",
+    "it": "Illuminazione durante l’inattività",
+    "pt-BR": "Iluminação durante a inatividade",
+    "pl": "Podświetlenie podczas bezczynności",
+    "tr": "Boştayken aydınlatma",
+    "ru": "Подсветка при бездействии",
+    "ja": "操作していないときの照明",
+    "ko": "입력이 없을 때 조명",
+    "zh-Hans": "空闲时的灯光"
+  },
+  "Globaler Effekt": {
+    "en": "Global effect",
+    "es": "Efecto global",
+    "fr": "Effet global",
+    "it": "Effetto globale",
+    "pt-BR": "Efeito global",
+    "pl": "Efekt globalny",
+    "tr": "Genel efekt",
+    "ru": "Общий эффект",
+    "ja": "全体のエフェクト",
+    "ko": "전체 효과",
+    "zh-Hans": "全局效果"
+  },
+  "LEDs ohne eigenen Effekt zeigen ihre festen Farben.": {
+    "en": "LEDs without individual effects show their fixed colors.",
+    "es": "Los LED sin efecto individual muestran sus colores fijos.",
+    "fr": "Les LED sans effet individuel affichent leurs couleurs fixes.",
+    "it": "I LED senza un effetto individuale mostrano i loro colori fissi.",
+    "pt-BR": "LEDs sem efeito individual exibem suas cores fixas.",
+    "pl": "Diody LED bez indywidualnego efektu świecą swoimi stałymi kolorami.",
+    "tr": "Ayrı efekti olmayan LED’ler sabit renklerini gösterir.",
+    "ru": "Светодиоды без отдельных эффектов показывают свои постоянные цвета.",
+    "ja": "個別のエフェクトがないLEDは、設定した色で常時点灯します。",
+    "ko": "개별 효과가 없는 LED는 설정된 색상으로 켜집니다.",
+    "zh-Hans": "没有单独效果的LED将显示其固定颜色。"
+  }
+}

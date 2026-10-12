@@ -16,7 +16,7 @@ public sealed partial class MainWindow
         var count = 0;
         void Check(bool condition, string name) { count++; if (!condition) throw new InvalidOperationException("Check failed: " + name); }
         void Reject(Action action, string name) { var rejected = false; try { action(); } catch (InvalidDataException) { rejected = true; } Check(rejected, name); }
-        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.49", "visible product assembly metadata uses INGLORIOUS 0.6.49");
+        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.50", "visible product assembly metadata uses INGLORIOUS 0.6.50");
         await RunConnectionsChecksAsync(Check);
         await RunProfileReplacementChecksAsync(Check);
         await RunKeyBindingChecksAsync(Check);
@@ -181,9 +181,9 @@ public sealed partial class MainWindow
             showAll.IsChecked = false;
             Check(presetList.Items.Count == 2 && applyPreset.IsEnabled && ((PresetRow)presetList.SelectedItem!).Entry.Preset.DeviceId == device.Id, "hiding other devices restores compatible selection");
             var beforePresetUi = EditorState.Fingerprint(_state.Project);
-            _page = "Beleuchtung"; _showEffects = false; _showStandby = true; _globalEffect = false; Build();
+            _page = "Gerät"; _showEffects = false; _globalEffect = false; Build();
             ApplyLightingPreset(preset);
-            Check(_showEffects && !_showStandby && _globalEffect && _scene?.Animated == true && _pendingApply is null,
+            Check(_showEffects && _page == "Beleuchtung" && _globalEffect && _scene?.Animated == true && _pendingApply is null,
                 "applying animated preset opens whole-layer effects and activates preview " + device.Id);
             var afterPresetUi = EditorState.Fingerprint(_state.Project);
             var firstPreview = new PreviewRgb[_state.Device.LedCount]; var laterPreview = new PreviewRgb[firstPreview.Length];
@@ -199,18 +199,19 @@ public sealed partial class MainWindow
             Check(EditorState.Fingerprint(_state.Project) == beforePresetUi,
                 "animated preset and identical reapply remain a single undoable change " + device.Id);
             ApplyLightingPreset(LightingPresetStore.Capture(ProjectService.Create(device.Id), 0, "Static preview fixture"));
-            Check(!_showEffects && !_showStandby && _scene?.Animated == false,
+            Check(!_showEffects && _page == "Beleuchtung" && _scene?.Animated == false,
                 "colors-only preset keeps color editor and does not invent animation " + device.Id);
             _state.Undo(); Changed(); Build();
             foreach (var page in new[] { "Beleuchtung", "Tastenbelegung", "Ebenen", "Makros", "Gerät", "Profile" })
             { _page = page; Build(); UpdateLayout(); Check(Content is not null && _root is not null, "UI builds " + device.Id + " " + page); }
-            _page = "Beleuchtung"; _showEffects = true; Build(); UpdateLayout(); Check(_editor.Children.Count > 8, "effect editor builds");
+            _page = "Beleuchtung"; _showEffects = true; Build(); UpdateLayout(); Check(_root!.GetLogicalDescendants().OfType<TabControl>().Single(c => c.Name == "LightingTabs").SelectedIndex == 1 && _root!.GetLogicalDescendants().OfType<NumericUpDown>().Count() >= 2, "effect editor builds within its selected tab");
         }
         Check(PhysicalCode(Avalonia.Input.PhysicalKey.P) == "KC_P", "physical letter distinct from numpad");
         RunSliderNavigationChecks(Check);
         RunLayerGuidanceChecks(Check);
         RunColorEditorChecks(Check);
         RunLightingPreviewChecks(Check);
+        RunGlobalEffectSwitchChecks(Check);
         RunStandbyEditorChecks(Check);
         _state = new EditorState("pro-iso");
         foreach (var operation in Enum.GetValues<SetupOperation>())
@@ -372,7 +373,7 @@ public sealed partial class MainWindow
     private void RunStandbyEditorChecks(Action<bool, string> check)
     {
         T Find<T>(string name) where T : Control => _root.GetLogicalDescendants().OfType<T>().Single(c => c.Name == name);
-        var original = _state; var language = L.CurrentLanguage;
+        var original = _state; var language = L.CurrentLanguage; var page = _page; var effects = _showEffects;
         try
         {
             foreach (var device in DeviceCatalog.All)
@@ -380,17 +381,21 @@ public sealed partial class MainWindow
                 _state = new EditorState(device.Id);
                 _state.Change(p => p.Standby = new() { Enabled = false, TimeoutSeconds = 157, Mode = 1, DimBrightnessPercent = 17 });
                 var initial = EditorState.Fingerprint(_state.Project); _page = "Beleuchtung";
-                ShowLightingSectionAsync("Standby").GetAwaiter().GetResult();
-                check(_showStandby && !_showEffects && Find<CheckBox>("StandbyEnabled").IsChecked == false && Find<NumericUpDown>("StandbyTimeoutSeconds").Value == 157 && Find<NumericUpDown>("StandbyBrightness").Value == 17, "standby opens exact existing device values " + device.Id);
+                ShowPageAsync("Gerät").GetAwaiter().GetResult();
+                check(Find<Grid>("WorkspaceColumns").ColumnDefinitions.Count == 2 && !_root.GetLogicalDescendants().OfType<Control>().Any(control => control.Name == "RightInspector"), "device page uses the entire workspace without an inspector " + device.Id);
+                check(Find<Grid>("DeviceSettingsSections").Children.Count == 2 && Find<StackPanel>("DeviceTimingSection").GetLogicalAncestors().OfType<Control>().Any(control => control.Name == "DeviceWorkspace") && Find<StackPanel>("DeviceStandbySection").GetLogicalAncestors().OfType<Control>().Any(control => control.Name == "DeviceWorkspace"), "timing and inactivity controls share the main device workspace " + device.Id);
+                check(_root.GetLogicalDescendants().OfType<Button>().Count(button => button.Name == "ApplyDeviceSettings") == 1 && !_root.GetLogicalDescendants().OfType<Button>().Any(button => button.Name == "LightingPresetsButton"), "device page keeps one combined apply and no lighting preset entry " + device.Id);
+                if (!device.IsOfflineOnly) check(Find<Button>("RestoreOriginalFirmware").IsVisible && Find<Button>("OpenDeviceRecoveryFolder").IsVisible, "recovery and backup-folder actions stay directly available " + device.Id);
+                check(_page == "Gerät" && Find<CheckBox>("StandbyEnabled").IsChecked == false && Find<NumericUpDown>("StandbyTimeoutSeconds").Value == 157 && Find<NumericUpDown>("StandbyBrightness").Value == 17, "standby opens exact existing device values " + device.Id);
                 check(Find<ComboBox>("StandbyDelayPreset").SelectedIndex == 7 && !Find<ComboBox>("StandbyMode").IsEffectivelyEnabled && _pendingApply is null && EditorState.Fingerprint(_state.Project) == initial, "custom timeout preserved and disabled section is pure");
                 Find<CheckBox>("StandbyEnabled").IsChecked = true;
                 Find<ComboBox>("StandbyDelayPreset").SelectedIndex = 2;
                 Find<NumericUpDown>("StandbyBrightness").Value = 31;
                 check(Find<NumericUpDown>("StandbyTimeoutSeconds").Value == 120 && _pendingApply is not null && EditorState.Fingerprint(_state.Project) == initial, "standby preset edits remain pending");
                 _offlinePromptChoice = 0; ShowLightingSectionAsync("Farbe").GetAwaiter().GetResult();
-                check(_showStandby && _pendingApply is not null && Find<NumericUpDown>("StandbyBrightness").Value == 31, "cancel keeps standby settings entered");
+                check(_page == "Gerät" && _pendingApply is not null && Find<NumericUpDown>("StandbyBrightness").Value == 31, "cancel keeps standby settings entered");
                 _offlinePromptChoice = 1; ShowLightingSectionAsync("Farbe").GetAwaiter().GetResult();
-                check(!_showStandby && _pendingApply is null && _state.Project.Standby is { Enabled: true, TimeoutSeconds: 120, Mode: 1, DimBrightnessPercent: 31 }, "apply changes standby atomically before navigation");
+                check(_page == "Beleuchtung" && _pendingApply is null && _state.Project.Standby is { Enabled: true, TimeoutSeconds: 120, Mode: 1, DimBrightnessPercent: 31 }, "apply changes standby atomically before navigation");
                 var expected = ProjectService.Create(device.Id); expected.Standby = new() { Enabled = true, TimeoutSeconds = 120, Mode = 1, DimBrightnessPercent = 31 };
                 check(EditorState.Fingerprint(_state.Project) == EditorState.Fingerprint(expected), "standby apply preserves lighting bindings macros layers and slider");
                 if (!device.IsOfflineOnly)
@@ -401,10 +406,10 @@ public sealed partial class MainWindow
                 check(PlatformDeviceService.UnsupportedReason(previousFirmware, image) == "Standby benötigt passende INGLORIOUS-Firmware." && PlatformDeviceService.UnsupportedReason(previousFirmware with { Flags = 249 }, image) is null, "standby capability blocks old firmware before backup or write");
                 }
                 _state.Undo(); Changed(); check(EditorState.Fingerprint(_state.Project) == initial, "standby undo restores exact pre-edit project");
-                ShowLightingSectionAsync("Standby").GetAwaiter().GetResult(); Find<CheckBox>("StandbyEnabled").IsChecked = true; Find<ComboBox>("StandbyMode").SelectedIndex = 0;
+                ShowPageAsync("Gerät").GetAwaiter().GetResult(); Find<CheckBox>("StandbyEnabled").IsChecked = true; Find<ComboBox>("StandbyMode").SelectedIndex = 0;
                 _offlinePromptChoice = 2; ShowLightingSectionAsync("Effekte").GetAwaiter().GetResult();
-                check(!_showStandby && _showEffects && EditorState.Fingerprint(_state.Project) == initial, "discard preserves stored standby config and opens effects");
-                ShowLightingSectionAsync("Standby").GetAwaiter().GetResult();
+                check(_page == "Beleuchtung" && _showEffects && EditorState.Fingerprint(_state.Project) == initial, "discard preserves stored standby config and opens effects");
+                ShowPageAsync("Gerät").GetAwaiter().GetResult();
                 Find<CheckBox>("StandbyEnabled").IsChecked = true; Find<ComboBox>("StandbyMode").SelectedIndex = 2;
                 check(_pendingApply is not null && EditorState.Fingerprint(_state.Project) == initial, "screensaver choice stays pending until apply");
                 _offlinePromptChoice = 1; ShowLightingSectionAsync("Farbe").GetAwaiter().GetResult();
@@ -418,22 +423,35 @@ public sealed partial class MainWindow
                 }
                 else check(_state.Project.Standby is { Enabled: true, Mode: 2 }, "screensaver can be saved in offline profile");
                 _state.Undo(); Changed(); check(EditorState.Fingerprint(_state.Project) == initial, "screensaver undo restores full previous profile");
-                ShowLightingSectionAsync("Standby").GetAwaiter().GetResult(); Find<CheckBox>("StandbyEnabled").IsChecked = true; Find<NumericUpDown>("StandbyTimeoutSeconds").Value = 173;
+                ShowPageAsync("Gerät").GetAwaiter().GetResult(); Find<CheckBox>("StandbyEnabled").IsChecked = true; Find<NumericUpDown>("StandbyTimeoutSeconds").Value = 173;
                 _offlinePromptChoice = 0; OpenSettingsAsync().GetAwaiter().GetResult();
-                check(L.CurrentLanguage == language && _showStandby && Find<NumericUpDown>("StandbyTimeoutSeconds").Value == 173 && _pendingApply is not null, "cancel before app settings preserves language and pending standby");
+                check(L.CurrentLanguage == language && _page == "Gerät" && Find<NumericUpDown>("StandbyTimeoutSeconds").Value == 173 && _pendingApply is not null, "cancel before app settings preserves language and pending standby");
                 _offlinePromptChoice = 1; OpenSettingsAsync().GetAwaiter().GetResult();
                 check(_pendingApply is null && _state.Project.Standby.TimeoutSeconds == 173 && _state.Project.Standby.Enabled, "app settings guard applies standby before language changes");
                 var applied = EditorState.Fingerprint(_state.Project);
                 L.SetLanguage(language == "en" ? "de" : "en"); Build();
                 check(EditorState.Fingerprint(_state.Project) == applied && _pendingApply is null && Find<NumericUpDown>("StandbyTimeoutSeconds").Value == 173 && Find<ComboBox>("StandbyDelayPreset").SelectedIndex == 7, "language rebuild retains exact custom standby values without creating pending edits");
                 L.SetLanguage(language); Build();
+                var beforeCombined = EditorState.Fingerprint(_state.Project);
+                Find<NumericUpDown>("DebounceMs").Value = 13;
+                Find<CheckBox>("StandbyEnabled").IsChecked = false;
+                _offlinePromptChoice = 1; ShowPageAsync("Beleuchtung").GetAwaiter().GetResult();
+                check(_state.Project.DeviceSettings.DebounceMs == 13 && !_state.Project.Standby.Enabled, "one device apply preserves timing and inactivity edits together");
+                _state.Undo(); Changed();
+                check(EditorState.Fingerprint(_state.Project) == beforeCombined, "combined timing and inactivity edit uses one undo step");
+                Build();
+                check(!_root.GetLogicalDescendants().OfType<Control>().Any(c => c.Name is "StandbyEnabled" or "StandbyHeading"), "inactivity settings are absent from the lighting tabs");
+                var tabs = Find<TabControl>("LightingTabs");
+                check(tabs.Items.Count == 2 && tabs.Items.Cast<TabItem>().Select(item => item.Name).SequenceEqual(new[] { "LightingColorTab", "LightingEffectsTab" }), "lighting contains only colors and effects tabs");
+                var presets = Find<Button>("LightingPresetsButton");
+                check(presets.GetLogicalAncestors().OfType<Control>().Any(control => control.Name == "InspectorHeader") && presets.Content is Avalonia.Controls.Shapes.Path && presets.Width == 32 && Equals(ToolTip.GetTip(presets), L.T("Beleuchtungsvorlagen")) && Avalonia.Automation.AutomationProperties.GetName(presets) == L.T("Beleuchtungsvorlagen"), "lighting presets use an accessible compact icon in the inspector header " + device.Id);
             }
         }
-        finally { L.SetLanguage(language); _offlinePromptChoice = null; _pendingApply = null; _showStandby = false; _showEffects = false; _state = original; }
+        finally { L.SetLanguage(language); _offlinePromptChoice = null; _pendingApply = null; _showEffects = effects; _state = original; _page = page; }
     }
     private void RunLightingPreviewChecks(Action<bool, string> check)
     {
-        var original = _state; var page = _page; var showEffects = _showEffects; var showStandby = _showStandby;
+        var original = _state; var page = _page; var showEffects = _showEffects;
         var globalEffect = _globalEffect; var previewRunning = _previewRunning; var hits = _hits.ToArray();
         try
         {
@@ -444,7 +462,7 @@ public sealed partial class MainWindow
                 _state.Layer.SynchronizeSides = true; _state.Layer.LedEffects.Clear();
                 foreach (var led in device.NonKeyLedIndices)
                     _state.Layer.LedEffects[led] = new() { Mode = 2, Speed = 200, Colors = ["#0000FF", "#FFFF00"] };
-                _state.Surface = "left"; _page = "Beleuchtung"; _showEffects = false; _showStandby = false;
+                _state.Surface = "left"; _page = "Beleuchtung"; _showEffects = false;
                 _globalEffect = false; _previewRunning = true; _hits.Clear(); Build();
                 var originalProfile = EditorState.Fingerprint(_state.Project); var undo = _state.CanUndo;
                 RenderLightingPreviewFrame(0);
@@ -471,9 +489,80 @@ public sealed partial class MainWindow
         }
         finally
         {
-            _state = original; _page = page; _showEffects = showEffects; _showStandby = showStandby;
+            _state = original; _page = page; _showEffects = showEffects;
             _globalEffect = globalEffect; _previewRunning = previewRunning; _hits.Clear(); _hits.AddRange(hits);
             _offlinePromptChoice = null; _pendingApply = null;
+        }
+    }
+    private void RunGlobalEffectSwitchChecks(Action<bool, string> check)
+    {
+        T Find<T>(string name) where T : Control => _root.GetLogicalDescendants().OfType<T>().Single(control => control.Name == name);
+        void Click(string name) => Find<Button>(name).RaiseEvent(new RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+        var original = _state; var page = _page; var showEffects = _showEffects; var global = _globalEffect;
+        var pending = _pendingApply; var choice = _offlinePromptChoice; var busy = _busy; var connectionPending = _initialConnectionsPending;
+        var running = _previewRunning; var hits = _hits.ToArray();
+        try
+        {
+            _busy = _initialConnectionsPending = false; _pendingApply = null; _previewRunning = true; _hits.Clear();
+            foreach (var device in new[] { "pro-iso", "numpad" })
+            {
+                _state = new EditorState(device); var keys = _state.Device.Keys.Where(key => key.LedIndex.HasValue).Take(3).ToArray();
+                _state.Layer.LightingEffect = new() { Mode = 2, Speed = 91, Brightness = 180, Target = 3, Reverse = true, Colors = ["#FF0000", "#AA0000"] };
+                _state.Layer.Keys[keys[0].Id].Color = "#123456"; _state.Layer.Keys[keys[1].Id].Color = "#000000";
+                _state.Layer.LedEffects[keys[2].LedIndex!.Value] = new() { Mode = 2, Speed = 180, Brightness = 255, Colors = ["#0000FF", "#FFFF00"] };
+                _state.SelectedKeys.Add(keys[2].Id); _state.MarkInitialClean();
+                _page = "Beleuchtung"; _showEffects = _globalEffect = true; Build();
+                var initial = EditorState.Fingerprint(_state.Project);
+                check(Find<CheckBox>("GlobalEffectEnabled").IsChecked == true && Find<StackPanel>("EffectSettings").IsVisible, "global effect controls reflect the stored active effect " + device);
+                Find<CheckBox>("GlobalEffectEnabled").IsChecked = false;
+                check(!Find<StackPanel>("EffectSettings").IsVisible && Find<TextBlock>("GlobalEffectDisabledHint").IsVisible && _pendingApply is not null && EditorState.Fingerprint(_state.Project) == initial && !_state.CanUndo,
+                    "switching global effect off remains a pending edit and preserves all stored settings " + device);
+                var pendingOff = _pendingApply; var switchControl = Find<CheckBox>("GlobalEffectEnabled");
+                Click("EffectPreviewToggle");
+                check(!_previewRunning && ReferenceEquals(Find<CheckBox>("GlobalEffectEnabled"), switchControl) && switchControl.IsChecked == false && ReferenceEquals(pendingOff, _pendingApply) && EditorState.Fingerprint(_state.Project) == initial,
+                    "pausing the preview preserves the pending global switch without rebuilding its controls " + device);
+                Click("EffectPreviewToggle");
+                Find<CheckBox>("GlobalEffectEnabled").IsChecked = true;
+                check(LightingEffects.All[Find<ComboBox>("EffectMode").SelectedIndex].Id == 2 && Find<NumericUpDown>("EffectBrightness").Value == 180,
+                    "off then on before apply preserves the chosen effect and brightness " + device);
+                Find<CheckBox>("GlobalEffectEnabled").IsChecked = false;
+                _offlinePromptChoice = 0; Click("SelectedEffectScope");
+                check(_globalEffect && Find<CheckBox>("GlobalEffectEnabled").IsChecked == false && _pendingApply is not null && EditorState.Fingerprint(_state.Project) == initial,
+                    "canceling a scope change retains the pending global switch " + device);
+                _offlinePromptChoice = 2; Click("SelectedEffectScope");
+                check(!_globalEffect && !_root.GetLogicalDescendants().OfType<Control>().Any(control => control.Name == "GlobalEffectEnabled") && _pendingApply is null && EditorState.Fingerprint(_state.Project) == initial,
+                    "discarding a global switch keeps the selection effect independent " + device);
+                Click("GlobalEffectScope"); Find<CheckBox>("GlobalEffectEnabled").IsChecked = false; Click("ApplyEffect");
+                var expected = ProjectService.Clone(_state.Project); expected.Layers[_state.LayerIndex].LightingEffect.Mode = 2; expected.Layers[_state.LayerIndex].LightingEffect.Brightness = 180;
+                check(_state.Layer.LightingEffect is { Mode: 0, Brightness: 255, Speed: 91, Target: 3, Reverse: true } && EditorState.Fingerprint(expected) == initial && _pendingApply is null,
+                    "applying off restores fixed colors and preserves overrides, palettes, targets, bindings and other layers " + device);
+                RenderLightingPreviewFrame(0);
+                check(_frame[keys[0].LedIndex!.Value] == new PreviewRgb(0x12, 0x34, 0x56) && _frame[keys[1].LedIndex!.Value] == new PreviewRgb(0, 0, 0) && _frame[keys[2].LedIndex!.Value] == new PreviewRgb(0, 0, 255) && _scene?.Animated == true,
+                    "applied off preview shows fixed colors, keeps black LEDs dark and retains the individual animation " + device);
+                var disabled = EditorState.Fingerprint(_state.Project);
+                _state.Undo(); Changed(); Build();
+                check(EditorState.Fingerprint(_state.Project) == initial && Find<CheckBox>("GlobalEffectEnabled").IsChecked == true, "undo restores the complete active effect in one step " + device);
+                _state.Redo(); Changed(); Build();
+                check(EditorState.Fingerprint(_state.Project) == disabled && Find<CheckBox>("GlobalEffectEnabled").IsChecked == false, "redo returns the exact off configuration " + device);
+                _state = new EditorState(OnboardSerializer.Decode(OnboardSerializer.Prepare(_state.Project).Payload), null); Build();
+                check(Find<CheckBox>("GlobalEffectEnabled").IsChecked == false && !Find<StackPanel>("EffectSettings").IsVisible, "device configuration read recognizes the inactive global effect " + device);
+                var read = EditorState.Fingerprint(_state.Project);
+                Find<CheckBox>("GlobalEffectEnabled").IsChecked = true;
+                check(LightingEffects.All[Find<ComboBox>("EffectMode").SelectedIndex].Id == 1 && Find<NumericUpDown>("EffectBrightness").Value == 255 && EditorState.Fingerprint(_state.Project) == read,
+                    "re-enabling a saved static configuration proposes breathing without changing the profile " + device);
+                _offlinePromptChoice = 0; var pendingEnabled = _pendingApply; Click("LightingPresetsButton");
+                check(ReferenceEquals(_pendingApply, pendingEnabled) && _globalEffect && Find<CheckBox>("GlobalEffectEnabled").IsChecked == true && EditorState.Fingerprint(_state.Project) == read, "moved preset entry preserves pending effect edits when canceled " + device);
+                _offlinePromptChoice = 0; Find<TabControl>("LightingTabs").SelectedIndex = 0;
+                check(_showEffects && Find<TabControl>("LightingTabs").SelectedIndex == 1 && _pendingApply is not null, "canceling a tab change retains the effect editor and pending switch " + device);
+                Click("ApplyEffect");
+                check(_state.Layer.LightingEffect.Mode == 1 && _state.Layer.LedEffects[keys[2].LedIndex!.Value].Mode == 2 && _pendingApply is null,
+                    "enabling a global effect does not replace independent LED effects " + device);
+            }
+        }
+        finally
+        {
+            _state = original; _page = page; _showEffects = showEffects; _globalEffect = global; _pendingApply = pending; _offlinePromptChoice = choice;
+            _busy = busy; _initialConnectionsPending = connectionPending; _previewRunning = running; _hits.Clear(); _hits.AddRange(hits);
         }
     }
     private void RunColorEditorChecks(Action<bool, string> check)

@@ -63,6 +63,10 @@ Confirm the prompt to install access rules for the supported USB devices. Then r
 
 At startup the app loads each connected INGLORIOUS device. Select **Lighting**, **Key assignments**, **Layers**, **Macros**, **Profiles** or **Device**, make your changes and use **Send to keyboard** at the bottom. After a successful transfer, the keyboard keeps working with the app closed.
 
+In **Lighting**, use the **Colors** and **Effects** tabs to choose what you edit. The palette icon opens lighting templates. Switching **Global effect** off shows the stored colors on LEDs without their own effect; black stays unlit. Individual LED effects remain unchanged. Apply your edits, then select **Send to keyboard**.
+
+Under **Device**, configure response time and lighting during inactivity. Firmware and backups are on the same page.
+
 Saving a profile keeps a copy on your computer. It does not change the keyboard until transferred. Macro and color libraries can be reused across compatible profiles; lighting templates show the matching device by default.
 
 Use the **?** button next to Settings for help in your language. Language follows **System** by default.

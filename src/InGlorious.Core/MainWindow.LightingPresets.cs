@@ -24,7 +24,7 @@ public partial class MainWindow
         { BeginChange(); _project = candidate; }
         // A preset applies to the complete layer. Show its actual effects instead
         // of leaving the preview in the colors-only editor mode.
-        _activeTab = 0; _showLightingStandby = false; _effectForSelection = false;
+        _activeTab = 0; _effectForSelection = false;
         _showLightingEffects = Layer.LightingEffect.Mode != 0 || Layer.LightingEffect.Brightness != 255 || Layer.LedEffects.Count > 0;
         RefreshAll();
         FinishChange(L.F($"Beleuchtungsvorlage „{preset.Name}“ auf Ebene {_layerIndex} übernommen."), false);

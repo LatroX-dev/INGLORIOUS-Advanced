@@ -30,6 +30,26 @@ Check(!OnboardIdentity.MatchesNames("unknown", "INGLORIOUS", "INGLORIOUS Numpad"
 
 foreach (var id in new[] { "pro-iso", "numpad" })
 {
+    var switched = ProjectService.Create(id);
+    switched.Layers[0].LightingEffect = new() { Mode = 2, Speed = 71, Brightness = 123, Target = 2, Reverse = true, Colors = ["#FF0000", "#550000"] };
+    switched.Layers[0].SynchronizeSides = true;
+    switched.Layers[0].LedEffects[0] = new() { Mode = 2, Speed = 167, Brightness = 149, Reverse = true, Colors = ["#00FFFF", "#FFFF00"] };
+    var activeImage = OnboardSerializer.Prepare(switched);
+    switched.Layers[0].LightingEffect = GlobalEffectSwitch.Disable(switched.Layers[0].LightingEffect);
+    var offImage = OnboardSerializer.Prepare(switched); var effectOffset = OnboardSerializer.Shape(id).Size;
+    var expectedOff = activeImage.Payload.ToArray(); expectedOff[effectOffset] = 0; expectedOff[effectOffset + 2] = 255;
+    Check(offImage.Payload.SequenceEqual(expectedOff), "Global off changes only its mode and brightness bytes; palettes, overrides, other layers and all settings remain intact");
+    var offTransport = new EmulatedDevice(id, activeImage.Payload) { EffectsSupported = true, ExtraFlags = 32 };
+    await using (var offClient = new OnboardClient(offTransport, id))
+    {
+        var transferred = await offClient.ApplyAsync(offImage);
+        Check(transferred.ReadbackVerified && offTransport.Active.SequenceEqual(offImage.Payload), "Global off transfers through the existing effects and color-sequence contract");
+        var read = OnboardSerializer.Decode(await offClient.ReadAsync());
+        Check(!GlobalEffectSwitch.IsEnabled(read.Layers[0].LightingEffect) && read.Layers[0].LightingEffect is { Mode: 0, Brightness: 255, Target: 2, Speed: 71, Reverse: true }, "Fresh device read recognizes off and retains all stored effect parameters");
+        Check(read.Layers[0].LightingEffect.Colors.SequenceEqual(["#FF0000", "#550000"]) && read.Layers[0].LedEffects[0] is { Mode: 2, Speed: 167, Brightness: 149, Reverse: true } && read.Layers[0].LedEffects[0].Colors.SequenceEqual(["#00FFFF", "#FFFF00"]), "Device read retains the inactive global palette and the active individual effect");
+        Check(OnboardSerializer.Prepare(read).Payload.SequenceEqual(offImage.Payload), "An applied off state survives a byte-exact fresh read and re-encoding");
+        Check(!offTransport.Commands.Contains(OnboardProtocol.GetExtensions), "Global off requires no new firmware extension or capability");
+    }
     var project = ProjectService.Create(id);
     var shape = OnboardSerializer.Shape(id);
     var effectShape = OnboardSerializer.Shape(id, 2);

@@ -16,7 +16,7 @@ public static class UserGuide
         new("lighting", "Beleuchtung", Array.AsReadOnly(new GuideSection[]
         {
             new("Farben und Effekte", "Wähle Tasten oder Seiten. Atmen, Wellen und Glitzern verwenden deren Basisfarben. „Farbwechsel“ verwendet seine eigene Farbfolge, ohne Farbfolge einen Regenbogen. Regenbogen und Feuer erzeugen eigene Farben."),
-            new("Global oder einzeln", "„Global“ gilt nur für die aktuelle Ebene und den gewählten Bereich. Eigene Effekte einzelner LEDs haben Vorrang, auch bei der Helligkeit. Mit „Globalen Effekt verwenden“ entfernst du diese Ausnahme."),
+            new("Global oder einzeln", "„Global“ gilt für die aktuelle Ebene. Eigene Effekte einzelner LEDs haben Vorrang. Schaltest du „Globaler Effekt“ aus, zeigen LEDs ohne eigenen Effekt ihre festen Farben; Schwarz bleibt aus. Zum erneuten Einschalten wählst du einen Effekt. Mit „Globalen Effekt verwenden“ kehrt eine ausgewählte LED zum globalen Effekt zurück."),
             new("Vorschau und Übernehmen", "„Farben“ und „Effekte“ zeigen die gespeicherte Beleuchtung mit ihren Effekten. Farbwähler und Farbfelder ändern die Basisfarbe. Eine eigene Farbfolge im Effekt „Farbwechsel“ verwendet stattdessen ihre Farben. Bestätige Änderungen mit „Übernehmen“ und danach mit „Auf Tastatur übertragen“.")
         })),
         new("bindings", "Tastenbelegung", Array.AsReadOnly(new GuideSection[]
@@ -54,7 +54,7 @@ public static class UserGuide
         })),
         new("standby", "Standby", Array.AsReadOnly(new GuideSection[]
         {
-            new("Licht bei Inaktivität", "Unter „Beleuchtung → Standby“ aktivierst du eine Wartezeit und wählst Ausschalten, Dimmen oder Screensaver. Standby gilt für das ganze Gerät. Übernimm die Einstellung und übertrage sie auf die Tastatur; danach funktioniert sie ohne laufende App."),
+            new("Licht bei Inaktivität", "Unter „Gerät → Beleuchtung bei Inaktivität“ aktivierst du eine Wartezeit und wählst Ausschalten, Dimmen oder Screensaver. Standby gilt für das ganze Gerät. Übernimm die Einstellung und übertrage sie auf die Tastatur; danach funktioniert sie ohne laufende App."),
             new("Wieder aufwecken", "Tasten, Drehgeber und eine bewusste Reglerbewegung beenden Standby. Der Screensaver wiederholt die komplette Lichtsequenz bis zur nächsten Eingabe. Deine normale Beleuchtung bleibt gespeichert. Im USB-Ruhezustand ist das Licht aus.")
         })),
         new("settings", "Einstellungen", Array.AsReadOnly(new GuideSection[]

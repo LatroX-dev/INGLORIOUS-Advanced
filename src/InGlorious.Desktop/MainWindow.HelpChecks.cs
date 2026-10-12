@@ -14,7 +14,7 @@ public sealed partial class MainWindow
     {
         if (!Program.Offline) throw new InvalidOperationException("Help checks require offline mode.");
         var language = L.CurrentLanguage; var preferences = _preferences;
-        var page = _page; var standby = _showStandby; var sliderEditor = _editingSlider; var pending = _pendingApply;
+        var page = _page; var sliderEditor = _editingSlider; var pending = _pendingApply;
         var before = EditorState.Fingerprint(_state.Project); var path = _state.Path;
         var dirty = _state.Dirty; var undo = _state.CanUndo; var redo = _state.CanRedo;
         var selectedKeys = _state.SelectedKeys.ToArray(); var selectedSides = _state.SelectedSideLeds.ToArray();
@@ -47,9 +47,7 @@ public sealed partial class MainWindow
             _editingSlider = false;
             foreach (var (source, id) in new[] { ("Beleuchtung", "lighting"), ("Tastenbelegung", "bindings"), ("Makros", "macros"),
                 ("Ebenen", "layers"), ("Profile", "profiles"), ("Gerät", "device"), ("", "start") })
-            { _page = source; _showStandby = false; check(CurrentGuideTopic() == id, "help opens the active editor topic: " + id); }
-            _page = "Beleuchtung"; _showStandby = true;
-            check(CurrentGuideTopic() == "standby", "standby editor opens its dedicated help topic");
+            { _page = source; check(CurrentGuideTopic() == id, "help opens the active editor topic: " + id); }
             var priorSliderEditor = _editingSlider;
             try
             {
@@ -103,7 +101,7 @@ public sealed partial class MainWindow
         }
         finally
         {
-            L.SetLanguage(language); _preferences = preferences; _page = page; _showStandby = standby; _editingSlider = sliderEditor;
+            L.SetLanguage(language); _preferences = preferences; _page = page; _editingSlider = sliderEditor;
             Build(); _pendingApply = pending;
         }
     }

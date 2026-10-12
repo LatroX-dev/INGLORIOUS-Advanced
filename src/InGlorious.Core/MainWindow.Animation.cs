@@ -121,8 +121,9 @@ public partial class MainWindow
         if (_showLightingEffects && _pendingEditsReady && !_refreshingEffects && HasPendingEffect && EffectChoice.SelectedItem is LightingEffectOption option &&
             (_effectForSelection || EffectTarget.SelectedIndex is >= 0 and <= 2))
         {
-            draft = new((byte)option.Id, (byte)Math.Round(EffectSpeed.Value), (byte)Math.Round(EffectBrightness.Value),
-                (byte)(_effectForSelection ? 3 : EffectTarget.SelectedIndex + 1), (byte)((option.HasDirection && EffectReverse.IsChecked == true ? 1 : 0) | (Layer.SynchronizeSides ? 2 : 0)), _effectColors.Select(PreviewRgb.FromHex).ToArray());
+            var effect = EffectiveEffectInput();
+            draft = new((byte)effect.Mode, (byte)effect.Speed, (byte)effect.Brightness,
+                (byte)(_effectForSelection ? 3 : effect.Target), (byte)((effect.Reverse ? 1 : 0) | (Layer.SynchronizeSides ? 2 : 0)), effect.Colors.Select(PreviewRgb.FromHex).ToArray());
             if (_effectForSelection) selected = SelectedEffectLeds().ToHashSet();
         }
         _previewScene = LightingPreviewEngine.CreateScene(Device, Layer, draft, selected);

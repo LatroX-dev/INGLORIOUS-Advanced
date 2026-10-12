@@ -72,7 +72,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="220" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                            <StackPanel x:Name="WorkspaceHeadingHost" VerticalAlignment="Center" Margin="0,0,12,0">
                                 <TextBlock x:Name="WorkspaceHeading" Text="{local:Tr Key='Tastatur'}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
                                 <TextBlock x:Name="ExperimentalDeviceLabel" Text="{local:Tr Key='Experimentell'}" Foreground="#E9B86B" FontSize="11" Margin="0,4,0,0" Visibility="Collapsed" />
                             </StackPanel>
@@ -145,39 +145,130 @@
                             </WrapPanel>
                         </Grid>
                         </StackPanel>
-                        <Border x:Name="DeviceOverview" VerticalAlignment="Top" Grid.Row="2" Visibility="Collapsed" Background="#171A1D" BorderBrush="#30363C" BorderThickness="1" Padding="22" Margin="0,14,0,14">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
+                        <Border x:Name="DeviceOverview" VerticalAlignment="Top" Grid.Row="2" Visibility="Collapsed" Margin="0,24,0,14">
+                            <StackPanel>
+                                <TextBlock x:Name="DevicePendingEditsHint" Text="{Binding Text, ElementName=PendingEditsHint}" Visibility="{Binding Visibility, ElementName=PendingEditsHint}" Foreground="{StaticResource Accent}" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,14" />
+                                <Grid x:Name="DeviceSettingsPanel" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="48" /><ColumnDefinition /></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{local:Tr Key='Reaktionszeit'}" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,18" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="20" /><ColumnDefinition /></Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{local:Tr Key='USB-Abfragerate'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+                                                <ComboBox x:Name="PollingChoice" SelectedValuePath="Tag">
+                                                    <ComboBoxItem Content="{local:Tr Key='1000 Hz · 1 ms'}" Tag="1" />
+                                                    <ComboBoxItem Content="{local:Tr Key='500 Hz · 2 ms'}" Tag="2" />
+                                                    <ComboBoxItem Content="{local:Tr Key='250 Hz · 4 ms'}" Tag="4" />
+                                                    <ComboBoxItem Content="{local:Tr Key='125 Hz · 8 ms'}" Tag="8" />
+                                                </ComboBox>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="{local:Tr Key='Entprellzeit'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="DebounceInput" Text="5" MaxLength="2" ToolTip="{local:Tr Key='Entprellzeit von 0 bis 40 Millisekunden'}" />
+                                                    <TextBlock Grid.Column="1" Text="{local:Tr Key='ms'}" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="9,0,0,0" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Grid>
+                                        <TextBlock Text="{local:Tr Key='0–40 ms · Standard: 5 ms. Niedrige Werte können bei prellenden Schaltern doppelte Eingaben verursachen.'}" Style="{StaticResource OptionalHelp}" Margin="0,12,0,0" />
+                                        <TextBlock Text="{local:Tr Key='Nach einer Änderung meldet sich das Gerät kurz per USB neu an. Umstecken ist nicht nötig.'}" Style="{StaticResource OptionalHelp}" Margin="0,9,0,0" />
+                                        <TextBlock Text="{local:Tr Key='Gilt für alle Ebenen dieses Geräts. USB-Abfragerate und Entprellzeit sind keine Messung der gesamten Eingabelatenz.'}" Style="{StaticResource OptionalHelp}" Margin="0,9,0,0" />
+                                        <Button x:Name="ApplyTimingButton" local:UiIcons.Kind="check" Content="{local:Tr Key='Einstellungen übernehmen'}" Click="ApplyDeviceSettings_Click" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" MinWidth="180" Margin="0,18,0,0" />
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Width="1" Background="{StaticResource Stroke}" Margin="0,0,0,0" />
+                                    <StackPanel x:Name="StandbyPanel" Grid.Column="2">
+                                        <Grid Margin="0,0,0,18">
+                                            <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                            <TextBlock Text="{local:Tr Key='Beleuchtung bei Inaktivität'}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                            <ToggleButton x:Name="StandbyEnabled" Grid.Column="1" Style="{StaticResource SwitchToggle}" ToolTip="{local:Tr Key='Standby aktivieren'}" AutomationProperties.Name="{local:Tr Key='Standby aktivieren'}" VerticalAlignment="Center" />
+                                        </Grid>
+                                        <StackPanel x:Name="StandbyOptions">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="20" /><ColumnDefinition /></Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{local:Tr Key='Wartezeit'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+                                                    <ComboBox x:Name="StandbyTimeChoice" SelectedValuePath="Tag" SelectionChanged="StandbyTime_Changed">
+                                                        <ComboBoxItem Content="{local:Tr Key='30 Sekunden'}" Tag="30" />
+                                                        <ComboBoxItem Content="{local:Tr Key='1 Minute'}" Tag="60" />
+                                                        <ComboBoxItem Content="{local:Tr Key='2 Minuten'}" Tag="120" />
+                                                        <ComboBoxItem Content="{local:Tr Key='5 Minuten'}" Tag="300" />
+                                                        <ComboBoxItem Content="{local:Tr Key='10 Minuten'}" Tag="600" />
+                                                        <ComboBoxItem Content="{local:Tr Key='30 Minuten'}" Tag="1800" />
+                                                        <ComboBoxItem Content="{local:Tr Key='60 Minuten'}" Tag="3600" />
+                                                        <ComboBoxItem Content="{local:Tr Key='Eigene Zeit'}" Tag="custom" />
+                                                    </ComboBox>
+                                                    <Grid x:Name="StandbyCustomTimePanel" Visibility="Collapsed" Margin="0,9,0,0">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                        <TextBox x:Name="StandbySeconds" Text="300" MaxLength="5" />
+                                                        <TextBlock Grid.Column="1" Text="{local:Tr Key='Sekunden'}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                                    </Grid>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="{local:Tr Key='Aktion'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+                                                    <ComboBox x:Name="StandbyMode" SelectedIndex="0">
+                                                        <ComboBoxItem Content="{local:Tr Key='Aus'}" /><ComboBoxItem Content="{local:Tr Key='Dimmen'}" /><ComboBoxItem Content="{local:Tr Key='Screensaver'}" />
+                                                    </ComboBox>
+                                                    <Grid x:Name="StandbyBrightnessPanel" Margin="0,9,0,0">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="85" /></Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{local:Tr Key='Helligkeit (%)'}" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" />
+                                                        <TextBox x:Name="StandbyBrightness" Grid.Column="1" Text="10" MaxLength="3" />
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Grid>
+                                            <TextBlock Text="{local:Tr Key='Nach der letzten Eingabe an diesem Gerät.'}" Style="{StaticResource OptionalHelp}" Margin="0,9,0,0" />
+                                            <TextBlock x:Name="StandbyScreensaverHint" Text="{local:Tr Key='Nach der Wartezeit wiederholt sich die vollständige Lichtsequenz bis zur nächsten Eingabe.'}" Visibility="Collapsed" Style="{StaticResource HelpText}" Margin="0,9,0,0" />
+                                        </StackPanel>
+                                        <TextBlock Text="{local:Tr Key='Gilt für das gesamte Gerät und läuft ohne geöffnete App.'}" Style="{StaticResource HelpText}" Margin="0,12,0,0" />
+                                        <TextBlock Text="{local:Tr Key='Tasten, Drehknopf oder Schieberegler wecken die Beleuchtung wieder auf.'}" Style="{StaticResource HelpText}" Margin="0,5,0,0" />
+                                        <TextBlock Text="{local:Tr Key='Im USB-Ruhezustand bleibt die Beleuchtung aus.'}" Style="{StaticResource HelpText}" Margin="0,5,0,0" />
+                                        <Border x:Name="ApplyStandbyHost" HorizontalAlignment="Left" MinWidth="180" Margin="0,18,0,0">
+                                            <Button local:UiIcons.Kind="check" Content="{local:Tr Key='Übernehmen'}" Click="ApplyStandby_Click" Style="{StaticResource PrimaryButton}" />
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                                <Border Style="{StaticResource PanelDivider}" Margin="0,28,0,24" />
                                 <TextBlock x:Name="ExperimentalDeviceNotice" Text="{local:Tr Key='Experimentelle Unterstützung: noch nicht an diesem Modell getestet.'}" Foreground="#E9B86B" TextWrapping="Wrap" LineHeight="21" Margin="0,0,0,18" Visibility="Collapsed" />
-                                <StackPanel x:Name="OfflineDeviceOverview" Grid.Row="1" Visibility="Collapsed">
+                                <StackPanel x:Name="OfflineDeviceOverview" Visibility="Collapsed">
                                     <TextBlock Text="{local:Tr Key='Offline-Profil'}" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
                                     <TextBlock Text="{local:Tr Key='Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar.'}" TextWrapping="Wrap" Foreground="{StaticResource Muted}" LineHeight="21" />
                                 </StackPanel>
-                                <StackPanel x:Name="DeviceHardwareOverview" Grid.Row="1">
-                                <TextBlock Text="{local:Tr Key='Firmware'}" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,16" />
-                                <TextBlock x:Name="DeviceFirmwareVersionText" Text="{local:Tr Key='Version noch nicht geprüft'}" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,16" />
-                                <TextBlock x:Name="FirmwareInstallationNotice" Text="{local:Tr Key='Firmwareinstallation ist für dieses Modell noch nicht verfügbar.'}" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Visibility="Collapsed" Margin="0,0,0,16" />
-                                <StackPanel x:Name="ExperimentalSetupActions" Visibility="Collapsed" Margin="0,0,0,16">
-                                    <Button Content="{local:Tr Key='Gerät einrichten'}" local:UiIcons.Kind="chip" Click="SetupDevice_Click" HorizontalAlignment="Left" />
-                                    <Button Content="{local:Tr Key='Original-Firmware wiederherstellen'}" local:UiIcons.Kind="restore" Click="RestoreSetupDevice_Click" HorizontalAlignment="Left" Margin="0,10,0,0" />
-                                </StackPanel>
-                                <Button x:Name="ManageFirmwareButton" local:UiIcons.Kind="chip" Content="{local:Tr Key='Firmware verwalten'}" Click="Firmware_Click" HorizontalAlignment="Left" MinHeight="40" Padding="12,9" />
-                                <StackPanel x:Name="DeviceRecoveryOverview">
-                                <Border Style="{StaticResource PanelDivider}" />
-                                <TextBlock Text="{local:Tr Key='Sicherungen'}" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-                                <TextBlock x:Name="CaptureStateText" Style="{StaticResource HelpText}" Margin="0,0,0,14" />
-                                <Button local:UiIcons.Kind="shield" Content="{local:Tr Key='Sicherungen ansehen'}" Click="Backup_Click" HorizontalAlignment="Left" />
-                                <Border Style="{StaticResource PanelDivider}" />
-                                <StackPanel x:Name="OriginalFirmwareSection">
-                                    <TextBlock Text="{local:Tr Key='Original-Firmware wiederherstellen'}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,16" />
-                                    <Button x:Name="RestoreOriginalFirmwareButton" local:UiIcons.Kind="restore" Content="{local:Tr Key='Wiederherstellung öffnen'}" Click="RestoreFirmware_Click" HorizontalAlignment="Left" MinHeight="40" Padding="12,9" />
-                                </StackPanel>
-                                </StackPanel>
-                                </StackPanel>
-                            </Grid>
+                                <Grid x:Name="DeviceHardwareOverview" Grid.IsSharedSizeScope="True">
+                                    <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="2*" /></Grid.ColumnDefinitions>
+                                    <Grid Margin="0,0,24,0">
+                                        <Grid.RowDefinitions><RowDefinition Height="Auto" SharedSizeGroup="DeviceActionTitle" /><RowDefinition Height="Auto" SharedSizeGroup="DeviceActionInfo" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                        <TextBlock Text="{local:Tr Key='Firmware'}" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                        <StackPanel Grid.Row="1" Margin="0,0,0,14">
+                                            <TextBlock x:Name="DeviceFirmwareVersionText" Text="{local:Tr Key='Version noch nicht geprüft'}" Style="{StaticResource HelpText}" />
+                                            <TextBlock x:Name="FirmwareInstallationNotice" Text="{local:Tr Key='Firmwareinstallation ist für dieses Modell noch nicht verfügbar.'}" Style="{StaticResource HelpText}" Visibility="Collapsed" Margin="0,8,0,0" />
+                                            <StackPanel x:Name="ExperimentalSetupActions" Visibility="Collapsed" Margin="0,10,0,0">
+                                                <Button Content="{local:Tr Key='Gerät einrichten'}" local:UiIcons.Kind="chip" Click="SetupDevice_Click" HorizontalAlignment="Left" />
+                                                <Button Content="{local:Tr Key='Original-Firmware wiederherstellen'}" local:UiIcons.Kind="restore" Click="RestoreSetupDevice_Click" HorizontalAlignment="Left" Margin="0,10,0,0" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <Button x:Name="ManageFirmwareButton" Grid.Row="2" local:UiIcons.Kind="chip" Content="{local:Tr Key='Firmware verwalten'}" Click="Firmware_Click" HorizontalAlignment="Left" MinHeight="37" Padding="12,9" />
+                                    </Grid>
+                                    <Grid x:Name="DeviceRecoveryOverview" Grid.Column="1">
+                                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+                                        <Border BorderBrush="{StaticResource Stroke}" BorderThickness="1,0,0,0" Padding="24,0" Margin="0,0,0,0">
+                                            <Grid>
+                                                <Grid.RowDefinitions><RowDefinition Height="Auto" SharedSizeGroup="DeviceActionTitle" /><RowDefinition Height="Auto" SharedSizeGroup="DeviceActionInfo" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                                <TextBlock Text="{local:Tr Key='Sicherungen'}" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,12" />
+                                                <TextBlock x:Name="CaptureStateText" Grid.Row="1" Style="{StaticResource HelpText}" Margin="0,0,0,14" />
+                                                <Button Grid.Row="2" local:UiIcons.Kind="shield" Content="{local:Tr Key='Sicherungen ansehen'}" Click="Backup_Click" HorizontalAlignment="Left" MinHeight="37" Padding="12,9" />
+                                            </Grid>
+                                        </Border>
+                                        <Border x:Name="OriginalFirmwareSection" Grid.Column="1" BorderBrush="{StaticResource Stroke}" BorderThickness="1,0,0,0" Padding="24,0,0,0">
+                                            <Grid>
+                                                <Grid.RowDefinitions><RowDefinition Height="Auto" SharedSizeGroup="DeviceActionTitle" /><RowDefinition Height="Auto" SharedSizeGroup="DeviceActionInfo" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                                <TextBlock Text="{local:Tr Key='Original-Firmware wiederherstellen'}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,12" />
+                                                <Button x:Name="RestoreOriginalFirmwareButton" Grid.Row="2" local:UiIcons.Kind="restore" Content="{local:Tr Key='Wiederherstellung öffnen'}" Click="RestoreFirmware_Click" HorizontalAlignment="Left" MinHeight="37" Padding="12,9" />
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+                            </StackPanel>
                         </Border>
                         <Border x:Name="MacroWorkspace" Grid.Row="2" Visibility="Collapsed" Background="#171A1D" BorderBrush="#30363C" BorderThickness="1" Padding="18" Margin="0,14,0,14">
                             <StackPanel>
@@ -283,54 +374,28 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <StackPanel>
-                        <TextBlock x:Name="EditorSectionTitle" Text="{local:Tr Key='Beleuchtung'}" Style="{StaticResource Eyebrow}" Foreground="#A0A7B0" Visibility="Collapsed" />
-                        <TextBlock x:Name="InspectorTitle" Text="{local:Tr Key='Taste auswählen'}" FontSize="18" FontWeight="SemiBold" Margin="0,9,0,0" />
-                        <TextBlock x:Name="InspectorSubtitle" Text="{local:Tr Key='Wähle eine Taste in der Vorschau.'}" Style="{StaticResource HelpText}" Margin="0,6,0,0" />
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock x:Name="EditorSectionTitle" Text="{local:Tr Key='Beleuchtung'}" Style="{StaticResource Eyebrow}" Foreground="#A0A7B0" Visibility="Collapsed" />
+                                <TextBlock x:Name="InspectorTitle" Text="{local:Tr Key='Taste auswählen'}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,9,0,0" />
+                                <TextBlock x:Name="InspectorSubtitle" Text="{local:Tr Key='Wähle eine Taste in der Vorschau.'}" Style="{StaticResource HelpText}" Margin="0,6,0,0" />
+                            </StackPanel>
+                            <Button x:Name="LightingPresetsButton" Grid.Column="1" local:UiIcons.Kind="palette" local:UiIcons.IconOnly="True" Content="{local:Tr Key='Beleuchtungsvorlagen'}" ToolTip="{local:Tr Key='Beleuchtungsvorlagen'}" AutomationProperties.Name="{local:Tr Key='Beleuchtungsvorlagen'}" Click="LightingPresets_Click" Width="36" Height="36" Padding="0" Margin="12,3,0,0" VerticalAlignment="Top" Style="{StaticResource QuietButton}" />
+                        </Grid>
                         <TextBlock x:Name="PendingEditsHint" Foreground="{StaticResource Accent}" TextWrapping="Wrap" Visibility="Collapsed" FontSize="11" Margin="0,9,0,0" />
                     </StackPanel>
                     <Border Grid.Row="1" Style="{StaticResource PanelDivider}" />
                     <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <Grid>
                             <StackPanel x:Name="ColorPanel">
-                                <Button local:UiIcons.Kind="palette" Content="{local:Tr Key='Beleuchtungsvorlagen'}" Click="LightingPresets_Click" Margin="0,0,0,14"/>
-                                <UniformGrid Columns="3" Margin="0,0,0,14">
-                                    <Button x:Name="LightColorsTab" Content="{local:Tr Key='Farben'}" Click="LightColors_Click" FontSize="11" Margin="0,0,3,0" />
-                                    <Button x:Name="LightEffectsTab" Content="{local:Tr Key='Effekte'}" Click="LightEffects_Click" FontSize="11" Margin="3,0,3,0" />
-                                    <Button x:Name="LightStandbyTab" Content="{local:Tr Key='Standby'}" Click="LightStandby_Click" FontSize="11" Margin="3,0,0,0" />
-                                </UniformGrid>
-                                <StackPanel x:Name="StandbyPanel" Visibility="Collapsed">
-                                    <ToggleButton x:Name="StandbyEnabled" Content="{local:Tr Key='Standby aktivieren'}" Style="{StaticResource SwitchToggle}" Margin="0,0,0,16" />
-                                    <StackPanel x:Name="StandbyOptions">
-                                        <TextBlock Text="{local:Tr Key='Wartezeit'}" Style="{StaticResource SectionTitle}" />
-                                        <TextBlock Text="{local:Tr Key='Nach der letzten Eingabe an diesem Gerät.'}" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,5,0,8" TextWrapping="Wrap" />
-                                        <ComboBox x:Name="StandbyTimeChoice" SelectedValuePath="Tag" SelectionChanged="StandbyTime_Changed" Margin="0,0,0,8">
-                                            <ComboBoxItem Content="{local:Tr Key='30 Sekunden'}" Tag="30" />
-                                            <ComboBoxItem Content="{local:Tr Key='1 Minute'}" Tag="60" />
-                                            <ComboBoxItem Content="{local:Tr Key='2 Minuten'}" Tag="120" />
-                                            <ComboBoxItem Content="{local:Tr Key='5 Minuten'}" Tag="300" />
-                                            <ComboBoxItem Content="{local:Tr Key='10 Minuten'}" Tag="600" />
-                                            <ComboBoxItem Content="{local:Tr Key='30 Minuten'}" Tag="1800" />
-                                            <ComboBoxItem Content="{local:Tr Key='60 Minuten'}" Tag="3600" />
-                                            <ComboBoxItem Content="{local:Tr Key='Eigene Zeit'}" Tag="custom" />
-                                        </ComboBox>
-                                        <Grid Margin="0,0,0,16"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                            <TextBox x:Name="StandbySeconds" Text="300" MaxLength="5" />
-                                            <TextBlock Grid.Column="1" Text="{local:Tr Key='Sekunden'}" VerticalAlignment="Center" Margin="8,0,0,0" />
-                                        </Grid>
-                                        <TextBlock Text="{local:Tr Key='Aktion'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
-                                        <ComboBox x:Name="StandbyMode" SelectedIndex="0" Margin="0,0,0,16">
-                                            <ComboBoxItem Content="{local:Tr Key='Aus'}"/><ComboBoxItem Content="{local:Tr Key='Dimmen'}"/><ComboBoxItem Content="{local:Tr Key='Screensaver'}"/>
-                                        </ComboBox>
-                                        <TextBlock x:Name="StandbyScreensaverHint" Text="{local:Tr Key='Nach der Wartezeit wiederholt sich die vollständige Lichtsequenz bis zur nächsten Eingabe.'}" Visibility="Collapsed" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,0,0,16" />
-                                        <StackPanel x:Name="StandbyBrightnessPanel">
-                                            <TextBlock Text="{local:Tr Key='Helligkeit (%)'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
-                                            <TextBox x:Name="StandbyBrightness" Text="10" MaxLength="3" Margin="0,0,0,16" />
-                                        </StackPanel>
-                                    </StackPanel>
-                                    <TextBlock Text="{local:Tr Key='Gilt für das gesamte Gerät und läuft ohne geöffnete App.'}" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
-                                    <TextBlock Text="{local:Tr Key='Tasten, Drehknopf oder Schieberegler wecken die Beleuchtung wieder auf.'}" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
-                                    <TextBlock Text="{local:Tr Key='Im USB-Ruhezustand bleibt die Beleuchtung aus.'}" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource Muted}" />
-                                </StackPanel>
+                                <Border BorderBrush="{StaticResource Stroke}" BorderThickness="0,0,0,1">
+                                    <UniformGrid x:Name="LightingEditorTabs" Columns="2" Height="38">
+                                        <Button x:Name="LightColorsTab" Content="{local:Tr Key='Farben'}" Click="LightColors_Click" Style="{StaticResource EditorSectionButton}" />
+                                        <Button x:Name="LightEffectsTab" Content="{local:Tr Key='Effekte'}" Click="LightEffects_Click" Style="{StaticResource EditorSectionButton}" />
+                                    </UniformGrid>
+                                </Border>
+                                <StackPanel x:Name="LightingEditorContent" Margin="4,14,4,0">
                                 <UniformGrid Columns="2" Margin="0,0,0,9" x:Name="EffectScopeButtons">
                                     <Button x:Name="GlobalEffectButton" Content="{local:Tr Key='Global'}" Click="GlobalEffect_Click" FontSize="11" Margin="0,0,3,0" />
                                     <Button x:Name="SelectedEffectButton" Content="{local:Tr Key='Auswahl'}" Click="SelectedEffect_Click" FontSize="11" Margin="3,0,0,0" />
@@ -360,7 +425,9 @@
                                     <TextBlock x:Name="LightingTargetHint" Style="{StaticResource HelpText}" Margin="0,0,0,12" Visibility="Collapsed" />
                                 </StackPanel>
                                 <StackPanel x:Name="EffectsPanel" Visibility="Collapsed">
+                                    <ToggleButton x:Name="GlobalEffectEnabled" Content="{local:Tr Key='Globaler Effekt'}" Style="{StaticResource SwitchToggle}" Checked="GlobalEffectEnabled_Changed" Unchecked="GlobalEffectEnabled_Changed" Margin="0,0,0,10" />
                                     <TextBlock x:Name="EffectScopeHint" Style="{StaticResource OptionalHelp}" Margin="0,0,0,15" />
+                                    <StackPanel x:Name="EffectSettingsPanel">
                                     <TextBlock Text="{local:Tr Key='Effekt'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
                                     <ComboBox x:Name="EffectChoice" ItemTemplate="{StaticResource OptionLabelTemplate}" SelectedValuePath="Id" SelectionChanged="EffectChoice_SelectionChanged" />
                                     <TextBlock x:Name="EffectDescription" Style="{StaticResource OptionalHelp}" Margin="0,9,0,15" />
@@ -399,6 +466,7 @@
                                     <TextBlock Text="{local:Tr Key='Gilt für die aktuelle Ebene. Die Einzelfarben bleiben unter „Farben“ gespeichert.'}" Style="{StaticResource OptionalHelp}" Margin="0,12,0,0" />
                                     <TextBlock x:Name="PreviewAnimationHint" Text="{local:Tr Key='Zum Testen auf Tasten klicken.'}" Style="{StaticResource HelpText}" Visibility="Collapsed" Margin="0,8,0,0" />
                                     <Border Style="{StaticResource PanelDivider}" />
+                                    </StackPanel>
                                 </StackPanel>
                                 <StackPanel x:Name="StaticColorsPanel">
                                     <Button x:Name="ColorPickerCard" Click="OpenColorPicker_Click" ToolTip="{local:Tr Key='Farbpicker öffnen …'}" AutomationProperties.Name="{local:Tr Key='Farbpicker öffnen …'}" Padding="12" Margin="0,0,0,16" HorizontalContentAlignment="Stretch">
@@ -439,31 +507,7 @@
                                     <Border Style="{StaticResource PanelDivider}" />
 
                                 </StackPanel>
-                            </StackPanel>
-                            <StackPanel x:Name="DeviceSettingsPanel" Visibility="Collapsed">
-                                <TextBlock Text="{local:Tr Key='USB-Abfragerate'}" Style="{StaticResource SectionTitle}" />
-                                <ComboBox x:Name="PollingChoice" SelectedValuePath="Tag" Margin="0,9,0,0">
-                                    <ComboBoxItem Content="{local:Tr Key='1000 Hz · 1 ms'}" Tag="1" />
-                                    <ComboBoxItem Content="{local:Tr Key='500 Hz · 2 ms'}" Tag="2" />
-                                    <ComboBoxItem Content="{local:Tr Key='250 Hz · 4 ms'}" Tag="4" />
-                                    <ComboBoxItem Content="{local:Tr Key='125 Hz · 8 ms'}" Tag="8" />
-                                </ComboBox>
-                                <TextBlock Text="{local:Tr Key='Nach einer Änderung meldet sich das Gerät kurz per USB neu an. Umstecken ist nicht nötig.'}" Style="{StaticResource OptionalHelp}" Margin="0,9,0,0" />
-                                <Border Style="{StaticResource PanelDivider}" />
-                                <TextBlock Text="{local:Tr Key='Entprellzeit'}" Style="{StaticResource SectionTitle}" />
-                                <Grid Margin="0,9,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="DebounceInput" Text="5" MaxLength="2" ToolTip="{local:Tr Key='Entprellzeit von 0 bis 40 Millisekunden'}" />
-                                    <TextBlock Grid.Column="1" Text="{local:Tr Key='ms'}" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="9,0,0,0" />
-                                </Grid>
-                                <TextBlock Text="{local:Tr Key='0–40 ms · Standard: 5 ms. Niedrige Werte können bei prellenden Schaltern doppelte Eingaben verursachen.'}" Style="{StaticResource OptionalHelp}" Margin="0,9,0,0" />
-                                <Button local:UiIcons.Kind="check" Content="{local:Tr Key='Einstellungen übernehmen'}" Click="ApplyDeviceSettings_Click" Style="{StaticResource PrimaryButton}" Margin="0,18,0,0" />
-                                <TextBlock Text="{local:Tr Key='Gilt für alle Ebenen dieses Geräts. USB-Abfragerate und Entprellzeit sind keine Messung der gesamten Eingabelatenz.'}" Style="{StaticResource OptionalHelp}" Margin="0,12,0,0" />
-                                <Border Style="{StaticResource PanelDivider}" />
-
+                                </StackPanel>
                             </StackPanel>
                             <StackPanel x:Name="BindingPanel" Visibility="Collapsed">
                                 <UniformGrid x:Name="BindingTargetButtons" Columns="2" Margin="0,0,0,16" Visibility="Collapsed">
@@ -630,9 +674,6 @@
                     </Border>
                     <Border x:Name="ApplyEffectHost" Grid.Row="3" Visibility="Collapsed" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,12,0,0">
                         <Button local:UiIcons.Kind="check" x:Name="ApplyEffectButton" Content="{local:Tr Key='Effekt übernehmen'}" Click="ApplyEffect_Click" Style="{StaticResource PrimaryButton}" />
-                    </Border>
-                    <Border x:Name="ApplyStandbyHost" Grid.Row="3" Visibility="Collapsed" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,12,0,0">
-                        <Button local:UiIcons.Kind="check" Content="{local:Tr Key='Übernehmen'}" Click="ApplyStandby_Click" Style="{StaticResource PrimaryButton}" />
                     </Border>
                 </Grid>
             </Border>

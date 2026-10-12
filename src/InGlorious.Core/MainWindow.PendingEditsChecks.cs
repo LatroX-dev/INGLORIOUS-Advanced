@@ -20,7 +20,7 @@ public partial class MainWindow
                 check(!HasPendingEdits, id + ": initialization has no pending input");
                 SetEffectScope(true); SetEffectScope(false);
                 check(decisions == 0 && !HasPendingEdits && EffectTargetPanel.Visibility == Visibility.Visible, id + ": scope changes do not create pending values");
-                EffectChoice.SelectedValue = 3; EffectSpeed.Value = 177;
+                GlobalEffectEnabled.IsChecked = true; EffectChoice.SelectedValue = 3; EffectSpeed.Value = 177;
                 check(HasPendingEffect && PendingEditsHint.Visibility == Visibility.Visible, id + ": unapplied effect is visible");
                 RefreshInspector();
                 check((int)EffectChoice.SelectedValue == 3 && EffectSpeed.Value == 177 && HasPendingEffect, id + ": caption refresh preserves unapplied effect");
@@ -50,7 +50,7 @@ public partial class MainWindow
                 check(_activeTab == 0 && _project.DeviceSettings.DebounceMs == 9 && !HasPendingEdits, id + ": valid timing applies before navigation");
                 DebounceInput.Text = "009";
                 check(!HasPendingTiming, id + ": equivalent numeric text does not require confirmation");
-                SetEffectScope(false); EffectChoice.SelectedValue = 6; DebounceInput.Text = "bad";
+                SetEffectScope(false); GlobalEffectEnabled.IsChecked = true; EffectChoice.SelectedValue = 6; DebounceInput.Text = "bad";
                 var beforePair = Fingerprint(_project);
                 check(!ResolvePendingEdits() && Fingerprint(_project) == beforePair && HasPendingEffect && HasPendingTiming, id + ": mixed pending set validates atomically before either mutation");
                 _pendingEditDecisionOverride = null;

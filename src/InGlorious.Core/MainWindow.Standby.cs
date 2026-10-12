@@ -7,7 +7,7 @@ namespace InGlorious.Core;
 
 public partial class MainWindow
 {
-    private bool _showLightingStandby, _applyingPendingStandby, _refreshingStandby;
+    private bool _applyingPendingStandby, _refreshingStandby;
     private string _standbyInputBaseline = "";
     private string StandbyInputFingerprint() => JsonSerializer.Serialize(new
     {
@@ -28,13 +28,14 @@ public partial class MainWindow
     private void StandbyInputChanged(object sender, RoutedEventArgs e)
     {
         if (_refreshingStandby) return;
-        if (ReferenceEquals(sender, StandbySeconds)) UpdateStandbyTimeChoice();
+        if (ReferenceEquals(sender, StandbySeconds) && StandbyTimeChoice.SelectedValue?.ToString() != "custom") UpdateStandbyTimeChoice();
         UpdateStandbyAvailability(); PendingInputChanged(sender, e);
     }
     private void StandbyTime_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (_refreshingStandby || StandbySeconds is null || _refreshingPendingInputs) return;
         if (int.TryParse(StandbyTimeChoice.SelectedValue?.ToString(), out var seconds)) StandbySeconds.Text = seconds.ToString(CultureInfo.InvariantCulture);
+        UpdateStandbyAvailability();
     }
     private void UpdateStandbyTimeChoice()
     {
@@ -49,6 +50,7 @@ public partial class MainWindow
     private void UpdateStandbyAvailability()
     {
         StandbyOptions.IsEnabled = StandbyEnabled.IsChecked == true;
+        StandbyCustomTimePanel.Visibility = StandbyTimeChoice.SelectedValue?.ToString() == "custom" ? Visibility.Visible : Visibility.Collapsed;
         StandbyBrightnessPanel.Visibility = StandbyMode.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
         StandbyScreensaverHint.Visibility = StandbyMode.SelectedIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -68,25 +70,19 @@ public partial class MainWindow
         finally { _refreshingStandby = false; _refreshingPendingInputs = prior; }
         UpdatePendingEditsHint();
     }
-    private void RefreshStandbySurface()
+    private void RefreshLightingTabs()
     {
-        StandbyPanel.Visibility = _showLightingStandby ? Visibility.Visible : Visibility.Collapsed;
-        ApplyStandbyHost.Visibility = _activeTab == 0 && _showLightingStandby ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var (button, active) in new[] { (LightColorsTab, !_showLightingEffects && !_showLightingStandby), (LightEffectsTab, _showLightingEffects && !_showLightingStandby), (LightStandbyTab, _showLightingStandby) })
+        foreach (var (button, active) in new[] { (LightColorsTab, !_showLightingEffects), (LightEffectsTab, _showLightingEffects) })
         {
-            button.Background = Brush(active ? "#3A252B" : "#252A2F"); button.BorderBrush = Brush(active ? "#A74B54" : "#353A40");
+            button.Background = Brush(active ? "#252A2F" : "#1C1F22");
+            button.BorderBrush = Brush(active ? "#EF646B" : "#353A40");
+            button.Foreground = Brush(active ? "#E4E7EB" : "#A0A7B0");
         }
-        if (!_showLightingStandby) return;
-        StaticColorsPanel.Visibility = EffectsPanel.Visibility = EffectScopeButtons.Visibility = LightingSelectionPanel.Visibility = Visibility.Collapsed;
-        ApplyEffectHost.Visibility = Visibility.Collapsed;
-        if (_activeTab == 0) { InspectorTitle.Text = L.T("Standby"); InspectorSubtitle.Text = Device.Name + L.T(" · alle Ebenen"); }
     }
-    private void LightStandby_Click(object sender, RoutedEventArgs e) => SetStandbyEditor();
     private void SetStandbyEditor()
     {
-        if (!_showLightingStandby && !ResolvePendingEdits()) return;
-        _showLightingStandby = true; _showLightingEffects = false;
-        RenderKeyboard(); RefreshInspector();
+        SetTab(4);
+        if (_activeTab == 4) WorkspaceScroll.ScrollToTop();
     }
     private bool ValidateStandbyInput()
     {
@@ -116,27 +112,36 @@ public partial class MainWindow
     private void RunStandbyChecks(Action<bool, string> check)
     {
         if (!_screenshotMode) throw new InvalidOperationException("Offline checks only.");
+        var oldWidth = Width; var oldHeight = Height;
         try
         {
+            Width = 1360; Height = 920;
             foreach (var id in new[] { "pro-iso", "numpad" })
             {
-                ResetWorkflowFixture(id); _showLightingStandby = false; RefreshAll(); SetStandbyEditor();
+                ResetWorkflowFixture(id); RefreshAll(); SetStandbyEditor();
                 var before = Fingerprint(_project); var layers = JsonSerializer.Serialize(_project.Layers); var history = _undo.Count;
-                check(StandbyPanel.Visibility == Visibility.Visible && ApplyStandbyHost.Visibility == Visibility.Visible && StaticColorsPanel.Visibility == Visibility.Collapsed && SelectionBar.Visibility == Visibility.Collapsed && CurrentLayerChoice.Visibility == Visibility.Collapsed, id + ": standby is a flat device-wide lighting view with a visible apply button");
+                UpdateLayout();
+                check(_activeTab == 4 && StandbyPanel.IsVisible && ApplyStandbyHost.IsVisible && DeviceOverview.IsVisible && !InspectorHost.IsVisible && !ColorPanel.IsVisible && SelectionBar.Visibility == Visibility.Collapsed && CurrentLayerChoice.Visibility == Visibility.Collapsed, id + ": standby is in the main Device workspace with its apply button and no layer or key selection");
                 StandbyEnabled.IsChecked = true; StandbyTimeChoice.SelectedValue = "60"; StandbyMode.SelectedIndex = 1; StandbyBrightness.Text = "15";
-                check(HasPendingStandby && Fingerprint(_project) == before && StandbySeconds.Text == "60", id + ": standby edits and preset time stay pending without changing the profile");
+                UpdateLayout();
+                check(HasPendingStandby && Fingerprint(_project) == before && StandbySeconds.Text == "60" && !StandbyCustomTimePanel.IsVisible && DevicePendingEditsHint.IsVisible, id + ": standby edits show pending feedback in the main workspace while preset times hide duplicate seconds");
+                check(WorkspaceScroll.ScrollableHeight <= 1 && WorkspaceScroll.VerticalOffset == 0 && ApplyTimingButton.IsVisible && ManageFirmwareButton.IsVisible && RestoreOriginalFirmwareButton.IsVisible,
+                    id + ": timing, standby and firmware actions fit the normal Device window without scrolling");
+                StandbyTimeChoice.SelectedValue = "custom"; StandbySeconds.Text = "300";
+                check(StandbyCustomTimePanel.Visibility == Visibility.Visible && StandbyTimeChoice.SelectedValue?.ToString() == "custom", id + ": entering a preset-equivalent custom time keeps the field visible while typing");
+                StandbyTimeChoice.SelectedValue = "60";
                 _pendingEditDecisionOverride = () => PendingEditChoice.Cancel; SetLightingEditor(false);
-                check(_showLightingStandby && HasPendingStandby, id + ": cancel retains standby view and pending input");
+                check(_activeTab == 4 && HasPendingStandby, id + ": cancel retains standby view and pending input");
                 _pendingEditDecisionOverride = () => PendingEditChoice.Apply; StandbySeconds.Text = "9"; SetTab(5);
-                check(_activeTab == 0 && HasPendingStandby && Fingerprint(_project) == before, id + ": invalid standby input blocks navigation without partial changes");
+                check(_activeTab == 4 && HasPendingStandby && Fingerprint(_project) == before, id + ": invalid standby input blocks navigation without partial changes");
                 check(!SaveProject(false) && Fingerprint(_project) == before, id + ": invalid standby input blocks file-save before any dialog or write");
                 StandbySeconds.Text = "70"; ApplyUiLanguage("en");
                 check(HasPendingStandby && StandbySeconds.Text == "70" && StandbyBrightness.Text == "15", id + ": language refresh preserves pending standby values and baseline");
                 ApplyUiLanguage("de"); _pendingEditDecisionOverride = () => PendingEditChoice.Discard; SetLightingEditor(false);
-                check(!_showLightingStandby && !HasPendingStandby && Fingerprint(_project) == before, id + ": discard restores saved standby values and opens colors");
+                check(_activeTab == 0 && !HasPendingStandby && Fingerprint(_project) == before, id + ": discard restores saved standby values and opens colors");
                 SetStandbyEditor(); StandbyEnabled.IsChecked = true; StandbyTimeChoice.SelectedValue = "60"; StandbyMode.SelectedIndex = 1; StandbyBrightness.Text = "15";
                 _pendingEditDecisionOverride = () => PendingEditChoice.Apply; SetLightingEditor(true);
-                check(!_showLightingStandby && _showLightingEffects && !HasPendingStandby && _project.Standby.Enabled && _project.Standby.TimeoutSeconds == 60 && _project.Standby.Mode == 1 && _project.Standby.DimBrightnessPercent == 15 && _undo.Count == history + 1, id + ": apply on leaving standby commits one undo entry");
+                check(_activeTab == 0 && _showLightingEffects && !HasPendingStandby && _project.Standby.Enabled && _project.Standby.TimeoutSeconds == 60 && _project.Standby.Mode == 1 && _project.Standby.DimBrightnessPercent == 15 && _undo.Count == history + 1, id + ": apply on leaving standby commits one undo entry");
                 check(JsonSerializer.Serialize(_project.Layers) == layers, id + ": device-wide standby preserves every layer color, binding, effect and name");
                 Undo_Click(this, new RoutedEventArgs()); check(Fingerprint(_project) == before, id + ": undo restores complete pre-standby profile");
                 Redo_Click(this, new RoutedEventArgs()); check(_project.Standby.Enabled && StandbySeconds.Text == "60" && !HasPendingStandby, id + ": redo restores standby and resets the pending baseline");
@@ -162,8 +167,21 @@ public partial class MainWindow
                 StandbyEnabled.IsChecked = false;
                 check(ApplyStandbyInputs() && !_project.Standby.Enabled && _project.Standby.Mode == 2 && !StandbyOptions.IsEnabled, id + ": disabling standby keeps the selected screensaver action");
                 SetLightingEditor(false);
+
+                ResetWorkflowFixture(id); SetStandbyEditor();
+                StandbyEnabled.IsChecked = true; StandbySeconds.Text = "75";
+                PollingChoice.SelectedValue = "4"; DebounceInput.Text = "9";
+                ApplyDeviceSettings_Click(this, new RoutedEventArgs());
+                check(!HasPendingTiming && HasPendingStandby && StandbySeconds.Text == "75" && !_project.Standby.Enabled && _project.DeviceSettings is { UsbPollingIntervalMs: 4, DebounceMs: 9 }, id + ": applying timing retains the uncommitted standby inputs in the same Device page");
+                PollingChoice.SelectedValue = "2"; DebounceInput.Text = "8";
+                ApplyStandby_Click(this, new RoutedEventArgs());
+                check(!HasPendingStandby && HasPendingTiming && DebounceInput.Text == "8" && _project.Standby is { Enabled: true, TimeoutSeconds: 75 } && _project.DeviceSettings.UsbPollingIntervalMs == 4, id + ": applying standby retains the uncommitted timing inputs");
+                before = Fingerprint(_project); StandbySeconds.Text = "9";
+                check(!ApplyPendingEdits() && HasPendingTiming && HasPendingStandby && Fingerprint(_project) == before, id + ": Device navigation validates both sections before committing either one");
+                StandbySeconds.Text = "90";
+                check(ApplyPendingEdits() && !HasPendingEdits && _project.DeviceSettings is { UsbPollingIntervalMs: 2, DebounceMs: 8 } && _project.Standby.TimeoutSeconds == 90, id + ": the combined pending set applies both Device sections without losing values");
             }
         }
-        finally { _pendingEditDecisionOverride = null; _showLightingStandby = false; ResetWorkflowFixture("pro-iso"); RefreshAll(); }
+        finally { _pendingEditDecisionOverride = null; Width = oldWidth; Height = oldHeight; ResetWorkflowFixture("pro-iso"); RefreshAll(); }
     }
 }

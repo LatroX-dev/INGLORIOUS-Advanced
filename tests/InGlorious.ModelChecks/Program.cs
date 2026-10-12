@@ -114,6 +114,7 @@ try
         for (var led = 0; led < facts.Leds; led++)
             Check(previewLayout[led].X == rawLeds[led].GetProperty("x").GetByte() && previewLayout[led].Y == rawLeds[led].GetProperty("y").GetByte(), "Preview uses physical rather than matrix coordinates " + facts.Id);
 
+        RunGlobalEffectSwitchChecks(model, Check);
         var project = ProjectService.Create(facts.Id);
         OnboardSerializer.ValidateEditorProject(project);
         Check(project.Layers.Count == 4 && project.Layers.All(l => l.Keys.Count == model.Keys.Count), "Four complete editable layers " + facts.Id);
@@ -281,6 +282,58 @@ static void RunProfileImportChecks(string root, Action<bool, string> check)
             check(refused && original.AsSpan().SequenceEqual(File.ReadAllBytes(entry.Path)), "case-sensitive sibling preset library is outside the deletion boundary");
         }
     }
+}
+
+static void RunGlobalEffectSwitchChecks(DeviceDefinition device, Action<bool, string> check)
+{
+    static string Json(object value) => JsonSerializer.Serialize(value, ProjectService.JsonOptions);
+    var project = ProjectService.Create(device.Id);
+    var layer = project.Layers[0]; var keys = device.Keys.Where(key => key.LedIndex.HasValue).Take(3).ToArray();
+    layer.Keys[keys[0].Id].Color = "#000000";
+    layer.Keys[keys[1].Id].Color = "#24B860";
+    layer.SideLedColor = "#001133";
+    layer.SynchronizeSides = true;
+    layer.LedEffects[keys[2].LedIndex!.Value] = new() { Mode = 2, Speed = 137, Brightness = 179, Reverse = true, Colors = ["#FF0000", "#00FFFF"] };
+    layer.LedEffects[device.LeftSideLedIndices[0]] = new() { Mode = 18, Speed = 87, Brightness = 163, Colors = ["#ABCDEF"] };
+    var colors = Json(new { layer.Keys, layer.SideLedColor, layer.ExtraLedColors });
+    var individual = Json(layer.LedEffects); var otherLayers = Json(project.Layers.Skip(1));
+    foreach (var target in new[] { 1, 2, 3 })
+    {
+        var original = new LightingEffectSettings { Mode = 2, Speed = 71, Brightness = 123, Target = target, Reverse = true, Colors = ["#FF0000", "#550000"] };
+        var originalJson = Json(original); var disabled = GlobalEffectSwitch.Disable(original);
+        check(GlobalEffectSwitch.IsEnabled(original) && !GlobalEffectSwitch.IsEnabled(disabled), "Global switch distinguishes active effect from static full brightness: " + device.Id);
+        check(disabled.Mode == 0 && disabled.Brightness == 255 && disabled.Speed == 71 && disabled.Target == target && disabled.Reverse && disabled.Colors.SequenceEqual(original.Colors), "Off retains target, speed, direction and palette in the existing device format");
+        check(Json(original) == originalJson && !ReferenceEquals(disabled, original) && !ReferenceEquals(disabled.Colors, original.Colors), "Disabling does not mutate or share source settings");
+        var enabled = GlobalEffectSwitch.Enable(disabled);
+        check(enabled.Mode == 1 && enabled.Brightness == 255 && enabled.Speed == disabled.Speed && enabled.Target == target && enabled.Reverse && enabled.Colors.SequenceEqual(disabled.Colors), "Enabling an applied off state starts breathing with retained settings");
+        var enabledCopy = GlobalEffectSwitch.Enable(original);
+        check(Json(enabledCopy) == originalJson && !ReferenceEquals(enabledCopy, original) && !ReferenceEquals(enabledCopy.Colors, original.Colors), "Enabling an already active effect preserves its exact settings in a detached copy");
+        enabled.Colors[0] = "#FFFFFF";
+        check(disabled.Colors[0] == "#FF0000" && Json(original) == originalJson, "Enabled copy palette changes cannot leak into off or original settings");
+        layer.LightingEffect = disabled;
+        check(Json(new { layer.Keys, layer.SideLedColor, layer.ExtraLedColors }) == colors && Json(layer.LedEffects) == individual && Json(project.Layers.Skip(1)) == otherLayers && layer.SynchronizeSides,
+            "Turning off preserves all base colors, individual effects, other layers and side synchronization");
+        var scene = LightingPreviewEngine.CreateScene(device, layer); var frame = new PreviewRgb[device.LedCount];
+        foreach (uint time in new[] { 0u, 800u, 1700u })
+        {
+            scene.Render(time, [], frame);
+            foreach (var led in scene.Leds)
+            {
+                var basis = PreviewRgb.FromHex(led.KeyId is not null ? layer.Keys[led.KeyId].Color : layer.ExtraLedColors.GetValueOrDefault(led.Index, layer.SideLedColor));
+                var expected = layer.LedEffects.TryGetValue(led.Index, out var own)
+                    ? LightingPreviewEngine.Pixel(LightingPreviewEngine.SelectedEffect(own, true), basis, led, time, []) : basis;
+                check(frame[led.Index] == expected, "Off renders exact stored base colors or the unchanged individual effect for every target: " + device.Id);
+            }
+            check(frame[keys[0].LedIndex!.Value] == default && frame[keys[1].LedIndex!.Value] == new PreviewRgb(36, 184, 96), "Black remains unlit and a stored color remains static at full brightness");
+        }
+        var payload = OnboardSerializer.Prepare(project).Payload; var decoded = OnboardSerializer.Decode(payload);
+        check(!GlobalEffectSwitch.IsEnabled(decoded.Layers[0].LightingEffect) && Json(decoded.Layers[0].LightingEffect) == Json(disabled), "Off and all retained effect parameters survive the device codec");
+        check(OnboardSerializer.Prepare(decoded).Payload.SequenceEqual(payload), "Off configuration is byte-exact after device read and re-encoding");
+        var preset = LightingPresetStore.Capture(project, 0, "Static colors");
+        var applied = LightingPresetStore.Apply(ProjectService.Create(device.Id), 2, preset);
+        check(!GlobalEffectSwitch.IsEnabled(applied.Layers[2].LightingEffect) && Json(applied.Layers[2].LedEffects) == individual, "Lighting presets preserve off and individual effects");
+    }
+    check(GlobalEffectSwitch.IsEnabled(new() { Mode = 0, Brightness = 0 }) && GlobalEffectSwitch.IsEnabled(new() { Mode = 0, Brightness = 254 }), "An intentional static dimmer is an active global setting, not discarded as off");
 }
 
 static List<string> BaseArguments(string source, string layout)

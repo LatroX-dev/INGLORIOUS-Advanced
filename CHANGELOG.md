@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.6.50
+
+- Turn off global lighting effects while keeping individual effects.
+- Clearer lighting controls and a full-width Device page.
 - Easier layer and Fn key setup.
 - Fixed the app sometimes failing to reopen on Linux.
 - Import and export key bindings for selected layers, including assigned macros.

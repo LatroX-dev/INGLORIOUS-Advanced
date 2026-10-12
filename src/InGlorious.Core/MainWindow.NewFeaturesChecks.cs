@@ -14,7 +14,7 @@ public partial class MainWindow
         {
             ResetWorkflowFixture(id); SetLightingEditor(true); SetEffectScope(false);
             var before = Fingerprint(_project);
-            EffectChoice.SelectedValue = 2; SetEffectColors(["#FF203D", "#22040B", "#FFFFFF"]);
+            GlobalEffectEnabled.IsChecked = true; EffectChoice.SelectedValue = 2; SetEffectColors(["#FF203D", "#22040B", "#FFFFFF"]);
             EffectColorsChanged();
             check(HasPendingEffect && Fingerprint(_project) == before, id + ": custom color sequence previews without changing profile");
             ApplyEffect_Click(this, new RoutedEventArgs());
@@ -44,7 +44,7 @@ public partial class MainWindow
             ApplyLightingPreset(preset); UpdateLayout();
             check(JsonSerializer.Serialize(Layer.Keys.ToDictionary(p => p.Key, p => p.Value.Binding)) == bindings && Layer.SynchronizeSides,
                 id + ": INGLORIOUS template changes lighting while preserving bindings");
-            check(_activeTab == 0 && _showLightingEffects && !_showLightingStandby && !_effectForSelection && ColorPanel.IsVisible && !HasPendingEdits,
+            check(_activeTab == 0 && _showLightingEffects && !_effectForSelection && ColorPanel.IsVisible && !HasPendingEdits,
                 id + ": applying an animated template opens its whole-layer effect editor from colors-only mode");
             var applied = Fingerprint(_project); RenderLightingPreviewFrame(0); var firstFrame = _previewFrame.ToArray();
             var animated = false;
@@ -59,7 +59,7 @@ public partial class MainWindow
             Undo_Click(this, new RoutedEventArgs()); check(Fingerprint(_project) == before, id + ": lighting template applies in one undo step");
             var staticPreset = LightingPresetStore.Capture(ProjectService.Create(id), 0, "Static preview fixture");
             ApplyLightingPreset(staticPreset); RenderLightingPreviewFrame(0);
-            check(!_showLightingEffects && !_showLightingStandby && _previewScene?.Animated == false,
+            check(!_showLightingEffects && _previewScene?.Animated == false,
                 id + ": a colors-only template still opens the color editor without invented animation");
         }
         ResetWorkflowFixture("numpad"); SetTab(0); UpdateLayout();

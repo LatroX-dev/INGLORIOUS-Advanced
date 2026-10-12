@@ -12,7 +12,7 @@ public sealed partial class MainWindow
         var savedState = _state; var savedSessions = _sessions.ToArray(); var savedConfirmed = _confirmed.ToArray();
         var savedIds = _connectedDeviceIds; var savedFailure = _connectionsFailed;
         var savedPending = _pendingApply; var savedPrompt = _offlinePromptChoice; var savedPage = _page;
-        var savedEffects = _showEffects; var savedStandby = _showStandby;
+        var savedEffects = _showEffects;
         var savedBusy = _busy; var savedLoading = _startupLoading; var savedClosed = _connectionsClosed;
         var savedAllowClose = _allowClose; var savedNavigating = _navigating; var savedRevision = _connectionRevision;
         var savedReader = _readConnections; var savedEnabled = IsEnabled; var savedStatus = _status;
@@ -28,7 +28,7 @@ public sealed partial class MainWindow
                 PlatformDeviceService.ConnectedModelFromUsbMetadata(0x342D, 0xDFA0) is null &&
                 PlatformDeviceService.ConnectedModelFromUsbMetadata(0x320F, 0xFFFF) is null, "crossed identities, bootloaders and unknown products are not connected model evidence");
             _busy = _startupLoading = _connectionsClosed = _allowClose = _navigating = _initialConnectionsPending = false; IsEnabled = true;
-            _state = new EditorState("pro-iso"); _state.MarkInitialClean(); _page = "Beleuchtung"; _showEffects = _showStandby = false;
+            _state = new EditorState("pro-iso"); _state.MarkInitialClean(); _page = "Beleuchtung"; _showEffects = false;
             _sessions["pro-iso"] = _state; Build(); ApplyConnectionSnapshot([]);
             check(_deviceButtonsPanel!.Children.Count == 0 && _deviceButtons.Count == 0 &&
                 _connectionHint!.IsVisible && _connectionHint.Text == L.T("Kein Gerät verbunden"), "empty discovery renders no invented device buttons and an explicit empty hint");
@@ -119,7 +119,7 @@ public sealed partial class MainWindow
             _state = savedState; _sessions.Clear(); foreach (var item in savedSessions) _sessions.Add(item.Key, item.Value);
             _confirmed.Clear(); foreach (var item in savedConfirmed) _confirmed.Add(item.Key, item.Value);
             _connectedDeviceIds = savedIds; _connectionsFailed = savedFailure; _pendingApply = savedPending; _offlinePromptChoice = savedPrompt;
-            _page = savedPage; _showEffects = savedEffects; _showStandby = savedStandby;
+            _page = savedPage; _showEffects = savedEffects;
             _busy = savedBusy; _startupLoading = savedLoading; _connectionsClosed = savedClosed;
             _allowClose = savedAllowClose; _navigating = savedNavigating; _connectionRevision = savedRevision;
             _readConnections = savedReader; IsEnabled = savedEnabled; _status = savedStatus;

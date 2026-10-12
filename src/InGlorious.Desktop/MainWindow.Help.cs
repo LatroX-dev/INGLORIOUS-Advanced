@@ -16,7 +16,7 @@ public sealed partial class MainWindow
 
     private string CurrentGuideTopic() => _page switch
     {
-        "Beleuchtung" => _showStandby ? "standby" : "lighting",
+        "Beleuchtung" => "lighting",
         "Tastenbelegung" => _editingSlider ? "device" : "bindings",
         "Makros" => "macros",
         "Ebenen" => "layers",

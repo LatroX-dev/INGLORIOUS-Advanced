@@ -1,4 +1,4 @@
-﻿{
+{
   "Anleitung": {
     "en": "Guide",
     "es": "Guía",
@@ -350,19 +350,6 @@
     "ko": "키 또는 측면을 선택하세요. 호흡, 물결, 반짝임은 해당 기본 색상을 사용합니다. “색상 순환”은 별도의 색상 순서를 사용하며, 설정된 순서가 없으면 무지개색으로 바뀝니다. 무지개와 불꽃 효과는 자체 색상을 만듭니다.",
     "zh-Hans": "选择按键或侧灯。呼吸、波浪和闪烁使用所设的基础颜色。“颜色循环”使用自己的颜色序列；未设置序列时使用彩虹色。彩虹和火焰效果会生成自己的颜色。"
   },
-  "„Global“ gilt nur für die aktuelle Ebene und den gewählten Bereich. Eigene Effekte einzelner LEDs haben Vorrang, auch bei der Helligkeit. Mit „Globalen Effekt verwenden“ entfernst du diese Ausnahme.": {
-    "en": "“Global” applies only to the current layer and selected area. Individual LED effects take priority, including their brightness. Choose “Use global effect” to remove an individual override.",
-    "es": "«Global» solo se aplica a la capa actual y al área elegida. Los efectos individuales de los LED tienen prioridad, incluido su brillo. «Usar efecto global» elimina esa excepción.",
-    "fr": "« Global » s’applique uniquement à la couche actuelle et à la zone choisie. Les effets propres aux LED sont prioritaires, y compris leur luminosité. « Utiliser l’effet global » supprime cette exception.",
-    "it": "«Globale» vale solo per il livello corrente e l’area scelta. Gli effetti dei singoli LED hanno la precedenza, anche per la luminosità. «Usa effetto globale» rimuove questa eccezione.",
-    "pt-BR": "“Global” vale apenas para a camada atual e a área escolhida. Efeitos individuais dos LEDs têm prioridade, inclusive no brilho. “Usar efeito global” remove essa exceção.",
-    "pl": "„Globalnie” dotyczy tylko bieżącej warstwy i wybranego obszaru. Indywidualne efekty diod mają pierwszeństwo, także w ustawieniu jasności. „Użyj efektu globalnego” usuwa taki wyjątek.",
-    "tr": "“Genel” yalnızca geçerli katman ve seçilen alan için geçerlidir. LED’lerin ayrı efektleri, parlaklık dahil önceliklidir. Bu ayrı ayarı kaldırmak için “Genel efekti kullan” seçeneğini kullanın.",
-    "ru": "«Глобально» действует только на текущий слой и выбранную область. Отдельные эффекты светодиодов имеют приоритет, включая яркость. «Использовать глобальный эффект» убирает такое исключение.",
-    "ja": "「全体」は現在のレイヤーと選択した範囲にのみ適用されます。LEDごとの設定がある場合は、明るさも含めてそちらが優先されます。「全体エフェクトを使用」で個別設定を解除できます。",
-    "ko": "“전체”은 현재 레이어와 선택한 영역에만 적용됩니다. 개별 LED 효과가 설정되어 있으면 밝기를 포함해 해당 설정이 우선합니다. “전체 효과 사용”을 선택하면 개별 설정이 해제됩니다.",
-    "zh-Hans": "“全局”仅作用于当前层和所选区域。单个 LED 的独立效果优先，包括亮度设置。选择“使用全局效果”可移除这项独立设置。"
-  },
   "„Farben“ und „Effekte“ zeigen die gespeicherte Beleuchtung mit ihren Effekten. Farbwähler und Farbfelder ändern die Basisfarbe. Eine eigene Farbfolge im Effekt „Farbwechsel“ verwendet stattdessen ihre Farben. Bestätige Änderungen mit „Übernehmen“ und danach mit „Auf Tastatur übertragen“.": {
     "en": "“Colors” and “Effects” show the saved lighting with its effects. The color picker and color fields change the base color. A custom sequence in “Color cycle” uses its own colors instead. Confirm changes with “Apply”, then “Transfer to keyboard”.",
     "es": "«Colores» y «Efectos» muestran la iluminación guardada con sus efectos. El selector y los campos de color cambian el color base. Una secuencia propia en «Cambio de color» usa sus propios colores. Confirma los cambios con «Aplicar» y después con «Transferir al teclado».",
@@ -545,19 +532,6 @@
     "ko": "톱니바퀴 아이콘에서 기기를 설정하세요. “기기”에서 펌웨어를 업데이트하거나 원래 펌웨어로 복원할 수 있습니다. 처음 설치할 때는 “백업 후 설치”를 선택하세요. 앱이 원래 펌웨어를 저장하고 확인한 다음 INGLORIOUS를 설치합니다. 다시 연결하라는 안내가 나올 때까지 앱을 열어 두고 USB 연결을 유지하세요.",
     "zh-Hans": "点击齿轮图标设置设备。在“设备”中可以更新固件或恢复原厂固件。首次安装时，选择“备份并安装”：应用会先保存并检查原厂固件，然后安装 INGLORIOUS。在出现重新连接的提示前，请保持应用打开和 USB 连接。"
   },
-  "Unter „Beleuchtung → Standby“ aktivierst du eine Wartezeit und wählst Ausschalten, Dimmen oder Screensaver. Standby gilt für das ganze Gerät. Übernimm die Einstellung und übertrage sie auf die Tastatur; danach funktioniert sie ohne laufende App.": {
-    "en": "Under “Lighting → Standby”, enable a waiting time and choose off, dim or screensaver. Standby applies to the whole device. Apply the setting and transfer it to the keyboard; it then works without the app running.",
-    "es": "En «Iluminación → Espera», activa un tiempo de espera y elige apagar, atenuar o salvapantallas. El modo de espera se aplica a todo el dispositivo. Aplica el ajuste y transfiérelo al teclado; después funcionará sin la app.",
-    "fr": "Dans « Éclairage → Veille », activez un délai et choisissez l’extinction, l’atténuation ou l’écran de veille. Cela concerne tout l’appareil. Appliquez le réglage et transférez-le au clavier ; il fonctionnera ensuite sans l’application.",
-    "it": "In «Illuminazione → Standby», attiva un tempo di attesa e scegli spegnimento, attenuazione o salvaschermo. La modalità standby vale per tutto il dispositivo. Applica l’impostazione e trasferiscila alla tastiera; funzionerà poi senza l’app.",
-    "pt-BR": "Em “Iluminação → Espera”, ative um tempo de espera e escolha desligar, reduzir o brilho ou protetor de tela. O modo de espera vale para todo o dispositivo. Aplique a configuração e transfira-a ao teclado; depois ela funcionará sem o app.",
-    "pl": "W „Podświetlenie → Czuwanie” włącz czas oczekiwania i wybierz wyłączenie, ściemnianie lub wygaszacz. Tryb czuwania dotyczy całego urządzenia. Zastosuj ustawienie i prześlij je na klawiaturę; potem będzie działać bez uruchomionej aplikacji.",
-    "tr": "“Aydınlatma → Bekleme” altında bekleme süresini etkinleştirip kapatma, kısma veya ekran koruyucuyu seçin. Bekleme modu tüm cihazı kapsar. Ayarı uygulayıp klavyeye aktarın; ardından uygulama çalışmadan da işler.",
-    "ru": "В «Подсветка → Ожидание» включите время ожидания и выберите выключение, затемнение или заставку. Режим ожидания действует на всё устройство. Примените настройку и передайте её на клавиатуру; после этого приложение не потребуется.",
-    "ja": "「照明 → 待機」で待ち時間を有効にし、消灯、減光、スクリーンセーバーから選びます。待機設定は機器全体に適用されます。設定を適用してキーボードに転送すると、その後はアプリなしで動作します。",
-    "ko": "“조명 → 대기”에서 대기 시간을 활성화하고 끄기, 밝기 줄이기 또는 화면 보호기를 선택하세요. 대기 설정은 장치 전체에 적용됩니다. 설정을 적용해 키보드에 전송하면 이후에는 앱 없이 작동합니다.",
-    "zh-Hans": "在“灯光 → 待机”中启用等待时间，并选择关闭、调暗或屏保。待机设置作用于整个设备。应用设置并传输到键盘后，无需运行应用即可生效。"
-  },
   "Tasten, Drehgeber und eine bewusste Reglerbewegung beenden Standby. Der Screensaver wiederholt die komplette Lichtsequenz bis zur nächsten Eingabe. Deine normale Beleuchtung bleibt gespeichert. Im USB-Ruhezustand ist das Licht aus.": {
     "en": "Keys, the knob and deliberate slider movement wake the device. The screensaver repeats the full lighting sequence until the next input. Your normal lighting stays saved. The lights are off while USB is suspended.",
     "es": "Las teclas, el mando y un movimiento intencionado del deslizador reactivan el dispositivo. El salvapantallas repite toda la secuencia de luces hasta la próxima entrada. Tu iluminación normal sigue guardada. En suspensión USB, las luces están apagadas.",
@@ -596,5 +570,31 @@
     "ja": "ここでの設定はアプリ用です。キー割り当てやOSのキーボード配列は変わりません。保存されたアプリデータのフォルダーも、ここから開けます。",
     "ko": "이 설정은 앱에만 적용됩니다. 키 할당이나 운영체제의 키보드 배열은 바꾸지 않습니다. 여기서 저장된 앱 데이터 폴더를 열 수도 있습니다.",
     "zh-Hans": "这些设置仅影响应用，不会改变按键分配或操作系统的键盘布局。还可在此打开保存应用数据的文件夹。"
+  },
+  "Unter „Gerät → Beleuchtung bei Inaktivität“ aktivierst du eine Wartezeit und wählst Ausschalten, Dimmen oder Screensaver. Standby gilt für das ganze Gerät. Übernimm die Einstellung und übertrage sie auf die Tastatur; danach funktioniert sie ohne laufende App.": {
+    "en": "Under “Device → Lighting when inactive”, enable a waiting time and choose off, dim or screensaver. Standby applies to the whole device. Apply the setting and transfer it to the keyboard; it then works without the app running.",
+    "es": "En «Dispositivo → Iluminación durante la inactividad», activa un tiempo de espera y elige apagar, atenuar o salvapantallas. El modo de espera se aplica a todo el dispositivo. Aplica el ajuste y transfiérelo al teclado; después funcionará sin la app.",
+    "fr": "Dans « Appareil → Éclairage en cas d’inactivité », activez un délai et choisissez l’extinction, l’atténuation ou l’écran de veille. Cela concerne tout l’appareil. Appliquez le réglage et transférez-le au clavier ; il fonctionnera ensuite sans l’application.",
+    "it": "In «Dispositivo → Illuminazione durante l’inattività», attiva un tempo di attesa e scegli spegnimento, attenuazione o salvaschermo. La modalità standby vale per tutto il dispositivo. Applica l’impostazione e trasferiscila alla tastiera; funzionerà poi senza l’app.",
+    "pt-BR": "Em “Dispositivo → Iluminação durante a inatividade”, ative um tempo de espera e escolha desligar, reduzir o brilho ou protetor de tela. O modo de espera vale para todo o dispositivo. Aplique a configuração e transfira-a ao teclado; depois ela funcionará sem o app.",
+    "pl": "W „Urządzenie → Podświetlenie podczas bezczynności” włącz czas oczekiwania i wybierz wyłączenie, ściemnianie lub wygaszacz. Tryb czuwania dotyczy całego urządzenia. Zastosuj ustawienie i prześlij je na klawiaturę; potem będzie działać bez uruchomionej aplikacji.",
+    "tr": "“Cihaz → Boştayken aydınlatma” altında bekleme süresini etkinleştirip kapatma, kısma veya ekran koruyucuyu seçin. Bekleme modu tüm cihazı kapsar. Ayarı uygulayıp klavyeye aktarın; ardından uygulama çalışmadan da işler.",
+    "ru": "В «Устройство → Подсветка при бездействии» включите время ожидания и выберите выключение, затемнение или заставку. Режим ожидания действует на всё устройство. Примените настройку и передайте её на клавиатуру; после этого приложение не потребуется.",
+    "ja": "「デバイス → 操作していないときの照明」で待ち時間を有効にし、消灯、減光、スクリーンセーバーから選びます。待機設定は機器全体に適用されます。設定を適用してキーボードに転送すると、その後はアプリなしで動作します。",
+    "ko": "“장치 → 입력이 없을 때 조명”에서 대기 시간을 활성화하고 끄기, 밝기 줄이기 또는 화면 보호기를 선택하세요. 대기 설정은 장치 전체에 적용됩니다. 설정을 적용해 키보드에 전송하면 이후에는 앱 없이 작동합니다.",
+    "zh-Hans": "在“设备 → 空闲时的灯光”中启用等待时间，并选择关闭、调暗或屏保。待机设置作用于整个设备。应用设置并传输到键盘后，无需运行应用即可生效。"
+  },
+  "„Global“ gilt für die aktuelle Ebene. Eigene Effekte einzelner LEDs haben Vorrang. Schaltest du „Globaler Effekt“ aus, zeigen LEDs ohne eigenen Effekt ihre festen Farben; Schwarz bleibt aus. Zum erneuten Einschalten wählst du einen Effekt. Mit „Globalen Effekt verwenden“ kehrt eine ausgewählte LED zum globalen Effekt zurück.": {
+    "en": "“Global” applies to the current layer. Individual LED effects take priority. Switch off “Global effect” to show fixed colors on LEDs without their own effect; black stays off. To enable it again, choose an effect. “Use global effect” returns a selected LED to the global effect.",
+    "es": "«Global» se aplica a la capa actual. Los efectos individuales tienen prioridad. Desactiva «Efecto global» para mostrar colores fijos en los LED sin efecto propio; el negro permanece apagado. Para volver a activarlo, elige un efecto. «Usar efecto global» devuelve el LED seleccionado al efecto global.",
+    "fr": "« Global » s’applique à la couche actuelle. Les effets individuels des LED sont prioritaires. Désactivez « Effet global » pour afficher des couleurs fixes sur les LED sans effet propre ; le noir reste éteint. Pour le réactiver, choisissez un effet. « Utiliser l’effet global » rétablit l’effet global sur la LED sélectionnée.",
+    "it": "«Globale» vale per il livello attuale. Gli effetti dei singoli LED hanno la precedenza. Disattiva «Effetto globale» per mostrare i colori fissi sui LED senza effetto proprio; il nero resta spento. Per riattivarlo, scegli un effetto. «Usa effetto globale» riporta il LED selezionato all’effetto globale.",
+    "pt-BR": "«Global» vale para a camada atual. Os efeitos individuais dos LEDs têm prioridade. Desative «Efeito global» para mostrar cores fixas nos LEDs sem efeito próprio; preto fica apagado. Para reativar, escolha um efeito. «Usar efeito global» retorna o LED selecionado ao efeito global.",
+    "pl": "„Globalny” dotyczy bieżącej warstwy. Indywidualne efekty LED mają pierwszeństwo. Wyłącz „Efekt globalny”, aby diody bez własnego efektu świeciły stałymi kolorami; czarne pozostaną wyłączone. Aby włączyć go ponownie, wybierz efekt. „Użyj efektu globalnego” przywraca globalny efekt wybranej diodzie.",
+    "tr": "“Genel” geçerli katmana uygulanır. Ayrı LED efektleri önceliklidir. Kendi efekti olmayan LED’lerde sabit renkleri göstermek için “Genel efekt”i kapat; siyah olanlar sönük kalır. Yeniden açmak için bir efekt seç. “Genel efekti kullan” seçili LED’i genel efekte döndürür.",
+    "ru": "«Общий» применяется к текущему слою. Отдельные эффекты светодиодов имеют приоритет. Выключите «Общий эффект», чтобы светодиоды без собственного эффекта показывали постоянные цвета; чёрные останутся выключенными. Для повторного включения выберите эффект. «Использовать общий эффект» возвращает выбранный светодиод к общему эффекту.",
+    "ja": "「全体」は現在のレイヤーに適用されます。個別のLEDエフェクトが優先されます。「全体のエフェクト」をオフにすると、個別エフェクトのないLEDは設定した色で点灯し、黒は消灯したままです。再びオンにするにはエフェクトを選びます。「全体のエフェクトを使用」で選択したLEDを全体のエフェクトに戻せます。",
+    "ko": "“전체”는 현재 레이어에 적용됩니다. 개별 LED 효과가 우선합니다. “전체 효과”를 끄면 개별 효과가 없는 LED는 고정 색상으로 켜지고 검정색 LED는 꺼진 상태를 유지합니다. 다시 켜려면 효과를 선택하세요. “전체 효과 사용”은 선택한 LED에 전체 효과를 다시 적용합니다.",
+    "zh-Hans": "“全局”作用于当前层。单独设置的LED效果优先。关闭“全局效果”后，没有单独效果的LED会显示固定颜色，黑色保持熄灭。重新启用时请选择效果。“使用全局效果”可让所选LED恢复使用全局效果。"
   }
 }
