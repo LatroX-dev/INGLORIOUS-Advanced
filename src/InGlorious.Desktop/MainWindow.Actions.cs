@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -166,7 +166,7 @@ public sealed partial class MainWindow
     private static void ShowFirmwareChangelog(StackPanel target, string deviceId, FirmwareSemanticVersion? installed)
     {
         target.Children.Clear();
-        if (!FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var targetVersion)) { target.IsVisible = false; return; }
+        if (!FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersionFor(deviceId), out var targetVersion)) { target.IsVisible = false; return; }
         var notes = FirmwareChangelog.Between(deviceId, installed, targetVersion);
         target.IsVisible = notes.Count != 0;
         if (notes.Count == 0) return;
@@ -350,13 +350,14 @@ public sealed partial class MainWindow
                 var shot = Array.IndexOf(Program.Arguments, "--screenshot");
                 if (shot >= 0 && shot + 1 < Program.Arguments.Length)
                 {
-                    if (Program.Arguments.Contains("--help") || Program.Arguments.Contains("--close-prompt") || Program.Arguments.Contains("--picker") || Program.Arguments.Contains("--device-setup") || Program.Arguments.Contains("--settings"))
+                    if (Program.Arguments.Contains("--help") || Program.Arguments.Contains("--close-prompt") || Program.Arguments.Contains("--picker") || Program.Arguments.Contains("--device-setup") || Program.Arguments.Contains("--device-test") || Program.Arguments.Contains("--settings"))
                     {
                         var helpTopic = Array.IndexOf(Program.Arguments, "--help-topic");
                         var prompt = Program.Arguments.Contains("--help") ? CreateUserGuide(helpTopic >= 0 && helpTopic + 1 < Program.Arguments.Length ? Program.Arguments[helpTopic + 1] : CurrentGuideTopic())
+                            : Program.Arguments.Contains("--device-test") ? new DeviceTestWindow(_state.Device.Id, null, preview: true)
                             : Program.Arguments.Contains("--settings") ? CreateSettingsWindow(_preferences, offlinePreview: true)
                             : Program.Arguments.Contains("--device-setup") ? CreateOfflineSetupPreview() : Program.Arguments.Contains("--picker") ? CreateColorPicker("#EF646B") : CreatePrompt("Ungespeichertes Profil", L.F($"Änderungen an „{_state.Project.Name}“ zuerst speichern?"), "Abbrechen", "Profil speichern", "Verwerfen");
-                        if ((Program.Arguments.Contains("--help") || Program.Arguments.Contains("--settings")) && Program.Arguments.Contains("--minimum")) { prompt.Width = prompt.MinWidth; prompt.Height = prompt.MinHeight; }
+                        if ((Program.Arguments.Contains("--help") || Program.Arguments.Contains("--settings") || Program.Arguments.Contains("--device-test")) && Program.Arguments.Contains("--minimum")) { prompt.Width = prompt.MinWidth; prompt.Height = prompt.MinHeight; }
                         prompt.Opened += async (_, _) =>
                         {
                             try { await Task.Delay(200); using var captured = new RenderTargetBitmap(new PixelSize((int)prompt.ClientSize.Width, (int)prompt.ClientSize.Height), new Vector(96, 96)); captured.Render(prompt); captured.Save(Program.Arguments[shot + 1], PngBitmapEncoderOptions.Default); }

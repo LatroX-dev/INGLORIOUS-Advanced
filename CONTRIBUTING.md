@@ -46,7 +46,7 @@ These commands use files and simulated devices. They do not flash hardware. The 
 | `docs` | User guides and separate developer documentation |
 | `Licenses` | Preserved dependency licenses and notices |
 
-Generated files go under ignored build/dependency directories. Personal profiles and firmware backups are never source files.
+Generated builds go under `artifacts/`. Separate local checkouts, source exports and temporary validation fixtures stay under the ignored `workspace/` directory within the project; do not create sibling working folders. See [the source export instructions](docs/public-release.md#source-export). Personal profiles and firmware backups are never source files.
 
 ## Changes
 

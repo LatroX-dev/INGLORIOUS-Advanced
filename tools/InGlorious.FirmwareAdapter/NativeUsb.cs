@@ -4,6 +4,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Diagnostics;
 
+using InGlorious.Core;
+
 namespace InGlorious.FirmwareAdapter;
 
 internal sealed record DeviceIdentity(byte Bus, byte Address, ushort Vendor, ushort Product, ushort DeviceVersion, string PortPath, string Serial);
@@ -63,14 +65,15 @@ internal sealed class NativeUsb : IDisposable
         catch { Dispose(); throw; }
     }
 
-    internal WbConnection OpenSelected(Selection selection)
+    internal WbConnection OpenSelected(Selection selection, Model model)
     {
+        WbProtocol.ValidateModel(model);
         var candidates = matching.Where(x => x.Identity.Vendor == selection.Vid && x.Identity.Product == selection.Pid && x.Identity.Bus == selection.Bus && x.Identity.PortPath == selection.PortPath && (selection.Serial == null || x.Identity.Serial == selection.Serial)).ToArray();
         if (selection.Vid != 0x342D || selection.Pid != 0xDFA0 || candidates.Length != 1) throw new IOException("Exactly one selected WB32 physical port is required; no device opened.");
         var item = candidates[0];
         if (item.Descriptor.NumConfigurations != 1) throw new IOException("Unexpected USB configuration count; no device opened.");
         ValidateInterfaces(item.Pointer);
-        return new WbConnection(item.Pointer, item.Descriptor, item.Identity);
+        return new WbConnection(item.Pointer, item.Descriptor, item.Identity, model);
     }
 
     internal static NativeLibraryEvidence VerifyBundledLibrary()
@@ -114,6 +117,7 @@ internal sealed class NativeUsb : IDisposable
         private bool claimed;
         private bool writesEnabled;
         private WbInfo? initialInfo;
+        private readonly Model selectedModel;
         private readonly Stopwatch elapsed = Stopwatch.StartNew();
         internal DeviceIdentity Identity { get; }
         internal string Manufacturer { get; }
@@ -122,8 +126,10 @@ internal sealed class NativeUsb : IDisposable
         internal List<object> Transfers { get; } = [];
         public object[] Log => Transfers.ToArray();
 
-        internal WbConnection(nint device, DeviceDescriptor descriptor, DeviceIdentity identity)
+        internal WbConnection(nint device, DeviceDescriptor descriptor, DeviceIdentity identity, Model model)
         {
+            WbProtocol.ValidateModel(model);
+            selectedModel = model;
             Identity = identity;
             Check(Native.Open(device, out handle), "opening WB32 ROM bootloader");
             try
@@ -155,7 +161,7 @@ internal sealed class NativeUsb : IDisposable
             try
             {
                 if (elapsed.ElapsedMilliseconds >= 300000) throw new TimeoutException("OPERATION_TIMEOUT");
-                WbProtocol.ValidatePacket(request, writesEnabled);
+                WbProtocol.ValidatePacket(request, writesEnabled, selectedModel);
                 Check(Native.Bulk(handle, 0x01, request, request.Length, out sent, 5000), "sending allowed read request");
                 if (sent != request.Length) throw new IOException("Incomplete read request transfer.");
                 Check(Native.Bulk(handle, 0x81, response, response.Length, out received, 5000), "receiving bootloader data");
@@ -171,8 +177,9 @@ internal sealed class NativeUsb : IDisposable
 
         public Fingerprint Probe(Model model)
         {
+            if (model != selectedModel) throw new InvalidDataException("MODEL_SESSION_CHANGED");
             if (model.Transport != "wb32-dfu") throw new InvalidDataException("MODEL_TRANSPORT_MISMATCH");
-            var info = WbProtocol.GetInfo(this);
+            var info = WbProtocol.GetInfo(this, selectedModel);
             if (initialInfo != null && initialInfo != info) throw new InvalidDataException("WB_IDENTITY_CHANGED");
             initialInfo = info;
             if (model.FlashBytes != info.FlashBytes || model.SramBytes != info.SramBytes) throw new InvalidDataException("MODEL_GEOMETRY_MISMATCH");
@@ -184,17 +191,29 @@ internal sealed class NativeUsb : IDisposable
         {
             _ = Probe(model); byte[] result = new byte[model.FlashBytes];
             for (int offset = 0; offset < result.Length; offset += 256)
-                WbProtocol.Read(this, Model.FlashBase + (uint)offset, 256).CopyTo(result, offset);
+                WbProtocol.Read(this, Model.FlashBase + (uint)offset, 256, selectedModel).CopyTo(result, offset);
             _ = Probe(model); return result;
         }
-        public void WriteAll(Model model, byte[] image, Action beforeFirstWrite)
+        public void WriteAll(Model model, byte[] image, Action beforeFirstWrite, IRetainedLoaderWriteGrant? engineeringGrant = null)
         {
-            _ = Probe(model);
-            if (image.Length != model.FlashBytes || image.Length != 131072 || writesEnabled) throw new InvalidDataException("WB_FULL_IMAGE_REQUIRED");
+            if ((selectedModel.ProtectedPrefixBytes != 0) != (engineeringGrant != null) ||
+                (engineeringGrant != null && (selectedModel.EngineeringOnly ? engineeringGrant is not EngineeringPolicy.WriteGrant : engineeringGrant is not RetainedLoaderWriteGrant)))
+                throw new InvalidDataException("RETAINED_TRANSPORT_GRANT_REQUIRED");
+            var fingerprint = Probe(model);
+            if (image.Length != selectedModel.FlashBytes || writesEnabled) throw new InvalidDataException("WB_FULL_IMAGE_REQUIRED");
+            if (engineeringGrant != null)
+            {
+                engineeringGrant.ValidateTransport(selectedModel, fingerprint, image);
+                var prefix = new byte[selectedModel.ProtectedPrefixBytes];
+                for (int offset = 0; offset < prefix.Length; offset += WbProtocol.Page)
+                    WbProtocol.Read(this, Model.FlashBase + (uint)offset, WbProtocol.Page, selectedModel).CopyTo(prefix, offset);
+                RetainedLoaderLayout.ValidatePrefix(prefix);
+                engineeringGrant.Consume(selectedModel, Probe(model), image, prefix);
+            }
             beforeFirstWrite(); writesEnabled = true;
             try
             {
-                WbProtocol.WriteImage(this, image);
+                WbProtocol.WriteImage(this, image, selectedModel);
             }
             finally { writesEnabled = false; }
         }

@@ -21,7 +21,7 @@ internal static partial class Program
             return await fixture.ReadyToCapture(operation);
         }
 
-        foreach (var board in BoardDescriptorRegistry.ProtocolBoards)
+        foreach (var board in RoundTripBoards)
         {
             using var fixture = new SetupFixture(board.DeviceId);
             var original = fixture.Environment.Current.ToArray();

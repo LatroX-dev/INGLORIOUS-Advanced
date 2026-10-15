@@ -66,7 +66,7 @@ $rules=Get-Content -LiteralPath (Join-Path $PSScriptRoot '70-inglorious.rules')
 $expectedPairs=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $stock=Get-Content -LiteralPath (Join-Path $root 'src/InGlorious.Core/StockDeviceCatalog.cs') -Raw
 foreach($match in [regex]::Matches($stock,'new StockDeviceMatch\(0x([0-9A-F]{4}), 0x([0-9A-F]{4}),')){[void]$expectedPairs.Add(($match.Groups[1].Value+':'+$match.Groups[2].Value).ToLowerInvariant())}
-1..15|ForEach-Object{[void]$expectedPairs.Add(('feed:{0:x4}' -f (0x1c00+$_)))}
+1..16|ForEach-Object{[void]$expectedPairs.Add(('feed:{0:x4}' -f (0x1c00+$_)))}
 $normalCount=$expectedPairs.Count
 foreach($pair in @('0483:df11','342d:dfa0')){[void]$expectedPairs.Add($pair)}
 $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)

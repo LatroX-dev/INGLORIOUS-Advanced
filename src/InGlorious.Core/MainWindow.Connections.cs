@@ -14,11 +14,15 @@ public partial class MainWindow
     private bool _connectionRefreshPending, _connectionScanFailed;
     private long _connectionRevision;
     private DateTime _nextConnectionScan;
+    private SetupDevice[] _setupDevices = [];
+
+    private static bool IsRuntimeDevice(DetectedDevice device) => device.IsSupported &&
+        string.Equals(device.VendorId, "FEED", StringComparison.OrdinalIgnoreCase);
 
     private DeviceDefinition[] ConnectedDevices => DeviceCatalog.All
-        .Where(model => _devices.Any(device => device.IsSupported && device.DeviceId == model.Id)).ToArray();
+        .Where(model => _devices.Any(device => IsRuntimeDevice(device) && device.DeviceId == model.Id)).ToArray();
     private bool IsActiveDeviceConnected => !_connectionScanFailed &&
-        _devices.Any(device => device.IsSupported && device.DeviceId == Device.Id);
+        _devices.Any(device => IsRuntimeDevice(device) && device.DeviceId == Device.Id);
 
     private void UpdateConnectedDeviceButtons()
     {
@@ -69,7 +73,70 @@ public partial class MainWindow
             ((TextBlock)((StackPanel)content.Children[1]).Children[1]).Text = L.T(_connectionScanFailed ? "Gerätesuche fehlgeschlagen" : "USB verbunden");
             ((TextBlock)((StackPanel)content.Children[1]).Children[2]).Text = L.T("Experimentell");
         }
+        UpdateSetupDeviceButtons();
     }
+
+    private void UpdateSetupDeviceButtons()
+    {
+        if (!SetupDeviceButtons.Children.OfType<Button>().Select(button => ((SetupDevice)button.Tag).InstanceId)
+            .SequenceEqual(_setupDevices.Select(device => device.InstanceId)))
+        {
+            SetupDeviceButtons.Children.Clear();
+            foreach (var device in _setupDevices)
+            {
+                var labels = new StackPanel();
+                labels.Children.Add(new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap });
+                labels.Children.Add(new TextBlock { FontSize = 11, Margin = new Thickness(0, 6, 0, 0), Foreground = Brush("#EF646B"), TextWrapping = TextWrapping.Wrap });
+                labels.Children.Add(new TextBlock { FontSize = 11, Margin = new Thickness(0, 4, 0, 0), Foreground = Brush("#E9B86B"), TextWrapping = TextWrapping.Wrap });
+                var button = new Button
+                {
+                    Content = labels, Tag = device, Style = (Style)FindResource("QuietButton"),
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(10),
+                    BorderThickness = new Thickness(2, 0, 0, 0), Margin = new Thickness(0, 0, 0, 4)
+                };
+                button.Click += SetupDeviceButton_Click;
+                SetupDeviceButtons.Children.Add(button);
+            }
+        }
+        for (var index = 0; index < _setupDevices.Length; index++)
+        {
+            var device = _setupDevices[index];
+            var button = (Button)SetupDeviceButtons.Children[index];
+            button.Tag = device;
+            button.IsEnabled = !_connectionScanFailed && !_readingDevice && !_checkingFirmwareGuide && !_startupLoading && !_startupFinishing;
+            var labels = (StackPanel)button.Content;
+            ((TextBlock)labels.Children[0]).Text = device.Name;
+            ((TextBlock)labels.Children[1]).Text = L.T("Gerät einrichten");
+            ((TextBlock)labels.Children[2]).Text = L.T("Experimentell");
+            labels.Children[2].Visibility = device.IsExperimental ? Visibility.Visible : Visibility.Collapsed;
+            System.Windows.Automation.AutomationProperties.SetName(button, device.Name + " · " + L.T("Gerät einrichten") +
+                (device.IsExperimental ? " · " + L.T("Experimentell") : ""));
+        }
+    }
+
+    private async void SetupDeviceButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: SetupDevice selected } || _connectionScanFailed ||
+            !_setupDevices.Any(device => device.InstanceId == selected.InstanceId)) return;
+        await OpenDeviceSetupAsync(preferredInstanceId: selected.InstanceId);
+    }
+
+    private static SetupDevice[] StockSetupDevices(IEnumerable<SetupDevice> devices) => devices
+        .Where(device => !device.IsRuntime && device.HasFirmwareCandidate &&
+            StockDeviceCatalog.Match(device.VendorId, device.ProductId) is { } stock &&
+            stock.CandidateDeviceIds.SequenceEqual(device.CandidateDeviceIds) &&
+            device.CandidateDeviceIds.All(id => BoardDescriptorRegistry.TryGet(id, out var board) && !board.IsEngineeringOnly))
+        .DistinctBy(device => device.InstanceId, StringComparer.OrdinalIgnoreCase)
+        .OrderBy(device => device.Name, StringComparer.Ordinal).ThenBy(device => device.InstanceId, StringComparer.OrdinalIgnoreCase).ToArray();
+
+    private static SetupDevice[] StockSetupDevices(IEnumerable<DetectedDevice> devices) => StockSetupDevices(devices.Select(device =>
+    {
+        if (!ushort.TryParse(device.VendorId, System.Globalization.NumberStyles.HexNumber, null, out var vendor) ||
+            !ushort.TryParse(device.ProductId, System.Globalization.NumberStyles.HexNumber, null, out var product) ||
+            StockDeviceCatalog.Match(vendor, product) is not { } stock) return null;
+        return new SetupDevice(device.InstanceId, stock.IdentifiedName ?? DeviceCatalog.ModelGroupName(stock.CandidateDeviceIds),
+            stock.CandidateDeviceIds, vendor, product, [], false);
+    }).OfType<SetupDevice>());
 
     private void DeviceButton_Click(object sender, RoutedEventArgs e)
     {
@@ -130,7 +197,7 @@ public partial class MainWindow
             await ScanDevicesAsync();
     }
 
-    private void ApplyConnectionSnapshot(IReadOnlyList<DetectedDevice> devices, bool selectInitial = false)
+    private void ApplyConnectionSnapshot(IReadOnlyList<DetectedDevice> devices, bool selectInitial = false, IReadOnlyList<SetupDevice>? setupDevices = null)
     {
         foreach (var id in _confirmedDeviceSaves.Keys.ToArray())
         {
@@ -139,6 +206,7 @@ public partial class MainWindow
             if (present.Count == 0 || previous.Count > 0 && !previous.SetEquals(present)) _confirmedDeviceSaves.Remove(id);
         }
         _devices = devices.ToArray();
+        _setupDevices = setupDevices is null ? StockSetupDevices(devices) : StockSetupDevices(setupDevices);
         _connectionScanFailed = false;
         // Initial selection happens while the editor is still locked. Hotplug never
         // changes a draft, resolves pending inputs, or reads a configuration again.
@@ -159,7 +227,7 @@ public partial class MainWindow
     }
 
     private async Task ScanDevicesAsync(bool selectInitial = false,
-        Func<Task<IReadOnlyList<DetectedDevice>>>? scan = null)
+        Func<Task<IReadOnlyList<DetectedDevice>>>? scan = null, Func<Task<IReadOnlyList<SetupDevice>>>? setupScan = null)
     {
         if (_scanning || (_screenshotMode && scan is null) || !CanRefreshConnections(selectInitial)) return;
         var revision = _connectionRevision;
@@ -167,10 +235,24 @@ public partial class MainWindow
         _connectionRefreshPending = false;
         try
         {
-            var devices = await (scan ?? DeviceScanner.ScanAsync)();
+            IReadOnlyList<DetectedDevice> devices;
+            IReadOnlyList<SetupDevice>? setupDevices = null;
+            if (scan is not null)
+            {
+                devices = await scan();
+                if (setupScan is not null) setupDevices = await setupScan();
+            }
+            else
+            {
+                // One metadata snapshot covers stock and INGLORIOUS devices. No HID handles or firmware writes.
+                setupDevices = await new DeviceSetupService().ListDevicesAsync();
+                devices = setupDevices.Where(device => device.IsRuntime && device.CandidateDeviceIds.Count == 1)
+                    .Select(device => new DetectedDevice(device.CandidateDeviceIds[0], device.Name, device.VendorId.ToString("X4"),
+                        device.ProductId.ToString("X4"), "unknown", device.InstanceId, "", "")).ToArray();
+            }
             if (revision != _connectionRevision || !CanRefreshConnections(selectInitial))
             { _connectionRefreshPending = true; return; }
-            ApplyConnectionSnapshot(devices, selectInitial);
+            ApplyConnectionSnapshot(devices, selectInitial, setupDevices);
         }
         catch (Exception ex)
         {

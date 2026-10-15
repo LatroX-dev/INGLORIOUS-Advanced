@@ -9,8 +9,11 @@
 #include "wear_leveling_efl_config.h"
 #include "wear_leveling_internal.h"
 
-#if !defined(QMK_MCU_FAMILY_WB32) || (IG_BOARD != 2 && (IG_BOARD < 4 || IG_BOARD > 15))
-#    error "WB32 bulk writer is restricted to the listed 128 KiB WB32 configurations"
+#if !defined(QMK_MCU_FAMILY_WB32) || (IG_BOARD != 2 && (IG_BOARD < 4 || IG_BOARD > 16))
+#    error "WB32 bulk writer is restricted to the explicitly listed WB32 configurations"
+#endif
+#if IG_BOARD == 16 && (!defined(IG_RETAINED_LOADER_BUILD) || IG_RETAINED_LOADER_BUILD != 1)
+#    error "Board 16 requires its retained-loader build"
 #endif
 #if defined(WB32_FLASH_PROGRAM_NO_ERASE)
 #    error "INGLORIOUS requires the WB32 erase-before-program implementation"
@@ -24,7 +27,11 @@
 
 _Static_assert(BACKING_STORE_WRITE_SIZE == 8, "Reviewed WB32 write width");
 _Static_assert(WB32_FLASH_SECTOR_SIZE == 256, "Reviewed WB32 page size");
-_Static_assert(WEAR_LEVELING_EFL_FLASH_SIZE == 131072, "Reviewed WB32 flash capacity");
+#if IG_BOARD == 16
+_Static_assert(WEAR_LEVELING_EFL_FLASH_SIZE == 262144, "Board 16 requires 256 KiB flash");
+#else
+_Static_assert(WEAR_LEVELING_EFL_FLASH_SIZE == 131072, "Existing WB32 boards require 128 KiB flash");
+#endif
 _Static_assert(WEAR_LEVELING_BACKING_SIZE == 32768, "Reviewed trailing storage range");
 
 bool backing_store_write_bulk(uint32_t address, backing_store_int_t *values, size_t item_count) {

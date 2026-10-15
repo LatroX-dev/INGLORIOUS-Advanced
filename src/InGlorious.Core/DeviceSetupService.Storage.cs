@@ -7,11 +7,20 @@ namespace InGlorious.Core;
 public sealed partial class DeviceSetupService
 {
     private sealed record SetupImage(string DeviceId, byte BoardId, string File, int Bytes, string Sha256,
-        string Transport, int FlashBytes, int SramBytes);
+        string Transport, int FlashBytes, int SramBytes, string? ReleaseId = null, int ApplicationOffset = 0);
     private sealed record ImageCatalog(int Schema, string ReleaseId, SetupImage[] Targets);
     private sealed record RecoveryRecord(int Schema, string DeviceId, Guid InstallationId, string OriginalSha256,
         string BackupManifest, string BackupManifestSha256, ushort OriginalVendor, ushort OriginalProduct);
     public static string TargetFirmwareVersion => ReadImageCatalog().ReleaseId;
+    public static string TargetFirmwareVersionFor(string deviceId)
+    {
+        var catalog = ReadImageCatalog();
+        var target = catalog.Targets.SingleOrDefault(item => item.DeviceId == deviceId)
+            ?? throw Error("Für dieses Modell ist noch keine INGLORIOUS-Firmware verfügbar.");
+        var value = target.ReleaseId ?? catalog.ReleaseId;
+        if (!FirmwareSemanticVersion.TryParse(value, out _)) throw Error("Das Firmware-Paket ist nicht gültig.");
+        return value;
+    }
 
     public async Task<SetupProgress> CaptureAsync(SetupSession session, IProgress<string>? log = null)
     {
@@ -80,7 +89,7 @@ public sealed partial class DeviceSetupService
                     {
                         try { session.InstalledFirmwareVersion = KnownFirmwareImages.Validate(current, session.DeviceId!, identity.BoardId); }
                         catch (InvalidDataException) { throw Error("Die installierte Firmware ist nicht bekannt. Das Update wurde angehalten."); }
-                        if (Version.Parse(session.InstalledFirmwareVersion) > Version.Parse(TargetFirmwareVersion))
+                        if (Version.Parse(session.InstalledFirmwareVersion) > Version.Parse(TargetFirmwareVersionFor(session.DeviceId!)))
                             throw Error("Die installierte Firmware ist neuer als das verfügbare Update.");
                         session.BundlePath = PrepareBundle(session, current);
                     }
@@ -213,13 +222,15 @@ public sealed partial class DeviceSetupService
     {
         var catalog = ReadImageCatalog();
         var target = catalog.Targets.Single(item => item.DeviceId == session.DeviceId);
-        if (target.FlashBytes != FlashBytesFor(target.DeviceId) || target.Transport != TransportFor(target.DeviceId) ||
+        if (target.FlashBytes != FlashBytesFor(target.DeviceId) || target.SramBytes != SramBytesFor(target.DeviceId) || target.Transport != TransportFor(target.DeviceId) ||
             target.BoardId != BoardDescriptorRegistry.Get(target.DeviceId).BoardId)
             throw Error("Das Firmware-Paket passt nicht zu diesem Modell.");
+        RetainedLoaderLayout.ValidateLayout(target.DeviceId, target.BoardId, target.FlashBytes, target.ApplicationOffset);
         var source = ContainedFile(_packageRoot, target.File);
         var bytes = File.ReadAllBytes(source);
         if (bytes.Length != target.Bytes || !HashEquals(bytes, target.Sha256)) throw Error("Das Firmware-Paket ist beschädigt oder unvollständig.");
-        var full = InstallationIdentity.CreateImage(bytes, target.FlashBytes, session.Installation!);
+        var original = target.ApplicationOffset == 0 ? Array.Empty<byte>() : ReadOriginalForBundle(session);
+        var full = InstallationIdentity.CreateImage(bytes, target.FlashBytes, session.Installation!, original);
         if (current is not null)
         {
             if (session.MigrateLegacy) LegacyFirmwareMigration.ValidateImage(current, target.DeviceId);
@@ -228,7 +239,8 @@ public sealed partial class DeviceSetupService
             current.AsSpan(current.Length - InstallationIdentity.StorageBytes).CopyTo(full.AsSpan(full.Length - InstallationIdentity.StorageBytes));
         }
         // The target must itself be in the retained approved-image catalog, including its release ID.
-        if (KnownFirmwareImages.Validate(full, target.DeviceId, target.BoardId) != catalog.ReleaseId)
+        var releaseId = TargetFirmwareVersionFor(target.DeviceId);
+        if (KnownFirmwareImages.Validate(full, target.DeviceId, target.BoardId) != releaseId)
             throw Error("Das Firmware-Paket ist nicht gültig.");
         var imagePath = Path.Combine(session.Directory, "installation.bin");
         WriteNew(imagePath, full);
@@ -238,10 +250,30 @@ public sealed partial class DeviceSetupService
             schema = 1, deviceId = target.DeviceId, boardId = target.BoardId, transport = target.Transport,
             flashBase = 0x08000000, flashBytes = target.FlashBytes, sramBytes = target.SramBytes,
             image = new { path = "installation.bin", bytes = full.Length, sha256 = Convert.ToHexString(SHA256.HashData(full)) },
-            releaseId = catalog.ReleaseId
+            releaseId
         };
         WriteNew(bundlePath, JsonSerializer.SerializeToUtf8Bytes(bundle, Json));
         return bundlePath;
+    }
+
+    private static byte[] ReadOriginalForBundle(SetupSession session)
+    {
+        var path = session.BackupPath ?? throw Error("Für diese Installation wurde keine passende Original-Sicherung gefunden.");
+        AssertNoLinks(path);
+        if (new FileInfo(path).Length > 65536) throw Error("Die Sicherungszuordnung ist ungültig.");
+        using var manifest = JsonDocument.Parse(File.ReadAllBytes(path));
+        var root = manifest.RootElement;
+        if (root.GetProperty("schema").GetInt32() != 1 || root.GetProperty("deviceId").GetString() != session.DeviceId)
+            throw Error("Die Original-Sicherung passt nicht zu dieser Installation.");
+        var records = root.GetProperty("artifacts").EnumerateArray().Where(item => item.GetProperty("kind").GetString() == "original-read").ToArray();
+        if (records.Length != 2) throw Error("Die Sicherungen stimmen nicht überein. Es wird nichts installiert.");
+        var directory = Path.GetDirectoryName(path)!;
+        RequireDistinctReads(directory, records);
+        var first = ReadCheckedArtifact(directory, records[0], FlashBytesFor(session.DeviceId!));
+        var second = ReadCheckedArtifact(directory, records[1], FlashBytesFor(session.DeviceId!));
+        if (!first.AsSpan().SequenceEqual(second) || session.Installation is null || !session.Installation.MatchesOriginal(first))
+            throw Error("Die Original-Sicherung passt nicht zu dieser Installation.");
+        return first;
     }
 
     private string FindRecovery(InstallationIdentity identity, string deviceId)

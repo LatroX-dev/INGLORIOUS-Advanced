@@ -23,6 +23,9 @@ public partial class AppSettingsWindow : Window
         _offlinePreview = offlinePreview;
         _autostart = new AppAutostartEditor(offlinePreview);
         InitializeComponent();
+        ContactEmailButton.Visibility = SupportContact.EmailUri is null ? Visibility.Collapsed : Visibility.Visible;
+        ContactEmailButton.IsEnabled = !offlinePreview;
+        ContactEmailButton.ToolTip = SupportContact.Email;
         LanguageChoice.ItemsSource = L.LanguageChoices;
         LanguageChoice.SelectedValue = current.Language;
         StartDeviceChoice.Items.Add(new System.Windows.Controls.ComboBoxItem { Content = L.T("Zuletzt benutztes Gerät"), Tag = "last" });
@@ -112,6 +115,13 @@ public partial class AppSettingsWindow : Window
             StatusText.Text = "";
         }
         catch (Exception ex) { StatusText.Text = L.T("Der Profilordner konnte nicht geöffnet werden. ") + ex.Message; }
+    }
+
+    private void ContactEmail_Click(object sender, RoutedEventArgs e)
+    {
+        if (_offlinePreview || SupportContact.EmailUri is not { } uri) return;
+        try { Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true }); }
+        catch { StatusText.Text = L.T("Der Link konnte nicht geöffnet werden. Prüfe deine Standard-App für Browser oder E-Mail."); }
     }
 
     private async void SetupDevice_Click(object sender, RoutedEventArgs e) => await OpenSetupAsync(SetupOperation.Install);

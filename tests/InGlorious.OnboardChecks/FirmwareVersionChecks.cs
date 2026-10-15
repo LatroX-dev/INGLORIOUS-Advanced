@@ -103,8 +103,11 @@ internal static class FirmwareVersionChecks
             check(deviceId == "numpad" ? patchNotes.Count == 1 && patchNotes[0].Version == v091
                 && patchNotes[0].Changes.SequenceEqual(new[] { "Fixed the Numpad lighting test stopping too early.", "Reduced unintended wake-ups from standby." }) : patchNotes.Count == 0,
                 "Numpad patch note is exact; a PRO patch update invents no device-specific fix");
-            check(FirmwareChangelog.Between(deviceId, v07, new(65535, 65535, 65535)).All(n => n.Version <= current)
-                && FirmwareChangelog.Between(deviceId, v07, new(65535, 65535, 65535)).Select(n => n.Version).SequenceEqual(expectedVersions), "A future target cannot expose notes beyond the current shipped firmware");
+            var redDefaults = new FirmwareSemanticVersion(0, 11, 3);
+            var lightingFix = new FirmwareSemanticVersion(0, 11, 4);
+            check(FirmwareChangelog.Between(deviceId, v07, new(65535, 65535, 65535)).All(n => n.Version <= lightingFix)
+                && FirmwareChangelog.Between(deviceId, v07, new(65535, 65535, 65535)).Select(n => n.Version).SequenceEqual(new[] { lightingFix, redDefaults }.Concat(expectedVersions)), "A future target cannot expose notes beyond the current documented firmware");
+            check(FirmwareChangelog.Between(deviceId, current, redDefaults).Single().Changes.SequenceEqual(new[] { "Red default lighting when no saved colors are available." }), "New default-color note does not invent per-key diagnostics for other boards");
             foreach (var installed in new FirmwareSemanticVersion?[] { null, default(FirmwareSemanticVersion), current, new(0, 11, 2), new(1, 0, 0) })
                 check(FirmwareChangelog.Between(deviceId, installed, current).Count == 0, "Missing/default/current/newer firmware has no proposed update changelog");
             check(FirmwareChangelog.Between(deviceId, v08, v08).Count == 0 && FirmwareChangelog.Between(deviceId, v09, v08).Count == 0, "Equal or downgrade targets never show update notes");
@@ -117,8 +120,25 @@ internal static class FirmwareVersionChecks
             L.SetLanguage("de");
             check(((ICollection<FirmwareReleaseNotes>)notes).IsReadOnly && ((ICollection<string>)notes[0].Changes).IsReadOnly, "Catalog results and their changes cannot mutate shared release notes");
         }
+        var previousRelease = new FirmwareSemanticVersion(0, 11, 3);
+        var latestRelease = new FirmwareSemanticVersion(0, 11, 4);
+        foreach (var board in BoardDescriptorRegistry.ProtocolBoards)
+        {
+            var notes = FirmwareChangelog.Between(board.DeviceId, previousRelease, latestRelease);
+            check(notes.Count == 1 && notes[0].Version == latestRelease && notes[0].Changes.SequenceEqual(new[] { "Fixed lighting tests being blocked when no key is pressed." }),
+                board.DeviceId + ": all included firmware targets receive only the new lighting-test fix when upgrading from0.11.3");
+            check(FirmwareChangelog.Between(board.DeviceId, new(0, 11, 2), previousRelease).All(note => note.Version < latestRelease),
+                board.DeviceId + ": a target before the fix never offers the new note");
+            foreach (var installed in new FirmwareSemanticVersion?[] { null, default(FirmwareSemanticVersion), latestRelease, new(0, 11, 5) })
+                check(FirmwareChangelog.Between(board.DeviceId, installed, latestRelease).Count == 0,
+                    board.DeviceId + ": missing, current or newer firmware has no pending lighting-test fix");
+            check(FirmwareChangelog.Between(board.DeviceId, previousRelease, new(99, 0, 0)).Select(note => note.Version).SequenceEqual(new[] { latestRelease }),
+                board.DeviceId + ": future target cannot invent changes after the documented lighting-test fix");
+            check(FirmwareChangelog.Between(board.DeviceId, latestRelease, new(99, 0, 0)).Count == 0,
+                board.DeviceId + ": undocumented future updates have no guessed notes");
+        }
         foreach (var unknownDevice in new string?[] { null, "", "PRO-ISO", "pro", "GMMK PRO", "other", "numpad " })
-            check(FirmwareChangelog.Between(unknownDevice!, new(0, 7, 0), new FirmwareSemanticVersion(0, 11, 1)).Count == 0, "Unknown model cannot receive another device's changelog");
+            check(FirmwareChangelog.Between(unknownDevice!, new(0, 7, 0), latestRelease).Count == 0, "Unknown model cannot receive another device's changelog");
     }
     private sealed class VersionTransport(string id) : IOnboardTransport
     {

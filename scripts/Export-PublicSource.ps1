@@ -40,9 +40,17 @@ $app = @(
     'MacroRecorderWindow.xaml','MacroRecorderWindow.xaml.cs','MacroRecording.cs',
     'FirmwareRelease.cs','FirmwareChangelog.cs','FirmwareMessages.cs','FirmwareLightingTestService.cs','MainWindow.Onboarding.cs','MainWindow.Standby.cs','UnsavedChangesWindow.cs','UiIcons.cs'
 )
+$app += @('RetainedLoaderLayout.cs','OnboardDiagnostics.cs','DeviceDiagnosticSession.cs','DeviceTestWindow.cs','MainWindow.DeviceTest.cs','DeviceSetupWindow.Options.cs')
 $allow = [Collections.Generic.List[string]]::new()
+$app += @('DeviceFeedback.cs','SupportContact.cs','DeviceFeedbackWindow.cs','MainWindow.Feedback.cs','CoreSettingsImport.cs','CoreImportWindow.cs','MainWindow.CoreImport.cs')
 foreach ($name in $app) { $allow.Add('src/InGlorious.Core/'+$name) }
+foreach ($name in @('feedback.json','core-import.json')) { $allow.Add('src/InGlorious.Core/Locales/'+$name) }
+foreach ($suite in @('InGlorious.FeedbackChecks','InGlorious.CoreImportChecks')) { $allow.Add('tests/'+$suite+'/'+$suite+'.csproj'); $allow.Add('tests/'+$suite+'/Program.cs') }
+$allow.Add('.github/ISSUE_TEMPLATE/device-feedback.md')
+$allow.Add('docs/core-import.md')
 $allow.Add('src/InGlorious.Core/SetupFirmwareCatalog.json')
+$allow.Add('src/InGlorious.Core/Locales/device-test.json')
+$allow.Add('tests/InGlorious.OnboardChecks/DiagnosticChecks.cs')
 $allow.Add('src/InGlorious.Core/KnownFirmwareCatalog.json')
 $allow.Add('src/InGlorious.Core/SetupToolCatalog.json')
 $allow.Add('src/InGlorious.Core/Locales/device-setup-ui.json')
@@ -68,9 +76,12 @@ $allow.Add('tests/PosixNativeChecks/check-dependency.sh')
 $allow.Add('scripts/Prepare-ReleaseAssets.py')
 $allow.Add('tests/ReleaseAssetsChecks/check_release_assets.py')
 $allow.Add('tests/InGlorious.SetupChecks/LegacyMigrationChecks.cs')
-$adapterFiles=@('AdapterEngine.cs','Contracts.cs','Files.cs','InGlorious.FirmwareAdapter.csproj','NativeUsb.cs','NativeToolCatalog.cs','Program.cs','README.md','SelfTests.cs','SelfTests.Legacy.cs','Stm32Device.cs','WbProtocol.cs',
+$adapterFiles=@('AdapterEngine.cs','EngineeringPolicy.cs','Contracts.cs','Files.cs','InGlorious.FirmwareAdapter.csproj','NativeUsb.cs','NativeToolCatalog.cs','Program.cs','README.md','SelfTests.cs','SelfTests.Legacy.cs','SelfTests.Engineering.cs','Stm32Device.cs','WbProtocol.cs',
  'Licenses/dfu-util-binary-provenance.txt','Licenses/dfu-util-GPL-2.0.txt','Licenses/dotnet-MIT.txt','Licenses/dotnet-THIRD-PARTY-NOTICES.txt','Licenses/libusb-LGPL-2.1.txt','Licenses/README.txt','Licenses/Westberry-Apache-2.0.txt','Licenses/Windows-runtime-notices.txt')
+$adapterFiles += @('RetainedLoaderWriteGrant.cs','SelfTests.RetainedLoader.cs')
 foreach($name in $adapterFiles){$allow.Add('tools/InGlorious.FirmwareAdapter/'+$name)}
+$deviceCliFiles = @('InGlorious.Device.csproj','Program.cs','DeviceArguments.cs','TimedTransport.cs')
+foreach($name in $deviceCliFiles){$allow.Add('tools/InGlorious.Device/'+$name)}
 foreach($suite in @('InGlorious.DiscoveryChecks','InGlorious.SetupChecks')){
  $allow.Add('tests/'+$suite+'/'+$suite+'.csproj');$allow.Add('tests/'+$suite+'/Program.cs')
 }
@@ -78,14 +89,16 @@ foreach($name in @('CoordinatorChecks.cs','IdentityChecks.cs','StockFirmwareChec
 $allow.Add('tests/InGlorious.PortableSetupChecks/InGlorious.PortableSetupChecks.csproj')
 foreach ($name in @('key-bindings.json','desktop.json','dialogs.json','favorites.json','firmware.json','firmware-service.json','firmware-guide-simple.json','firmware-wizard-simple.json','firmware-routing.json','firmware-details.json','firmware-log.json','firmware-source.json','lighting-presets.json','macros.json','main-status.json','main.json','models.json','operations.json','preferences-profiles.json','sequences.json','standby.json','transfer-simple.json','startup.json','guide.json','slider-editor.json','model-support.json','connections.json','firmware-models.json')) { $allow.Add('src/InGlorious.Core/Locales/'+$name) }
 $desktop = @('App.axaml','App.axaml.cs','EditorState.cs','InGlorious.Desktop.csproj','MainWindow.Actions.cs','MainWindow.Checks.cs','MainWindow.cs','MainWindow.Editors.cs','MainWindow.Icons.cs','MainWindow.Macros.cs','MainWindow.KeyBindings.cs','MainWindow.KeyBindingsChecks.cs','MainWindow.Presets.cs','MainWindow.Settings.cs','MainWindow.SoftwareUpdate.cs','MainWindow.Startup.cs','MainWindow.StartupChecks.cs','MainWindow.Connections.cs','MainWindow.ConnectionsChecks.cs','MainWindow.Help.cs','MainWindow.HelpChecks.cs','MainWindow.Setup.cs','DeviceSetupWindow.cs','DeviceSetupWindow.Checks.cs','DeviceSetupWindow.Completion.cs','Program.cs','README.md','DesktopTrayIcon.cs','MainWindow.Background.cs','Shared/AssemblyInfo.cs','Shared/InGlorious.Shared.csproj','Shared/OnboardHidTransport.cs','Shared/PlatformDeviceService.cs')
+$desktop += @('DeviceFeedbackWindow.cs','MainWindow.Feedback.cs','CoreImportWindow.cs','MainWindow.CoreImport.cs')
+$desktop += @('DeviceTestWindow.cs','MainWindow.DeviceTest.cs','DeviceSetupWindow.Options.cs')
 foreach ($name in $desktop) { $allow.Add('src/InGlorious.Desktop/'+$name) }
 foreach ($name in @('inglorious-mark.png','inglorious.ico')) { $allow.Add('src/InGlorious.Core/Assets/'+$name) }
 foreach ($name in @('INGLORIOUS-Oxanium-SemiBold.ttf','Oxanium-OFL.txt','Oxanium-source.json')) { $allow.Add('src/InGlorious.Core/Assets/Fonts/'+$name) }
 foreach ($name in @('LICENSE','sources.json','pro-iso.json','numpad.json','pro-iso-default.c','numpad-default.c','pro-ansi.json','pro-ansi-default.c','pro-rev2-ansi.json','pro-rev2-ansi-default.c','pro-rev2-iso.json','pro-rev2-iso-default.c','gmmk2-65-ansi.json','gmmk2-65-ansi-default.c','gmmk2-65-iso.json','gmmk2-65-iso-default.c','gmmk2-96-ansi.json','gmmk2-96-ansi-default.c','gmmk2-96-iso.json','gmmk2-96-iso-default.c')) { $allow.Add('reference/qmk/'+$name) }
-foreach ($name in @('Build-Firmware.ps1','Prepare-Overlay.ps1','Patch-QmkTiming.ps1','Patch-QmkStorage.ps1','Verify-CandidateBuild.py','targets.json','protocol.md','README.md')) { $allow.Add('firmware/'+$name) }
+foreach ($name in @('Build-Firmware.ps1','Resolve-Targets.ps1','Prepare-Overlay.ps1','Patch-QmkTiming.ps1','Patch-QmkStorage.ps1','Verify-CandidateBuild.py','engineering/targets.json','boards/gmmk3-pro-100-iso/ig_board_version.h','engineering/README.md','targets.json','protocol.md','README.md')) { $allow.Add('firmware/'+$name) }
 foreach ($name in @('inglorious.c','ig_version.h','ig_effects.h','ig_color.h','ig_timing.c','ig_timing.h','ig_storage.h','ig_storage.inc','wb32_bulk.c')) { $allow.Add('firmware/inglorious/'+$name) }
-foreach ($name in @('ig_board.h','cache_staging_checks.h','Run-PortChecks.ps1','storage_tests.c','Run-StorageChecks.ps1')) { $allow.Add('firmware/tests/'+$name) }
-foreach ($name in @('port_checks.c','port_mock.h','raw_hid.h','eeprom.h','wear_leveling.h','keymap_introspection.h','bootloader.h','wait.h')) { $allow.Add('firmware/tests/ports/'+$name) }
+foreach ($name in @('ig_board.h','cache_staging_checks.h','Run-PortChecks.ps1','Run-EngineeringChecks.ps1','storage_tests.c','Run-StorageChecks.ps1')) { $allow.Add('firmware/tests/'+$name) }
+foreach ($name in @('port_checks.c','diagnostic_checks.h','port_mock.h','raw_hid.h','eeprom.h','wear_leveling.h','keymap_introspection.h','bootloader.h','wait.h')) { $allow.Add('firmware/tests/ports/'+$name) }
 foreach ($name in @('runtime_tests.c','version_reporting_checks.h','color_sequences_checks.h','color_output_checks.h','standby_checks.h','lighting_test_checks.h','effects_tests.c','bulk_tests.c','qmk_mock.h','analog.h','bootloader.h','eeprom.h','ig_physical.h','keymap_introspection.h','qmk_midi.h','raw_hid.h','wait.h','wear_leveling.h','Run-RuntimeChecks.ps1','Run-EffectsChecks.ps1','Run-BulkChecks.ps1','README.md')) { $allow.Add('firmware/tests/'+$name) }
 foreach ($name in @('hal.h','wear_leveling_efl_config.h','wear_leveling_internal.h','wear_leveling.h')) { $allow.Add('firmware/tests/bulk_mocks/'+$name) }
 foreach ($name in @('debounce.h','action.h','qmk_mock.h','usb_main.h','timer.h','timing_tests.c','Run-TimingChecks.ps1','Test-DescriptorPatch.ps1')) { $allow.Add('tests/TimingChecks/'+$name) }
@@ -95,10 +108,12 @@ foreach ($suite in @('InGlorious.Checks','InGlorious.OnboardChecks','InGlorious.
 $allow.Add('tests/InGlorious.Checks/ColorPaletteChecks.cs')
 $allow.Add('tests/InGlorious.OnboardChecks/FirmwareVersionChecks.cs')
 $allow.Add('tests/InGlorious.OnboardChecks/ExperimentalBoardChecks.cs')
+$allow.Add('tests/InGlorious.OnboardChecks/EngineeringConfigurationChecks.cs')
 $allow.Add('src/InGlorious.Core/Locales/lighting-zones.json')
 $allow.Add('reference/discovery/gmbk-eternal-20261011.json')
 $allow.Add('docs/discovery-gmbk-eternal.md')
 $allow.Add('docs/gmmk3-port.md')
+$allow.Add('docs/gmmk3-pro-port.md')
 $allow.Add('scripts/Test-Gmmk3References.py')
 $allow.Add('scripts/Test-ModelReferenceRejections.py')
 $allow.Add('firmware/Prepare-Gmmk3References.py')
@@ -181,6 +196,11 @@ function Assert-NoPrivateText([string]$Relative,[byte[]]$Bytes) {
         $scan = $text -replace ([regex]::Escape($publicOwnerUrl)+'(?=[/\s)"''#?]|$)'), 'https://github.com/REPOSITORY_OWNER'
         $publicApiUrl = 'https://api.github.com/repos/LatroX-dev/INGLORIOUS-Advanced'
         $scan = $scan -replace ([regex]::Escape($publicApiUrl)+'(?=[/\s)"''#?]|$)'), 'https://api.github.com/repos/REPOSITORY_OWNER/INGLORIOUS-Advanced'
+        # This exact public contact was supplied by the maintainer. Other addresses,
+        # domain references and local identifiers are still checked without exemptions.
+        $publicContact = "inglorious@latrox.dev"
+        $mailToken = '[A-Za-z0-9.!#$%&''*+/=?^_`{|}~@-]'
+        $scan = $scan -replace ('(?<!'+$mailToken+')'+[regex]::Escape($publicContact)+'(?!'+$mailToken+')'), 'PUBLIC_CONTACT_EMAIL'
         foreach ($value in $private) {
             if ($scan.Contains($value,[StringComparison]::OrdinalIgnoreCase)) { throw ('Private local identifier detected in allowlisted file: '+$Relative) }
         }
@@ -193,7 +213,9 @@ $target = $null
 if ($Destination) {
     $target = [IO.Path]::GetFullPath($Destination).TrimEnd([IO.Path]::DirectorySeparatorChar)
     if ($target -notmatch '^[A-Za-z]:\\' -or ([IO.DriveInfo]::new([IO.Path]::GetPathRoot($target))).DriveType -eq [IO.DriveType]::Network) { throw 'Destination must be a local drive path, not a network path.' }
-    if ($target.Equals($root,[StringComparison]::OrdinalIgnoreCase) -or $target.StartsWith($root+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Destination must be outside SourceRoot.' }
+    $exportsRoot = Join-Path $root 'workspace/exports'
+    $dedicatedExport = [IO.Path]::GetDirectoryName($target).Equals($exportsRoot,[StringComparison]::OrdinalIgnoreCase)
+    if (-not $dedicatedExport) { throw 'Destination must be a new direct child of SourceRoot/workspace/exports.' }
     if (Test-Path -LiteralPath $target) { throw 'Destination already exists. Nothing will be overwritten or cleaned.' }
     Assert-NoLink ([IO.Path]::GetDirectoryName($target))
 } elseif ($Export) { throw '-Export requires an explicit new local -Destination.' }
@@ -203,7 +225,8 @@ $locks = [Collections.Generic.List[IO.FileStream]]::new()
 try {
     foreach ($relative in $allow) {
         $reviewedAdapter=$relative.StartsWith('tools/InGlorious.FirmwareAdapter/') -and $relative.Substring('tools/InGlorious.FirmwareAdapter/'.Length) -in $adapterFiles
-        if ((-not$reviewedAdapter-and$relative -match '(^|/)(backups|data|artifacts|bin|obj|tools|releases|toolchain)(/|$)') -or $relative.Contains('..')) { throw 'An unsafe path entered the source allowlist.' }
+        $reviewedDeviceCli=$relative.StartsWith('tools/InGlorious.Device/') -and $relative.Substring('tools/InGlorious.Device/'.Length) -in $deviceCliFiles
+        if ((-not$reviewedAdapter-and-not$reviewedDeviceCli-and$relative -match '(^|/)(workspace|backups|data|artifacts|bin|obj|tools|releases|toolchain)(/|$)') -or $relative.Contains('..')) { throw 'An unsafe path entered the source allowlist.' }
         $path = Join-Path $root $relative
         if (-not (Test-Path -LiteralPath $path)) { throw ('Reviewed source file is missing: '+$relative) }
         Assert-NoLink $path

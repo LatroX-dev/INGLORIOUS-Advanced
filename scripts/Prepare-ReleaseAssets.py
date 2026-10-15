@@ -68,13 +68,14 @@ def stage(source: Path, destination: Path, version: str, repository: Path) -> li
             raise ValueError("Release copy verification failed.")
     migration_note = ("Windows 0.6.48 and earlier: download and run the installer once to switch to the new package names. "
                       "Your profiles and backups are kept.\n\n") if version == "0.6.49" else ""
-    notes = (section[1].strip() + "\n\n" + migration_note +
+    notes = (section[1].strip() + "\n\n" +
+             f"[Full changelog](https://github.com/LatroX-dev/INGLORIOUS-Advanced/blob/v{version}/CHANGELOG.md)\n\n" + migration_note +
              f"Choose **INGLORIOUS-Advanced-{version}-win-x64-Setup.exe** for Windows, **osx-arm64** for Apple silicon, **osx-x64** for Intel Macs, "
              "or **linux-x64** for Linux. Each app package includes firmware and its USB tools.\n\n"
              "macOS and Linux are **Early Alpha**. Native builds and offline checks do not replace physical-device testing. "
              "Windows packages are unsigned; macOS packages are not notarized.\n\n"
              "**GMMK Numpad: USB only. Bluetooth does not work with INGLORIOUS firmware.** "
-             "Additional model/layout variants marked experimental have not been tested on hardware.\n\n"
+             "Experimental variants still require full hardware acceptance; see the model support notes.\n\n"
              "Updating the app keeps profiles and original-firmware backups. Keyboard firmware is installed separately in the app. "
              "Use at your own risk and keep a separate copy of your original backups.\n\n"
              "The Source archive includes the matching application and upstream firmware sources.\n")

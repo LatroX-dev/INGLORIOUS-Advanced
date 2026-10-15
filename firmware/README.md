@@ -1,6 +1,6 @@
 # INGLORIOUS onboard firmware
 
-The current included firmware is **0.11.1**, build `0x000B0101`, for the 15 model/layout variants in `targets.json`. Thirteen variants remain experimental. Model support and physical acceptance are listed in [the model overview](../docs/model-support.md).
+All sixteen targets use firmware **0.11.4**, build `0x000B0401`, including the separate GMMK 3 PRO 100% ISO wired, non-HE target. Build success does not establish full physical acceptance. Model support and physical acceptance are listed in [the model overview](../docs/model-support.md).
 
 ## Behavior
 
@@ -8,13 +8,13 @@ The QMK-based firmware runs key assignments, four layers, macros, lighting and s
 
 There are 21 lighting modes with per-LED overrides, custom color sequences and global settings. The optional lighting test lasts 21 seconds and the screensaver repeats the sequence after inactivity. Settings and the test sequence run locally, without a background service.
 
-Each device has two configuration slots inside a 32-KiB internal flash reserve. Board IDs 1–9 use 7,168-byte slots; IDs 10–15 use 7,680-byte slots. Four layers, up to 32 macro slots and shared event/color pools fit within that fixed space. Oversized configurations are rejected rather than silently truncated. An upload stages data in the inactive part of the EEPROM RAM cache and commits only after full validation.
+Each device has two configuration slots inside a 32-KiB internal flash reserve. Board IDs 1–9 use 7,168-byte slots; IDs 10–16 use 7,680-byte slots. Four layers, up to 32 macro slots and shared event/color pools fit within that fixed space. Oversized configurations are rejected rather than silently truncated. An upload stages data in the inactive part of the EEPROM RAM cache and commits only after full validation.
 
 This storage implementation does not promise atomic recovery from power loss during QMK flash consolidation. External stock SPI memory is disabled. The firmware does not store profiles in the wireless controller or preserve all original external settings.
 
 ## Protocol and identities
 
-[`protocol.md`](protocol.md) defines the 32-byte RAW-HID configuration protocol, feature flags, explicit version response and persistent configuration formats. Development USB PIDs `FEED:1C01` through `FEED:1C0F` map to the 15 board IDs. These are development identities, not a commercial USB allocation. App handshake checks must agree with the expected model; a PID alone does not authorize writing.
+[`protocol.md`](protocol.md) defines the 32-byte RAW-HID configuration protocol, feature flags, explicit version response and persistent configuration formats. Development USB PIDs `FEED:1C01` through `FEED:1C10` map to the 16 board IDs. These are development identities, not a commercial USB allocation. App handshake checks must agree with the expected model; a PID alone does not authorize writing.
 
 The runtime protocol offers no arbitrary memory access, firmware write, protection change or remote bootloader command. A physical startup gesture enters the bootloader. INGLORIOUS keyboard firmware uses Space+B; the Numpad uses Plus+Enter. Original-firmware gestures may differ: see [`setup-boot-gestures.md`](../docs/setup-boot-gestures.md).
 
@@ -26,7 +26,7 @@ The public build prepares pinned dependencies and builds all targets without acc
 
 ```powershell
 pwsh -NoProfile -File scripts/Initialize-BuildDependencies.ps1 -Scope Firmware
-pwsh -NoProfile -File firmware/Build-Firmware.ps1 -Board all -OutputDirectory firmware/build
+pwsh -NoProfile -File firmware/Build-Firmware.ps1 -Board all -Clean -OutputDirectory firmware/build
 python firmware/Verify-CandidateBuild.py firmware/build
 ```
 
@@ -36,11 +36,15 @@ The GMMK 3 wired non-HE ports are normalized from pinned manufacturer sources. T
 
 The build records binary sizes, source hashes, compiler version, linker maps and stack reports. Firmware catalog hashes must match before those files can be packaged. A successful build proves neither hardware compatibility nor maximum stack usage under every input sequence.
 
+Board 16 produces an application-only image at `0x08007000`. Its first 28 KiB must be preserved from that device's independently verified original backup; vendor bytes are never distributed with the build. The linker excludes that prefix, the identity page at `0x08037F00`, and settings at `0x08038000`. The retained loader's early Space+B route is part of the installation safety policy. See [the layout and engineering notes](engineering/README.md). Build manifests record version and layout per target, so each artifact has an explicit version and application offset.
+
+Board 16 also provides opt-in physical key/encoder diagnostics and temporary all-LED or individual-LED colors. The session times out after ten seconds without a refresh, ends on USB suspend, and does not save settings or suppress normal key input. Other targets keep their existing manual lighting test. Exact command layouts are in [the protocol](protocol.md).
+
 ## Offline checks
 
 ```powershell
 pwsh -NoProfile -File firmware/tests/Run-RuntimeChecks.ps1
-pwsh -NoProfile -File firmware/tests/Run-PortChecks.ps1
+pwsh -NoProfile -File firmware/tests/Run-PortChecks.ps1 -FixtureDirectory artifacts/gmmk3-pro-port-fixtures
 pwsh -NoProfile -File firmware/tests/Run-StorageChecks.ps1
 pwsh -NoProfile -File firmware/tests/Run-BulkChecks.ps1
 ```

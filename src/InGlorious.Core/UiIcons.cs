@@ -42,7 +42,8 @@ public static class UiIcons
         ["shield"] = "M12,2 L21,6 L20,14 C19,18 15,21 12,23 C9,21 5,18 4,14 L3,6 Z M7,12 L10,15 L17,8",
         ["star"] = "M12,2 L15,9 L23,9 L17,14 L19,22 L12,18 L5,22 L7,14 L1,9 L9,9 Z",
         ["action"] = "M4,3 L14,3 L14,7 M4,3 L4,21 L20,21 L20,13 M10,14 L22,2 M15,2 L22,2 L22,9",
-        ["clock"] = "M12,2 A10,10 0 1 1 12,22 A10,10 0 1 1 12,2 M12,6 L12,12 L17,15"
+        ["clock"] = "M12,2 A10,10 0 1 1 12,22 A10,10 0 1 1 12,2 M12,6 L12,12 L17,15",
+        ["message"] = "M3,3 L21,3 L21,17 L9,17 L3,22 Z M7,8 L17,8 M7,12 L14,12"
     };
 
     private static void OnKindChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)

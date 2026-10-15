@@ -1,6 +1,6 @@
 #requires -Version 7.2
 [CmdletBinding()]
-param([string]$Board = 'all')
+param([string]$Board = 'all', [switch]$Engineering)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 function Write-IfDifferent([string]$Path,[string]$Text) {
@@ -11,6 +11,11 @@ function Copy-IfDifferent([string]$Source,[string]$Destination) {
  if (!(Test-Path -LiteralPath $target) -or (Get-FileHash -LiteralPath $Source).Hash -ne (Get-FileHash -LiteralPath $target).Hash) { Copy-Item -LiteralPath $Source -Destination $target -Force }
 }
 function Assert-Pinned([string]$Relative) {
+ if($Relative.StartsWith('keyboards/gmmk/inglorious3pro/',[StringComparison]::Ordinal)){
+  $source=Join-Path $PSScriptRoot ('ports/gmmk3/'+$Relative.Substring('keyboards/gmmk/inglorious3pro/'.Length))
+  if(!(Test-Path -LiteralPath $source)-or(Get-FileHash -LiteralPath $source).Hash-ne(Get-FileHash -LiteralPath (Join-Path $qmk $Relative)).Hash){throw "Modified engineering derivative source: $Relative"}
+  return
+ }
  if($Relative.StartsWith('keyboards/gmmk/inglorious3/',[StringComparison]::Ordinal)){
   $source=Join-Path $PSScriptRoot ('ports/gmmk3/'+$Relative.Substring('keyboards/gmmk/inglorious3/'.Length))
   if(!(Test-Path -LiteralPath $source)-or(Get-FileHash -LiteralPath $source).Hash-ne(Get-FileHash -LiteralPath (Join-Path $qmk $Relative)).Hash){throw "Modified normalized manufacturer source: $Relative"}
@@ -40,12 +45,11 @@ function Find-Key([string]$Code,$Keys,[string[]]$Codes) {
  return ,@([int]$Keys[$indices[0]].matrix[0],[int]$Keys[$indices[0]].matrix[1])
 }
 $qmk=Join-Path $PSScriptRoot 'qmk_firmware'
-$manifest=Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'targets.json') | ConvertFrom-Json
-if($manifest.schema-ne1-or$manifest.targets.Count-ne15-or$manifest.storageBytes-ne32768){throw 'Unsupported target manifest'}
+$selection=& (Join-Path $PSScriptRoot 'Resolve-Targets.ps1') -Board $Board -Engineering:$Engineering
+$manifest=$selection.Manifest
 $actualCommit=(& git -C $qmk rev-parse HEAD).Trim()
 if($LASTEXITCODE-ne0-or$actualCommit-cne$manifest.qmkCommit){throw 'The QMK checkout does not match the target manifest'}
-$targets=@($manifest.targets|Where-Object{$Board-eq'all'-or$_.name-ceq$Board-or$_.deviceId-ceq$Board})
-if($targets.Count-eq0){throw "Unknown firmware target: $Board"}
+$targets=$selection.Targets
 if(@($targets|Where-Object boardId -ge 10).Count){
  $workspace=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
  $provenance=Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'ports/gmmk3/provenance.json')|ConvertFrom-Json
@@ -56,13 +60,20 @@ if(@($targets|Where-Object boardId -ge 10).Count){
   $file=[IO.Path]::GetFullPath((Join-Path $workspace $entry.path))
   if(!$file.StartsWith($workspace+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)-or!(Test-Path -LiteralPath $file)-or(Get-Item -LiteralPath $file).Length-ne$entry.bytes-or(Get-FileHash -LiteralPath $file).Hash-cne$entry.sha256){throw "Manufacturer provenance failed: $($entry.path)"}
  }
- $existing=@(& git -C $qmk ls-tree -r --name-only HEAD -- keyboards/gmmk/inglorious3)
+ $prefixes=@()
+ if(@($targets|Where-Object{$_.boardId-ge10-and$_.boardId-le15}).Count){$prefixes+='keyboards/gmmk/inglorious3/'}
+ if(@($targets|Where-Object boardId -eq 16).Count){$prefixes+='keyboards/gmmk/inglorious3pro/'}
+ foreach($prefix in $prefixes){
+ $existing=@(& git -C $qmk ls-tree -r --name-only HEAD -- $prefix)
  if($LASTEXITCODE-ne0-or$existing.Count){throw 'The private board prefix must not overwrite an upstream board'}
  foreach($entry in $provenance.outputs|Where-Object{$_.path.StartsWith('firmware/ports/gmmk3/',[StringComparison]::Ordinal)}){
+  $relative=$entry.path.Substring('firmware/ports/gmmk3/'.Length)
+  if($prefix.EndsWith('inglorious3pro/')-and$relative-cnotmatch'^p100/(?:config\.h|halconf\.h|mcuconf\.h|iso/.+)$'){continue}
   $source=Join-Path $workspace $entry.path
-  $destination=Join-Path $qmk ('keyboards/gmmk/inglorious3/'+$entry.path.Substring('firmware/ports/gmmk3/'.Length))
+  $destination=Join-Path $qmk ($prefix+$relative)
   New-Item -ItemType Directory -Path (Split-Path $destination -Parent) -Force|Out-Null
   Copy-IfDifferent $source (Split-Path $destination -Parent)
+ }
  }
 }
 & (Join-Path $PSScriptRoot 'Patch-QmkTiming.ps1') -Apply | Out-Null
@@ -134,6 +145,8 @@ foreach($target in $targets){
 #define DYNAMIC_KEYMAP_LAYER_COUNT 4
 '@
  $config=$config.Replace('__PID__',$target.runtimeProductId).Replace('__PRODUCT__',$target.product).Replace('__BOARD__',[string]$target.boardId).Replace('__CAPACITY__',[string]$target.flashBytes)
+ if($Engineering){$config+="`n#define IG_ENGINEERING_BUILD 1`n"}
+ if($target.boardId-eq16){$config+="`n#define IG_RETAINED_LOADER_BUILD 1`n"}
  if($target.slider){$config+="`n#define IG_HAS_SLIDER 1`n"}
  foreach($effect in $effects){$config+="`n#undef $effect"}
  Write-IfDifferent (Join-Path $dir 'config.h') ($config+"`n")
@@ -154,16 +167,30 @@ OPT_DEFS += -DIG_CACHE_STAGING
 MCU_LDSCRIPT = IG___NAME__
 '@
  $rules+="`nENCODER_MAP_ENABLE = $(if($target.encoder){'yes'}else{'no'})`n"
+ if($target.boardId-eq16){$rules+="LDFLAGS += -Wl,--undefined=ig_fw_identity`n"}
  if($target.mcu.StartsWith('WB32',[StringComparison]::Ordinal)){$rules+="USE_CHIBIOS_CONTRIB = yes`nSRC += `$(KEYMAP_PATH)/wb32_bulk.c`n"}
  Write-IfDifferent (Join-Path $dir 'rules.mk') ($rules.Replace('__NAME__',$target.name)+"`n")
- $ldSource=if($target.mcu-ceq'STM32F303'){'lib/chibios/os/common/startup/ARMCMx/compilers/GCC/ld/STM32F303xC.ld'}elseif($target.mcu-ceq'WB32FQ95'){'lib/chibios-contrib/os/common/startup/ARMCMx/compilers/GCC/ld/WB32FQ95xB.ld'}else{'lib/chibios-contrib/os/common/startup/ARMCMx/compilers/GCC/ld/WB32F3G71xB.ld'}
+ $ldSource=if($target.mcu-ceq'STM32F303'){'lib/chibios/os/common/startup/ARMCMx/compilers/GCC/ld/STM32F303xC.ld'}elseif($target.boardId-eq16){'lib/chibios-contrib/os/common/startup/ARMCMx/compilers/GCC/ld/WB32FQ95xC.ld'}elseif($target.mcu-ceq'WB32FQ95'){'lib/chibios-contrib/os/common/startup/ARMCMx/compilers/GCC/ld/WB32FQ95xB.ld'}else{'lib/chibios-contrib/os/common/startup/ARMCMx/compilers/GCC/ld/WB32F3G71xB.ld'}
  $ld=[IO.File]::ReadAllText((Join-Path $qmk $ldSource))
  $flashRegex='(flash0 \(rx\) : org = 0x08000000, len = )\d+k'
  if([regex]::Matches($ld,$flashRegex).Count-ne1){throw 'Unexpected linker-script flash layout'}
  $ld=$ld -replace $flashRegex,('${1}'+(($target.flashBytes-$manifest.storageBytes)/1024)+'k')
+ if($target.boardId-eq16){
+  $codeBytes=$target.flashBytes-$manifest.storageBytes-$target.applicationOffsetBytes-$target.identityBytes
+  $ld=$ld -replace 'flash0 \(rx\) : org = 0x08000000, len = \d+k',('flash0 (rx) : org = 0x{0:X8}, len = 0x{1:X}' -f (0x08000000+$target.applicationOffsetBytes),$codeBytes)
+  if($ld-notmatch'ram0\s+\(wx\) : org = 0x20000000, len = 36k'){throw 'Engineering linker RAM layout changed'}
+ }
  Write-IfDifferent (Join-Path $dir ('IG_'+$target.name+'.ld')) $ld
  $dest=Join-Path $board 'keymaps/inglorious';New-Item -ItemType Directory -Path $dest -Force | Out-Null
  foreach($file in @('keymap.c','ig_physical.h','ig_board.h','config.h','rules.mk')){Copy-IfDifferent (Join-Path $dir $file) $dest}
+ if($target.boardId-eq16){
+  foreach($generatedRoot in @($dir,$dest)){
+   $obsolete=Join-Path $generatedRoot 'ig_engineering_version.h'
+   if(Test-Path -LiteralPath $obsolete){Remove-Item -LiteralPath $obsolete}
+  }
+  Copy-IfDifferent (Join-Path $PSScriptRoot $target.versionHeaderPath) $dir
+  Copy-IfDifferent (Join-Path $dir 'ig_board_version.h') $dest
+ }
  foreach($file in @('inglorious.c','ig_effects.h','ig_color.h','ig_timing.h','ig_version.h','ig_timing.c','ig_storage.h','ig_storage.inc')){Copy-IfDifferent (Join-Path $PSScriptRoot ('inglorious/'+$file)) $dest}
  if($target.mcu.StartsWith('WB32',[StringComparison]::Ordinal)){Copy-IfDifferent (Join-Path $PSScriptRoot 'inglorious/wb32_bulk.c') $dest}
  $lddir=Join-Path $board 'ld';New-Item -ItemType Directory -Path $lddir -Force | Out-Null

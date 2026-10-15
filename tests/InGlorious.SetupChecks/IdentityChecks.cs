@@ -7,6 +7,12 @@ internal static partial class Program
     private static void CheckIdentity()
     {
         var id = Guid.Parse("502192c6-e07c-4f3f-83a3-a96e792ab027");
+        var engineeringImage = Enumerable.Repeat((byte)0xFF, 262144).ToArray();
+        new InstallationIdentity(16, id, new string('0', 64)).Encode().CopyTo(engineeringImage, InstallationIdentity.Offset(engineeringImage.Length));
+        Reject(() => InstallationIdentity.CreateImage(new byte[64], 262144, new(16, id, new string('0', 64))),
+            "Retained-loader image creation requires its own verified original, never a synthetic prefix.");
+        Reject(() => KnownFirmwareImages.Validate(engineeringImage, "gmmk3-pro-100-iso", 16),
+            "A structurally valid engineering marker cannot whitelist an unapproved firmware image.");
         foreach (var flashBytes in new[] { 131072, 262144 })
         {
             var original = Enumerable.Range(0, flashBytes).Select(i => (byte)(i * 17 + 3)).ToArray();
@@ -45,7 +51,7 @@ internal static partial class Program
             foreach (var index in new[] { 8, 9, 10, 11 })
             {
                 var invalid = (byte[])valid.Clone();
-                invalid[offset + index] = index == 9 ? (byte)16 : (byte)2;
+                invalid[offset + index] = index == 9 ? (byte)17 : (byte)2;
                 RecalculateIdentityCrc(invalid.AsSpan(offset, 64));
                 Reject(() => InstallationIdentity.Read(invalid), "Valid CRC cannot bypass version, board, or reserved-byte validation.");
             }
@@ -60,7 +66,7 @@ internal static partial class Program
         foreach (var bytes in new[] { 0, 65536, 131071, 131073, 262143, 262145 })
             Reject(() => InstallationIdentity.Read(new byte[bytes]), "Only supported complete flash geometries are allowed.");
         var goodHash = new string('A', 64);
-        foreach (var board in new byte[] { 0, 16, 255 }) Reject(() => new InstallationIdentity(board, id, goodHash).Encode(), "Unknown boards cannot be encoded.");
+        foreach (var board in new byte[] { 0, 17, 255 }) Reject(() => new InstallationIdentity(board, id, goodHash).Encode(), "Unknown boards cannot be encoded.");
         Reject(() => new InstallationIdentity(1, Guid.Empty, goodHash).Encode(), "Empty ID cannot be encoded.");
         Reject(() => new InstallationIdentity(1, id, new string('Z', 64)).Encode(), "Nonhex hash cannot be encoded.");
         Reject(() => new InstallationIdentity(1, id, "1234").Encode(), "Truncated hash cannot be encoded.");

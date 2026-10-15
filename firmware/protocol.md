@@ -1,6 +1,6 @@
 # INGLORIOUS firmware protocol 1 / configuration schemas 1, 2, 3 and 4
 
-This is the implementation contract for **firmware 0.11.1**, assigned build ID `0x000B0101`. The installation and update catalog supplies this release for all 15 model/layout variants; hardware validation is tracked separately in [the model overview](../docs/model-support.md). All multi-byte integers are little-endian. No packet enters a bootloader, resets the MCU, writes firmware, changes protection, or exposes arbitrary memory. Command 8 explicitly schedules a USB re-enumeration to apply a saved keyboard polling interval.
+This is the implementation contract for **firmware 0.11.4**, assigned build ID `0x000B0401`. The installation and update catalog supplies this release for all 16 model/layout variants; hardware validation is tracked separately in [the model overview](../docs/model-support.md). All multi-byte integers are little-endian. No packet enters a bootloader, resets the MCU, writes firmware, changes protection, or exposes arbitrary memory. Command 8 explicitly schedules a USB re-enumeration to apply a saved keyboard polling interval.
 
 ## Identity and transport
 
@@ -24,10 +24,13 @@ Candidate0.10 adds board IDs3..9 and corresponding development PIDs1C03..1C09. T
 | 13 | 5368 | 6624 | 667 |
 | 14 | 5644 | 7176 | 655 |
 | 15 | 5656 | 7200 | 655 |
+| 16 | 5656 | 7200 | 655 |
 
 Candidate 0.11 adds GMMK 3 wired, non-HE board IDs 10..15 / PIDs 1C0A..1C0F in 65 ANSI, 65 ISO, 75 ANSI, 75 ISO, 100 ANSI, 100 ISO order. Each has an encoder and no slider. Their slot capacity is 7,648 payload bytes rather than the 7,136 bytes on IDs 1..9. Slots start at 1,024 and 8,704, with a 32-byte header. The second ends at 16,384. The 75/100 logo LED is an independent RGB LED, excluded from side pairing. It uses the existing per-LED color/effect fields without a wire-format extension.
 
 The existing boards retain their wire/persistent layouts and slot addresses. Upload staging borrows the inactive slot payload in the existing16KiB RAM cache. BEGIN/WRITE_STAGE perform no backing writes. Ordinary EEPROM writes/erase/init are blocked while borrowed. ABORT replays the backing strictly read-only and verifies the original full cache hash. Only a semantically validated COMMIT can perform the ordered invalid-marker, forced-payload, header, valid-marker writes. The forced flush is necessary because staged bytes already equal the cache. Driver errors latch a fault. Consolidation retains the existing power-loss limitation; this is not a new atomicity guarantee.
+
+Board 16 is the separate GMMK 3 PRO 100% ISO wired, non-HE target, PID `1C10`. It has the same configuration dimensions and slot sizes as board 15 but requires its own board identity. Its 256 KiB flash image preserves a 28 KiB resident-loader prefix; the application starts at `0x08007000`, the installation identity page at `0x08037F00`, and the 32 KiB settings region at `0x08038000`. These image-layout differences do not expose arbitrary memory through Raw HID.
 
 These uppercase USB display names are present from release0.7 onward. Frozen release0.6 retains its original display strings and hashes. Device identifiers and protocol bytes are unchanged.
 
@@ -47,6 +50,8 @@ Common packet: bytes 0..1 ASCII `IG`, byte 2 protocol `1`, byte 3 command, byte 
 | `0x0B GET_EXTENSIONS` | empty | version u16=1, flags u16(bit0=bounded manual light test, bit1=standby screensaver), durationMs u16, reserved u16=0; release0.9 reports flags3, duration21000 |
 | `0x0C LIGHT_TEST` | action byte: 0=status, 1=start, 2=stop | active byte0/1, pattern byte0=idle/1=keyboard/2=Numpad, remainingMs u16 |
 | `0x0D GET_FIRMWARE_VERSION` | empty | 16-byte release identity described below; no state changes |
+| `0x0E PHYSICAL_DIAGNOSTICS` | action byte: 0=status, 1=start/refresh, 2=stop, 3=refresh-only | 24 bytes described in board 16 diagnostics below |
+| `0x0F DIAGNOSTIC_LEDS` | mode, LED index, R, G, B | echoed request, reserved zero, remainingMs u16; requires active session |
 
 INFO payload: board byte0 (1 PRO, 2 Numpad), rows byte1, cols byte2, layers byte3=4, LEDs byte4, macro slots byte5=32, max events per macro byte6=128, flags byte7 (bit0 persistent storage available, bit1 slider present, bit2 staging active, bit3 schema2 effects supported, bit4 runtime timing and command8 supported, bit5 schema3 color sequences supported, bit6 volatile brightness commands9/10 supported, bit7 schema4 autonomous standby supported), **active** blob size u16 at8, **active** event capacity u16 at10 (768 in schema1/2; PRO668 or Numpad702 in schema3/4), active generation u32 at12, active CRC32 u32 at16, received staging bytes u16 at20, **active** config schema u16 at22 (1,2,3,4). Firmware0.6 sets bits3..7 even while preserving an active schema1 blob. It accepts either supported size at BEGIN; schema2/3/4 have the same length. The active size is not an upload-capacity restriction. An older host that rejects unknown capability bits must stop before writing; a newer host must check the relevant capabilities before uploading settings. In particular schema3 requires bit5 even if its stored color sequences are currently unused by the chosen effects.
 
@@ -97,6 +102,16 @@ After header, in order:
 5. Event pool `[768]`, each type byte, reserved byte0, value u16. Types1 key-down,2 key-up,3 delay-ms. Key values must be basic HID keyboard usages4..0xA4 or modifiers0xE0..0xE7; delay0..60000ms. Each macro must have balanced down/up events, no duplicate down/unmatched up, total delay<=300000ms. Unused events are all zero. Macro triggers do not recurse. One macro runs at a time, without blocking matrix scanning; a second macro trigger while running is ignored. Any new ordinary key press (including Escape) cancels and releases macro-held keys before the physical input is processed. A macro starts only without other host-reporting physical keys held; encoder-triggered macros require no host-reporting matrix keys held. Firmware revision 0.2 permits already-held MO(0..3) layer switches for both triggers; actual modifiers and normal keys still block start. The temporary layer-switch mask is cleared on release, non-layer remapping at that position, restart and suspend. Revision 0.1 blocked Fn-triggered macros too; the stored format is unchanged.
 
 Slider mode2 sends bounded relative consumer volume steps after physical movement; it cannot determine the OS absolute volume, and startup position sends no volume changes. MIDI requires a MIDI-aware receiver. Brightness mode changes autonomous lighting live without continual EEPROM writes. Slider configuration must use mode0 on PRO.
+
+## Board 16 physical diagnostics (0.11.3)
+
+GET_EXTENSIONS format 1 adds flag `0x04` only for board 16; its combined flags are 7. The original fifteen targets remain at flags 3. No stored configuration layout changes. Hosts must check this flag before using commands 14 or 15.
+
+RAW14 takes one action byte: 0 reads status, 1 starts or refreshes an active session, 2 stops, and 3 refreshes only an already-active session. Action 3 returns status 8 (conflict) if the session expired, stopped or was suspended; it never restarts or clears observations to satisfy a late poll. Hosts use action 1 only for explicit user start and action 3 for periodic refresh. The successful 24-byte payload is format 1 at byte 0, active boolean at 1, matrix rows 14 at 2, columns 8 at 3, fourteen cumulative row bitmasks at 4..17, clockwise counter u16 at 18, counterclockwise counter u16 at 20, and watchdog milliseconds remaining u16 at 22. Row bits latch physical pressed positions since session start, exclude matrix holes, and survive release, remapping and refresh. Encoder counters count pressed encoder events before keycode processing, including unmapped bindings, and wrap modulo 65536. Stop, expiry and suspend clear the session observations.
+
+RAW15 takes five bytes: mode at 0 (0 clears the overlay, 1 colors all LEDs, 2 colors one LED), LED index at 1 (zero unless mode 2), and sRGB R/G/B at 2..4 (all zero for mode 0). The successful eight-byte response echoes those five bytes, reserves byte 5 as zero and reports remaining milliseconds at 6. One-LED mode makes all other LEDs black. Colors pass through the normal sRGB-to-PWM conversion once and temporarily override the saved brightness/effect. Clearing the overlay restores normal rendering without stopping the session. RAW15 requires an active session and never refreshes its deadline.
+
+The session lasts at most 10000 ms without RAW14 action 1 or 3, using wrap-safe elapsed time. Housekeeping, rendering and status enforce expiry; USB suspend and explicit stop also restore normal profile rendering. A new session rejects held keys, staged uploads, running macros, an existing manual lighting test, pending USB re-enumeration or suspend. BEGIN, COMMIT, reconnect, volatile brightness and starting the old manual test return busy while active. Configuration reads and identity queries remain available. No diagnostic action writes configuration storage. Keys and the encoder retain their normal operating-system behavior; the app must explain that limitation. A lost host connection while the keyboard stays powered is bounded by the watchdog.
 
 ## Schema2 lighting extension
 

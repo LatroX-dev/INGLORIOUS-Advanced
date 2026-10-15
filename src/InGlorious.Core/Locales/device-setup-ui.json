@@ -1,4 +1,17 @@
 {
+  "Für dieses Modell ist noch keine INGLORIOUS-Firmware verfügbar.": {
+    "en": "INGLORIOUS firmware is not yet available for this model.",
+    "es": "Todavía no hay firmware INGLORIOUS disponible para este modelo.",
+    "fr": "Le firmware INGLORIOUS n’est pas encore disponible pour ce modèle.",
+    "it": "Il firmware INGLORIOUS non è ancora disponibile per questo modello.",
+    "pt-BR": "O firmware INGLORIOUS ainda não está disponível para este modelo.",
+    "pl": "Oprogramowanie INGLORIOUS nie jest jeszcze dostępne dla tego modelu.",
+    "tr": "Bu model için INGLORIOUS aygıt yazılımı henüz mevcut değil.",
+    "ru": "Прошивка INGLORIOUS пока недоступна для этой модели.",
+    "ja": "このモデル用のINGLORIOUSファームウェアはまだ提供されていません。",
+    "ko": "이 모델용 INGLORIOUS 펌웨어는 아직 제공되지 않습니다.",
+    "zh-Hans": "此型号的 INGLORIOUS 固件尚未提供。"
+  },
   "Abschluss": {
     "en": "Finish",
     "es": "Finalización",

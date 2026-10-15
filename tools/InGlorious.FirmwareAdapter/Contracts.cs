@@ -36,11 +36,18 @@ internal sealed record AdapterResponse(int Schema, string Operation, string Sess
     string EvidenceDirectory, Artifact[] Artifacts, Selection[]? Devices = null, string? Error = null,
     Guid? InstallationId = null, string[]? CompatibleDeviceIds = null);
 
-internal sealed record Model(string DeviceId, int BoardId, string Transport, int FlashBytes, int SramBytes)
+internal sealed record Model(string DeviceId, int BoardId, string Transport, int FlashBytes, int SramBytes, bool EngineeringOnly = false)
 {
     internal const uint FlashBase = 0x08000000;
-    internal static Model Get(string? id)
+    internal const string EngineeringDeviceId = "gmmk3-pro-100-iso";
+    internal byte? BootVersion => Transport == "wb32-dfu" ? (DeviceId == EngineeringDeviceId ? (byte)4 : (byte)3) : null;
+    internal int ProtectedPrefixBytes => DeviceId == EngineeringDeviceId ? 0x7000 : 0;
+    internal static Model Get(string? id, bool allowEngineering = false)
     {
+        if (id == EngineeringDeviceId)
+        {
+            return new(EngineeringDeviceId, 16, "wb32-dfu", 262144, 36864, EngineeringOnly: allowEngineering);
+        }
         string[] ids = ["pro-iso", "numpad", "pro-ansi", "pro-rev2-ansi", "pro-rev2-iso",
             "gmmk2-65-ansi", "gmmk2-65-iso", "gmmk2-96-ansi", "gmmk2-96-iso",
             "gmmk3-65-ansi", "gmmk3-65-iso", "gmmk3-75-ansi", "gmmk3-75-iso", "gmmk3-100-ansi", "gmmk3-100-iso"];
@@ -51,11 +58,17 @@ internal sealed record Model(string DeviceId, int BoardId, string Transport, int
     }
 }
 
+internal interface IRetainedLoaderWriteGrant
+{
+    void ValidateTransport(Model selectedModel, Fingerprint fingerprint, byte[] image);
+    void Consume(Model selectedModel, Fingerprint fingerprint, byte[] image, byte[] livePrefix);
+}
+
 internal interface IDevice : IDisposable
 {
     Fingerprint Probe(Model model);
     byte[] ReadAll(Model model);
-    void WriteAll(Model model, byte[] image, Action beforeFirstWrite);
+    void WriteAll(Model model, byte[] image, Action beforeFirstWrite, IRetainedLoaderWriteGrant? engineeringGrant = null);
     object[] Log { get; }
 }
 internal interface IBackend : IDisposable

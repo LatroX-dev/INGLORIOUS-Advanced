@@ -23,6 +23,8 @@ typedef struct { uint8_t matrix_co[MATRIX_ROWS][MATRIX_COLS]; point_t point[RGB_
 extern led_config_t g_led_config;
 typedef struct { struct { bool pressed; int type; struct { uint8_t row, col; } key; } event; } keyrecord_t;
 #define IS_KEYEVENT(event) ((event).type == 1)
+#define ENCODER_CW_EVENT 2
+#define ENCODER_CCW_EVENT 3
 #define IS_ENCODEREVENT(event) ((event).type == 2 || (event).type == 3)
 typedef enum { WEAR_LEVELING_FAILED, WEAR_LEVELING_SUCCESS, WEAR_LEVELING_CONSOLIDATED } wear_leveling_status_t;
 extern uint32_t layer_state, default_layer_state;

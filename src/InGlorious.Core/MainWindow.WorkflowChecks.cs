@@ -80,11 +80,22 @@ public partial class MainWindow
             }
             else check(BadgeLightButton.Visibility == Visibility.Collapsed, model.Id + ": layouts without badge expose no logo target");
             SetTab(4); UpdateLayout();
-            check(ExperimentalDeviceLabel.IsVisible && ExperimentalDeviceNotice.IsVisible && ExperimentalDeviceNotice.Text == L.T("Experimentelle Unterstützung: noch nicht an diesem Modell getestet."), model.Id + ": device overview explains the experimental test status without an opt-in gate");
+            check(ExperimentalDeviceLabel.IsVisible && ExperimentalDeviceNotice.IsVisible && ExperimentalDeviceNotice.Text == L.T("Experimentelle Unterstützung: noch nicht vollständig geprüft."), model.Id + ": device overview explains the experimental test status without an opt-in gate");
             check(DeviceHardwareOverview.Visibility == Visibility.Visible && OfflineDeviceOverview.Visibility == Visibility.Collapsed && DeviceRecoveryOverview.Visibility == Visibility.Visible && FirmwareInstallationNotice.Visibility == Visibility.Collapsed && ExperimentalSetupActions.Visibility == Visibility.Collapsed, model.Id + ": runtime status, generic update and restore share one device overview");
             check(ManageFirmwareButton.IsEnabled && RestoreOriginalFirmwareButton.IsEnabled, model.Id + ": connected models can open generic firmware checks with independent write protection");
             DiscardPendingEdits();
         }
+        ResetWorkflowFixture("gmmk3-pro-100-iso"); SetOfflineConnectionFixture(["gmmk3-pro-100-iso"]);
+        BuildDeviceButtons(); UpdateSourceHint(); SetTab(4); UpdateLayout();
+        check(!Device.IsOfflineOnly && ReadDeviceButton.IsEnabled && TransferButton.IsEnabled && ManageFirmwareButton.IsEnabled && RestoreOriginalFirmwareButton.IsEnabled,
+            "The separately identified PRO exposes normal configuration and guarded setup actions");
+        check(!ExperimentalDeviceLabel.IsVisible && !ExperimentalDeviceNotice.IsVisible && !OfflineDeviceOverview.IsVisible && DeviceHardwareOverview.IsVisible && DeviceRecoveryOverview.IsVisible,
+            "The hardware-tested GMMK 3 PRO 100% ISO has no experimental badge and retains guarded firmware actions");
+        var engineeringBefore = Fingerprint(_project); var engineeringKey = Device.Keys.First(key => key.LedIndex.HasValue);
+        SetTab(0); _selection.Add(engineeringKey.Id); ApplyColor("#A01337");
+        check(Layer.Keys[engineeringKey.Id].Color == "#A01337" && _project.DeviceId == "gmmk3-pro-100-iso", "Engineering profile stays separately editable");
+        Undo_Click(this, new RoutedEventArgs());
+        check(Fingerprint(_project) == engineeringBefore, "Engineering profile edit can be undone without device access");
         }
         finally { _devices = devicesBefore; ResetWorkflowFixture("pro-iso"); }
     }

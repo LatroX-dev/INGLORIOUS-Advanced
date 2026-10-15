@@ -60,7 +60,7 @@ jobs:
         shell: pwsh
         run: |
           $catalog = Get-Content src/InGlorious.Core/SetupFirmwareCatalog.json -Raw | ConvertFrom-Json
-          if ($catalog.targets.Count -ne 15) { throw 'Unexpected firmware catalog.' }
+          if ($catalog.targets.Count -ne 16) { throw 'Unexpected firmware catalog.' }
           New-Item -ItemType Directory artifacts/reviewed-firmware | Out-Null
           foreach ($item in $catalog.targets) {
             $file = Join-Path artifacts/public-build/firmware $item.file
@@ -85,7 +85,8 @@ jobs:
       - name: Prepare corresponding source
         shell: pwsh
         run: |
-          $publicSource = Join-Path $env:RUNNER_TEMP 'inglorious-public-source'
+          New-Item -ItemType Directory -Force workspace/exports | Out-Null
+          $publicSource = Join-Path $PWD 'workspace/exports/release-source'
           ./scripts/Export-PublicSource.ps1 -Destination $publicSource -Export
           [xml]$project = Get-Content src/InGlorious.Core/InGlorious.Core.csproj
           $version = $project.Project.PropertyGroup.Version

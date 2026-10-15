@@ -8,7 +8,8 @@ namespace InGlorious.Core;
 public enum StockMatchConfidence
 {
     CatalogModel,
-    AmbiguousRevision
+    AmbiguousRevision,
+    IdentifiedWithoutFirmware
 }
 
 /// <summary>
@@ -21,9 +22,11 @@ public sealed record StockDeviceMatch
     public ushort VendorId { get; }
     public ushort ProductId { get; }
     public string CoreCatalogName { get; }
+    public string? IdentifiedName { get; init; }
     public IReadOnlyList<string> CandidateDeviceIds { get; }
+    public bool HasFirmwareCandidate => CandidateDeviceIds.Count > 0;
     public bool IsModelUnambiguous => CandidateDeviceIds.Count == 1;
-    public StockMatchConfidence Confidence => IsModelUnambiguous
+    public StockMatchConfidence Confidence => !HasFirmwareCandidate ? StockMatchConfidence.IdentifiedWithoutFirmware : IsModelUnambiguous
         ? StockMatchConfidence.CatalogModel : StockMatchConfidence.AmbiguousRevision;
     public bool RequiresHardwareVerification => true;
     public ushort ConfigurationUsagePage => 0xFF01;
@@ -41,8 +44,8 @@ public sealed record StockDeviceMatch
 }
 
 /// <summary>
-/// Exact normal-mode VID/PID declarations extracted from Glorious CORE 2.1.21.
-/// Source evidence and limitations: reference/glorious-stock-devices.json.
+/// Exact normal-mode VID/PID declarations, including identified models without a firmware candidate.
+/// Firmware-candidate source evidence and limitations: reference/glorious-stock-devices.json.
 /// Does not enumerate devices or authorize any device operation.
 /// </summary>
 public static class StockDeviceCatalog
@@ -65,7 +68,9 @@ public static class StockDeviceCatalog
         new StockDeviceMatch(0x342D, 0xE3C9, "GMMK 3 75 Wired ANSI", "gmmk3-75-ansi"),
         new StockDeviceMatch(0x342D, 0xE3D2, "GMMK 3 75 Wired ISO", "gmmk3-75-iso"),
         new StockDeviceMatch(0x342D, 0xE3C8, "GMMK 3 100 Wired ANSI", "gmmk3-100-ansi"),
-        new StockDeviceMatch(0x342D, 0xE3D1, "GMMK 3 100 Wired ISO", "gmmk3-100-iso")
+        new StockDeviceMatch(0x342D, 0xE3D1, "GMMK 3 100 Wired ISO", "gmmk3-100-iso"),
+        // Separate retained-loader target; first installation still verifies both original reads and the loader revision.
+        new StockDeviceMatch(0x342D, 0xE3CE, "GMMK 3 PRO 100 Wired ISO", "gmmk3-pro-100-iso") { IdentifiedName = "GMMK 3 PRO 100% ISO" }
     });
 
     public static StockDeviceMatch? Match(ushort vid, ushort pid) =>

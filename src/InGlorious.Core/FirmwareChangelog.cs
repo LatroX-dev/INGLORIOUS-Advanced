@@ -7,6 +7,14 @@ public static class FirmwareChangelog
 {
     private static readonly FirmwareSemanticVersion Version08 = new(0, 8, 0);
     private static readonly FirmwareSemanticVersion Version09 = new(0, 9, 0);
+    private static readonly FirmwareReleaseNotes LightingTestNotes = new(new(0, 11, 4), Array.AsReadOnly(new[]
+    {
+        "Fixed lighting tests being blocked when no key is pressed."
+    }));
+    private static readonly FirmwareReleaseNotes RedDefaultsNotes = new(new(0, 11, 3), Array.AsReadOnly(new[]
+    {
+        "Red default lighting when no saved colors are available."
+    }));
     private static readonly FirmwareReleaseNotes ColorOutputNotes = new(new(0, 9, 2), Array.AsReadOnly(new[]
     {
         "Improved color output for less washed-out colors."
@@ -18,6 +26,8 @@ public static class FirmwareChangelog
     // Customer-facing features, improvements and bugfixes: short English bullets, without technical details.
     private static readonly IReadOnlyList<FirmwareReleaseNotes> Notes = Array.AsReadOnly(new[]
     {
+        LightingTestNotes,
+        RedDefaultsNotes,
         new FirmwareReleaseNotes(new(0, 11, 1), Array.AsReadOnly(new[]
         {
             "Fixed reactive lighting reappearing after long periods without input."
@@ -47,7 +57,15 @@ public static class FirmwareChangelog
         var newestDocumentedVersion = Notes[0].Version;
         if (!installed.HasValue || installed.Value == default || installed.Value >= target || installed.Value >= newestDocumentedVersion)
             return Array.Empty<FirmwareReleaseNotes>();
-        var notes = deviceId switch { "pro-iso" => Notes, "numpad" => NumpadNotes, _ => null };
+        IReadOnlyList<FirmwareReleaseNotes>? notes = deviceId switch
+        {
+            "pro-iso" => Notes,
+            "numpad" => NumpadNotes,
+            "gmmk3-pro-100-iso" => [LightingTestNotes, new(new(0, 11, 3), Array.AsReadOnly(new[]
+            { "Red default lighting when no saved colors are available.", "Individual key, knob and LED tests." }))],
+            _ when BoardDescriptorRegistry.ProtocolBoards.Any(board => board.DeviceId == deviceId) => [LightingTestNotes, RedDefaultsNotes],
+            _ => null
+        };
         if (notes is null) return Array.Empty<FirmwareReleaseNotes>();
         return Array.AsReadOnly(notes.Where(note => installed.Value < note.Version && note.Version <= target && note.Version <= newestDocumentedVersion).ToArray());
     }

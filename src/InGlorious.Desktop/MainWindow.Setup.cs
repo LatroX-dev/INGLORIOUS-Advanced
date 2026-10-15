@@ -16,28 +16,33 @@ public sealed partial class MainWindow
     {
         if (!BoardDescriptorRegistry.TryGet(id, out _) || info is null || info.DeviceId != id || !info.Persistent ||
             (info.Flags & 4) != 0 || info.StagingBytes != 0 || version is null || version.DeviceId != id || version.BuildId == 0 ||
-            !FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var target)) return SetupRuntimeState.Unknown;
+            !FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersionFor(id), out var target)) return SetupRuntimeState.Unknown;
         return version.Version < target ? SetupRuntimeState.UpdateAvailable : version.Version > target ? SetupRuntimeState.Newer : SetupRuntimeState.Current;
     }
 
-    private async Task OpenDeviceSetupAsync(string? preferredDeviceId = null, SetupOperation operation = SetupOperation.Install, Window? owner = null, bool allowBusy = false)
+    private async Task OpenDeviceSetupAsync(string? preferredDeviceId = null, SetupOperation operation = SetupOperation.Install, Window? owner = null, bool allowBusy = false,
+        string? preferredInstanceId = null)
     {
         if (Program.Offline || _firmwareFlow || _startupLoading || _startupWindowClosed || _allowClose || _busy && !allowBusy) return;
         if (_pendingApply is not null && !await GuardNavigation()) return;
         if (_firmwareFlow || _startupWindowClosed || _allowClose) return;
         var priorBusy = _busy; _firmwareFlow = _busy = true; _root.IsEnabled = false;
+        CoreImportSelection? importedCore = null;
         try
         {
             await _sharedBrightness.StopAsync();
-            var dialog = new DeviceSetupWindow(preferredDeviceId, operation);
+            var dialog = new DeviceSetupWindow(preferredDeviceId, operation, preferredInstanceId: preferredInstanceId);
             await dialog.ShowDialog(owner ?? this);
             InvalidateFirmwareOutcome(dialog);
             if (dialog.Completed) Status(L.T("Prüfe jetzt die Tasten und die Beleuchtung."));
+            if (dialog.Completed) importedCore = dialog.ImportedCoreSelection;
         }
         catch (Exception ex) { Trace.TraceError("Firmware setup failed: {0}", ex); Status(DeviceSetupService.ForUser(ex)); }
         finally
         {
-            _firmwareFlow = false; _busy = priorBusy;
+            _firmwareFlow = _busy = false;
+            if (importedCore is not null) { _root.IsEnabled = true; await AdoptSetupCoreImportAsync(importedCore); }
+            _busy = priorBusy;
             if (!_startupWindowClosed && !_allowClose)
             { _root.IsEnabled = !_busy; UpdateFooter(); await UpdateBrightnessService(); await RefreshConnectionsAsync(); }
         }
@@ -56,6 +61,7 @@ public sealed partial class MainWindow
         if (_pendingApply is not null && !await GuardNavigation()) return;
         if (_firmwareFlow || _startupWindowClosed || _allowClose) return;
         _automaticSetupChecked = true; _firmwareFlow = _busy = true; _root.IsEnabled = false;
+        CoreImportSelection? importedCore = null;
         try
         {
             await _sharedBrightness.StopAsync();
@@ -64,11 +70,13 @@ public sealed partial class MainWindow
             var service = new DeviceSetupService();
             var devices = await service.ListDevicesAsync();
             if (_startupWindowClosed || _allowClose) return;
-            var eligible = devices.Where(device => requestedId is null || device.CandidateDeviceIds.Contains(requestedId)).ToArray();
+            var eligible = devices.Where(device => device.HasFirmwareCandidate && (requestedId is null || device.CandidateDeviceIds.Contains(requestedId))).ToArray();
             if (eligible.Any(device => !device.IsRuntime))
             {
                 var install = new DeviceSetupWindow(requestedId);
-                await install.ShowDialog(owner ?? this); InvalidateFirmwareOutcome(install); return;
+                await install.ShowDialog(owner ?? this); InvalidateFirmwareOutcome(install);
+                if (install.Completed) importedCore = install.ImportedCoreSelection;
+                return;
             }
             var ids = requestedId is not null ? new[] { requestedId } : eligible.Where(d => d.IsRuntime).SelectMany(d => d.CandidateDeviceIds).Distinct().ToArray();
             foreach (var id in ids)
@@ -93,6 +101,7 @@ public sealed partial class MainWindow
         finally
         {
             _firmwareFlow = _busy = false;
+            if (importedCore is not null) { _root.IsEnabled = true; await AdoptSetupCoreImportAsync(importedCore); }
             if (!_startupWindowClosed && !_allowClose) { Build(); await UpdateBrightnessService(); await RefreshConnectionsAsync(); }
         }
     }

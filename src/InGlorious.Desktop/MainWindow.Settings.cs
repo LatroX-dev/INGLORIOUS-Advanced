@@ -106,12 +106,26 @@ public sealed partial class MainWindow
         var layout = new Grid { RowDefinitions = new("Auto,*,Auto"), Margin = new Thickness(24) };
         var title = Text(L.T("App-Einstellungen"), size: 22); title.Margin = new Thickness(0, 0, 0, 20);
         layout.Children.Add(title); Grid.SetRow(scroll, 1); layout.Children.Add(scroll);
-        var footer = new Grid { Name = "SettingsFooter", ColumnDefinitions = new("*,Auto"), Margin = new Thickness(0, 16, 0, 0) };
+        var footer = new Grid { Name = "SettingsFooter", ColumnDefinitions = new("*,Auto,Auto"), Margin = new Thickness(0, 16, 0, 0) };
         error.VerticalAlignment = VerticalAlignment.Center; error.Margin = new Thickness(0, 0, 12, 0); footer.Children.Add(error);
+        var contact = new Button { Name = "ContactEmailButton", Content = L.T("E-Mail öffnen"),
+            IsVisible = SupportContact.EmailUri is not null, IsEnabled = !offlinePreview, Margin = new Thickness(0, 0, 16, 0) };
+        ToolTip.SetTip(contact, SupportContact.Email);
+        contact.Click += async (_, _) =>
+        {
+            if (offlinePreview || SupportContact.EmailUri is not { } uri) return;
+            try
+            {
+                if (await Launcher.LaunchUriAsync(uri)) return;
+            }
+            catch { }
+            error.Text = L.T("Der Link konnte nicht geöffnet werden. Prüfe deine Standard-App für Browser oder E-Mail.");
+        };
+        Grid.SetColumn(contact, 1); footer.Children.Add(contact);
         var cancel = new Button { Name = "CancelSettings", Content = L.T("Abbrechen"), IsCancel = true };
         cancel.Click += (_, _) => dialog.Close();
         var actions = Row(cancel, save); actions.HorizontalAlignment = HorizontalAlignment.Right;
-        Grid.SetColumn(actions, 1); footer.Children.Add(actions); Grid.SetRow(footer, 2); layout.Children.Add(footer);
+        Grid.SetColumn(actions, 2); footer.Children.Add(actions); Grid.SetRow(footer, 2); layout.Children.Add(footer);
         dialog.Content = layout;
         if (initialSection == "Updates") dialog.Opened += (_, _) => Dispatcher.UIThread.Post(() => updateSection.BringIntoView());
         return dialog;
@@ -165,6 +179,9 @@ public sealed partial class MainWindow
         var save = controls.OfType<Button>().Single(control => control.Name == "SaveSettings");
         check(save.GetLogicalAncestors().Contains(footer) && !save.IsEnabled,
             "Settings: offline Save stays in the fixed footer and cannot write preferences");
+        var contact = controls.OfType<Button>().Single(control => control.Name == "ContactEmailButton");
+        check(contact.GetLogicalAncestors().Contains(footer) && contact.IsVisible == (SupportContact.EmailUri is not null) && !contact.IsEnabled,
+            "Settings: public contact is independent of the connected device and disabled in offline previews");
         var start = controls.OfType<ToggleSwitch>().Single(control => control.Name == "AutostartCheck");
         window.Width = window.MinWidth; window.Height = window.MinHeight;
         check(ReferenceEquals(start, SettingsControls(window).OfType<ToggleSwitch>().Single(control => control.Name == "AutostartCheck")),

@@ -12,12 +12,15 @@ public sealed partial class MainWindow
 {
     private readonly DispatcherTimer _connectionTimer = new() { Interval = TimeSpan.FromSeconds(3) };
     private Func<Task<IReadOnlyList<string>>> _readConnections = PlatformDeviceService.FindConnectedModelsAsync;
+    private Func<Task<IReadOnlyList<SetupDevice>>> _readSetupConnections = () => new DeviceSetupService().ListDevicesAsync();
     private string[] _connectedDeviceIds = [], _selectorDeviceIds = [];
+    private SetupDevice[] _connectedSetupDevices = [];
     private bool _connectionsFailed, _scanningConnections, _connectionsStarted, _connectionsClosed;
     private bool _initialConnectionsPending = !Program.Offline;
     private int _connectionRevision;
     private StackPanel? _deviceButtonsPanel;
     private readonly Dictionary<string, Button> _deviceButtons = [];
+    private readonly Dictionary<string, Button> _setupDeviceButtons = [];
     private TextBlock? _connectionHint;
     private Button? _readDeviceButton, _transferButton;
 
@@ -49,9 +52,10 @@ public sealed partial class MainWindow
         _busy = true; _root.IsEnabled = false;
         try
         {
-            var ids = await _readConnections();
+            var runtimeScan = _readConnections(); var setupScan = _readSetupConnections();
+            await Task.WhenAll(runtimeScan, setupScan);
             if (_startupWindowClosed || _allowClose) return;
-            ApplyConnectionSnapshot(ids);
+            ApplyConnectionSnapshot(await runtimeScan, setupDevices: await setupScan);
             if (SelectInitialConnectedSession()) Build();
         }
         catch (Exception error)
@@ -82,7 +86,8 @@ public sealed partial class MainWindow
         _connectionTimer.Stop();
     }
 
-    private async Task RefreshConnectionsAsync(Func<Task<IReadOnlyList<string>>>? offlineSnapshot = null)
+    private async Task RefreshConnectionsAsync(Func<Task<IReadOnlyList<string>>>? offlineSnapshot = null,
+        Func<Task<IReadOnlyList<SetupDevice>>>? offlineSetupSnapshot = null)
     {
         // Offline windows can enter this path only with an explicitly injected fixture.
         if (_scanningConnections || !CanRefreshConnections || (Program.Offline && offlineSnapshot is null)) return;
@@ -91,8 +96,10 @@ public sealed partial class MainWindow
         _scanningConnections = true;
         try
         {
-            var ids = await read();
-            if (revision == _connectionRevision && CanRefreshConnections) ApplyConnectionSnapshot(ids);
+            var runtimeScan = read();
+            var setupScan = Program.Offline ? offlineSetupSnapshot?.Invoke() ?? Task.FromResult<IReadOnlyList<SetupDevice>>([]) : _readSetupConnections();
+            await Task.WhenAll(runtimeScan, setupScan);
+            if (revision == _connectionRevision && CanRefreshConnections) ApplyConnectionSnapshot(await runtimeScan, setupDevices: await setupScan);
         }
         catch (Exception error)
         {
@@ -108,9 +115,21 @@ public sealed partial class MainWindow
         return DeviceCatalog.All.Where(device => known.Contains(device.Id)).Select(device => device.Id).ToArray();
     }
 
-    private void ApplyConnectionSnapshot(IEnumerable<string> ids, bool failed = false)
+    private static SetupDevice[] EligibleSetupDevices(IEnumerable<SetupDevice> devices) => devices
+        .Where(device => !device.IsRuntime && device.HasFirmwareCandidate &&
+            StockDeviceCatalog.Match(device.VendorId, device.ProductId) is { } stock &&
+            stock.CandidateDeviceIds.SequenceEqual(device.CandidateDeviceIds) &&
+            device.CandidateDeviceIds.All(id => BoardDescriptorRegistry.TryGet(id, out var board) && !board.IsEngineeringOnly))
+        .GroupBy(device => device.InstanceId, StringComparer.Ordinal).Where(group => group.Count() == 1)
+        .Select(group => group.Single()).OrderBy(device => device.Name, StringComparer.Ordinal).ThenBy(device => device.InstanceId, StringComparer.Ordinal).ToArray();
+
+    private void ApplyConnectionSnapshot(IEnumerable<string> ids, bool failed = false, IEnumerable<SetupDevice>? setupDevices = null)
     {
-        if (!failed) _connectedDeviceIds = NormalizeConnectedModels(ids);
+        if (!failed)
+        {
+            _connectedDeviceIds = NormalizeConnectedModels(ids);
+            _connectedSetupDevices = EligibleSetupDevices(setupDevices ?? []);
+        }
         _connectionsFailed = failed;
         // A previous readback cannot confirm a later connection, or an unknown connection state.
         foreach (var id in _confirmed.Keys.Where(id => failed || !_connectedDeviceIds.Contains(id, StringComparer.Ordinal)).ToArray()) _confirmed.Remove(id);
@@ -127,9 +146,16 @@ public sealed partial class MainWindow
             foreach (var id in _deviceButtons.Keys.Where(id => !_connectedDeviceIds.Contains(id, StringComparer.Ordinal)).ToArray()) _deviceButtons.Remove(id);
             foreach (var id in _connectedDeviceIds)
                 if (!_deviceButtons.ContainsKey(id)) _deviceButtons[id] = CreateConnectedDeviceButton(DeviceCatalog.Get(id));
-            _deviceButtonsPanel.Children.Clear();
-            foreach (var id in _selectorDeviceIds) _deviceButtonsPanel.Children.Add(_deviceButtons[id]);
         }
+        foreach (var instance in _setupDeviceButtons.Keys.Where(instance => !_connectedSetupDevices.Any(device => device.InstanceId == instance)).ToArray()) _setupDeviceButtons.Remove(instance);
+        foreach (var device in _connectedSetupDevices)
+            if (!_setupDeviceButtons.TryGetValue(device.InstanceId, out var existing) || existing.Tag is not SetupDevice previous ||
+                previous.Name != device.Name || previous.VendorId != device.VendorId || previous.ProductId != device.ProductId ||
+                !previous.CandidateDeviceIds.SequenceEqual(device.CandidateDeviceIds))
+                _setupDeviceButtons[device.InstanceId] = CreateSetupDeviceButton(device);
+        var cards = _selectorDeviceIds.Select(id => _deviceButtons[id]).Concat(_connectedSetupDevices.Select(device => _setupDeviceButtons[device.InstanceId])).ToArray();
+        if (!_deviceButtonsPanel.Children.SequenceEqual(cards))
+        { _deviceButtonsPanel.Children.Clear(); foreach (var card in cards) _deviceButtonsPanel.Children.Add(card); }
         foreach (var (id, button) in _deviceButtons)
         {
             var active = CurrentModelConnected && id == _state.Device.Id;
@@ -141,9 +167,39 @@ public sealed partial class MainWindow
             var labels = (StackPanel)body.Children[1];
             ((TextBlock)labels.Children[1]).Text = _connectionsFailed ? L.T("Gerätesuche fehlgeschlagen") : L.T("USB verbunden");
         }
-        _connectionHint.Text = _connectionsFailed ? L.T("Gerätesuche fehlgeschlagen") : _selectorDeviceIds.Length == 0 ? L.T("Kein Gerät verbunden") : L.T("Gerät nicht verbunden");
-        _connectionHint.IsVisible = _connectionsFailed || _selectorDeviceIds.Length == 0 || !CurrentModelConnected;
+        _connectionHint.Text = _connectionsFailed ? L.T("Gerätesuche fehlgeschlagen") : cards.Length == 0 ? L.T("Kein Gerät verbunden") : L.T("Gerät nicht verbunden");
+        _connectionHint.IsVisible = _connectionsFailed || cards.Length == 0 || !CurrentModelConnected && _connectedSetupDevices.Length == 0;
         UpdateConnectionActions();
+    }
+
+    private Button CreateSetupDeviceButton(SetupDevice device)
+    {
+        var labels = new StackPanel { Spacing = 4 };
+        var name = Text(device.Name, size: 12); name.TextWrapping = TextWrapping.Wrap; labels.Children.Add(name);
+        labels.Children.Add(Text(L.T("Gerät einrichten"), true, 11));
+        if (device.IsExperimental) labels.Children.Add(ExperimentalLabel("ExperimentalSetupDeviceBadge"));
+        var button = new Button
+        {
+            Name = "SetupDeviceButton", Content = labels, Tag = device, Padding = new Thickness(8),
+            MinHeight = 55, CornerRadius = new CornerRadius(0), BorderThickness = new Thickness(2, 0, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Background = Brushes.Transparent, BorderBrush = Brushes.Transparent
+        };
+        button.Classes.Add("nav");
+        Avalonia.Automation.AutomationProperties.SetName(button, device.Name + " · " + L.T("Gerät einrichten"));
+        ToolTip.SetTip(button, device.Name + "\n" + L.T("Gerät einrichten"));
+        button.Click += async (_, _) => await SetupConnectedDeviceAsync(device.InstanceId);
+        return button;
+    }
+
+    private async Task SetupConnectedDeviceAsync(string instanceId)
+    {
+        if (_building || _connectionsFailed || _connectionsClosed || _busy || _startupLoading || _initialConnectionsPending) return;
+        var matches = _connectedSetupDevices.Where(device => device.InstanceId == instanceId).ToArray();
+        if (matches.Length != 1) return;
+        var device = matches[0];
+        await OpenDeviceSetupAsync(device.CandidateDeviceIds.Count == 1 ? device.CandidateDeviceIds[0] : null,
+            preferredInstanceId: instanceId);
     }
 
     private Button CreateConnectedDeviceButton(DeviceDefinition device)
@@ -182,6 +238,7 @@ public sealed partial class MainWindow
         if (_readDeviceButton is not null) _readDeviceButton.IsEnabled = available;
         if (_transferButton is not null) _transferButton.IsEnabled = available;
         foreach (var button in _deviceButtons.Values) button.IsEnabled = !_connectionsFailed && !_busy && !_startupLoading && !_initialConnectionsPending;
+        foreach (var button in _setupDeviceButtons.Values) button.IsEnabled = !_connectionsFailed && !_busy && !_startupLoading && !_initialConnectionsPending;
     }
 
     private async Task SelectConnectedDeviceAsync(string id)

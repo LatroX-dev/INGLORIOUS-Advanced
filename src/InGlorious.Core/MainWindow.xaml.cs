@@ -85,6 +85,14 @@ public partial class MainWindow : Window
             var fixtureIndex = Array.IndexOf(args, "--connected-devices");
             SetOfflineConnectionFixture(fixtureIndex >= 0 && fixtureIndex + 1 < args.Length
                 ? args[fixtureIndex + 1].Split(',') : args.Contains("--ui-smoke") ? ["pro-iso", "numpad"] : []);
+            var setupFixtureIndex = Array.IndexOf(args, "--setup-devices");
+            if (setupFixtureIndex >= 0 && setupFixtureIndex + 1 < args.Length)
+                _setupDevices = StockSetupDevices(args[setupFixtureIndex + 1].Split(',').Select(id =>
+                {
+                    var stock = StockDeviceCatalog.All.First(match => match.CandidateDeviceIds.Contains(id));
+                    return new SetupDevice("offline-setup-" + id, stock.IdentifiedName ?? DeviceCatalog.ModelGroupName(stock.CandidateDeviceIds),
+                        stock.CandidateDeviceIds, stock.VendorId, stock.ProductId, [], false);
+                }));
         }
         InitializeStartup();
         Resources["HelpVisibility"] = _preferences.ShowHelp ? Visibility.Visible : Visibility.Collapsed;
@@ -173,6 +181,7 @@ public partial class MainWindow : Window
             finally
             {
                 _startupFinishing = false;
+                UpdateSetupDeviceButtons();
                 if (!_startupClosed) EditorSurface.IsEnabled = true;
                 StartSharedBrightnessIfReady();
                 StartConnectionMonitor();
@@ -286,6 +295,18 @@ public partial class MainWindow : Window
             };
             settings.ShowDialog(); Close(); return;
         }
+        if (screenshotIndex >= 0 && screenshotIndex + 1 < args.Length && args.Contains("--device-test"))
+        {
+            var test = new DeviceTestWindow(Device.Id, null, preview: true) { Owner = this };
+            test.Loaded += async (_, _) =>
+            {
+                await Task.Delay(180);
+                try { SaveVisualScreenshot((FrameworkElement)test.Content, Path.GetFullPath(args[screenshotIndex + 1])); }
+                catch (Exception ex) { File.WriteAllText(Path.Combine(Paths.DataRoot, "screenshot-error.txt"), ex.ToString()); Environment.ExitCode = 1; }
+                test.Close();
+            };
+            test.ShowDialog(); Close(); return;
+        }
         if (smokeIndex >= 0 && smokeIndex + 1 < args.Length)
         {
             var smokePath = Path.GetFullPath(args[smokeIndex + 1]);
@@ -349,7 +370,7 @@ public partial class MainWindow : Window
     private void BuildDeviceButtons()
     {
         UpdateConnectedDeviceButtons();
-        EmptyDeviceSetup.Visibility = ConnectedDevices.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyDeviceSetup.Visibility = ConnectedDevices.Length == 0 && _setupDevices.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         ExperimentalSetupActions.Visibility = Visibility.Collapsed;
         var current = _devices.FirstOrDefault(d => d.IsSupported && d.DeviceId == _project.DeviceId);
         var offline = Device.IsOfflineOnly;
@@ -358,7 +379,7 @@ public partial class MainWindow : Window
         OfflineDeviceOverview.Visibility = offline ? Visibility.Visible : Visibility.Collapsed;
         DeviceModeText.Text = _connectionScanFailed ? L.T("Gerätesuche fehlgeschlagen") : ConnectedDevices.Length == 0 ? L.T("Kein Gerät verbunden")
             : IsActiveDeviceConnected ? L.T("USB verbunden") : L.T("Gerät nicht verbunden");
-        DeviceModeText.Visibility = IsActiveDeviceConnected ? Visibility.Collapsed : Visibility.Visible;
+        DeviceModeText.Visibility = !_connectionScanFailed && (IsActiveDeviceConnected || ConnectedDevices.Length == 0 && _setupDevices.Length > 0) ? Visibility.Collapsed : Visibility.Visible;
         DeviceModeText.Foreground = Brush(IsActiveDeviceConnected ? "#75D9CF" : "#A0A7B0");
         ReadDeviceButton.IsEnabled = TransferButton.IsEnabled = !offline && IsActiveDeviceConnected;
         ManageFirmwareButton.IsEnabled = RestoreOriginalFirmwareButton.IsEnabled = !offline && IsActiveDeviceConnected;
@@ -403,7 +424,7 @@ public partial class MainWindow : Window
         _keyButtons.Clear();
         KeyboardCanvas.Width = Device.PreviewWidth * unit + inset * 2;
         KeyboardCanvas.Height = Device.PreviewHeight * unit;
-        var largeLayout = Device.Id.StartsWith("gmmk3-100-", StringComparison.Ordinal);
+        var largeLayout = Device.Id.StartsWith("gmmk3-100-", StringComparison.Ordinal) || Device.Id == "gmmk3-pro-100-iso";
         PreviewDeviceName.Text = Device.Name;
         PreviewLayerName.Text = L.F($"{Device.Subtitle} · Ebene {_layerIndex}");
         WorkspaceHeading.Text = _activeTab == 5 ? L.T("Profile") : Device.Name;
@@ -1414,6 +1435,9 @@ public partial class MainWindow : Window
     private static string SliderModeLabel(int mode) => mode switch { 1 => L.T("MIDI-Controller"), 2 => L.T("Relative Lautstärke"), 3 => L.T("Beleuchtung dimmen"), _ => L.T("Deaktiviert") };
     private void RefreshDeviceSettingsCore()
     {
+        DeviceTestAction.Visibility = Device.Id == RetainedLoaderLayout.DeviceId ? Visibility.Visible : Visibility.Collapsed;
+        DeviceTestHint.Visibility = DeviceTestAction.Visibility;
+        DeviceTestColumn.Width = DeviceTestAction.Visibility == Visibility.Visible ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         PollingChoice.SelectedValue = _project.DeviceSettings.UsbPollingIntervalMs.ToString(CultureInfo.InvariantCulture);
         DebounceInput.Text = _project.DeviceSettings.DebounceMs.ToString(CultureInfo.InvariantCulture);
         SliderModeChoice.SelectedIndex = _project.Slider.Mode;

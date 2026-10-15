@@ -6,10 +6,14 @@
 #include "wear_leveling.h"
 
 // Preserve the original slot locations for every existing board. Only the six
-// GMMK3 boards use the remaining 1 KiB of the same 16 KiB logical EEPROM.
+// GMMK3 boards and the retained-loader PRO variant use the remaining
+// 1 KiB of the same 16 KiB logical EEPROM.
 #define IG_STORAGE_BASE 1024U
 #define IG_STORAGE_HEADER_BYTES 32U
-#if IG_BOARD == 10 || IG_BOARD == 11 || IG_BOARD == 12 || IG_BOARD == 13 || IG_BOARD == 14 || IG_BOARD == 15
+#if IG_BOARD == 16 && (!defined(IG_RETAINED_LOADER_BUILD) || IG_RETAINED_LOADER_BUILD != 1)
+#    error "Board 16 requires its retained-loader build"
+#endif
+#if IG_BOARD == 10 || IG_BOARD == 11 || IG_BOARD == 12 || IG_BOARD == 13 || IG_BOARD == 14 || IG_BOARD == 15 || IG_BOARD == 16
 #    define IG_STORAGE_SLOT_BYTES 7680U
 #elif IG_BOARD == 1 || IG_BOARD == 2 || IG_BOARD == 3 || IG_BOARD == 4 || IG_BOARD == 5 || IG_BOARD == 6 || IG_BOARD == 7 || IG_BOARD == 8 || IG_BOARD == 9
 #    define IG_STORAGE_SLOT_BYTES 7168U

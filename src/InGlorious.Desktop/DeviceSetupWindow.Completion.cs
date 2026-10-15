@@ -23,8 +23,13 @@ public sealed partial class DeviceSetupWindow
 
     private void InitializeCompletionControls()
     {
-        _lightingButton.Content = L.T("Beleuchtung testen"); _lightingButton.Classes.Add("primary");
-        _completion.Children.Add(_lightingButton);
+        _lightingButton.Content = MainWindow.ButtonContent("Beleuchtung testen"); _lightingButton.Classes.Add("primary");
+        _lightingButton.Margin = new(0, 0, 12, 0);
+        var lightingActions = new WrapPanel();
+        lightingActions.Children.Add(_lightingButton); lightingActions.Children.Add(_deviceTestButton);
+        _completion.Children.Add(lightingActions);
+        AutomationProperties.SetName(_lightingButton, L.T("Beleuchtung testen"));
+        AutomationProperties.SetName(_deviceTestButton, L.T("Gerät testen"));
         _completion.Children.Add(new TextBlock { Text = L.T("Dauert etwa 21 Sekunden."), Margin = new(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap });
         _completion.Children.Add(new TextBlock { Text = L.T("Während des Lichttests keine Tasten drücken."), Margin = new(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap });
         _lightingStatus.Margin = new(0, 8, 0, 0); _completion.Children.Add(_lightingStatus);
@@ -32,10 +37,12 @@ public sealed partial class DeviceSetupWindow
         AutomationProperties.SetName(_typingTest, L.T("Hier Tasten testen"));
         _lightingButton.Click += async (_, _) => await RunCompletionLightingAsync();
         _typingTest.TextChanged += (_, _) => { if (!_offlinePreview && TypingCompletes) Close(); };
+        InitializeCompletionOptions();
     }
 
     private void RenderCompletion()
     {
+        RenderCompletionOptions();
         _completion.IsVisible = CompletionTestsVisible ? true : false;
         _lightingButton.IsEnabled = !_offlinePreview && LightingReady;
         _typingTest.IsEnabled = !_offlinePreview && !_lightingRunning;
@@ -81,7 +88,7 @@ public sealed partial class DeviceSetupWindow
         BoardDescriptorRegistry.TryGet(id, out _) && info.DeviceId == id && info.Persistent && (info.Flags & 4) == 0 && info.StagingBytes == 0 &&
         info.SupportsEffects && info.SupportsTiming && info.SupportsColorSequences && info.SupportsRuntimeBrightness && info.SupportsStandby &&
         extensions.SupportsLightingTest && version is not null && version.DeviceId == id && version.BuildId != 0 &&
-        FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var target) && version.Version == target;
+        FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersionFor(id), out var target) && version.Version == target;
 
     private async Task RunCompletionLightingAsync()
     {

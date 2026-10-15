@@ -56,7 +56,7 @@ public static class DeviceScanner
         const string script = """
             $ErrorActionPreference = 'Stop'
             [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-            $result = @(Get-PnpDevice -PresentOnly | Where-Object { $_.InstanceId -match '^USB\\(VID_320F&PID_(5046|5093|5088)|VID_FEED&PID_1C0[1-9A-F])\\' } | ForEach-Object {
+            $result = @(Get-PnpDevice -PresentOnly | Where-Object { $_.InstanceId -match '^USB\\(VID_320F&PID_(5046|5093|5088)|VID_FEED&PID_1C(0[1-9A-F]|10))\\' } | ForEach-Object {
                 $device = $_
                 $properties = Get-PnpDeviceProperty -InstanceId $device.InstanceId
                 $desc = ($properties | Where-Object KeyName -eq 'DEVPKEY_Device_BusReportedDeviceDesc').Data

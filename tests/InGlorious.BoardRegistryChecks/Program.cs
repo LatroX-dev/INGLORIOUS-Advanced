@@ -5,11 +5,51 @@ var checks = 0;
 void Check(bool value, string message) { if (!value) throw new Exception(message); checks++; }
 void Reject(Action action, string message) { try { action(); } catch (InvalidDataException) { checks++; return; } throw new Exception(message); }
 async Task RejectAsync(Func<Task> action, string message) { try { await action(); } catch (InvalidDataException) { checks++; return; } throw new Exception(message); }
-Check(BoardDescriptorRegistry.All.Count == 2, "Exactly two reviewed protocol boards");
-Check(BoardDescriptorRegistry.All.Select(b => b.BoardId).Distinct().Count() == 2 && BoardDescriptorRegistry.All.Select(b => b.DeviceId).Distinct().Count() == 2, "Unique board and model identities");
+Check(BoardDescriptorRegistry.All.Count == 3, "Exactly three hardware-tested protocol boards");
+Check(BoardDescriptorRegistry.All.Select(b => b.BoardId).Distinct().Count() == 3 && BoardDescriptorRegistry.All.Select(b => b.DeviceId).Distinct().Count() == 3, "Unique board and model identities");
 Check(BoardDescriptorRegistry.All is not BoardDescriptor[], "Registry does not expose its mutable array");
-Check(BoardDescriptorRegistry.Experimental.Count == 13 && BoardDescriptorRegistry.ProtocolBoards.Count == 15, "Thirteen candidates are explicit and separate from existing approvals");
-Check(BoardDescriptorRegistry.ProtocolBoards.Select(b => b.BoardId).Distinct().Count() == 15 && BoardDescriptorRegistry.ProtocolBoards.Select(b => b.RuntimeProductId).Distinct().Count() == 15, "Every candidate has a unique board and runtime identity");
+Check(BoardDescriptorRegistry.Experimental.Count == 13 && BoardDescriptorRegistry.ProtocolBoards.Count == 16, "Thirteen untested variants retain their experimental status");
+Check(BoardDescriptorRegistry.ProtocolBoards.Select(b => b.BoardId).SequenceEqual(Enumerable.Range(1, 16).Select(id => (byte)id)), "Support status changes do not reorder protocol identities");
+Check(BoardDescriptorRegistry.ProtocolBoards.Select(b => b.BoardId).Distinct().Count() == 16 && BoardDescriptorRegistry.ProtocolBoards.Select(b => b.RuntimeProductId).Distinct().Count() == 16, "Every candidate has a unique board and runtime identity");
+Check(BoardDescriptorRegistry.ProtocolBoards.Where(board => board.BoardId != 16).All(board => board.DeviceId is "pro-iso" or "pro-ansi"
+    ? board.FlashBytes == 262144 && board.SramBytes == 40960 : board.FlashBytes == 131072 && board.SramBytes == 28672), "All fifteen existing memory geometries remain unchanged");
+Check(BoardDescriptorRegistry.EngineeringOnly.Count == 0 && BoardDescriptorRegistry.KnownBoards.Count == 16 &&
+    BoardDescriptorRegistry.KnownBoards.Select(b => b.BoardId).Distinct().Count() == 16 && BoardDescriptorRegistry.KnownBoards.Select(b => b.RuntimeProductId).Distinct().Count() == 16,
+    "The sixteenth normal protocol identity is unique without a hidden engineering-only board");
+var engineering = BoardDescriptorRegistry.Get("gmmk3-pro-100-iso");
+var editor = DeviceCatalog.Get(engineering.DeviceId);
+Check(engineering.BoardId == 16 && engineering.RuntimeProductId == 0x1C10 && engineering.Rows == 14 && engineering.Cols == 8 &&
+    engineering.LedCount == 126 && engineering.LegacySize == 5656 && engineering.PayloadCapacity == 7648 &&
+    engineering.FlashBytes == 262144 && engineering.SramBytes == 36864 && engineering.StockProductId is null,
+    "The separate PRO identity has exact geometry without borrowing legacy stock IDs");
+Check(!engineering.IsEngineeringOnly && !engineering.IsExperimental && engineering.HasApprovedFirmwareManagement && BoardDescriptorRegistry.All.Contains(engineering) &&
+    !editor.IsOfflineOnly && editor.SupportsOnboardConfiguration && !editor.IsExperimentalFirmware && editor.HasApprovedFirmwareManagement && editor.Name == "GMMK 3 PRO 100% ISO",
+    "Only the exact hardware-tested GMMK 3 PRO 100% ISO is promoted");
+Check(OnboardIdentity.MatchesNames(engineering.DeviceId, "INGLORIOUS", engineering.RuntimeName) &&
+    !OnboardIdentity.MatchesNames(engineering.DeviceId, "InGlorious", "InGlorious" + engineering.ProductSuffix),
+    "Removing the experimental badge never enables an unsupported legacy USB product spelling");
+Check(!BoardDescriptorRegistry.TryGetStockUsb(0x320F, 0xE3CE, out _) &&
+    !BoardDescriptorRegistry.TryGetStockUsb(0x342D, 0xE3CE, out _),
+    "Promoted PRO stock discovery still uses the exact separate manufacturer catalog");
+Check(StockDeviceCatalog.Match(0x342D, 0xE3CE)!.CandidateDeviceIds.SequenceEqual([engineering.DeviceId]), "Exact stock PRO PID resolves only board16");
+Check(BoardDescriptorRegistry.TryGetRuntimeUsb(0xFEED, 0x1C10, out var engineeringRuntime) && engineeringRuntime == engineering &&
+    PlatformDeviceService.ConnectedModelFromUsbMetadata(0xFEED, 0x1C10) == engineering.DeviceId,
+    "Reserved runtime metadata is identified without opening its transport");
+var engineeringScan = DeviceScanner.ParseDevices("""[{"vendorId":"FEED","productId":"1C10","release":"0001","instanceId":"USB\\VID_FEED&PID_1C10\\TEST"}]""").Single();
+Check(engineeringScan.DeviceId == engineering.DeviceId && engineeringScan.IsSupported, "Metadata scanner names the distinct engineering model");
+for (var schema = 1; schema <= 4; schema++) Check(OnboardSerializer.Shape(engineering.DeviceId, schema).Size == (schema == 1 ? 5656 : 7200), "Engineering shape is reserved separately");
+var engineeringProject = ProjectService.Create(engineering.DeviceId);
+OnboardSerializer.ValidateEditorProject(engineeringProject);
+Check(engineeringProject.DeviceId != "gmmk3-100-iso" && ProjectService.Validate(engineeringProject).Count == 0, "Engineering editor preserves its own local profile identity");
+var engineeringPayload = OnboardSerializer.Prepare(engineeringProject).Payload;
+Check(engineeringPayload[6] == 16 && OnboardSerializer.Decode(engineeringPayload).DeviceId == engineering.DeviceId &&
+    OnboardSerializer.Prepare(OnboardSerializer.Decode(engineeringPayload)).Payload.SequenceEqual(engineeringPayload), "Normal board16 payload is byte-exact and has a distinct model identity");
+Check(OnboardHidTransport.IsAllowedPath(@"\\?\hid#vid_feed&pid_1c10&mi_01#offline"), "Exact board16 path passes the pure identity filter; this test never opens it");
+Reject(() => OnboardHidTransport.Open(new(engineering.DeviceId, engineering.RuntimeName, @"\\?\hid#vid_feed&pid_1c0f&mi_01#offline")), "PRO model cannot open generic100ISO path, before native access");
+var genericEditor = DeviceCatalog.Get("gmmk3-100-iso");
+Check(JsonSerializer.Serialize(editor.Keys) == JsonSerializer.Serialize(genericEditor.Keys) &&
+    editor.NonKeyLedIndices.SequenceEqual(genericEditor.NonKeyLedIndices) && editor.BadgeLedIndices.SequenceEqual(genericEditor.BadgeLedIndices) && editor.SideLedIndices.SequenceEqual(genericEditor.SideLedIndices),
+    "Shared editor layout and default bindings match independently of model identity");
 foreach (var (id, boardId, rows, cols, leds, legacySize, extendedSize, stockPid, runtimePid) in new[] {
     ("pro-iso", 1, 11, 8, 99, 5140, 6360, 0x5046, 0x1C01), ("numpad", 2, 5, 4, 31, 3780, 4184, 0x5088, 0x1C02) })
 {
@@ -43,13 +83,13 @@ foreach (var unknown in new[] { "", "unknown", "pro-rev3-iso", "gmmk3", "unverif
     await RejectAsync(() => PlatformDeviceService.ApplyAsync(device, image, null, () => writes++), "Unknown model upload rejected without backup or transport");
     Check(writes == 0 && PlatformDeviceService.UnsupportedReason(new(unknown, 255, 0, 0, 0, 0), image) is not null, "No unknown image can be approved by capability flags");
 }
-foreach (var board in new byte[] { 0, 16, 255 }) Reject(() => BoardDescriptorRegistry.GetByBoardId(board), "Unknown board cannot decode as Numpad");
+foreach (var board in new byte[] { 0, 17, 255 }) Reject(() => BoardDescriptorRegistry.GetByBoardId(board), "Unknown board cannot decode as Numpad");
 Check(!BoardDescriptorRegistry.TryGetStockUsb(0x320F, 0x5093, out _), "5093 is not the reviewed 5046 revision");
 var candidate = DeviceScanner.ParseDevices("""[{"vendorId":"320F","productId":"5093","release":"0001","instanceId":"USB\\VID_320F&PID_5093\\TEST"}]""").Single();
 Check(candidate.DeviceId == "unverified-usb-320f-5093" && !candidate.IsSupported && candidate.DeviceId != "pro-iso", "5093 remains visible but quarantined");
 Check(DeviceScanner.ParseDevices("""[{"vendorId":"9999","productId":"5046","release":"0001","instanceId":"USB\\VID_9999&PID_5046\\TEST"}]""").Count == 0, "Foreign vendor cannot masquerade as PRO");
 Reject(() => DeviceScanner.ParseDevices("""[{"vendorId":"320F","productId":"5046","release":"0001","instanceId":"USB\\VID_320F&PID_5093\\TEST"}]"""), "Metadata does not override physical USB identity");
-foreach (var path in new[] { @"\\?\hid#foreign#vid_feed&pid_1c01&mi_01", @"\\?\hid#vid_320f&pid_5046&mi_01", @"\\?\hid#vid_feed&pid_1c10&mi_01", @"C:\vid_feed&pid_1c01&" })
+foreach (var path in new[] { @"\\?\hid#foreign#vid_feed&pid_1c01&mi_01", @"\\?\hid#vid_320f&pid_5046&mi_01", @"\\?\hid#vid_feed&pid_1c11&mi_01", @"C:\vid_feed&pid_1c01&" })
     Check(!OnboardHidTransport.IsAllowedPath(path), "Unreviewed or embedded HID identity is rejected");
 Check(OnboardHidTransport.IsAllowedPath(@"\\?\hid#vid_feed&pid_1c01&mi_01#offline"), "Actual reviewed path remains eligible for descriptor check");
 Reject(() => OnboardHidTransport.Open(new("numpad", "INGLORIOUS Numpad", @"\\?\hid#vid_feed&pid_1c01&mi_01#offline")), "Cross-board path rejected before native access");
@@ -65,7 +105,7 @@ foreach (var model in DeviceCatalog.All.Where(d => d.SupportsOnboardConfiguratio
     Reject(() => OnboardSerializer.Decode(invalid), "Unknown wire board never defaults to an existing board");
 }
 var candidates = DeviceCatalog.All.Where(d => d.IsExperimentalFirmware).ToArray();
-Check(candidates.Length == 13 && candidates.All(d => d.SupportsOnboardConfiguration && !d.IsOfflineOnly && !d.HasApprovedFirmwareManagement), "Thirteen candidate codecs do not acquire firmware-management approval");
+Check(candidates.Length == 13 && candidates.All(d => d.SupportsOnboardConfiguration && !d.IsOfflineOnly && !d.HasApprovedFirmwareManagement), "Thirteen untested candidate codecs retain their individual support status");
 foreach (var model in candidates)
 {
     var board = BoardDescriptorRegistry.Get(model.Id);

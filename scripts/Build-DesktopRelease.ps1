@@ -23,7 +23,7 @@ $expectedSdk=(Get-Content -LiteralPath (Join-Path $root 'global.json') -Raw|Conv
 if((& dotnet --version).Trim()-cne$expectedSdk){throw ('Install .NET SDK '+$expectedSdk+' before building.')}
 $catalogPath=Join-Path $root 'src/InGlorious.Core/SetupFirmwareCatalog.json'
 $catalog=Get-Content -LiteralPath $catalogPath -Raw|ConvertFrom-Json
-if($catalog.targets.Count-ne15){throw 'Unexpected reviewed firmware target count.'}
+if($catalog.targets.Count-ne16){throw 'Unexpected reviewed firmware target count.'}
 foreach($entry in $catalog.targets){
  $file=Join-Path $firmware $entry.file
  if(-not(Test-Path -LiteralPath $file)-or(Get-Item -LiteralPath $file).Length-ne$entry.bytes-or(Get-FileHash -LiteralPath $file).Hash-cne$entry.sha256){throw ('Firmware differs from the reviewed release: '+$entry.file)}

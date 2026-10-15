@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "reviewedOn": "2026-10-11",
-  "purpose": "Manufacturer catalog recognition candidates only. No stock-image verification, silicon identification, unique specimen binding, restore test or write authorization is implied.",
+  "reviewedOn": "2026-10-15",
+  "purpose": "Manufacturer catalog recognition, including identified models without firmware candidates. No stock-image verification, silicon identification, unique specimen binding, restore test or write authorization is implied.",
   "sources": {
     "core": {
       "publisher": "Glorious",
@@ -40,7 +40,7 @@
     "HID usages identify collections; no exact interface numbers or report lengths have been measured for the thirteen experimental devices.",
     "Catalog firmware versions identify updater packages, not models, silicon or physical specimens.",
     "Vendor updater Bootloader declarations must not select a ROM DFU transport.",
-    "GMMK3 PRO, HE, wireless, GMBK and Eternal are intentionally excluded; no alias compatibility is claimed.",
+    "GMMK 3 PRO firmware support is limited to the exact 100% ISO wired, non-HE model 342D:E3CE. Other PRO sizes and layouts, HE, wireless, GMBK and Eternal are excluded from firmware candidates; no alias compatibility is claimed.",
     "Custom QMK can reuse these normal VID/PIDs. A match does not prove original firmware.",
     "USB serial numbers and port paths are not established as persistent unique specimen IDs."
   ],
@@ -725,6 +725,40 @@
         }
       ],
       "limitations": "CORE separates this model/layout; hardware verification and a backup path are required before firmware installation."
+    }
+  ],
+  "identifiedWithoutFirmware": [
+    {
+      "vid": "342D",
+      "pid": "E3CE",
+      "coreProductId": "GMMK3PRO100WiredISO",
+      "coreCatalogName": "GMMK 3 PRO 100 Wired ISO",
+      "displayName": "GMMK 3 PRO 100% ISO",
+      "candidateDeviceIds": [],
+      "confidence": "identified-without-firmware",
+      "connection": "usb-wired",
+      "layout": "ISO",
+      "source": "sources.core",
+      "coreSourceLine": 9438,
+      "exactUsbProductString": null,
+      "bcdDeviceIdentityRule": null,
+      "mcu": null,
+      "requiresHardwareVerification": true,
+      "firmwareWriteAuthorized": false,
+      "catalogUpdaterMode": {
+        "vid": "2442",
+        "pid": "B051",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "packageUpdaterMode": {
+        "pid": "B059",
+        "isVerifiedRomBootloaderIdentity": false
+      },
+      "limitations": [
+        "The preserved CORE source identifies this exact normal USB model only; it does not establish MCU, PCB compatibility or an INGLORIOUS firmware candidate.",
+        "CORE updater metadata declares B051 while manufacturer package metadata declares B059. Neither value is a verified ROM bootloader identity or permission to select a firmware transport.",
+        "No device capture, original-firmware backup, recovery validation or hardware acceptance is claimed."
+      ]
     }
   ],
   "hardwareIdentityEvidence": {

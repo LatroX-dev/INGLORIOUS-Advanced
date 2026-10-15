@@ -163,14 +163,106 @@ static void check_reactive_expiry(void) {
     now=first; housekeeping_task_user();
     check(!effect_hit_count && !writes,"expired history does not return after a complete timer cycle or alter storage");
 }
+static void check_physical_activity(void) {
+    boot(true);
+    uint8_t config[IG_SIZE], action=1;
+    for(uint16_t offset=0;offset<IG_SIZE;offset++) config[offset]=default_byte(offset);
+    // One harmless delay lets macro admission be tested without any key report.
+    put16(config+14,1); put16(config+IG_MACRO_OFFSET+2,1);
+    config[IG_EVENT_OFFSET]=3; put16(config+IG_EVENT_OFFSET+2,1);
+    check(validate_config(config,IG_SIZE),"physical activity fixture is valid");
+    upload(config,IG_SIZE); check(commit(config,IG_SIZE)==0,"install activity fixture");
+    unsigned initial_writes=writes;
+    uint32_t generation=active_generation,crc=active_crc;
+    matrix_row_t holes[MATRIX_ROWS]={0};
+    for(uint8_t row=0;row<MATRIX_ROWS;row++) for(uint8_t col=0;col<MATRIX_COLS;col++) {
+        matrix_row_t bit=(matrix_row_t)1U<<col;
+        if(reference_physical[row*MATRIX_COLS+col]) continue;
+        holes[row]|=bit; pressed[row]=bit;
+        check(!any_keys_pressed(),"unused matrix position is not a held key");
+        action=1; check(command(12,&action,1)==0 && light_test_active,"unused matrix position cannot block the light test");
+        now+=20; housekeeping_task_user();
+        check(light_test_active,"unused matrix position cannot cancel the light test during scan");
+        rgb_matrix_indicators_advanced_user(0,RGB_MATRIX_LED_COUNT);
+        for(uint8_t led=0;led<RGB_MATRIX_LED_COUNT;led++)
+            check(pixels[led].r==ig_srgb_to_pwm(160) && pixels[led].g==ig_srgb_to_pwm(160) && pixels[led].b==ig_srgb_to_pwm(160),"light test renders all LEDs with a matrix hole held");
+        keyrecord_t event={.event={.pressed=true,.type=1,.key={row,col}}};
+        check(process_record_user(KC_NO,&event) && light_test_active,"unused press cannot cancel the light test");
+        event.event.pressed=false;
+        check(process_record_user(KC_NO,&event) && light_test_active,"unused release cannot cancel the light test");
+        action=2; check(command(12,&action,1)==0,"stop hole test");
+        lighting_idle=true; uint32_t last_activity=lighting_last_activity;
+        now+=20; housekeeping_task_user();
+        check(lighting_idle && lighting_last_activity==last_activity,"unused held position does not wake standby");
+        event.event.pressed=true; process_record_user(KC_NO,&event);
+        event.event.pressed=false; process_record_user(KC_NO,&event);
+        check(lighting_idle && lighting_last_activity==last_activity,"unused press and release do not wake standby");
+        check(command(8,NULL,0)==0,"unused matrix position cannot block timing confirmation");
+        start_macro(0,false); check(macro_running,"unused matrix position cannot block a macro"); cancel_macro();
+#if IG_BOARD == 16
+        action=1; check(command(14,&action,1)==0,"unused matrix position cannot block diagnostics");
+        action=2; check(command(14,&action,1)==0,"stop hole diagnostics");
+#endif
+        pressed[row]=0;
+    }
+    memcpy(pressed,holes,sizeof(pressed));
+    action=1; check(command(12,&action,1)==0,"all unused matrix positions may coexist during a light test");
+    now+=20; housekeeping_task_user(); check(light_test_active,"combined unused positions cannot cancel the test");
+    action=2; check(command(12,&action,1)==0,"stop combined hole test");
+    start_macro(0,false); check(macro_running,"combined unused positions cannot block macros"); cancel_macro();
+    check(writes==initial_writes && active_generation==generation && active_crc==crc,"activity checks do not change saved configuration");
+    upload(config,IG_SIZE);
+    for(uint8_t row=0;row<MATRIX_ROWS;row++) for(uint8_t col=0;col<MATRIX_COLS;col++) {
+        if(!reference_physical[row*MATRIX_COLS+col]) continue;
+        pressed[row]|=(matrix_row_t)1U<<col;
+        check(any_keys_pressed(),"every physical position remains a held key regardless of mapping");
+        check(commit(config,IG_SIZE)==3 && writes==initial_writes,"every real key blocks configuration commit even among holes");
+        pressed[row]=holes[row];
+    }
+    check(commit(config,IG_SIZE)==0,"unused positions alone do not block a validated commit");
+    for(uint8_t row=0;row<MATRIX_ROWS;row++) for(uint8_t col=0;col<MATRIX_COLS;col++) {
+        if(!reference_physical[row*MATRIX_COLS+col]) continue;
+        pressed[row]|=(matrix_row_t)1U<<col;
+        action=1; check(command(12,&action,1)==3 && !light_test_active,"every real key still blocks light test startup");
+        start_macro(0,false); check(!macro_running,"every real held key still blocks nonphysical macro startup");
+        start_macro(0,true); check(macro_running,"single physical macro trigger remains usable among matrix holes"); cancel_macro();
+        lighting_idle=true; light_test_active=true; light_test_started=now;
+        keyrecord_t event={.event={.pressed=true,.type=1,.key={row,col}}};
+        check(process_record_user(KC_NO,&event) && !light_test_active && !lighting_idle,"unmapped real key still wakes standby and cancels the test");
+        pressed[row]=holes[row];
+    }
+    for(uint8_t type=ENCODER_CW_EVENT;type<=ENCODER_CCW_EVENT;type++) {
+        lighting_idle=true; light_test_active=true; light_test_started=now;
+        keyrecord_t event={.event={.pressed=true,.type=type,.key={255,255}}};
+        check(process_record_user(KC_NO,&event) && !light_test_active && !lighting_idle,"encoder turns keep waking standby and cancelling the test");
+    }
+    memset(pressed,0,sizeof(pressed));
+}
+#include "diagnostic_checks.h"
+
 int main(int argc,char **argv) {
     check(argc==4,"three serializer fixtures supplied"); uint16_t default_length=load(argv[1],defaults); check(default_length==IG_SIZE,"schema1 default");
     check(sizeof(staging)==sizeof(uint8_t *),"no full duplicate staging allocation");
     check(sizeof(ig_physical)==sizeof(reference_physical) && !memcmp(ig_physical,reference_physical,sizeof(reference_physical)),"physical matrix agrees with QMK reference");
     boot(true);
+    check(active_slot==-1 && active_generation==0,"fresh storage uses the unsaved fallback");
+    for(uint8_t layer=0;layer<IG_LAYERS;layer++) {
+        layer_state=1U<<layer; rgb_matrix_indicators_advanced_user(0,RGB_MATRIX_LED_COUNT);
+        for(uint8_t led=0;led<RGB_MATRIX_LED_COUNT;led++) {
+            uint16_t at=IG_RGB_OFFSET+(layer*RGB_MATRIX_LED_COUNT+led)*3;
+            check(active_byte(at)==255 && !active_byte(at+1) && !active_byte(at+2),"fresh physical key and side colors are red on all layers");
+            check(pixels[led].r==255 && !pixels[led].g && !pixels[led].b,"fresh red colors reach the physical LED output");
+        }
+    }
+    check(writes==0,"fresh default colors do not cause storage writes"); layer_state=0;
     for(uint16_t i=IG_KEYS_OFFSET;i<IG_ENCODER_OFFSET;i++) check(default_byte(i)==defaults[i],"all four default keymap layers");
     check(command(1,NULL,0)==0 && response[8]==IG_BOARD && response[9]==MATRIX_ROWS && response[10]==MATRIX_COLS && response[12]==RGB_MATRIX_LED_COUNT,"board identity and dimensions");
-    check(command(13,NULL,0)==0 && response[10]==IG_BOARD && u16(response+14)==11 && u16(response+16)==1 && u32(response+20)==0x000B0101,"candidate version identity");
+#if IG_BOARD == 16
+    static const uint8_t expected_version[16]={1,0,16,0,0,0,11,0,4,0,0,0,1,4,11,0};
+#else
+    static const uint8_t expected_version[16]={1,0,IG_BOARD,0,0,0,11,0,4,0,0,0,1,4,11,0};
+#endif
+    check(command(13,NULL,0)==0 && response[6]==16 && !memcmp(response+8,expected_version,16),"exact candidate version identity, reserved fields and build ID");
     uint8_t config[IG_MAX_SIZE], before[sizeof(backing)];
     for(int fixture=1;fixture<argc;fixture++) {
         uint16_t length=load(argv[fixture],config); check(validate_config(config,length),"desktop payload semantically accepted");
@@ -178,7 +270,9 @@ int main(int argc,char **argv) {
         upload(config,length); check(writes==initial_writes && !memcmp(before,backing,sizeof(backing)),"upload is entirely volatile");
         check(command(6,NULL,0)==0 && !borrowed && writes==initial_writes && !memcmp(before,backing,sizeof(backing)),"abort preserves backing");
         upload(config,length); check(commit(config,length)==0 && !borrowed,"commit validated payload"); readback(config,length);
-        boot(false); readback(config,length);
+        uint32_t saved_generation=active_generation, saved_crc=active_crc;
+        memcpy(before,backing,sizeof(backing)); boot(false); readback(config,length);
+        check(active_slot>=0 && active_generation==saved_generation && active_crc==saved_crc && !writes && !memcmp(before,backing,sizeof(backing)),"saved colors and profile bytes survive reboot without adopting new fallback");
         memcpy(before,backing,sizeof(backing)); initial_writes=writes;
         config[6]^=0x40; upload(config,length); check(commit(config,length)==6 && writes==initial_writes && !memcmp(before,backing,sizeof(backing)),"other board payload rejected before writes");
         check(command(6,NULL,0)==0,"abort invalid board payload"); config[6]^=0x40;
@@ -190,6 +284,6 @@ int main(int argc,char **argv) {
         }
         boot(false);
     }
-    check_recovery(); check_lighting(); check_reactive_expiry();
+    check_recovery(); check_lighting(); check_reactive_expiry(); check_diagnostics(); check_physical_activity();
     printf("PASS board%d: %u native port checks; no hardware access.\n",IG_BOARD,checks); return 0;
 }

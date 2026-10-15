@@ -16,6 +16,7 @@ internal static partial class Program
         await CheckSuccessfulRoundTrips();
         await CheckUpdates();
         await CheckDiscoveryAndTransitions();
+        await CheckIdentifiedModelWithoutFirmware();
         await CheckCaptureFailures();
         await CheckWritesAndArchives();
         using var busy = new SetupFixture("numpad");
@@ -51,10 +52,49 @@ internal static partial class Program
         finally { File.Delete(path); Directory.Delete(root); }
     }
 
+    private static async Task CheckIdentifiedModelWithoutFirmware()
+    {
+        using var f = new SetupFixture("numpad");
+        var pro = f.Environment.Normal with { InstanceId = "USB\\VID_342D&PID_E3CE\\PRO-FIXTURE", VendorId = 0x342D, ProductId = 0xE3CE };
+        f.Environment.Nodes = [pro];
+        var archive = Path.Combine(f.Root, "pro-selection-archive");
+        var service = new DeviceSetupService(f.Environment, archive, Path.Combine(f.Root, "Firmware"));
+        var identified = (await service.ListDevicesAsync()).Single();
+        Check(identified.Name == "GMMK 3 PRO 100% ISO" && !identified.IsRuntime && !identified.IsExperimental &&
+            identified.CandidateDeviceIds.SequenceEqual([RetainedLoaderLayout.DeviceId]), "Exact stock PRO is a separate hardware-tested model.");
+        Check(DeviceSetupService.FlashBytesFor(identified.CandidateDeviceIds[0]) == 262144 && DeviceSetupService.SramBytesFor(identified.CandidateDeviceIds[0]) == 36864 &&
+            DeviceSetupService.TransportFor(identified.CandidateDeviceIds[0]) == "wb32-dfu", "PRO memory geometry remains separate from generic100ISO.");
+        foreach (var operation in Enum.GetValues<SetupOperation>())
+        {
+            await RejectAsync(() => service.BeginAsync(identified with { CandidateDeviceIds = ["gmmk3-100-iso"] }, operation), "Forged generic model cannot adopt the PRO USB identity.");
+            Check(!Directory.Exists(archive) && f.Environment.Requests.Count == 0 && f.Environment.Writes == 0, "Forged model is rejected before adapter or archive access.");
+        }
+        foreach (var operation in new[] { SetupOperation.Update, SetupOperation.Restore })
+            await RejectAsync(() => service.BeginAsync(identified, operation), "Stock PRO cannot masquerade as installed firmware.");
+        var session = await service.BeginAsync(identified);
+        Check(session.Stage == SetupStage.Disconnect && f.Environment.Requests.Count == 0 && f.Environment.Writes == 0, "Normal PRO selection starts only the observed disconnect stage.");
+        f.Environment.Nodes = [pro, f.Environment.Normal];
+        var available = await service.ListDevicesAsync();
+        Check(available.Count == 2 && available.Single(device => device.VendorId == 0x320F).CandidateDeviceIds.SequenceEqual(["numpad"]), "PRO candidate does not change Numpad discovery.");
+        f.Environment.Nodes = [pro with { InstanceId = "USB\\VID_FEED&PID_1C10\\PRO-FIXTURE", VendorId = 0xFEED, ProductId = 0x1C10 }];
+        var runtime = (await service.ListDevicesAsync()).Single();
+        Check(runtime.IsRuntime && !runtime.IsExperimental && runtime.CandidateDeviceIds.SequenceEqual([RetainedLoaderLayout.DeviceId]), "Exact tested PRO runtime resolves only board16.");
+        await RejectAsync(() => service.BeginAsync(runtime), "Installed PRO cannot use initial installation.");
+        foreach (var operation in new[] { SetupOperation.Update, SetupOperation.Restore })
+        {
+            var prepared = await service.BeginAsync(runtime, operation);
+            Check(prepared.Stage == SetupStage.Disconnect && f.Environment.Requests.Count == 0 && f.Environment.Writes == 0, "Runtime PRO update/restore begins with metadata only.");
+        }
+        foreach (ushort pid in new ushort[] { 0xE3CD, 0xE3CF, 0xE3D0 })
+        {
+            f.Environment.Nodes = [pro with { InstanceId = $"USB\\VID_342D&PID_{pid:X4}\\UNKNOWN", ProductId = pid }];
+            Check((await service.ListDevicesAsync()).All(item => !item.CandidateDeviceIds.Contains(RetainedLoaderLayout.DeviceId)), "Other PRO layouts and wireless variants never alias wired ISO.");
+        }
+    }
     private static async Task CheckUpdates()
     {
         Check(Version.TryParse(DeviceSetupService.TargetFirmwareVersion, out _), "Update target comes from a valid embedded catalog version.");
-        foreach (var model in BoardDescriptorRegistry.ProtocolBoards)
+        foreach (var model in RoundTripBoards)
         {
             using var f = new SetupFixture(model.DeviceId);
             var original = f.Environment.Current.ToArray();
@@ -67,7 +107,7 @@ internal static partial class Program
             var identity = InstallationIdentity.Read(before);
             var update = await f.ReadyToCapture(SetupOperation.Update);
             var prepared = await f.Service.CaptureAsync(update);
-            Check(prepared.CanUpdate && f.Environment.Writes == 1 && update.InstalledFirmwareVersion == DeviceSetupService.TargetFirmwareVersion,
+            Check(prepared.CanUpdate && f.Environment.Writes == 1 && update.InstalledFirmwareVersion == DeviceSetupService.TargetFirmwareVersionFor(model.DeviceId),
                 "Known code is identified and prepared without an update write.");
             Check(File.ReadAllBytes(Path.Combine(update.Directory, "installation.bin")).SequenceEqual(before),
                 "Prepared update preserves the exact whole configuration and installation identity.");
@@ -131,7 +171,7 @@ internal static partial class Program
 
     private static async Task CheckSuccessfulRoundTrips()
     {
-        foreach (var model in BoardDescriptorRegistry.ProtocolBoards)
+        foreach (var model in RoundTripBoards)
         {
             using var f = new SetupFixture(model.DeviceId);
             var original = (byte[])f.Environment.Current.Clone();
@@ -400,7 +440,7 @@ internal static partial class Program
         private readonly string _fingerprintHash;
         internal FakeSetupEnvironment(string id,bool shared)
         {
-            DeviceId=id;_stm=id is "pro-iso" or "pro-ansi";_size=_stm?262144:131072;
+            DeviceId=id;_stm=id is "pro-iso" or "pro-ansi";_size=DeviceSetupService.FlashBytesFor(id);
             var match=StockDeviceCatalog.All.First(x=>x.CandidateDeviceIds.Contains(id) && (shared || !id.StartsWith("pro-rev2") || x.IsModelUnambiguous));
             Normal=new($"USB\\VID_{match.VendorId:X4}&PID_{match.ProductId:X4}\\FAKE",match.VendorId,match.ProductId,"Fixture stock","usbccgp",[SetupFixture.Port]);
             var board=BoardDescriptorRegistry.Get(id);
@@ -409,8 +449,9 @@ internal static partial class Program
             Nodes=[Normal];Current=Enumerable.Repeat((byte)0xFF,_size).ToArray();
             BinaryPrimitives.WriteUInt32LittleEndian(Current,0x20001000);BinaryPrimitives.WriteUInt32LittleEndian(Current.AsSpan(4),0x08000101);
             UsbDescriptor(match.VendorId,match.ProductId).CopyTo(Current,113);
+            if (id == RetainedLoaderLayout.DeviceId && RetainedOriginalPair() is { } retained) Current = retained;
             _selection=JsonSerializer.SerializeToElement(new{vid=Boot.VendorId,pid=Boot.ProductId,bus=1,portPath="1.2",serial=_stm?"0123456789AB":"",transport=_stm?"stm32-dfuse":"wb32-dfu"});
-            _fingerprint=JsonSerializer.SerializeToElement(new{transport=_stm?"stm32-dfuse":"wb32-dfu",vid=Boot.VendorId,pid=Boot.ProductId,bus=1,portPath="1.2",serial=_stm?"0123456789AB":"",configuration=1,@interface=0,alternate=0,deviceVersion=0x0100,chipId=_stm?(uint?)null:0x3A502980,bootVersion=_stm?(byte?)null:3,flashBase=0x08000000,flashBytes=_size,sramBytes=_stm?40960:28672,memoryMap=_stm?"@Internal Flash /0x08000000/128*0002Kg":null,uniqueId=(string?)null,identityStrength=_stm?"usb-serial-and-port":"transport-session"});
+            _fingerprint=JsonSerializer.SerializeToElement(new{transport=_stm?"stm32-dfuse":"wb32-dfu",vid=Boot.VendorId,pid=Boot.ProductId,bus=1,portPath="1.2",serial=_stm?"0123456789AB":"",configuration=1,@interface=0,alternate=0,deviceVersion=0x0100,chipId=_stm?(uint?)null:0x3A502980,bootVersion=_stm?(byte?)null:id == RetainedLoaderLayout.DeviceId ? (byte)4 : (byte)3,flashBase=0x08000000,flashBytes=_size,sramBytes=DeviceSetupService.SramBytesFor(id),memoryMap=_stm?"@Internal Flash /0x08000000/128*0002Kg":null,uniqueId=(string?)null,identityStrength=_stm?"usb-serial-and-port":"transport-session"});
             _fingerprintHash=Hash(JsonSerializer.SerializeToUtf8Bytes(_fingerprint,new JsonSerializerOptions{WriteIndented=true}));
         }
         public Task<IReadOnlyList<SetupUsbNode>> ScanAsync()=>ThrowScan?Task.FromException<IReadOnlyList<SetupUsbNode>>(new IOException("fake scan failure")):Task.FromResult(Nodes);

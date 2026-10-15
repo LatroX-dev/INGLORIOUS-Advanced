@@ -7,7 +7,7 @@ namespace InGlorious.Desktop;
 
 public sealed partial class MainWindow
 {
-    private object ButtonContent(string source)
+    internal static object ButtonContent(string source)
     {
         var shape = source switch
         {
@@ -29,11 +29,23 @@ public sealed partial class MainWindow
             "Übernehmen" or "Anwenden" or "Zuweisen" => "M3 12 L9 18 L21 5",
             "Entfernen" or "Schritt entfernen" or "Verwerfen" => "M4 6 L20 6 M8 6 L8 3 L16 3 L16 6 M6 6 L7 22 L17 22 L18 6 M10 10 L10 18 M14 10 L14 18",
             "Beleuchtungsvorlagen …" => "M3 3 L10 3 L10 10 L3 10 Z M14 3 L21 3 L21 10 L14 10 Z M3 14 L10 14 L10 21 L3 21 Z M14 14 L21 14 L21 21 L14 21 Z",
+            "Gerät testen" => "M2 5 L22 5 L22 19 L2 19 Z M5 9 L7 9 M10 9 L12 9 M15 9 L17 9 M19 9 L20 9 M5 13 L7 13 M10 13 L12 13 M15 13 L20 13 M6 16 L17 16",
+            "Beleuchtung testen" => "M12 2 L12 5 M12 19 L12 22 M2 12 L5 12 M19 12 L22 12 M5 5 L7 7 M17 17 L19 19 M5 19 L7 17 M17 7 L19 5 M12 7 A5 5 0 1 0 12 17 A5 5 0 1 0 12 7",
+            "CORE-Einstellungen importieren" => "M12 2 L12 17 M6 11 L12 17 L18 11 M3 17 L3 22 L21 22 L21 17",
+            "Rückmeldung & Kontakt" => "M3 3 L21 3 L21 17 L9 17 L3 22 Z M7 8 L17 8 M7 12 L14 12",
             _ => null
         };
         if (shape is null) return L.T(source);
         var icon = new Avalonia.Controls.Shapes.Path { Data = Geometry.Parse(shape), Stroke = Brush("#E4E7EB"), Fill = Brushes.Transparent, StrokeThickness = 1.7, Stretch = Stretch.Uniform, Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center };
         if (source is "↶" or "↷" or "⚙") return icon;
+        if (source is "Gerät testen" or "Beleuchtung testen" or "CORE-Einstellungen importieren" or "Rückmeldung & Kontakt")
+        {
+            var content = new Grid { ColumnDefinitions = new("Auto,*"), ColumnSpacing = 7 };
+            content.Children.Add(icon);
+            var label = new TextBlock { Text = L.T(source), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(label, 1); content.Children.Add(label);
+            return content;
+        }
         return Row(icon, new TextBlock { Text = L.T(source), VerticalAlignment = VerticalAlignment.Center });
     }
 }

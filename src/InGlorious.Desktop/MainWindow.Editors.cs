@@ -362,10 +362,10 @@ public sealed partial class MainWindow
     {
         var body = Column(BuildDeviceSettings()); body.Name = "DeviceWorkspace"; body.Spacing = 18;
         if (_state.Device.IsExperimentalFirmware)
-            body.Children.Insert(0, new TextBlock { Name = "ExperimentalDeviceNotice", Text = L.T("Experimentelle Unterstützung: noch nicht an diesem Modell getestet."), Foreground = Brush("#E9B86B"), FontSize = 12, TextWrapping = TextWrapping.Wrap });
+            body.Children.Insert(0, new TextBlock { Name = "ExperimentalDeviceNotice", Text = L.T("Experimentelle Unterstützung: noch nicht vollständig geprüft."), Foreground = Brush("#E9B86B"), FontSize = 12, TextWrapping = TextWrapping.Wrap });
         body.Children.Add(new Separator());
         var firmware = Column(Heading(_state.Device.IsOfflineOnly ? "Offline-Profil" : "Firmware"), BuildFirmwareVersionPanel()); firmware.Name = "DeviceFirmwareSection";
-        if (_state.Device.IsOfflineOnly) { body.Children.Add(firmware); return body; }
+        if (_state.Device.IsOfflineOnly) { body.Children.Add(firmware); body.Children.Add(new Separator()); body.Children.Add(BuildDeviceSupportActions()); return body; }
         firmware.Children.Add(AsyncButton("Gerät einrichten", () => OpenDeviceSetupAsync(_state.Device.Id)));
         var restore = AsyncButton("Original-Firmware wiederherstellen", () => OpenDeviceSetupAsync(_state.Device.Id, SetupOperation.Restore)); restore.Name = "RestoreOriginalFirmware";
         var folder = AsyncButton("Sicherungsordner öffnen", () => OpenRecoveryFolderAsync(Status)); folder.Name = "OpenDeviceRecoveryFolder";
@@ -375,6 +375,8 @@ public sealed partial class MainWindow
             folder, restore); recovery.Name = "DeviceRecoverySection";
         var maintenance = new Grid { Name = "DeviceMaintenance", ColumnDefinitions = new("*,*"), ColumnSpacing = 36 };
         maintenance.Children.Add(firmware); Grid.SetColumn(recovery, 1); maintenance.Children.Add(recovery); body.Children.Add(maintenance);
+        body.Children.Add(new Separator());
+        body.Children.Add(BuildDeviceSupportActions());
         return body;
     }
     private Control BuildDeviceSettings()

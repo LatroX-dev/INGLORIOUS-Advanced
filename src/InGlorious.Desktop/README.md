@@ -1,6 +1,6 @@
 # INGLORIOUS Advanced desktop app
 
-Avalonia app for macOS and Linux, app 0.6.51 with firmware 0.11.1. The separate Windows WPF app uses the same profiles, configuration models, firmware coordinator and validation rules. Native builds, packages and offline checks have passed for Linux x64, macOS Intel and macOS Apple silicon. Physical-device validation is still pending; a successful build or screenshot is not a hardware test.
+Avalonia app for macOS and Linux, app 0.6.55 with firmware 0.11.4. The separate Windows WPF app uses the same profiles, configuration models, firmware coordinator and validation rules. Native builds, packages and offline checks have passed for earlier releases on Linux x64, macOS Intel and macOS Apple silicon. Current release packages require their own build and validation. Physical-device validation is still pending; a successful build or screenshot is not a hardware test.
 
 ## Features
 
@@ -8,7 +8,7 @@ The app shows connected devices and reads their current configuration before edi
 
 First installation, firmware updates and original-firmware restoration use the same guided workflow as Windows. Setup identifies the stock model, observes the physical disconnect/reconnect, checks the bootloader at the same USB port and saves two matching original-firmware reads before asking for permission to write. Updates and restores require the installation's matching local recovery archive. Missing access, ambiguous devices or failed verification stop the operation. There is no automatic write retry, privilege elevation or driver replacement.
 
-The catalog includes 15 model/layout variants. GMMK PRO revision 1 ISO and GMMK Numpad have historical hardware-use evidence; the other 13 variants remain visibly experimental. See [model support](../../docs/model-support.md) and [hardware acceptance](../../docs/hardware-acceptance.md). The Numpad is **USB only — Bluetooth does not work** with INGLORIOUS firmware.
+The catalog includes 16 model/layout variants. GMMK PRO revision 1 ISO, GMMK Numpad and the wired non-HE GMMK 3 PRO 100% ISO have physical-use evidence on Windows; the other 13 variants remain visibly experimental. The GMMK 3 PRO has passed installation, original-firmware recovery, normal typing and lighting, and an update with the complete lighting sequence. Its complete hardware checklist and native macOS/Linux device tests remain pending. See [model support](../../docs/model-support.md) and [hardware acceptance](../../docs/hardware-acceptance.md). The Numpad is **USB only — Bluetooth does not work** with INGLORIOUS firmware.
 
 The device page uses the keyboard's explicit firmware-version response. Unknown, current or newer versions do not produce an update offer. Update notes are filtered by device and installed version. The app does not search online for firmware files.
 

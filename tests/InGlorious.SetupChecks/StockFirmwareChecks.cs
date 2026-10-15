@@ -8,7 +8,7 @@ internal static partial class Program
         foreach (var match in StockDeviceCatalog.All)
         foreach (var model in match.CandidateDeviceIds)
         {
-            var length = model is "pro-ansi" or "pro-iso" ? 262144 : 131072;
+            var length = DeviceSetupService.FlashBytesFor(model);
             var descriptor = UsbDescriptor(match.VendorId, match.ProductId);
             foreach (var offset in new[] { 0, 11, 791, length - 18 })
             {

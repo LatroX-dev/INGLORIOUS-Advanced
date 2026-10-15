@@ -10,7 +10,15 @@
 
 static unsigned checks,program_calls,scalar_calls,descriptor_calls,fail_call;
 static bool null_descriptor;
-static uint8_t storage[131072],expected[131072];
+// Numeric test geometry is independent of the production capacity macro.
+#if IG_BOARD == 16
+#define TEST_FLASH_BYTES 262144U
+#define TEST_STORAGE_BASE 229376U
+#else
+#define TEST_FLASH_BYTES 131072U
+#define TEST_STORAGE_BASE 98304U
+#endif
+static uint8_t storage[TEST_FLASH_BYTES],expected[TEST_FLASH_BYTES];
 static uint64_t values[4096],original_values[4096];
 BaseFlash EFLD1;
 static flash_descriptor_t descriptor;
@@ -20,7 +28,7 @@ const flash_descriptor_t *flashGetDescriptor(BaseFlash *flash){
     CHECK(flash==&EFLD1);++descriptor_calls;return null_descriptor?NULL:&descriptor;
 }
 int flashProgram(BaseFlash *flash,uint32_t offset,size_t count,const uint8_t *bytes){
-    CHECK(flash==&EFLD1);CHECK(offset>=98304);CHECK(offset+count<=sizeof(storage));
+    CHECK(flash==&EFLD1);CHECK(offset>=TEST_STORAGE_BASE);CHECK(offset+count<=sizeof(storage));
     CHECK(count==8||count==256);CHECK((offset%256)+count<=256);CHECK(bytes!=NULL);
     ++program_calls;if(program_calls==fail_call)return 99;
     // The pinned EFL implementation copies the current page, erases, then programs
@@ -32,18 +40,18 @@ int flashProgram(BaseFlash *flash,uint32_t offset,size_t count,const uint8_t *by
 }
 bool backing_store_write(uint32_t address,backing_store_int_t value){
     ++scalar_calls;if(descriptor.attributes&FLASH_ATTR_ERASED_IS_ONE)value=~value;
-    return flashProgram(&EFLD1,98304+address,sizeof(value),(const uint8_t*)&value)==FLASH_NO_ERROR;
+    return flashProgram(&EFLD1,TEST_STORAGE_BASE+address,sizeof(value),(const uint8_t*)&value)==FLASH_NO_ERROR;
 }
 static void reset(bool invert){
     program_calls=scalar_calls=descriptor_calls=fail_call=0;null_descriptor=false;
-    descriptor=(flash_descriptor_t){.attributes=invert?FLASH_ATTR_ERASED_IS_ONE:0,.size=131072,.sectors_size=256,.sectors_count=512,.page_size=8,.sectors=NULL};
+    descriptor=(flash_descriptor_t){.attributes=invert?FLASH_ATTR_ERASED_IS_ONE:0,.size=TEST_FLASH_BYTES,.sectors_size=256,.sectors_count=TEST_FLASH_BYTES/256,.page_size=8,.sectors=NULL};
     for(size_t i=0;i<sizeof(storage);++i)storage[i]=(uint8_t)(i*29U+17U);
     memcpy(expected,storage,sizeof(storage));
     for(size_t i=0;i<4096;++i)values[i]=UINT64_C(0x93819A764BEF0119)^(UINT64_C(0x0936718273640921)*i);
     memcpy(original_values,values,sizeof(values));
 }
 static void expect_data(uint32_t address,size_t count,bool invert){
-    for(size_t i=0;i<count*8;++i){uint8_t value=((uint8_t*)values)[i];expected[98304+address+i]=invert?(uint8_t)~value:value;}
+    for(size_t i=0;i<count*8;++i){uint8_t value=((uint8_t*)values)[i];expected[TEST_STORAGE_BASE+address+i]=invert?(uint8_t)~value:value;}
 }
 static void valid_ranges(void){
     const size_t counts[]={0,1,2,31,32,33,63,64,65,127,511,2048,4096};
@@ -73,9 +81,9 @@ static void rejected_inputs(void){
     CHECK(!backing_store_write_bulk(8,values,4096));CHECK(program_calls==0&&descriptor_calls==0);
     CHECK(memcmp(storage,expected,sizeof(storage))==0);
     reset(false);null_descriptor=true;CHECK(!backing_store_write_bulk(0,values,32));CHECK(program_calls==0);
-    reset(false);descriptor.size=131071;CHECK(!backing_store_write_bulk(0,values,32));CHECK(program_calls==0);
+    reset(false);descriptor.size=TEST_FLASH_BYTES-1;CHECK(!backing_store_write_bulk(0,values,32));CHECK(program_calls==0);
     reset(false);descriptor.sectors_size=128;CHECK(!backing_store_write_bulk(0,values,32));CHECK(program_calls==0);
-    reset(false);descriptor.sectors_count=511;CHECK(!backing_store_write_bulk(0,values,32));CHECK(program_calls==0);
+    reset(false);descriptor.sectors_count=TEST_FLASH_BYTES/256-1;CHECK(!backing_store_write_bulk(0,values,32));CHECK(program_calls==0);
     reset(false);descriptor.page_size=4;CHECK(!backing_store_write_bulk(0,values,32));CHECK(program_calls==0);
     reset(false);descriptor.sectors=&descriptor;CHECK(!backing_store_write_bulk(0,values,32));CHECK(program_calls==0);
 }

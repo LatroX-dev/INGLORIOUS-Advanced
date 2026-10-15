@@ -4,9 +4,11 @@ Configure Glorious keyboards with per-key lighting, effects, key assignments, ma
 
 I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
 
-**App 0.6.51 · Firmware 0.11.1**
+**App 0.6.55 · Firmware 0.11.4**
 
 Get installers and packages from the [Releases page](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases). macOS and Linux builds are Early Alpha; physical-device testing is still limited.
+
+See the [Changelog](CHANGELOG.md) for new features, improvements and bug fixes.
 
 INGLORIOUS Advanced is an independent project. It is not affiliated with or endorsed by Glorious. Product names identify compatible hardware.
 
@@ -33,10 +35,11 @@ Read the [setup and recovery guide](docs/getting-started.md). The **?** button o
 | GMMK PRO, revision 2 | ANSI, ISO | Experimental |
 | GMMK 2, 65% and 96% | ANSI, ISO | Experimental |
 | GMMK 3, wired non-HE, 65%, 75% and 100% | ANSI, ISO | Experimental |
+| GMMK 3 PRO, wired non-HE, 100% | ISO | Hardware tested on Windows |
 
-There are **15 model/layout variants**, including **13 experimental variants**. Experimental devices can be configured and installed, but have not been tested on physical hardware. The Numpad's original-firmware recovery, first installation, automatic reconnection, lighting sequence and typing test have been used on Windows with app 0.6.43. The complete [hardware acceptance checklist](docs/hardware-acceptance.md) is still in progress.
+There are **16 model/layout variants**, including **13 experimental variants**. Experimental devices can be configured and installed; their physical testing is still pending. On one GMMK 3 PRO 100% ISO, installation, normal typing and lighting, original-firmware recovery, and an update to firmware 0.11.4 with the complete lighting sequence have been tested on Windows. This status applies only to the wired, non-HE 100% ISO variant. The Numpad's original-firmware recovery, first installation, automatic reconnection, lighting sequence and typing test have been used on Windows with app 0.6.43. See the [hardware acceptance checklist](docs/hardware-acceptance.md) for the remaining tests.
 
-GMMK 3 PRO is not automatically treated as a supported GMMK 3. GMMK HE, GMBK, GMMK Eternal, Bluetooth and other wireless modes are not supported. Check the [complete model list](docs/model-support.md) before installing firmware.
+GMMK 3 PRO support is limited to the **100% ISO wired, non-HE variant**. Other PRO sizes and layouts, GMMK HE, GMBK, GMMK Eternal, Bluetooth and other wireless modes are not supported. Check the [complete model list](docs/model-support.md) before installing firmware.
 
 ![GMMK 3 75% ISO lighting layout with separate logo lighting](docs/images/experimental-layout.png)
 
@@ -127,6 +130,12 @@ Physical-device checks for macOS and Linux are still pending. Windows packages a
 ![Linux lighting editor with a GMMK Numpad](docs/images/linux-numpad.png)
 
 These screenshots were captured on native macOS and Linux runners using synthetic profiles. Both platforms are **Early Alpha**; the screenshots show the app and do not demonstrate a physical-device test. [Capture details](docs/images/native-provenance.json).
+
+## Contact and feedback
+
+Use **Device → Feedback & contact** to preview a voluntary report and open it on GitHub or in your email app. Nothing is submitted automatically. GitHub reports are public; do not include personal data or backup files.
+
+Public contact: [inglorious@latrox.dev](mailto:inglorious@latrox.dev).
 
 ## Build and contribute
 

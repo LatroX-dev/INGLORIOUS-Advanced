@@ -61,7 +61,7 @@ internal static partial class Program
 
     private static async Task CheckPortableRoundTrips()
     {
-        foreach (var board in BoardDescriptorRegistry.ProtocolBoards)
+        foreach (var board in RoundTripBoards)
         {
             using var fixture = new SetupFixture(board.DeviceId);
             var adapter = fixture.Environment;

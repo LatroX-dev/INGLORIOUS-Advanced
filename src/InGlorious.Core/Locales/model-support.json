@@ -51,17 +51,17 @@
     "ko": "실험적",
     "zh-Hans": "实验性"
   },
-  "Experimentelle Unterstützung: noch nicht an diesem Modell getestet.": {
-    "en": "Experimental support: not yet tested on this model.",
-    "es": "Compatibilidad experimental: aún no probada en este modelo.",
-    "fr": "Prise en charge expérimentale : pas encore testée sur ce modèle.",
-    "it": "Supporto sperimentale: non ancora testato su questo modello.",
-    "pt-BR": "Suporte experimental: ainda não testado neste modelo.",
-    "pl": "Obsługa eksperymentalna: nieprzetestowana jeszcze na tym modelu.",
-    "tr": "Deneysel destek: bu modelde henüz test edilmedi.",
-    "ru": "Экспериментальная поддержка: ещё не проверена на этой модели.",
-    "ja": "実験的なサポート：このモデルではまだ動作確認されていません。",
-    "ko": "실험적 지원: 이 모델에서는 아직 테스트되지 않았습니다.",
-    "zh-Hans": "实验性支持：尚未在此型号上测试。"
+  "Experimentelle Unterstützung: noch nicht vollständig geprüft.": {
+    "en": "Experimental support: not yet fully tested.",
+    "es": "Compatibilidad experimental: aún no se ha probado por completo.",
+    "fr": "Prise en charge expérimentale : pas encore entièrement testée.",
+    "it": "Supporto sperimentale: non ancora verificato completamente.",
+    "pt-BR": "Suporte experimental: ainda não foi totalmente testado.",
+    "pl": "Obsługa eksperymentalna: jeszcze nie w pełni przetestowana.",
+    "tr": "Deneysel destek: henüz tamamen test edilmedi.",
+    "ru": "Экспериментальная поддержка: ещё не полностью проверена.",
+    "ja": "実験的なサポート：まだ十分な動作確認が完了していません。",
+    "ko": "실험적 지원: 아직 완전히 테스트되지 않았습니다.",
+    "zh-Hans": "实验性支持：尚未完成全面测试。"
   }
 }

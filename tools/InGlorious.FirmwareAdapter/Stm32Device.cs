@@ -12,7 +12,7 @@ internal sealed class NativeBackend : IBackend
     public IDevice Open(Selection selection, Model model, string evidenceDirectory)
     {
         if (selection.Transport != model.Transport) throw new InvalidDataException("MODEL_TRANSPORT_MISMATCH");
-        if (model.Transport == "wb32-dfu") return usb.OpenSelected(selection);
+        if (model.Transport == "wb32-dfu") return usb.OpenSelected(selection, model);
         var matches = List().Where(d => d == selection).ToArray();
         if (matches.Length != 1) throw new IOException("SELECTED_DEVICE_NOT_UNIQUE");
         return new Stm32Device(selection, evidenceDirectory);
@@ -92,8 +92,9 @@ internal sealed class Stm32Device : IDevice
         if (result.Length != model.FlashBytes) throw new IOException("STM_SHORT_READ");
         return result;
     }
-    public void WriteAll(Model model, byte[] image, Action beforeFirstWrite)
+    public void WriteAll(Model model, byte[] image, Action beforeFirstWrite, IRetainedLoaderWriteGrant? engineeringGrant = null)
     {
+        if (engineeringGrant != null) throw new InvalidDataException("ENGINEERING_AUTHORIZATION_NOT_APPLICABLE");
         if (model.FlashBytes != 262144 || image.Length != 262144) throw new InvalidDataException("STM_FULL_IMAGE_REQUIRED");
         _ = Probe(model);
         Artifact artifact = Files.New(evidence, "dfu-write-image.bin", image, "exact-write-image");

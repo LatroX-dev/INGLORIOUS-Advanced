@@ -6,7 +6,7 @@ namespace InGlorious.FirmwareAdapter;
 
 internal sealed class AdapterEngine(Func<IBackend> createBackend)
 {
-    internal AdapterResponse Run(AdapterRequest request)
+    internal AdapterResponse Run(AdapterRequest request, bool engineering = false, string? engineeringAuthorizationPath = null)
     {
         ValidateRequest(request);
         string directory = Files.NewSession(request.SessionDirectory);
@@ -17,26 +17,45 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
         IDevice? device = null;
         IBackend? backend = null;
         IDisposable? operationLock = null;
+        EngineeringWriteAuthorization? engineeringAuthorization = null;
         try
         {
             Files.New(directory, "request.json", Json.Bytes(request), "request");
+            Model? selectedModel = request.Operation == "list" ? null : Model.Get(request.DeviceId, engineering);
+            if (engineeringAuthorizationPath != null && (!engineering || selectedModel is not { EngineeringOnly: true } || request.Operation is not ("install" or "restore")))
+                throw new InvalidDataException("ENGINEERING_AUTHORIZATION_NOT_APPLICABLE");
+            if (selectedModel is { EngineeringOnly: true })
+            {
+                if (request.Operation is not ("probe" or "capture"))
+                {
+                    if (request.Operation is not ("install" or "restore")) throw new InvalidDataException("ENGINEERING_OPERATION_NOT_ALLOWED");
+                    if (engineeringAuthorizationPath == null) throw new InvalidDataException("ENGINEERING_WRITE_AUTHORIZATION_REQUIRED");
+                    byte[] bytes = Files.ReadBounded(engineeringAuthorizationPath, 65536);
+                    var locked = Files.Lock(engineeringAuthorizationPath, bytes.Length, Files.Hash(bytes)); locks.Add(locked.Stream);
+                    engineeringAuthorization = JsonSerializer.Deserialize<EngineeringWriteAuthorization>(locked.Bytes, Json.Options) ?? throw new InvalidDataException("ENGINEERING_AUTHORIZATION_NULL");
+                    EngineeringPolicy.ValidateRequest(engineeringAuthorization, request, selectedModel);
+                    Files.New(directory, "engineering-authorization.json", locked.Bytes, "scoped-engineering-write-authorization");
+                }
+                Files.New(directory, "engineering.json", Json.Bytes(new { schema = 1, engineering = true, deviceId = selectedModel.DeviceId, scopedWriteAuthorization = engineeringAuthorization != null }), "engineering-mode");
+            }
             operationLock = Files.AcquireDeviceOperation();
             backend = createBackend();
             if (request.Operation == "list")
                 return Save(new(1, request.Operation, sessionId, "ok", null, request.DeviceId, null, null, false, false, false, false, false, directory, [], backend.List()));
-            Model model = Model.Get(request.DeviceId);
+            Model model = selectedModel!;
             device = backend.Open(request.Selection!, model, directory);
             fingerprint = device.Probe(model);
             fingerprintHash = Files.Hash(Json.Bytes(fingerprint));
             if (request.ExpectedFingerprintSha256 != null && request.ExpectedFingerprintSha256 != fingerprintHash) throw new InvalidDataException("DEVICE_FINGERPRINT_CHANGED");
             if (request.Operation == "probe")
-                return Save(new(1, request.Operation, sessionId, "ok", null, model.DeviceId, fingerprint, fingerprintHash, true, true, false, false, false, directory, []));
+                return Save(new(1, request.Operation, sessionId, "ok", null, model.DeviceId, fingerprint, fingerprintHash, true, !model.EngineeringOnly, false, false, false, directory, []));
             if (request.Operation == "capture")
             {
                 var original = CapturePair("original", "original-read");
                 ValidateVectors(original, model);
+                if (!model.EngineeringOnly && model.ProtectedPrefixBytes != 0) RetainedLoaderLayout.ValidatePrefix(original);
                 SaveCapture();
-                return Save(new(1, request.Operation, sessionId, "ok", null, model.DeviceId, fingerprint, fingerprintHash, true, true, false, false, false, directory, artifacts.ToArray()));
+                return Save(new(1, request.Operation, sessionId, "ok", null, model.DeviceId, fingerprint, fingerprintHash, true, !model.EngineeringOnly, false, false, false, directory, artifacts.ToArray()));
             }
 
             // All model/image/backup checks finish before the only write call.
@@ -50,6 +69,8 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
                 capture.Artifacts[0].Path == capture.Artifacts[1].Path || capture.FingerprintSha256 != Files.Hash(Json.Bytes(capture.Fingerprint)) ||
                 capture.Fingerprint.Transport != model.Transport || capture.Fingerprint.FlashBytes != model.FlashBytes || capture.Fingerprint.SramBytes != model.SramBytes)
                 throw new InvalidDataException("BACKUP_MANIFEST_MISMATCH");
+            if (model.EngineeringOnly && capture.Fingerprint != fingerprint) throw new InvalidDataException("ENGINEERING_CAPTURE_DEVICE_CHANGED");
+            if (!model.EngineeringOnly && model.ProtectedPrefixBytes != 0) RetainedLoaderWriteGrant.ValidateBackupDevice(capture.Fingerprint, fingerprint);
             string backupRoot = Path.GetDirectoryName(Path.GetFullPath(request.BackupPath!))!;
             if (capture.Artifacts.Select(a => Files.Child(backupRoot, a.Path)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != 2)
                 throw new InvalidDataException("BACKUP_PAIR_ALIASES");
@@ -76,7 +97,7 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
                 image = imageLock.Bytes; ValidateVectors(image, model);
                 identity = InstallationIdentity.Read(image) ?? throw new InvalidDataException("INSTALLATION_ID_REQUIRED");
                 ValidateInstallationIdentity(identity, request, model);
-                targetVersion = KnownFirmwareImages.Validate(image, model.DeviceId, (byte)model.BoardId);
+                targetVersion = model.EngineeringOnly ? EngineeringPolicy.ValidateCandidateImage(image, model) : KnownFirmwareImages.Validate(image, model.DeviceId, (byte)model.BoardId);
                 if (targetVersion != bundle.ReleaseId) throw new InvalidDataException("BUNDLE_RELEASE_MISMATCH");
                 int offset = InstallationIdentity.Offset(model.FlashBytes);
                 if (request.Operation == "install" && image.AsSpan(offset + InstallationIdentity.Size).ContainsAnyExcept((byte)0xFF)) throw new InvalidDataException("INITIAL_CONFIGURATION_NOT_ERASED");
@@ -116,6 +137,9 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
                 }
             }
             installationId = identity.InstallationId;
+            IRetainedLoaderWriteGrant? engineeringGrant = model.EngineeringOnly
+                ? EngineeringPolicy.Authorize(engineeringAuthorization!, request, model, fingerprint, originalBytes!, before, image)
+                : model.ProtectedPrefixBytes != 0 ? RetainedLoaderWriteGrant.Create(request, model, fingerprint, originalBytes!, before, image) : null;
             var fresh = artifacts.ToArray();
             foreach (var artifact in fresh)
                 locks.Add(Files.Lock(Files.Child(directory, artifact.Path), artifact.Bytes, artifact.Sha256).Stream);
@@ -128,7 +152,7 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
                 if (!request.ConfirmWrite || attempted) throw new InvalidOperationException("EXPLICIT_WRITE_GATE_REQUIRED");
                 attempted = true;
                 Files.New(directory, "write-attempt.json", Json.Bytes(new { utc = DateTimeOffset.UtcNow, operation = request.Operation, imageArtifact.Sha256, installationId }), "write-attempt");
-            });
+            }, engineeringGrant);
             if (!attempted) throw new IOException("TRANSPORT_DID_NOT_MARK_WRITE");
             byte[] after = CapturePair("after", "verified-read");
             if (!after.AsSpan().SequenceEqual(image)) throw new IOException("FULL_READBACK_MISMATCH");

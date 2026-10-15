@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+## 0.6.55
+
+- Added GMMK 3 PRO 100% ISO wired, non-HE support, including original-firmware recovery.
+- New key, knob and individual LED test for the GMMK 3 PRO 100% ISO.
+- Import saved CORE colors and simple key bindings into a profile copy.
+- Optional device feedback and email contact.
+- Set up connected supported keyboards directly from the device list.
+- Clearer device tools and test buttons after firmware installation and updates.
+- Fixed lighting tests being blocked when no key is pressed.
+- New installations use red lighting when no saved colors are available.
+
+## 0.6.54
+
+- Fixed lighting tests being blocked when no key is pressed.
+
+## 0.6.53
+
+- Set up connected supported keyboards directly from the device list, including experimental models.
+
+## 0.6.52
+
+- Added experimental GMMK 3 PRO 100% ISO wired support, including original-firmware recovery.
+- New key, knob and individual LED test for the GMMK 3 PRO 100% ISO.
+- Import saved CORE colors and simple key bindings into a profile copy.
+- Optional device feedback and email contact.
+- New installations use red lighting when no saved colors are available.
+
 ## 0.6.51
 
 - Fixed the app not opening after completing Windows setup.

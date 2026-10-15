@@ -12,7 +12,7 @@ For first installation, **Back up and install** authorizes one combined operatio
 
 Updates and restoration use the same sequence through **Back up and update** and **Back up and restore**. The app checks the current firmware and matching original archive before continuing to the confirmed operation. The confirmation applies only to that device and attempt; an error cannot trigger a retry or another write.
 
-There are no user-specific identifiers in the distributed code or tool bundle. Each platform's app package includes the same reviewed firmware for 15 model/layout variants and a native adapter. The 13 additional variants remain visibly experimental; offline tests do not establish physical compatibility for untested revisions.
+There are no user-specific identifiers in the distributed code or tool bundle. Each platform's app package includes the same reviewed firmware for 16 model/layout variants and a native adapter. Thirteen untested variants remain visibly experimental; offline tests do not establish physical compatibility for untested revisions.
 
 ## Backup locations
 

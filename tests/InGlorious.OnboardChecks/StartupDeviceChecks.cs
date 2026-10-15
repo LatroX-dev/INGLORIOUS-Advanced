@@ -10,7 +10,7 @@ internal static class StartupDeviceChecks
         static Task<IReadOnlyList<OnboardDevice>> Found(params OnboardDevice[] devices) => Task.FromResult<IReadOnlyList<OnboardDevice>>(devices);
         static byte[] Defaults(string id) => OnboardSerializer.Prepare(ProjectService.Create(id)).Payload;
         static StartupDeviceResult Result(IReadOnlyList<StartupDeviceResult> results, string id) => results.Single(r => r.DeviceId == id);
-        check(DeviceCatalog.All.Count == 15 && DeviceCatalog.All.All(d => d.SupportsOnboardConfiguration), "All fifteen explicit protocol boards may read from their own positively identified runtime interface");
+        check(DeviceCatalog.All.Count == 16 && DeviceCatalog.All.All(d => d.SupportsOnboardConfiguration) && !DeviceCatalog.Get("gmmk3-pro-100-iso").IsOfflineOnly, "Sixteen exact protocol boards are available for read-only startup loading");
         void OnlyRead(ObservedTransport transport, string label)
         {
             check(transport.Inner.Commands.All(c => c is OnboardProtocol.Info or OnboardProtocol.Read), label + ": only INFO and READ, no write, abort, reconnect, brightness or lighting command");

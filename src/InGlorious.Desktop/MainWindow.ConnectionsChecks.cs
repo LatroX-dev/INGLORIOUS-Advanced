@@ -11,6 +11,7 @@ public sealed partial class MainWindow
         if (!Program.Offline) throw new InvalidOperationException("Connection checks require offline mode.");
         var savedState = _state; var savedSessions = _sessions.ToArray(); var savedConfirmed = _confirmed.ToArray();
         var savedIds = _connectedDeviceIds; var savedFailure = _connectionsFailed;
+        var savedSetupDevices = _connectedSetupDevices; var savedSetupReader = _readSetupConnections;
         var savedPending = _pendingApply; var savedPrompt = _offlinePromptChoice; var savedPage = _page;
         var savedEffects = _showEffects;
         var savedBusy = _busy; var savedLoading = _startupLoading; var savedClosed = _connectionsClosed;
@@ -19,8 +20,9 @@ public sealed partial class MainWindow
         var savedInitial = _initialConnectionsPending; var savedPreferences = _preferences;
         try
         {
-            check(PlatformDeviceService.ConnectedModelFromUsbMetadata(0x320F, 0x5046) == "pro-iso" &&
-                PlatformDeviceService.ConnectedModelFromUsbMetadata(0x320F, 0x5088) == "numpad", "stock USB metadata identifies both supported devices without opening HID");
+            check(PlatformDeviceService.ConnectedModelFromUsbMetadata(0x320F, 0x5046) is null &&
+                PlatformDeviceService.ConnectedModelFromUsbMetadata(0x320F, 0x5088) is null,
+                "stock USB metadata never enables runtime editors or creates duplicate PRO/numpad cards");
             check(PlatformDeviceService.ConnectedModelFromUsbMetadata(0xFEED, 0x1C01) == "pro-iso" &&
                 PlatformDeviceService.ConnectedModelFromUsbMetadata(0xFEED, 0x1C02) == "numpad", "runtime USB metadata identifies both supported devices");
             check(PlatformDeviceService.ConnectedModelFromUsbMetadata(0x320F, 0x1C01) is null &&
@@ -33,6 +35,36 @@ public sealed partial class MainWindow
             check(_deviceButtonsPanel!.Children.Count == 0 && _deviceButtons.Count == 0 &&
                 _connectionHint!.IsVisible && _connectionHint.Text == L.T("Kein Gerät verbunden"), "empty discovery renders no invented device buttons and an explicit empty hint");
             check(!_readDeviceButton!.IsEnabled && !_transferButton!.IsEnabled && _deviceState.Text == L.T("Gerät nicht verbunden"), "disconnected active profile cannot read or transfer");
+            var stocks = StockDeviceCatalog.All.Select((stock, index) => new SetupDevice("offline-stock-" + index,
+                stock.IdentifiedName ?? DeviceCatalog.ModelGroupName(stock.CandidateDeviceIds), stock.CandidateDeviceIds,
+                stock.VendorId, stock.ProductId, [], false)).ToArray();
+            var stockPad = stocks.Single(device => device.CandidateDeviceIds.SequenceEqual(new[] { "numpad" }));
+            var stockPro = stocks.First(device => device.CandidateDeviceIds.Contains("pro-iso"));
+            var stockPro3 = stocks.Single(device => device.CandidateDeviceIds.Contains("gmmk3-pro-100-iso"));
+            ApplyConnectionSnapshot([], setupDevices: stocks);
+            check(_connectedSetupDevices.Length == stocks.Length && _deviceButtons.Count == 0 && _setupDeviceButtons.Count == stocks.Length &&
+                _deviceButtonsPanel.Children.Count == stocks.Length && !_connectionHint!.IsVisible,
+                "every supported connected stock model gets one setup card without a misleading disconnected hint");
+            check(_setupDeviceButtons.Values.All(button => button.GetLogicalDescendants().OfType<TextBlock>().Any(text => text.Text == L.T("Gerät einrichten"))) &&
+                stocks.All(device => _setupDeviceButtons[device.InstanceId].GetLogicalDescendants().OfType<TextBlock>().Any(text => text.Name == "ExperimentalSetupDeviceBadge") ==
+                    device.CandidateDeviceIds.Any(id => DeviceCatalog.Get(id).IsExperimentalFirmware)),
+                "setup cards show their localized action and experimental models remain clearly marked");
+            check(!_readDeviceButton.IsEnabled && !_transferButton!.IsEnabled && _state.Device.Id == "pro-iso",
+                "stock presence never enables upload or replaces the user's current profile");
+            var pro3Card = _setupDeviceButtons[stockPro3.InstanceId];
+            ApplyConnectionSnapshot([], setupDevices: stocks);
+            check(ReferenceEquals(pro3Card, _setupDeviceButtons[stockPro3.InstanceId]), "unchanged stock scan preserves setup controls");
+            ApplyConnectionSnapshot(["numpad"], setupDevices: [stockPro, stockPro3,
+                stockPad with { InstanceId = "runtime-fixture", IsRuntime = true }, stockPad with { InstanceId = "unsupported", CandidateDeviceIds = [] },
+                stockPad with { InstanceId = "unknown-product", ProductId = 0xFFFF }]);
+            check(_deviceButtons.Count == 1 && _setupDeviceButtons.Count == 2 && _deviceButtonsPanel.Children.Count == 3,
+                "runtime cards coexist with supported stock cards while unsupported and runtime metadata rows are excluded");
+            ApplyConnectionSnapshot([], failed: true);
+            check(_setupDeviceButtons.Values.All(button => !button.IsEnabled), "failed USB scan disables stale setup cards");
+            ApplyConnectionSnapshot([], setupDevices: [stockPro3, stockPro3]);
+            check(_setupDeviceButtons.Count == 0, "ambiguous duplicate physical rows cannot offer a setup action");
+            ApplyConnectionSnapshot([]);
+            check(_setupDeviceButtons.Count == 0 && _deviceButtonsPanel.Children.Count == 0, "unplugged setup cards are removed");
             ApplyConnectionSnapshot(["numpad", "unknown", "pro-iso", "numpad"]);
             check(_selectorDeviceIds.SequenceEqual(new[] { "pro-iso", "numpad" }) && _deviceButtons.Count == 2 && _deviceButtons["pro-iso"].Classes.Contains("active-device") && !_deviceButtons["numpad"].Classes.Contains("active-device"),
                 "positive models are deduplicated, unknowns excluded and no offline catalog is appended");
@@ -75,6 +107,7 @@ public sealed partial class MainWindow
 
             var calls = 0;
             _readConnections = () => { calls++; throw new InvalidOperationException("Real discovery must never run offline."); };
+            _readSetupConnections = () => { calls++; throw new InvalidOperationException("Real setup discovery must never run offline."); };
             await RefreshConnectionsAsync(); await StartConnectionsAsync();
             check(calls == 0 && !_connectionTimer.IsEnabled, "offline startup and polling never invoke the real discovery provider");
             Task<IReadOnlyList<string>> Fixture() { calls++; return Task.FromResult<IReadOnlyList<string>>(["pro-iso"]); }
@@ -85,6 +118,9 @@ public sealed partial class MainWindow
             check(calls == 0, "busy, startup, navigation and modal-disabled owner defer discovery before calling a provider");
             await RefreshConnectionsAsync(Fixture);
             check(calls == 1 && _connectedDeviceIds.SequenceEqual(new[] { "pro-iso" }), "explicit offline fixture updates presence without device I/O");
+            await RefreshConnectionsAsync(() => Task.FromResult<IReadOnlyList<string>>([]), () => Task.FromResult<IReadOnlyList<SetupDevice>>([stockPro3]));
+            check(calls == 1 && _setupDeviceButtons.ContainsKey(stockPro3.InstanceId) && !_readDeviceButton!.IsEnabled && !_transferButton!.IsEnabled,
+                "explicit stock fixture updates sidebar without HID access or editor transfer");
             await RefreshConnectionsAsync(() => Task.FromException<IReadOnlyList<string>>(new IOException("Synthetic metadata failure")));
             check(_connectionsFailed && !_transferButton!.IsEnabled && ReferenceEquals(_pendingApply, pending), "failed async discovery disables hardware actions without affecting pending input");
 
@@ -105,8 +141,10 @@ public sealed partial class MainWindow
 
             _connectionsClosed = false; _pendingApply = null; _initialConnectionsPending = true;
             _state = new EditorState("pro-ansi"); _state.MarkInitialClean(); _preferences = _preferences with { StartDevice = "pro-ansi" };
-            ApplyConnectionSnapshot([PlatformDeviceService.ConnectedModelFromUsbMetadata(0x320F, 0x5088)!]);
-            check(SelectInitialConnectedSession() && _state.Device.Id == "numpad", "initial stock-only discovery selects its connected session ahead of an unavailable offline preference");
+            ApplyConnectionSnapshot([], setupDevices: [stockPad]);
+            check(!SelectInitialConnectedSession() && _state.Device.Id == "pro-ansi", "initial stock-only discovery offers setup without treating it as an editable runtime");
+            ApplyConnectionSnapshot(["numpad"]);
+            check(SelectInitialConnectedSession() && _state.Device.Id == "numpad", "initial runtime discovery selects its connected session ahead of an unavailable offline preference");
             _initialConnectionsPending = false; _state = new EditorState("pro-iso"); _state.MarkInitialClean();
             check(!SelectInitialConnectedSession() && _state.Device.Id == "pro-iso", "later hotplug never automatically switches a clean active profile either");
             _initialConnectionsPending = true; _state.Change(project => project.Name = "Unsaved");
@@ -119,6 +157,7 @@ public sealed partial class MainWindow
             _state = savedState; _sessions.Clear(); foreach (var item in savedSessions) _sessions.Add(item.Key, item.Value);
             _confirmed.Clear(); foreach (var item in savedConfirmed) _confirmed.Add(item.Key, item.Value);
             _connectedDeviceIds = savedIds; _connectionsFailed = savedFailure; _pendingApply = savedPending; _offlinePromptChoice = savedPrompt;
+            _connectedSetupDevices = savedSetupDevices; _readSetupConnections = savedSetupReader;
             _page = savedPage; _showEffects = savedEffects;
             _busy = savedBusy; _startupLoading = savedLoading; _connectionsClosed = savedClosed;
             _allowClose = savedAllowClose; _navigating = savedNavigating; _connectionRevision = savedRevision;

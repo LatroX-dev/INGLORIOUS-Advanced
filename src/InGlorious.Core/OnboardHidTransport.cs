@@ -17,7 +17,7 @@ public sealed class OnboardHidTransport : IOnboardTransport
 {
     private readonly FileStream _stream;
     private OnboardHidTransport(SafeFileHandle handle) => _stream = new FileStream(handle, FileAccess.ReadWrite, 33, true);
-    public static IReadOnlyList<OnboardDevice> FindDevices()
+    public static IReadOnlyList<OnboardDevice> FindDevices(bool allowEngineering = false)
     {
         var found = new List<OnboardDevice>();
         Native.HidD_GetHidGuid(out var guid);
@@ -44,25 +44,26 @@ public sealed class OnboardHidTransport : IOnboardTransport
                 path = Marshal.PtrToStringUni(IntPtr.Add(buffer, 4)) ?? "";
             }
             finally { Marshal.FreeHGlobal(buffer); }
-            if (!IsAllowedPath(path)) continue;
+            if (!IsAllowedPath(path, allowEngineering)) continue;
             using var handle = Native.CreateFileW(path, 0, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
-            if (!handle.IsInvalid && Identify(handle, path) is { } device) found.Add(device with { UsbInstanceId = ReadUsbRoot(deviceInfo.DevInst) });
+            if (!handle.IsInvalid && Identify(handle, path, allowEngineering) is { } device) found.Add(device with { UsbInstanceId = ReadUsbRoot(deviceInfo.DevInst) });
         }
         return found;
     }
 
-    public static bool IsAllowedPath(string path) => BoardDescriptorRegistry.TryGetRuntimeHidPath(path, out _);
+    public static bool IsAllowedPath(string path, bool allowEngineering = false) => BoardDescriptorRegistry.TryGetRuntimeHidPath(path, out _, allowEngineering);
 
-    public static OnboardHidTransport Open(OnboardDevice device)
+    public static OnboardHidTransport Open(OnboardDevice device, bool allowEngineering = false)
     {
         if (!BoardDescriptorRegistry.TryGet(device.DeviceId, out var board) ||
-            !BoardDescriptorRegistry.TryGetRuntimeHidPath(device.Path, out var pathBoard) || board != pathBoard)
+            !BoardDescriptorRegistry.TryGetRuntimeHidPath(device.Path, out var pathBoard, allowEngineering) || board != pathBoard ||
+            (board.IsEngineeringOnly && !IsPhysicalUsbRoot(device.UsbInstanceId)))
             throw new InvalidDataException("Nur INGLORIOUS-Firmware wird zur Konfiguration geöffnet.");
         var handle = Native.CreateFileW(device.Path, 0xC0000000, 3, IntPtr.Zero, 3, 0x40000000, IntPtr.Zero);
         if (handle.IsInvalid) { var error = Marshal.GetLastWin32Error(); handle.Dispose(); throw new Win32Exception(error); }
         try
         {
-            var current = Identify(handle, device.Path);
+            var current = Identify(handle, device.Path, allowEngineering);
             if (current == null || current.DeviceId != device.DeviceId || current.Name != device.Name) throw new InvalidDataException("Die Geräteidentität oder HID-Schnittstelle hat sich geändert.");
             if (device.UsbInstanceId is not null && !string.Equals(device.UsbInstanceId, ReadUsbRootForInterface(device.Path), StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("Die USB-Zuordnung des Geräts hat sich geändert.");
@@ -111,10 +112,11 @@ public sealed class OnboardHidTransport : IOnboardTransport
         }
         finally { Marshal.FreeHGlobal(buffer); }
     }
-    private static OnboardDevice? Identify(SafeFileHandle handle, string path)
+    private static OnboardDevice? Identify(SafeFileHandle handle, string path, bool allowEngineering = false)
     {
         var attributes = new Attributes { Size = Marshal.SizeOf<Attributes>() };
-        if (!Native.HidD_GetAttributes(handle, ref attributes) || !BoardDescriptorRegistry.TryGetRuntimeUsb(attributes.VendorId, attributes.ProductId, out var board)) return null;
+        if (!Native.HidD_GetAttributes(handle, ref attributes) || !BoardDescriptorRegistry.TryGetRuntimeUsb(attributes.VendorId, attributes.ProductId, out var board) ||
+            (board.IsEngineeringOnly && !EngineeringConfigurationPolicy.IsEnabled(board.DeviceId, allowEngineering))) return null;
         var id = board.DeviceId;
         var name = board.RuntimeName;
         if (!OnboardIdentity.MatchesNames(id, ReadString(handle, false), ReadString(handle, true))) return null;
@@ -139,7 +141,7 @@ public sealed class OnboardHidTransport : IOnboardTransport
     }
     public async Task<byte[]> ExchangeAsync(byte[] packet, CancellationToken cancellationToken)
     {
-        if (packet.Length != 32 || packet[0] != 'I' || packet[1] != 'G' || packet[2] != 1 || (packet[3] is < 1 or > 6 && packet[3] is not OnboardProtocol.ReconnectUsb and not OnboardProtocol.ReadRuntimeBrightness and not OnboardProtocol.SetRuntimeBrightness and not OnboardProtocol.GetExtensions and not OnboardProtocol.LightingTest and not OnboardProtocol.GetFirmwareVersion) || (packet[3] is OnboardProtocol.ReconnectUsb or OnboardProtocol.ReadRuntimeBrightness or OnboardProtocol.GetExtensions or OnboardProtocol.GetFirmwareVersion && packet[6] != 0) || (packet[3] == OnboardProtocol.SetRuntimeBrightness && packet[6] != 1) || (packet[3] == OnboardProtocol.LightingTest && (packet[6] != 1 || packet[8] > 2)) || packet[6] > 24 || packet[5] != 0 || packet[7] != 0 || packet.AsSpan(8 + packet[6]).IndexOfAnyExcept((byte)0) >= 0) throw new InvalidDataException("Kein INGLORIOUS-Konfigurationspaket.");
+        OnboardProtocol.ValidateRequest(packet);
         var output = new byte[33]; packet.CopyTo(output, 1);
         await _stream.WriteAsync(output, cancellationToken);
         // HID transfers are report-based: reject short reports instead of combining unrelated packets.

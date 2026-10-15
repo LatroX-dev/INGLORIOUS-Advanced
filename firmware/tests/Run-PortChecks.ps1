@@ -1,33 +1,37 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param([string]$ReportPath)
+param([string]$ReportPath, [switch]$Engineering, [Alias('Board')][string]$TargetBoard='all', [string]$FixtureDirectory)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $compilerDirectory = Join-Path $root 'firmware/toolchain/qmk-msys/{app}/mingw64/bin'
 $compiler = Join-Path $compilerDirectory 'gcc.exe'
 if (-not (Test-Path -LiteralPath $compiler)) { throw 'Local QMK-MSYS native GCC is required. Nothing is downloaded.' }
-$targets = Get-Content -LiteralPath (Join-Path $root 'firmware/targets.json') -Raw | ConvertFrom-Json
+$selection=& (Join-Path $PSScriptRoot '../Resolve-Targets.ps1') -Board $TargetBoard -Engineering:$Engineering
+$targets=$selection.Manifest
+if(@($selection.Targets|Where-Object boardId -eq 16).Count-and!$FixtureDirectory){throw 'Board 16 runtime checks require explicit offline fixtures.'}
 $references = Get-Content -LiteralPath (Join-Path $root 'reference/qmk/sources.json') -Raw | ConvertFrom-Json
 $utf8 = [Text.UTF8Encoding]::new($false)
 $priorPath = $env:PATH
 $results = @()
 try {
     $env:PATH = $compilerDirectory + ';' + (Join-Path $root 'firmware/toolchain/qmk-msys/{app}/usr/bin') + ';' + $priorPath
-    foreach ($board in @($targets.targets | Where-Object boardId -gt 2)) {
-        $fixtureRoot = if($board.boardId -ge 10) { 'artifacts/gmmk3-port-fixtures/' } else { 'artifacts/port-fixtures/' }
-        $fixtures = Get-Content -LiteralPath (Join-Path $root ($fixtureRoot+'manifest.json')) -Raw | ConvertFrom-Json
-        $generated = Join-Path $root ('artifacts/firmware-port-checks/' + $board.name)
+    foreach ($board in @($selection.Targets | Where-Object boardId -gt 2)) {
+        $referenceId=if($board.boardId-eq16){$board.sourceDerivative}else{$board.deviceId}
+        $fixtureRoot = if($board.boardId-eq16){[IO.Path]::GetFullPath($FixtureDirectory)}elseif($board.boardId -ge 10) { Join-Path $root 'artifacts/gmmk3-port-fixtures' } else { Join-Path $root 'artifacts/port-fixtures' }
+        if(!$fixtureRoot.StartsWith($root+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Fixtures must stay inside the project.'}
+        $fixtures = Get-Content -LiteralPath (Join-Path $fixtureRoot 'manifest.json') -Raw | ConvertFrom-Json
+        $generated = if($board.boardId-eq16){Join-Path (Split-Path $fixtureRoot -Parent) 'port-checks'}else{Join-Path $root ('artifacts/firmware-port-checks/' + $board.name)}
         [IO.Directory]::CreateDirectory($generated) | Out-Null
-        foreach ($name in @(($board.deviceId + '.json'), ($board.deviceId + '-default.c'))) {
+        foreach ($name in @(($referenceId + '.json'), ($referenceId + '-default.c'))) {
             $source = @($references | Where-Object file -eq $name)
             if ($source.Count -ne 1 -or $source[0].qmkCommit -ne $targets.qmkCommit -or (Get-FileHash -LiteralPath (Join-Path $root ('reference/qmk/' + $name))).Hash -ne $source[0].sha256) { throw ('Unverified reference: '+$name) }
         }
-        $geometry = Get-Content -LiteralPath (Join-Path $root ('reference/qmk/' + $board.deviceId + '.json')) -Raw | ConvertFrom-Json
+        $geometry = Get-Content -LiteralPath (Join-Path $root ('reference/qmk/' + $referenceId + '.json')) -Raw | ConvertFrom-Json
         $layout = @($geometry.layouts.($board.layout).layout)
         $leds = @($geometry.rgb_matrix.layout)
         if ($layout.Count -ne $board.keys -or $leds.Count -ne $board.leds) { throw 'Reference counts disagree with target manifest.' }
-        $baseSource = [IO.File]::ReadAllText((Join-Path $root ('reference/qmk/' + $board.deviceId + '-default.c')))
+        $baseSource = [IO.File]::ReadAllText((Join-Path $root ('reference/qmk/' + $referenceId + '-default.c')))
         $baseSource = [regex]::Replace($baseSource, '(?s)/\*.*?\*/|//[^\r\n]*', '')
         $start = [regex]::Match($baseSource, '\bLAYOUT\w*\s*\(')
         if (-not $start.Success) { throw 'No independent default layout found.' }
@@ -56,9 +60,10 @@ try {
         [IO.File]::WriteAllText((Join-Path $generated 'port_reference.h'),$referenceText,$utf8)
         [IO.File]::WriteAllText((Join-Path $generated 'port_model.h'),"#pragma once`n#define IG_BOARD $($board.boardId)`n#define MATRIX_ROWS $($board.rows)`n#define MATRIX_COLS $($board.cols)`n#define RGB_MATRIX_LED_COUNT $($board.leds)`n",$utf8)
         $executable = Join-Path $generated 'port-checks.exe'
-        & $compiler '-std=c11' '-Wall' '-Wextra' '-Werror' ('-I'+(Join-Path $PSScriptRoot 'ports')) ('-I'+$generated) ('-I'+(Join-Path $root ('firmware/keymaps/'+$board.name))) (Join-Path $PSScriptRoot 'ports/port_checks.c') '-lm' '-o' $executable
+        $gate=@(if($board.boardId-eq16){'-DIG_RETAINED_LOADER_BUILD=1'})
+        & $compiler @gate '-std=c11' '-Wall' '-Wextra' '-Werror' ('-I'+(Join-Path $PSScriptRoot 'ports')) ('-I'+$generated) ('-I'+(Join-Path $root ('firmware/keymaps/'+$board.name))) (Join-Path $PSScriptRoot 'ports/port_checks.c') '-lm' '-o' $executable
         if ($LASTEXITCODE -ne 0) { throw ('Port harness compilation failed: '+$board.name) }
-        $paths = @('default','configured','v4-configured') | ForEach-Object { Join-Path $root ($fixtureRoot+$board.deviceId+'-'+$_+'.bin') }
+        $paths = @('default','configured','v4-configured') | ForEach-Object { Join-Path $fixtureRoot ($board.deviceId+'-'+$_+'.bin') }
         foreach($path in $paths) {
             $expected = @($fixtures | Where-Object file -eq ([IO.Path]::GetFileName($path)))
             if($expected.Count -ne 1 -or $expected[0].boardId -ne $board.boardId -or (Get-Item -LiteralPath $path).Length -ne $expected[0].bytes -or (Get-FileHash -LiteralPath $path).Hash -ne $expected[0].sha256) { throw 'Serializer fixture identity/hash mismatch.' }

@@ -9,7 +9,7 @@ public static class OnboardIdentity
     {
         if (!BoardDescriptorRegistry.TryGet(deviceId, out var board)) return false;
         var suffix = board.ProductSuffix;
-        return ((!board.IsExperimental && manufacturer == "InGlorious" && product == "InGlorious" + suffix) ||
+        return ((deviceId is "pro-iso" or "numpad" && manufacturer == "InGlorious" && product == "InGlorious" + suffix) ||
             (manufacturer == "INGLORIOUS" && product == "INGLORIOUS" + suffix));
     }
 }
@@ -35,15 +35,23 @@ public sealed record OnboardExtensions(ushort Version, ushort Flags, ushort Ligh
     public const ushort MaximumLightingTestDurationMs = 60000;
     public bool SupportsLightingTest => Version == 1 && (Flags & 1) != 0;
     public bool SupportsScreensaver => Version == 1 && (Flags & 2) != 0;
+    public bool SupportsDeviceTest => Version == 1 && (Flags & 4) != 0;
 }
 public sealed record OnboardLightingTestStatus(bool Active, byte Pattern, ushort RemainingMs);
 
 /// <summary>Configuration and acknowledged USB re-enumeration only. No flashing, memory addresses or bootloader commands.</summary>
-public sealed class OnboardClient(IOnboardTransport transport, string expectedDeviceId) : IAsyncDisposable
+public sealed partial class OnboardClient(IOnboardTransport transport, string expectedDeviceId, bool allowEngineering = false) : IAsyncDisposable
 {
+    private readonly bool _allowEngineering = ValidateEngineeringAccess(expectedDeviceId, allowEngineering);
     private readonly SemaphoreSlim _exclusive = new(1, 1);
     private byte _sequence;
     private ushort? _lightingTestDurationMs;
+    private static bool ValidateEngineeringAccess(string deviceId, bool allowEngineering)
+    {
+        if (BoardDescriptorRegistry.Get(deviceId).IsEngineeringOnly && !EngineeringConfigurationPolicy.IsEnabled(deviceId, allowEngineering))
+            throw new InvalidDataException("This device requires an explicit local engineering configuration opt-in.");
+        return allowEngineering;
+    }
     public static IReadOnlyList<OnboardDevice> FindDevices() => OnboardHidTransport.FindDevices();
     public static OnboardClient Open(OnboardDevice device) => new(OnboardHidTransport.Open(device), device.DeviceId);
 
@@ -89,7 +97,7 @@ public sealed class OnboardClient(IOnboardTransport transport, string expectedDe
         byte[] data;
         try { data = await Send(OnboardProtocol.GetExtensions, [], ct); }
         catch (OnboardCommandException ex) when (ex.Status == 9) { _lightingTestDurationMs = 0; return new(0, 0, 0); } // Old firmware: read-only unsupported-command response.
-        if (data.Length != 8 || Get16(data, 0) != 1 || (Get16(data, 2) & ~3) != 0 || Get16(data, 6) != 0 ||
+        if (data.Length != 8 || Get16(data, 0) != 1 || (Get16(data, 2) & ~7) != 0 || Get16(data, 6) != 0 ||
             ((Get16(data, 2) & 1) != 0 ? Get16(data, 4) is < 1 or > OnboardExtensions.MaximumLightingTestDurationMs : Get16(data, 4) != 0))
             throw new InvalidDataException(L.T("Ungültige Antwort zu den Firmware-Erweiterungen."));
         _lightingTestDurationMs = Get16(data, 4);
@@ -158,7 +166,7 @@ public sealed class OnboardClient(IOnboardTransport transport, string expectedDe
                 throw new IOException("Der gespeicherte Gerätestand ist verändert oder eine Übertragung läuft. USB wird nicht neu angemeldet.");
             // Re-read under this client's lock; reconnect is never sent after an unverified configuration.
             var data = await ReadCore(info, cancellationToken);
-            var savedInterval = OnboardSerializer.Decode(data).DeviceSettings.UsbPollingIntervalMs;
+            var savedInterval = OnboardSerializer.Decode(data, _allowEngineering).DeviceSettings.UsbPollingIntervalMs;
             var response = await Send(OnboardProtocol.ReconnectUsb, [], cancellationToken);
             if (response.Length != 4 || response[0] is not (1 or 2 or 4 or 8) || response[1] != savedInterval || response[2] > 1 || response[3] != 0 || (response[2] == 1) != (response[0] != response[1]))
                 throw new InvalidDataException("USB-Neuanmeldung nicht eindeutig bestätigt. Gespeicherte Konfiguration bleibt erhalten; bei Bedarf USB-Kabel neu verbinden.");
@@ -171,7 +179,7 @@ public sealed class OnboardClient(IOnboardTransport transport, string expectedDe
         if (image.DeviceId != expectedDeviceId) throw new InvalidDataException("Das Profil passt nicht zum ausgewählten Gerät.");
         // Freeze caller-owned data before any asynchronous work; reject forged images through a semantic decode.
         var frozen = image.Payload.ToArray();
-        var decoded = OnboardSerializer.Decode(frozen);
+        var decoded = OnboardSerializer.Decode(frozen, _allowEngineering);
         if (decoded.DeviceId != expectedDeviceId) throw new InvalidDataException("Konfigurationsplatine stimmt nicht überein.");
         var imageSchema = Get16(frozen, 4);
         var crc = OnboardProtocol.Crc32(frozen);

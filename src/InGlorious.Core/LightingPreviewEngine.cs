@@ -25,7 +25,7 @@ public static class LightingPreviewEngine
         {
             if (Layouts.TryGetValue(device.Id, out var known)) return Array.AsReadOnly(known);
             var assembly = typeof(DeviceCatalog).Assembly;
-            var name = assembly.GetManifestResourceNames().Single(n => n.EndsWith(device.Id + ".json", StringComparison.Ordinal));
+            var name = assembly.GetManifestResourceNames().Single(n => n.EndsWith(device.LayoutReferenceId + ".json", StringComparison.Ordinal));
             using var stream = assembly.GetManifestResourceStream(name)!;
             using var json = JsonDocument.Parse(stream);
             var leds = json.RootElement.GetProperty("rgb_matrix").GetProperty("layout").EnumerateArray().Select((led, index) =>

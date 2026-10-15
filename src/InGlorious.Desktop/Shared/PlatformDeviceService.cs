@@ -13,7 +13,8 @@ public static class PlatformDeviceService
     public static string? ConnectedModelFromUsbMetadata(int vendorId, int productId)
     {
         if (BoardDescriptorRegistry.TryGetRuntimeUsb(vendorId, productId, out var runtime)) return runtime.DeviceId;
-        return BoardDescriptorRegistry.TryGetStockUsb(vendorId, productId, out var stock) ? stock.DeviceId : null;
+        // Stock firmware is a setup candidate, not an editable INGLORIOUS runtime.
+        return null;
     }
 
     public static Task<IReadOnlyList<string>> FindConnectedModelsAsync() => Task.Run<IReadOnlyList<string>>(() =>
@@ -41,7 +42,8 @@ public static class PlatformDeviceService
     }
     public static string? UnsupportedReason(OnboardInfo info, OnboardImage image, OnboardExtensions? extensions = null)
     {
-        if (!BoardDescriptorRegistry.TryGet(info.DeviceId, out _) || !BoardDescriptorRegistry.TryGet(image.DeviceId, out _)) return "Unbekanntes Gerätemodell.";
+        if (!BoardDescriptorRegistry.TryGet(info.DeviceId, out var board) || !BoardDescriptorRegistry.TryGet(image.DeviceId, out _)) return "Unbekanntes Gerätemodell.";
+        if (board.IsEngineeringOnly) return "Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar.";
         if (info.DeviceId != image.DeviceId) return "Das Profil passt nicht zum ausgewählten Gerät.";
         if (image.RequiresScreensaver && extensions?.SupportsScreensaver != true) return "Der Screensaver benötigt ein Firmware-Update. Es wird nichts übertragen.";
         if (image.RequiresStandby && !info.SupportsStandby) return "Standby benötigt passende INGLORIOUS-Firmware.";

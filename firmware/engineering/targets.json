@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "engineering": true,
+  "releaseCandidate": false,
+  "defaultManifestSha256": "17AC707E8FDFB9A0439812F598C09ECC5FFCF6A3836057F7899A274BB4C0DDFB",
+  "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
+  "runtimeVendorId": "FEED",
+  "storageBytes": 32768,
+  "targets": [
+    {
+      "name": "gmmk3-pro-100-iso",
+      "deviceId": "gmmk3-pro-100-iso",
+      "boardId": 16,
+      "qmk": "gmmk/inglorious3pro/p100/iso",
+      "runtimeProductId": "1C10",
+      "product": "INGLORIOUS GMMK3 PRO 100 ISO",
+      "layout": "LAYOUT",
+      "rows": 14,
+      "cols": 8,
+      "keys": 106,
+      "leds": 126,
+      "encoder": true,
+      "slider": false,
+      "mcu": "WB32FQ95",
+      "flashBytes": 262144,
+      "ramBytes": 36864,
+      "applicationOffsetBytes": 28672,
+      "protectedPrefixBytes": 28672,
+      "identityBytes": 256,
+      "externalSpiCs": "C4",
+      "verifiedStockProductId": "E3CE",
+      "manufacturerCommit": "f53deb1cc507412fe4cbb849c89080a1f580886c",
+      "engineeringOnly": true,
+      "sourceDerivative": "gmmk3-100-iso",
+      "hardwareAcceptanceTested": false,
+      "variant": "GMMK 3 PRO 100% ISO wired (non-HE)",
+      "firmwareBuildId": "000B0401",
+      "versionHeaderPath": "boards/gmmk3-pro-100-iso/ig_board_version.h",
+      "verifiedStockVendorId": "342D",
+      "firmwareVersion": "0.11.4"
+    }
+  ]
+}

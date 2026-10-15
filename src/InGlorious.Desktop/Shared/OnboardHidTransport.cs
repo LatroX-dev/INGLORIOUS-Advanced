@@ -24,7 +24,7 @@ public sealed class OnboardHidTransport : IOnboardTransport
     }
     private static OnboardDevice? Identify(HidDevice device)
     {
-        if (!BoardDescriptorRegistry.TryGetRuntimeUsb(device.VendorID, device.ProductID, out var board)) return null;
+        if (!BoardDescriptorRegistry.TryGetRuntimeUsb(device.VendorID, device.ProductID, out var board) || board.IsEngineeringOnly) return null;
         var id = board.DeviceId;
         if (!OnboardIdentity.MatchesNames(id, device.GetManufacturer(), device.GetProductName()) || device.GetMaxInputReportLength() != 33 || device.GetMaxOutputReportLength() != 33) return null;
         if (!IsAllowedDescriptor(device.GetReportDescriptor())) return null;
@@ -43,6 +43,7 @@ public sealed class OnboardHidTransport : IOnboardTransport
     public static OnboardHidTransport Open(OnboardDevice expected)
     {
         var board = BoardDescriptorRegistry.Get(expected.DeviceId);
+        if (board.IsEngineeringOnly) throw new InvalidDataException(L.T("Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar."));
         var device = DeviceList.Local.GetHidDevices(BoardDescriptorRegistry.RuntimeVendorId).SingleOrDefault(d => d.DevicePath == expected.Path && d.ProductID == board.RuntimeProductId)
             ?? throw new IOException(L.T("Keine passende eigene INGLORIOUS-Firmware erkannt. Ein Gerät mit Original-Firmware kann hier noch nicht ausgelesen werden."));
         if (Identify(device) != expected) throw new IOException(L.T("Die gelesene Konfiguration passt nicht zum gewählten Gerät."));
@@ -72,13 +73,7 @@ public sealed class OnboardHidTransport : IOnboardTransport
     }
     public static void ValidateOutbound(byte[] packet)
     {
-        if (packet.Length != 32 || packet[0] != 'I' || packet[1] != 'G' || packet[2] != 1 ||
-            (packet[3] is < 1 or > 6 && packet[3] is not OnboardProtocol.ReconnectUsb and not OnboardProtocol.ReadRuntimeBrightness and not OnboardProtocol.SetRuntimeBrightness and not OnboardProtocol.GetExtensions and not OnboardProtocol.LightingTest and not OnboardProtocol.GetFirmwareVersion) ||
-            (packet[3] is OnboardProtocol.ReconnectUsb or OnboardProtocol.ReadRuntimeBrightness or OnboardProtocol.GetExtensions or OnboardProtocol.GetFirmwareVersion && packet[6] != 0) ||
-            (packet[3] == OnboardProtocol.SetRuntimeBrightness && packet[6] != 1) ||
-            (packet[3] == OnboardProtocol.LightingTest && (packet[6] != 1 || packet[8] > 2)) ||
-            packet[6] > 24 || packet[5] != 0 || packet[7] != 0 || packet.AsSpan(8 + packet[6]).IndexOfAnyExcept((byte)0) >= 0)
-            throw new InvalidDataException("Invalid INGLORIOUS configuration packet.");
+        OnboardProtocol.ValidateRequest(packet);
     }
     private void Close() { if (Interlocked.Exchange(ref _closed, 1) == 0) _stream.Dispose(); }
     public ValueTask DisposeAsync() { Close(); return ValueTask.CompletedTask; }

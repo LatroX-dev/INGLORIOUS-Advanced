@@ -47,7 +47,7 @@ public static class OnboardSerializer
     /// <summary>Validates an editable profile. Success does not grant protocol or firmware support to an editor-only model.</summary>
     public static void ValidateEditorProject(AppProject project)
     {
-        if (BoardDescriptorRegistry.TryGet(project.DeviceId, out _)) { _ = Prepare(project); return; }
+        if (BoardDescriptorRegistry.TryGet(project.DeviceId, out var board) && !board.IsEngineeringOnly) { _ = Prepare(project); return; }
         var errors = ProjectService.Validate(project);
         if (errors.Count != 0) throw new InvalidDataException(string.Join("\n", errors));
         var device = DeviceCatalog.Get(project.DeviceId);
@@ -80,8 +80,10 @@ public static class OnboardSerializer
         return false;
     }
 
-    public static OnboardImage Prepare(AppProject project)
+    public static OnboardImage Prepare(AppProject project, bool allowEngineering = false)
     {
+        if (DeviceCatalog.Get(project.DeviceId).IsOfflineOnly && !EngineeringConfigurationPolicy.IsEnabled(project.DeviceId, allowEngineering))
+            throw new InvalidDataException(L.T("Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar."));
         var errors = ProjectService.Validate(project);
         if (errors.Count != 0) throw new InvalidDataException(string.Join("\n", errors));
         // Side synchronization alone remains an editor preference, as it was in schema 1.
@@ -232,12 +234,14 @@ public static class OnboardSerializer
         if (data.AsSpan(padding, Shape(deviceId).Size - padding).IndexOfAnyExcept((byte)0) >= 0) throw new InvalidDataException(L.T("Ungültiger Farbfolgenspeicher."));
         return result;
     }
-    public static AppProject Decode(byte[] data)
+    public static AppProject Decode(byte[] data, bool allowEngineering = false)
     {
         if (data.Length < 32 || !data.AsSpan(0, 4).SequenceEqual("IGCF"u8) || Get16(data, 4) is not 1 and not 2 and not 3 and not 4)
             throw new InvalidDataException("Unbekanntes Geräte-Konfigurationsformat.");
         var schemaVersion = Get16(data, 4);
         var id = BoardDescriptorRegistry.GetByBoardId(data[6]).DeviceId;
+        if (DeviceCatalog.Get(id).IsOfflineOnly && !EngineeringConfigurationPolicy.IsEnabled(id, allowEngineering))
+            throw new InvalidDataException(L.T("Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar."));
         var s = Shape(id, schemaVersion);
         var legacySize = Shape(id).Size;
         var macroCapacity = MacroCapacity(id, schemaVersion);
@@ -349,7 +353,7 @@ public static class OnboardSerializer
             result.Layers[layer].SideLedColor = result.Layers[layer].ExtraLedColors.Values.FirstOrDefault() ?? "#8374F8";
         }
         if (sequences is not null && (schemaVersion == 3 && sequenceSeen == 0 || sequences.Skip(1).Count(c => c.Count != 0) != sequenceSeen)) throw new InvalidDataException(L.T("Ungültiger Farbfolgenverweis."));
-        _ = Prepare(result); // Apply the editor's stricter macro and binding constraints before adoption.
+        _ = Prepare(result, allowEngineering); // Apply the editor's stricter macro and binding constraints before adoption.
         return result;
     }
 
@@ -412,11 +416,20 @@ public sealed class OnboardCommandException(byte status, string message) : IOExc
 public static class OnboardProtocol
 {
     public const byte Info = 1, Read = 2, Write = 3, Begin = 4, Commit = 5, Abort = 6, ReconnectUsb = 8, ReadRuntimeBrightness = 9, SetRuntimeBrightness = 10, GetExtensions = 11, LightingTest = 12, GetFirmwareVersion = 13;
+    public const byte DeviceTest = 14, DeviceTestLed = 15;
     public static byte[] Packet(byte command, byte sequence, ReadOnlySpan<byte> payload)
     {
-        if ((command is < 1 or > 6 && command is not ReconnectUsb and not ReadRuntimeBrightness and not SetRuntimeBrightness and not GetExtensions and not LightingTest and not GetFirmwareVersion) || payload.Length > 24 || (command is ReconnectUsb or ReadRuntimeBrightness or GetExtensions or GetFirmwareVersion && payload.Length != 0) || (command == SetRuntimeBrightness && payload.Length != 1) || (command == LightingTest && (payload.Length != 1 || payload[0] > 2))) throw new ArgumentOutOfRangeException(nameof(payload));
+        if ((command is < 1 or > 6 && command is not ReconnectUsb and not ReadRuntimeBrightness and not SetRuntimeBrightness and not GetExtensions and not LightingTest and not GetFirmwareVersion and not DeviceTest and not DeviceTestLed) || payload.Length > 24 || (command is ReconnectUsb or ReadRuntimeBrightness or GetExtensions or GetFirmwareVersion && payload.Length != 0) || (command == SetRuntimeBrightness && payload.Length != 1) || (command == LightingTest && (payload.Length != 1 || payload[0] > 2)) || (command == DeviceTest && (payload.Length != 1 || payload[0] > 3)) || (command == DeviceTestLed && (payload.Length != 5 || payload[0] > 2 || (payload[0] != 2 && payload[1] != 0) || (payload[0] == 0 && payload[2..].IndexOfAnyExcept((byte)0) >= 0)))) throw new ArgumentOutOfRangeException(nameof(payload));
         var result = new byte[32]; result[0] = (byte)'I'; result[1] = (byte)'G'; result[2] = 1; result[3] = command; result[4] = sequence; result[6] = (byte)payload.Length;
         payload.CopyTo(result.AsSpan(8)); return result;
+    }
+    public static void ValidateRequest(byte[] packet)
+    {
+        if (packet.Length != 32 || packet[0] != 'I' || packet[1] != 'G' || packet[2] != 1 || packet[5] != 0 || packet[7] != 0 || packet[6] > 24 ||
+            packet.AsSpan(8 + packet[6]).IndexOfAnyExcept((byte)0) >= 0)
+            throw new InvalidDataException("Invalid INGLORIOUS configuration packet.");
+        try { _ = Packet(packet[3], packet[4], packet.AsSpan(8, packet[6])); }
+        catch (ArgumentOutOfRangeException error) { throw new InvalidDataException("Invalid INGLORIOUS configuration packet.", error); }
     }
     public static byte[] ParseResponse(byte[] packet, byte command, byte sequence)
     {

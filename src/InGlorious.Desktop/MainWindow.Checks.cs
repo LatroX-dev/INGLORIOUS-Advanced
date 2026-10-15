@@ -16,7 +16,7 @@ public sealed partial class MainWindow
         var count = 0;
         void Check(bool condition, string name) { count++; if (!condition) throw new InvalidOperationException("Check failed: " + name); }
         void Reject(Action action, string name) { var rejected = false; try { action(); } catch (InvalidDataException) { rejected = true; } Check(rejected, name); }
-        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.51", "visible product assembly metadata uses INGLORIOUS 0.6.51");
+        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.55", "visible product assembly metadata uses INGLORIOUS 0.6.55");
         await RunConnectionsChecksAsync(Check);
         await RunProfileReplacementChecksAsync(Check);
         await RunKeyBindingChecksAsync(Check);
@@ -71,6 +71,8 @@ public sealed partial class MainWindow
         var reportId = descriptor[..7].Concat(new byte[] { 0x85, 1 }).Concat(descriptor[7..]).ToArray(); Check(!OnboardHidTransport.IsAllowedDescriptor(new HidSharp.Reports.ReportDescriptor(reportId)), "report IDs rejected");
         var packet = new byte[32]; packet[0] = (byte)'I'; packet[1] = (byte)'G'; packet[2] = 1; packet[3] = 1; OnboardHidTransport.ValidateOutbound(packet);
         packet[3] = 0xFF; Reject(() => OnboardHidTransport.ValidateOutbound(packet), "unknown command blocked"); packet[3] = 1; packet[31] = 1; Reject(() => OnboardHidTransport.ValidateOutbound(packet), "nonzero reserved packet bytes blocked");
+        Check(BoardDescriptorRegistry.Get("gmmk3-pro-100-iso").RuntimeProductId == 0x1C10 && !BoardDescriptorRegistry.Get("gmmk3-pro-100-iso").IsEngineeringOnly,
+            "Portable PRO uses its own reviewed runtime identity");
         foreach (var device in DeviceCatalog.All)
         {
             var state = new EditorState(device.Id); state.MarkInitialClean(); var before = EditorState.Fingerprint(state.Project);
@@ -160,7 +162,11 @@ public sealed partial class MainWindow
                 badgeButton.RaiseEvent(new RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
                 Check(_page == "Beleuchtung" && _state.Surface == "badge" && _state.SelectedKeys.Count == 0 && _ledViews.ContainsKey(badge), "clicking badge shows editable and animated logo lighting");
                 Check(_root!.GetLogicalDescendants().OfType<Button>().Any(button => button.Name == "BadgeLightButton") && !_editor.GetLogicalDescendants().OfType<CheckBox>().Any(box => Equals(box.Content, L.T("Seiten synchronisieren"))), "badge editor does not expose side-only controls");
-                var image = OnboardSerializer.Prepare(_state.Project); Check(OnboardSerializer.Prepare(OnboardSerializer.Decode(image.Payload)).Payload.SequenceEqual(image.Payload), "badge colors and own palette survive wire roundtrip");
+                if (!device.IsOfflineOnly)
+                {
+                    var image = OnboardSerializer.Prepare(_state.Project); Check(OnboardSerializer.Prepare(OnboardSerializer.Decode(image.Payload)).Payload.SequenceEqual(image.Payload), "badge colors and own palette survive wire roundtrip");
+                }
+                else Reject(() => OnboardSerializer.Prepare(_state.Project), "Engineering badge edits remain local");
             }
             _state = OpenSession(device.Id);
             var presetEntries = DeviceCatalog.All.SelectMany(d => new[] { new LightingPresetEntry("", LightingPresetStore.CreateInGlorious(d.Id), true), new LightingPresetEntry("", LightingPresetStore.CreateInGlorious(d.Id)) }).ToArray();
@@ -225,9 +231,38 @@ public sealed partial class MainWindow
         foreach (var device in DeviceCatalog.All)
         {
             ShowFirmwareChangelog(notesPanel, device.Id, new(0, 8, 0));
-            if (!device.HasApprovedFirmwareManagement)
+            if (device.IsOfflineOnly)
             {
-                Check(!notesPanel.IsVisible && notesPanel.Children.Count == 0, "candidate model never invents stable firmware release notes");
+                Check(!notesPanel.IsVisible && notesPanel.Children.Count == 0, "Engineering model never invents active release notes");
+                _state = new EditorState(device.Id); Build(); ApplyConnectionSnapshot([device.Id]);
+                Check(_deviceState.Text == L.T("Offline-Profil") && !_readDeviceButton!.IsEnabled && !_transferButton!.IsEnabled,
+                    "Exact engineering metadata preserves the offline status and disabled configuration actions");
+                Check(!BuildFirmwareVersionPanel().GetLogicalDescendants().OfType<Button>().Any() &&
+                    !BuildDeviceWorkspace().GetLogicalDescendants().OfType<Button>().Any(button => button.Name == "RestoreOriginalFirmware"),
+                    "Engineering model offers no firmware query or restore action");
+                ApplyConnectionSnapshot([]);
+                continue;
+            }
+            if (BoardDescriptorRegistry.Get(device.Id).BoardId >= 3)
+            {
+                FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersionFor(device.Id), out var candidateTarget);
+                var documented = candidateTarget >= new FirmwareSemanticVersion(0, 11, 3);
+                Check(notesPanel.IsVisible == documented && (documented || notesPanel.Children.Count == 0), "candidate notes appear only for an included documented release");
+                if (documented)
+                {
+                    var candidateNotes = notesPanel.GetLogicalDescendants().OfType<TextBlock>().Select(item => item.Text).ToArray();
+                    Check(candidateNotes.Contains("INGLORIOUS 0.11.3") && candidateNotes.Contains("Red default lighting when no saved colors are available.") &&
+                        !candidateNotes.Contains("INGLORIOUS 0.9.0"), "candidate notes never borrow another model's older releases");
+                    Check(candidateNotes.Contains("Individual key, knob and LED tests.") == (device.Id == RetainedLoaderLayout.DeviceId), "only the PRO diagnostic target describes individual device tests");
+                    var includesLightingFix = candidateTarget >= new FirmwareSemanticVersion(0, 11, 4);
+                    Check(candidateNotes.Contains("INGLORIOUS 0.11.4") == includesLightingFix &&
+                        candidateNotes.Contains("Fixed lighting tests being blocked when no key is pressed.") == includesLightingFix,
+                        "candidate lighting-test fix is shown only when its firmware release is included");
+                }
+                ShowFirmwareChangelog(notesPanel, device.Id, null);
+                Check(!notesPanel.IsVisible && notesPanel.Children.Count == 0, "unknown candidate version clears release notes");
+                ShowFirmwareChangelog(notesPanel, device.Id, candidateTarget);
+                Check(!notesPanel.IsVisible, "current candidate firmware offers no pending release notes");
                 _state = new EditorState(device.Id); Build();
                 ApplyConnectionSnapshot([]);
                 Check(_deviceState.Text == L.T("Gerät nicht verbunden"), "disconnected candidate has clear footer status");
@@ -244,7 +279,7 @@ public sealed partial class MainWindow
             Check(noteText.Contains("New lighting test after firmware updates.") && noteText.Contains("Optional screensaver."), "release notes stay brief for supported hardware " + device.Id);
             ShowFirmwareChangelog(notesPanel, device.Id, null);
             Check(!notesPanel.IsVisible && notesPanel.Children.Count == 0, "unknown refreshed version clears prior release notes");
-            FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var targetRelease);
+            FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersionFor(device.Id), out var targetRelease);
             ShowFirmwareChangelog(notesPanel, device.Id, targetRelease);
             Check(!notesPanel.IsVisible, "current firmware shows no pending changes");
         }
@@ -313,9 +348,20 @@ public sealed partial class MainWindow
                 check(buttonLabels.Length == (device.IsExperimentalFirmware ? 1 : 0), "only experimental connected buttons receive a label");
                 check(labels.Count(label => label.Name == "ExperimentalHeaderBadge") == (device.IsExperimentalFirmware ? 1 : 0), "active header distinguishes experimental from stable models");
                 check(labels.Count(label => label.Name == "ExperimentalDeviceNotice") == (device.IsExperimentalFirmware ? 1 : 0), "device page explains missing model hardware testing only where relevant");
+                if (device.IsOfflineOnly)
+                {
+                    check(!_readDeviceButton!.IsEnabled && !_transferButton!.IsEnabled && !device.HasApprovedFirmwareManagement,
+                        "Engineering metadata cannot enable read, transfer or firmware management");
+                    check(!_state.Dirty && EditorState.Fingerprint(_state.Project) == before &&
+                        !_root.GetLogicalDescendants().OfType<Button>().Any(button => button.Name == "RestoreOriginalFirmware"),
+                        "Engineering editor rendering preserves its separate local profile and omits firmware actions");
+                    continue;
+                }
                 check(_root.GetLogicalDescendants().OfType<Button>().Any(button => Equals(button.Content, L.T("Gerät einrichten"))) &&
                     _root.GetLogicalDescendants().OfType<Button>().Any(button => Equals(button.Content, L.T("Original-Firmware wiederherstellen"))),
                     "every device page exposes installation and original restore");
+                check(_root.GetLogicalDescendants().OfType<Button>().Any(button => button.Name == "DeviceTestButton" && button.IsVisible) == (device.Id == RetainedLoaderLayout.DeviceId),
+                    "the detailed device test is offered only for the exact diagnostic-capable PRO model");
                 check(_readDeviceButton!.IsEnabled && _transferButton!.IsEnabled && button.IsEnabled && device.SupportsOnboardConfiguration,
                     "experimental label does not add opt-in or disable connected runtime configuration");
                 check(OnboardSerializer.Prepare(_state.Project).Payload.Length > 0 && !_state.Dirty && EditorState.Fingerprint(_state.Project) == before,
@@ -328,7 +374,7 @@ public sealed partial class MainWindow
                 {
                     check(buttonLabels.Single().Text == L.T("Experimentell") && buttonLabels.Single().Foreground is Avalonia.Media.SolidColorBrush brush && brush.Color == Avalonia.Media.Color.Parse("#E9B86B"),
                         "experimental badge uses localized text and muted amber");
-                    check(labels.Single(label => label.Name == "ExperimentalDeviceNotice").Text == L.T("Experimentelle Unterstützung: noch nicht an diesem Modell getestet."),
+                    check(labels.Single(label => label.Name == "ExperimentalDeviceNotice").Text == L.T("Experimentelle Unterstützung: noch nicht vollständig geprüft."),
                         "experimental device notice gives the precise testing limitation");
                 }
             }

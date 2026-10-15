@@ -9,7 +9,8 @@ internal static class ExperimentalBoardChecks
         static void Reject(Action action, Action<bool, string> check, string label)
         { try { action(); } catch (InvalidDataException) { check(true, label); return; } throw new Exception(label); }
         var gmmk3Only = Array.IndexOf(args, "--gmmk3-fixtures") >= 0;
-        var exportIndex = Array.IndexOf(args, gmmk3Only ? "--gmmk3-fixtures" : "--port-fixtures");
+        var retainedOnly = Array.IndexOf(args, "--retained-loader-fixtures") >= 0;
+        var exportIndex = Array.IndexOf(args, retainedOnly ? "--retained-loader-fixtures" : gmmk3Only ? "--gmmk3-fixtures" : "--port-fixtures");
         var output = exportIndex >= 0 && exportIndex + 1 < args.Length ? Path.GetFullPath(args[exportIndex + 1]) : null;
         if (output is not null) Directory.CreateDirectory(output);
         var manifest = new List<object>();
@@ -43,10 +44,10 @@ internal static class ExperimentalBoardChecks
             var stopped = await client.StopLightingTestAsync();
             check(!stopped.Active && stopped.Pattern == 0 && stopped.RemainingMs == 0, "Stopped test has no active pattern: " + board.DeviceId);
         }
-        foreach (var board in BoardDescriptorRegistry.Experimental)
+        foreach (var board in BoardDescriptorRegistry.ProtocolBoards.Where(board => board.BoardId >= 3))
         {
             var model = DeviceCatalog.Get(board.DeviceId);
-            check(model.SupportsOnboardConfiguration && model.IsExperimentalFirmware && !model.HasApprovedFirmwareManagement && !model.IsOfflineOnly, "Candidate configuration support is separate from flashing: " + board.DeviceId);
+            check(model.SupportsOnboardConfiguration && model.IsExperimentalFirmware == board.IsExperimental && model.HasApprovedFirmwareManagement == board.HasApprovedFirmwareManagement && !model.IsOfflineOnly, "Port configuration support agrees with its individual hardware status: " + board.DeviceId);
             check(model.HasEncoder == board.HasEncoder && model.HasSlider == board.HasSlider, "Physical control metadata agrees: " + board.DeviceId);
             check(board.LegacySize == 32 + 4 * board.Rows * board.Cols * 2 + 16 + 4 * board.LedCount * 3 + 128 + 768 * 4, "Wire size follows explicit matrix/LED dimensions: " + board.DeviceId);
             var baseline = ProjectService.Create(board.DeviceId);
@@ -103,7 +104,7 @@ internal static class ExperimentalBoardChecks
                     var result = await client.ApplyAsync(image);
                     check(result.ReadbackVerified && transport.Active.SequenceEqual(image.Payload) && transport.Commands.Count(command => command == OnboardProtocol.Commit) == 1, "Candidate upload commits once and verifies complete readback: " + board.DeviceId + "/" + name);
                 }
-                if (output is not null && (gmmk3Only ? board.BoardId >= 10 : board.BoardId < 10))
+                if (output is not null && (retainedOnly ? board.BoardId == 16 : gmmk3Only ? board.BoardId is >= 10 and <= 15 : board.BoardId < 10))
                 {
                     var file = board.DeviceId + "-" + name + ".bin"; File.WriteAllBytes(Path.Combine(output, file), image.Payload);
                     manifest.Add(new { file, deviceId = board.DeviceId, boardId = board.BoardId, board.Rows, board.Cols, board.LedCount, schema, capacity = image.CapacityBytes, bytes = image.UsedBytes, sha256 = Convert.ToHexString(SHA256.HashData(image.Payload)), crc32 = image.Crc32, macroEvents = image.MacroEvents, macroCapacity = image.MacroCapacity });

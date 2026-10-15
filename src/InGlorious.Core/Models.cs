@@ -26,6 +26,7 @@ public record BadgeGeometry(double X, double Y, double W, double H, int? LedInde
 }
 public record DeviceDefinition(string Id, string Name, string SourceSubtitle, string ProductId, IReadOnlyList<KeyDefinition> Keys, double Width, double Height)
 {
+    internal string LayoutReferenceId { get; init; } = Id;
     public string Subtitle => L.T(SourceSubtitle);
     public bool SupportsOnboardConfiguration { get; init; }
     public bool IsOfflineOnly => !SupportsOnboardConfiguration;
@@ -123,6 +124,7 @@ public sealed class LayerProfile
 {
     public string Name { get; set; } = "Layer";
     public Dictionary<string, KeyAssignment> Keys { get; set; } = [];
+    // Preserve the fallback for older JSON files; new profiles set their color explicitly.
     public string SideLedColor { get; set; } = "#8374F8";
     public Dictionary<int, string> ExtraLedColors { get; set; } = [];
     // Stored as an effect flag in schema 2; colors always remain individual LED values.
@@ -229,7 +231,8 @@ public static class DeviceCatalog
     private sealed record Descriptor(string Id, string Name, string Subtitle, string ProductId, string Bindings,
         string HardwareRevision, string? EncoderKeyId = null, bool HasSlider = false, bool HasApprovedFirmwareManagement = false,
         bool SupportsOnboardConfiguration = false,
-        string LayoutName = "LAYOUT", int LeftSideX = 0, int RightSideX = 224, bool AnsiLegends = false);
+        string LayoutName = "LAYOUT", int LeftSideX = 0, int RightSideX = 224, bool AnsiLegends = false,
+        string? LayoutReferenceId = null);
     public static IReadOnlyList<DeviceDefinition> All { get; } = new Descriptor[]
     {
         new("pro-iso", "GMMK PRO ISO", "83 Tasten · Drehgeber · USB", "5046", ProBindings, "rev1", EncoderKeyId: "r0c1", HasApprovedFirmwareManagement: true, SupportsOnboardConfiguration: true),
@@ -246,7 +249,10 @@ public static class DeviceCatalog
         new("gmmk3-75-ansi", "GMMK 3 75% ANSI", "ANSI", "", Gmmk375AnsiBindings, "", EncoderKeyId: "r11c6", SupportsOnboardConfiguration: true, AnsiLegends: true),
         new("gmmk3-75-iso", "GMMK 3 75% ISO", "ISO", "", Gmmk375IsoBindings, "", EncoderKeyId: "r11c6", SupportsOnboardConfiguration: true),
         new("gmmk3-100-ansi", "GMMK 3 100% ANSI", "ANSI", "", Gmmk3100AnsiBindings, "", EncoderKeyId: "r11c6", SupportsOnboardConfiguration: true, AnsiLegends: true),
-        new("gmmk3-100-iso", "GMMK 3 100% ISO", "ISO", "", Gmmk3100IsoBindings, "", EncoderKeyId: "r11c6", SupportsOnboardConfiguration: true)
+        new("gmmk3-100-iso", "GMMK 3 100% ISO", "ISO", "", Gmmk3100IsoBindings, "", EncoderKeyId: "r11c6", SupportsOnboardConfiguration: true),
+        // Shared physical editor geometry; firmware and recovery have a separate retained-loader target.
+        new("gmmk3-pro-100-iso", "GMMK 3 PRO 100% ISO", "ISO", "", Gmmk3100IsoBindings, "",
+            EncoderKeyId: "r11c6", LayoutReferenceId: "gmmk3-100-iso", SupportsOnboardConfiguration: true, HasApprovedFirmwareManagement: true)
     }.Select(Build).ToArray();
     // Display only: shared USB IDs must not imply that a hardware revision is resolved.
     public static string ModelGroupName(IReadOnlyList<string> deviceIds)
@@ -262,7 +268,7 @@ public static class DeviceCatalog
     {
         var id = definition.Id;
         var assembly = typeof(DeviceCatalog).Assembly;
-        var resource = assembly.GetManifestResourceNames().Single(n => n.EndsWith(id + ".json", StringComparison.Ordinal));
+        var resource = assembly.GetManifestResourceNames().Single(n => n.EndsWith((definition.LayoutReferenceId ?? id) + ".json", StringComparison.Ordinal));
         using var stream = assembly.GetManifestResourceStream(resource)!;
         using var json = JsonDocument.Parse(stream);
         var root = json.RootElement;
@@ -321,13 +327,14 @@ public static class DeviceCatalog
             HasSlider = definition.HasSlider, HardwareRevision = definition.HardwareRevision, KeyAreaHeight = height,
             LedCount = ledCount,
             NonKeyLedIndices = Enumerable.Range(0, ledCount).Except(leds.Values).ToArray(),
+            LayoutReferenceId = definition.LayoutReferenceId ?? id,
             BadgeLedIndices = badgeLeds.ToArray(),
             // Photo-derived housing positions, shared by ANSI/ISO. See docs/gmmk3-port.md.
             BadgeGeometry = id switch
             {
                 "gmmk3-65-ansi" or "gmmk3-65-iso" => new(15.2, 1.0, 1.4, .85, null),
                 "gmmk3-75-ansi" or "gmmk3-75-iso" => new(14.0, -.6, .85, 1.45, badgeLeds.Single()),
-                "gmmk3-100-ansi" or "gmmk3-100-iso" => new(20.35, -.6, .85, 1.45, badgeLeds.Single()),
+                "gmmk3-100-ansi" or "gmmk3-100-iso" or "gmmk3-pro-100-iso" => new(20.35, -.6, .85, 1.45, badgeLeds.Single()),
                 _ => null
             },
             LeftSideLedIndices = leftSideLeds.OrderBy(led => led.Y).Select(led => led.Index).ToArray(),
@@ -422,12 +429,12 @@ public static class ProjectService
     public static AppProject Create(string deviceId)
     {
         var device = DeviceCatalog.Get(deviceId);
-        var colors = new[] { "#8374F8", "#668BFA", "#49BDCA", "#DB86BC" };
+        const string color = "#FF0000";
         var result = new AppProject { DeviceId = deviceId, Name = device.Name };
         for (var l = 0; l < 4; l++)
         {
-            var layer = new LayerProfile { Name = l == 0 ? L.T("Basis") : l == 1 ? L.T("Funktion") : L.F($"Ebene {l}") };
-            foreach (var key in device.Keys) layer.Keys[key.Id] = new() { Binding = l == 0 ? key.DefaultBinding : "KC_TRNS", Color = colors[Math.Min(3, (int)(key.X / device.Width * 4))] };
+            var layer = new LayerProfile { Name = l == 0 ? L.T("Basis") : l == 1 ? L.T("Funktion") : L.F($"Ebene {l}"), SideLedColor = color };
+            foreach (var key in device.Keys) layer.Keys[key.Id] = new() { Binding = l == 0 ? key.DefaultBinding : "KC_TRNS", Color = color };
             result.Layers.Add(layer);
         }
         if (deviceId == "numpad") result.Layers[1].Keys["r4c0"].Binding = "KC_NUM"; // Fn + 0; the held Fn switch cannot press itself a second time.

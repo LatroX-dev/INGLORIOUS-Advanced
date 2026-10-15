@@ -9,7 +9,7 @@
 
 // Independent numeric oracle for the two persisted layouts, not header aliases.
 #define TEST_BASE 1024U
-#if IG_BOARD >= 10 && IG_BOARD <= 15
+#if IG_BOARD >= 10 && IG_BOARD <= 16
 #define TEST_SLOT_BYTES 7680U
 #define TEST_OTHER_PAYLOAD1 8224U
 #else

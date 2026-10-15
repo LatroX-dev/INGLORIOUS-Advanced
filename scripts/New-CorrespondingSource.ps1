@@ -44,7 +44,7 @@ if($export.mode-cne'local-export'-or$export.hardwareAccess-ne$false-or$export.ne
 $paths=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach($file in $export.files){
     if(-not$paths.Add($file.path)){throw 'Duplicate source manifest path.'}
-    if($file.path-match'(^|/)(backups|data|artifacts|bin|obj|\.git|vendor|toolchain|releases|candidates)(/|$)'-or$file.path-match'(?i)(local-firmware-bindings|\.bin$|\.exe$|\.dll$|\.log$)'){throw 'Private or built material is not permitted in the source export.'}
+    if($file.path-match'(^|/)(backups|data|artifacts|workspace|bin|obj|\.git|vendor|toolchain|releases|candidates)(/|$)'-or$file.path-match'(?i)(local-firmware-bindings|\.bin$|\.exe$|\.dll$|\.log$)'){throw 'Private or built material is not permitted in the source export.'}
     Verified (Safe-Child $public $file.path) $file.bytes $file.sha256
 }
 foreach($required in @('LICENSE','COPYRIGHT.md','THIRD-PARTY-NOTICES.md','firmware/targets.json','src/InGlorious.Core/SetupFirmwareCatalog.json')){

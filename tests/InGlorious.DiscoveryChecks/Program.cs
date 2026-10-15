@@ -19,8 +19,9 @@ void RejectMutation(Action action, string message)
 using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("stock-evidence.json")!;
 using var evidence = JsonDocument.Parse(stream);
 var rows = evidence.RootElement.GetProperty("devices").EnumerateArray().ToArray();
-Check(StockDeviceCatalog.All.Count == 15 && rows.Length == 15, "Exactly the known fifteen normal USB declarations.");
-Check(StockDeviceCatalog.All.Select(x => (x.VendorId, x.ProductId)).Distinct().Count() == 15, "Normal identifiers must be unique.");
+Check(StockDeviceCatalog.All.Count == 16 && StockDeviceCatalog.All.Count(x => x.HasFirmwareCandidate) == 16 && rows.Length == 15,
+    "The fifteen earlier source rows remain unchanged; the separately evidenced PRO adds one exact candidate.");
+Check(StockDeviceCatalog.All.Select(x => (x.VendorId, x.ProductId)).Distinct().Count() == 16, "Normal identifiers must be unique.");
 foreach (var row in rows)
 {
     var vid = Convert.ToUInt16(row.GetProperty("vid").GetString(), 16);
@@ -42,11 +43,37 @@ Check(StockDeviceCatalog.Match(0x320F, 0x5046)!.CandidateDeviceIds.SequenceEqual
 Check(StockDeviceCatalog.Match(0x320F, 0x5044)!.Confidence == StockMatchConfidence.AmbiguousRevision, "Ambiguous confidence is preserved.");
 Check(StockDeviceCatalog.Match(0x320F, 0x5092)!.CandidateDeviceIds.Single() == "pro-rev2-ansi", "Official WB updater maps ALT to the WB candidate.");
 Check(StockDeviceCatalog.Match(0x320F, 0x5093)!.CandidateDeviceIds.Single() == "pro-rev2-iso", "ISO ALT does not impersonate proven rev1.");
-Check(StockDeviceCatalog.All.SelectMany(x => x.CandidateDeviceIds).Distinct().Count() == 15, "Both existing devices and thirteen experimental models are represented.");
+Check(StockDeviceCatalog.All.SelectMany(x => x.CandidateDeviceIds).Distinct().Count() == 16, "Three hardware-tested devices and thirteen experimental models are represented.");
+var identifiedRows = evidence.RootElement.GetProperty("identifiedWithoutFirmware").EnumerateArray().ToArray();
+Check(identifiedRows.Length == 1 && StockDeviceCatalog.All.All(x => x.HasFirmwareCandidate),
+    "Historical PRO identification evidence remains available after enabling its separate normal candidate.");
+foreach (var row in identifiedRows)
+{
+    var vid = Convert.ToUInt16(row.GetProperty("vid").GetString(), 16);
+    var pid = Convert.ToUInt16(row.GetProperty("pid").GetString(), 16);
+    var item = StockDeviceCatalog.Match(vid, pid);
+    Check(vid == 0x342D && pid == 0xE3CE && item is not null, "The added PRO candidate uses only the exact wired ISO USB pair.");
+    Check(item!.IdentifiedName == row.GetProperty("displayName").GetString() && item.CoreCatalogName == row.GetProperty("coreCatalogName").GetString(),
+        "PRO display and CORE catalog names match the preserved identification evidence.");
+    Check(row.GetProperty("source").GetString() == "sources.core" && row.GetProperty("coreSourceLine").GetInt32() == 9438 &&
+        row.GetProperty("coreProductId").GetString() == "GMMK3PRO100WiredISO", "The exact CORE definition is traceable within the existing pinned source.");
+    Check(item.HasFirmwareCandidate && item.CandidateDeviceIds.SequenceEqual(["gmmk3-pro-100-iso"]) && row.GetProperty("candidateDeviceIds").GetArrayLength() == 0 &&
+        item.Confidence == StockMatchConfidence.CatalogModel && row.GetProperty("confidence").GetString() == "identified-without-firmware",
+        "Historical identification now resolves its own model only; it never aliases generic GMMK3 firmware.");
+    Check(item.RequiresHardwareVerification && row.GetProperty("requiresHardwareVerification").GetBoolean() &&
+        !row.GetProperty("firmwareWriteAuthorized").GetBoolean() && row.GetProperty("mcu").ValueKind == JsonValueKind.Null &&
+        row.GetProperty("exactUsbProductString").ValueKind == JsonValueKind.Null && row.GetProperty("bcdDeviceIdentityRule").ValueKind == JsonValueKind.Null,
+        "Identification evidence grants no hardware, measured descriptor or firmware authorization claim.");
+    Check(row.GetProperty("catalogUpdaterMode").GetProperty("pid").GetString() == "B051" &&
+        row.GetProperty("packageUpdaterMode").GetProperty("pid").GetString() == "B059" &&
+        !row.GetProperty("catalogUpdaterMode").GetProperty("isVerifiedRomBootloaderIdentity").GetBoolean() &&
+        !row.GetProperty("packageUpdaterMode").GetProperty("isVerifiedRomBootloaderIdentity").GetBoolean(),
+        "Conflicting vendor updater identifiers remain metadata rather than a ROM transport selection.");
+}
 foreach (var (vid, pid) in new (ushort, ushort)[]
 {
     (0,0), (0x504B,0x320F), (0x342D,0xE3C5), (0x342D,0xE3C6), (0x342D,0xE3C7),
-    (0x342D,0xE3CE), (0x342D,0xE3CF), (0x342D,0xE3D0), // PRO must not alias generic GMMK3.
+    (0x342D,0xE3CF), (0x342D,0xE3D0), // Other PRO models remain unknown.
     (0x342D,0xE3DD), (0x342D,0xE3DE), (0x342D,0xE3DF), // HE excluded.
     (0x342D,0xE3CB), (0x342D,0xE3CC), (0x342D,0xE3CD), // Wireless excluded.
     (0x2442,0xB051), (0x2442,0xB052), (0x2442,0xB053), (0x342D,0xDFA0), (0x0483,0xDF11),

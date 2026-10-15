@@ -45,6 +45,47 @@ public sealed partial class DeviceSetupWindow
     internal void RunOfflineChecks(Action<bool, string> check)
     {
         if (!_offlinePreview) throw new InvalidOperationException("Setup checks are offline only.");
+        if (_operation == SetupOperation.Install)
+        {
+            var selected = new DeviceSetupWindow(offlinePreview: true, preferredInstanceId: "selected-stock");
+            try
+            {
+                var stock = StockDeviceCatalog.Match(0x320F, 0x5046)!;
+                var chosen = new SetupDevice("selected-stock", "GMMK PRO ISO", stock.CandidateDeviceIds, stock.VendorId, stock.ProductId, [], false);
+                var other = chosen with { InstanceId = "other-stock" };
+                selected.ApplyDevices([other, chosen]);
+                check(selected.SelectedDevice == chosen && selected._devices.Visibility == Visibility.Collapsed && selected.ActionReady &&
+                    selected._session is null && chosen.CandidateDeviceIds.Count == 2,
+                    "Setup: sidebar selection uses the chosen physical keyboard without starting work or guessing its board revision");
+                selected.ApplyDevices([other]);
+                check(selected.SelectedDevice is null && !selected.ActionReady,
+                    "Setup: unplugging a sidebar-selected keyboard never falls back to another device of the same model");
+                selected.ApplyDevices([chosen with { IsRuntime = true }]);
+                check(selected.SelectedDevice is null && !selected.ActionReady,
+                    "Setup: an already installed sidebar device never enters first installation");
+            }
+            finally { selected.Close(); }
+            var unavailable = new DeviceSetupWindow(offlinePreview: true);
+            try
+            {
+                var stock = StockDeviceCatalog.Match(0x342D, 0xE3CE)!;
+                var identified = new SetupDevice("unavailable-fixture", stock.IdentifiedName!, [],
+                    stock.VendorId, stock.ProductId, [], false);
+                unavailable.ApplyDevices([identified]);
+                check(unavailable.SelectedDevice == identified && unavailable._deviceName.Text.Contains("GMMK 3 PRO 100% ISO", StringComparison.Ordinal) &&
+                    unavailable._description.Text == L.T("Für dieses Modell ist noch keine INGLORIOUS-Firmware verfügbar."),
+                    "Setup: a device without any candidate shows its exact name and unavailable firmware message.");
+                check(!unavailable.ActionReady && !unavailable._action.IsEnabled && unavailable._service is null && !unavailable._timer.IsEnabled &&
+                    unavailable._version.Visibility == Visibility.Collapsed && unavailable._summary.Visibility == Visibility.Collapsed &&
+                    unavailable._step.Visibility == Visibility.Collapsed && unavailable._keepOpen.Visibility == Visibility.Collapsed,
+                    "Setup: unavailable firmware has no executable action, offered version, backup promise or installation steps.");
+                check(BootKeyLabels(identified).Length == 0 && BootInstruction(identified) == "" && unavailable._keyPanel.Visibility == Visibility.Collapsed,
+                    "Setup: a device without candidates never inherits a boot gesture.");
+                check(L.Catalog["Für dieses Modell ist noch keine INGLORIOUS-Firmware verfügbar."].Count == L.SupportedLanguages.Count - 1,
+                    "Setup: unavailable firmware guidance is translated in every supported language.");
+            }
+            finally { unavailable.Close(); }
+        }
         ShowOfflineStep("select");
         var device = SelectedDevice!;
         check(_service is null && !_timer.IsEnabled && !CanAct, "Setup: offline construction never creates a service or starts polling");
@@ -61,17 +102,17 @@ public sealed partial class DeviceSetupWindow
         if (_operation == SetupOperation.Update)
         {
             ShowOfflineStep("select");
-            check(ActionReady && _version.Text.Contains("0.0.1", StringComparison.Ordinal) && _version.Text.Contains(DeviceSetupService.TargetFirmwareVersion, StringComparison.Ordinal),
+            check(ActionReady && _version.Text.Contains("0.0.1", StringComparison.Ordinal) && _version.Text.Contains(DeviceSetupService.TargetFirmwareVersionFor(device.CandidateDeviceIds[0]), StringComparison.Ordinal),
                 "Update: the actual older report and target appear before preparing the update");
             _runtimeVersion = null; Render();
             check(!ActionReady, "Update: missing version response never offers an update");
-            FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var target);
+            FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersionFor(device.CandidateDeviceIds[0]), out var target);
             _runtimeVersion = new(device.CandidateDeviceIds[0], target, 1); Render();
             check(!ActionReady, "Update: the installed target version is already current");
             _runtimeVersion = new(device.CandidateDeviceIds[0], new(ushort.MaxValue, 0, 0), 1); Render();
             check(!ActionReady, "Update: newer firmware is never offered a downgrade");
             ShowOfflineStep("backup"); _modelConfirmation.IsChecked = true;
-            _session!.InstalledFirmwareVersion = DeviceSetupService.TargetFirmwareVersion;
+            _session!.InstalledFirmwareVersion = DeviceSetupService.TargetFirmwareVersionFor(device.CandidateDeviceIds[0]);
             check(!ActionReady, "Update: firmware captured in boot mode must match the earlier actual runtime report");
             ShowOfflineStep("select"); _readingVersion = true;
             check(!ActionReady, "Update: no button activates while the selected device version is being read");
@@ -146,7 +187,7 @@ public sealed partial class DeviceSetupWindow
         check(_driverHelp.Visibility == Visibility.Visible, "Setup: driver instructions appear only with a detected missing driver");
         ApplyProgress(new(SetupStage.ConnectBootloader, "Waiting fixture", _session.DeviceId));
         check(_driverHelp.Visibility == Visibility.Collapsed, "Setup: driver instructions disappear after the condition changes");
-        foreach (var model in DeviceCatalog.All)
+        foreach (var model in DeviceCatalog.All.Where(model => !model.IsOfflineOnly))
         {
             ShowOfflineStep("reconnect", model.Id);
             check(_heading.Text == L.T("Jetzt normal neu verbinden") && _deviceName.Text == "\"" + model.Name + "\"" &&
@@ -159,10 +200,14 @@ public sealed partial class DeviceSetupWindow
             check(_status.Text == warning && !Completed, "Setup: reconnect guidance never hides a failed verification or invents completion");
             ShowOfflineStep("connect", model.Id);
             var instruction = BootInstruction(SelectedDevice);
-            check(model.Id == "numpad" ? instruction.Contains("Plus", StringComparison.Ordinal) : _operation == SetupOperation.Install && model.Id.StartsWith("gmmk3-", StringComparison.Ordinal) ? instruction.Contains("Esc", StringComparison.Ordinal) : instruction.Contains("Leertaste", StringComparison.Ordinal), "Setup: " + model.Id + " " + _operation + " uses its reviewed firmware-specific boot gesture");
+            var stockEsc = _operation == SetupOperation.Install && model.Id.StartsWith("gmmk3-", StringComparison.Ordinal) && model.Id != "gmmk3-pro-100-iso";
+            var expectedInstruction = model.Id == "numpad" ? L.T("Halte Plus und Enter beim Einstecken gedrückt. Lass die Tasten nach etwa 3 Sekunden los.")
+                : stockEsc ? L.T("Halte Esc beim Einstecken gedrückt. Lass die Taste nach etwa 3 Sekunden los.")
+                : L.T("Halte Leertaste und B beim Einstecken gedrückt. Lass die Tasten nach etwa 3 Sekunden los.");
+            check(instruction == expectedInstruction, "Setup: " + model.Id + " " + _operation + " uses its reviewed firmware-specific boot gesture");
             var keyLabels = _keyCaps.Children.OfType<Border>().Select(cap => ((TextBlock)cap.Child).Text).ToArray();
-            var expectedKeys = model.Id == "numpad" ? new[] { "+", "Enter" }
-                : _operation == SetupOperation.Install && model.Id.StartsWith("gmmk3-", StringComparison.Ordinal) ? ["Esc"] : new[] { "Leertaste", "B" };
+            var expectedKeys = model.Id == "numpad" ? new[] { "+", L.T("Plus (+) + Enter").Split(" + ")[1] }
+                : stockEsc ? ["Esc"] : L.T("Leertaste + B").Split(" + ");
             check(keyLabels.SequenceEqual(expectedKeys) && _stepProgress.Value == 3, "Setup: " + model.Id + " shows the real boot keys as individual keycaps");
             var firstCap = _keyCaps.Children[0]; Render();
             check(ReferenceEquals(firstCap, _keyCaps.Children[0]), "Setup: USB observation does not replace or flicker unchanged keycaps");
@@ -179,7 +224,7 @@ public sealed partial class DeviceSetupWindow
             _lightingRunning = false;
 
             var board = BoardDescriptorRegistry.Get(model.Id);
-            FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var target);
+            FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersionFor(model.Id), out var target);
             var report = new OnboardFirmwareVersion(model.Id, target, 1);
             var info = new OnboardInfo(model.Id, (byte)(249 | (board.HasSlider ? 2 : 0)), 0, 1, 0, 0);
             var extensions = new OnboardExtensions(1, 3, 21000);

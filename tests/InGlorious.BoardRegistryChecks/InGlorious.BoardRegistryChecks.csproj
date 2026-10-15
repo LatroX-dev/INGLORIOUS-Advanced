@@ -3,6 +3,7 @@
   <ItemGroup>
     <PackageReference Include="HidSharp" Version="2.6.4" />
     <Compile Include="../../src/InGlorious.Core/BoardDescriptorRegistry.cs" Link="BoardDescriptorRegistry.cs" />
+    <Compile Include="../../src/InGlorious.Core/StockDeviceCatalog.cs" Link="StockDeviceCatalog.cs" />
     <Compile Include="../../src/InGlorious.Core/Models.cs" Link="Models.cs" />
     <Compile Include="../../src/InGlorious.Core/Onboard*.cs" Link="%(Filename).cs" />
     <Compile Include="../../src/InGlorious.Core/DeviceScanner.cs" Link="DeviceScanner.cs" />

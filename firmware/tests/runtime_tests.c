@@ -136,7 +136,14 @@ static uint8_t command(uint8_t cmd, const uint8_t *payload, uint8_t count) {
     unsigned before = replies; raw_hid_receive(packet, 32);
     check(replies == before + 1 && response[3] == cmd && response[4] == 71, "response command/sequence correlation"); return response[5];
 }
-static void make_config(uint8_t *config, uint8_t color) { for (uint16_t i = 0; i < IG_SIZE; i++) config[i] = default_byte(i); config[IG_RGB_OFFSET] = color; }
+static void make_config(uint8_t *config, uint8_t color) {
+    for (uint16_t i = 0; i < IG_SIZE; i++) config[i] = default_byte(i);
+    // Keep saved-profile test colors independent of the fresh-device fallback.
+    for (uint16_t i = IG_RGB_OFFSET; i < IG_MACRO_OFFSET; i += 3) {
+        config[i] = 32; config[i+1] = 100; config[i+2] = 220;
+    }
+    config[IG_RGB_OFFSET] = color;
+}
 static uint8_t begin(const uint8_t *config, uint32_t gen) { uint8_t p[10]; put16(p, IG_SIZE); put32(p + 2, gen); put32(p + 6, crc_buffer(config, IG_SIZE)); return command(4, p, 10); }
 static void stage_all(const uint8_t *config) {
     for (uint16_t at = 0; at < IG_SIZE;) { uint8_t p[24] = {0}; uint8_t n = IG_SIZE - at > 20 ? 20 : IG_SIZE - at; put16(p, at); p[2] = n; memcpy(p + 4, config + at, n); check(command(3, p, n + 4) == 0 && u16(response + 8) == at + n, "sequential staging acknowledgement"); at += n; }
@@ -156,6 +163,41 @@ static void make_v2(uint8_t *config) {
 }
 static void check_readback(const uint8_t *config, uint16_t length) {
     for(uint16_t at=0;at<length;) { uint8_t p[4]={0}; uint8_t n=length-at>20?20:length-at; put16(p,at); p[2]=n; check(command(2,p,4)==0 && !memcmp(response+12,config+at,n),"full active variable blob readback exact"); at+=n; }
+}
+static void fallback_color_checks(void) {
+    uint8_t config[IG_SIZE], saved[sizeof(mock_backing)];
+    reset(); memcpy(saved,mock_backing,sizeof(saved));
+    check(active_slot==-1 && active_generation==0,"fresh boot uses fallback without creating a saved profile");
+    for(uint8_t layer=0;layer<IG_LAYERS;layer++) {
+        layer_state=1U<<layer;
+        rgb_matrix_indicators_advanced_user(0,RGB_MATRIX_LED_COUNT);
+        for(uint8_t led=0;led<RGB_MATRIX_LED_COUNT;led++) {
+            uint16_t at=IG_RGB_OFFSET+(layer*RGB_MATRIX_LED_COUNT+led)*3;
+            check(active_byte(at)==255 && !active_byte(at+1) && !active_byte(at+2),"all fresh layer/key/side colors are pure red");
+            check(rendered[led].r==255 && !rendered[led].g && !rendered[led].b,"fresh colors render red at the final output");
+        }
+    }
+    check(!writes && !memcmp(saved,mock_backing,sizeof(saved)),"fallback rendering never writes a profile");
+
+    make_config(config,32);
+    // A previously saved blue profile, with independent colors in every layer.
+    for(uint8_t layer=0;layer<IG_LAYERS;layer++) {
+        uint16_t at=IG_RGB_OFFSET+(layer*RGB_MATRIX_LED_COUNT+1)*3;
+        config[at]=17+layer; config[at+1]=91+layer; config[at+2]=203-layer;
+    }
+    layer_state=0; install(config); memcpy(saved,mock_backing,sizeof(saved));
+    unsigned before=writes; uint32_t generation=active_generation, crc=active_crc;
+    memset(mock_cache,0xEC,sizeof(mock_cache)); keyboard_post_init_user();
+    check(active_slot>=0 && active_generation==generation && active_crc==crc,"saved profile identity survives reboot after fallback change");
+    check_readback(config,IG_SIZE);
+    for(uint8_t layer=0;layer<IG_LAYERS;layer++) {
+        layer_state=1U<<layer; rgb_matrix_indicators_advanced_user(0,RGB_MATRIX_LED_COUNT);
+        for(uint8_t led=0;led<RGB_MATRIX_LED_COUNT;led++) {
+            uint16_t at=IG_RGB_OFFSET+(layer*RGB_MATRIX_LED_COUNT+led)*3;
+            check(rendered[led].r==reference_pwm(config[at]) && rendered[led].g==reference_pwm(config[at+1]) && rendered[led].b==reference_pwm(config[at+2]),"saved blue and custom colors win over red fallback on every layer");
+        }
+    }
+    check(writes==before && !memcmp(saved,mock_backing,sizeof(saved)),"reload and rendering leave saved configuration bytes unchanged");
 }
 static void effect_runtime_checks(void) {
     uint8_t legacy[IG_SIZE], config[IG_MAX_SIZE], broken[IG_MAX_SIZE];
@@ -402,6 +444,7 @@ int main(int argc, char **argv) {
     lighting_slider_checks();
     screensaver_checks();
     version_reporting_checks();
+    fallback_color_checks();
     color_output_checks();
     cache_staging_checks();
     printf("PASS: board%u, %u firmware runtime checks; separate mock cache/backing; zero hardware access.\n", IG_BOARD, checks);

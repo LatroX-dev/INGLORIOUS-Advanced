@@ -12,6 +12,7 @@ public partial class MainWindow
     {
         if (!_screenshotMode) throw new InvalidOperationException("Connection checks require offline UI-smoke mode.");
         var devicesBefore = _devices;
+        var setupDevicesBefore = _setupDevices;
         var preferencesBefore = _preferences;
         var confirmationsBefore = _confirmedDeviceSaves.ToArray();
         var scanFailedBefore = _connectionScanFailed; var pendingBefore = _connectionRefreshPending;
@@ -29,6 +30,7 @@ public partial class MainWindow
         static Task<IReadOnlyList<DetectedDevice>> Snapshot(params DetectedDevice[] devices) => Task.FromResult<IReadOnlyList<DetectedDevice>>(devices);
         Button[] DeviceOptions() => DeviceButtons.Children.OfType<Button>().ToArray();
         string[] VisibleModels() => DeviceOptions().Select(button => (string)button.Tag).ToArray();
+        SetupDevice[] SetupOptions() => SetupDeviceButtons.Children.OfType<Button>().Select(button => (SetupDevice)button.Tag).ToArray();
         string[] HighlightedModels() => DeviceOptions()
             .Where(button => button.BorderBrush is SolidColorBrush { Color.A: > 0 })
             .Select(button => (string)button.Tag).ToArray();
@@ -57,8 +59,26 @@ public partial class MainWindow
             check(stableButtons.SequenceEqual(DeviceOptions()) && HighlightedModels().SequenceEqual(new[] { "pro-iso" }),
                 "Connections: unchanged presence keeps the existing buttons and active selection stable");
             await ScanDevicesAsync(scan: () => Snapshot(DevicePresence("pro-iso", stock: true), DevicePresence("numpad", stock: true)));
-            check(VisibleModels().SequenceEqual(new[] { "pro-iso", "numpad" }),
-                "Connections: devices with original firmware remain visible before setup or after restoration");
+            check(VisibleModels().Length == 0 && SetupOptions().Length == 2 &&
+                SetupOptions().Any(device => device.Name == "GMMK Numpad") && !ReadDeviceButton.IsEnabled && !TransferButton.IsEnabled,
+                "Connections: original firmware appears as setup cards, never duplicate editor cards or enabled transfers");
+            var stockCards = SetupDeviceButtons.Children.OfType<Button>().ToArray();
+            await ScanDevicesAsync(scan: () => Snapshot(DevicePresence("pro-iso", stock: true), DevicePresence("numpad", stock: true)));
+            check(stockCards.SequenceEqual(SetupDeviceButtons.Children.OfType<Button>()), "Connections: unchanged stock presence keeps setup cards stable");
+            foreach (var stock in StockDeviceCatalog.All.Where(item => item.HasFirmwareCandidate))
+            {
+                var device = new SetupDevice("stock-fixture", stock.IdentifiedName ?? DeviceCatalog.ModelGroupName(stock.CandidateDeviceIds),
+                    stock.CandidateDeviceIds, stock.VendorId, stock.ProductId, [], false);
+                await ScanDevicesAsync(scan: () => Snapshot(pro), setupScan: () => Task.FromResult<IReadOnlyList<SetupDevice>>([device]));
+                var card = SetupDeviceButtons.Children.OfType<Button>().Single();
+                var labels = (StackPanel)card.Content;
+                check(SetupOptions().Single() == device && card.IsEnabled && ((TextBlock)labels.Children[1]).Text == L.T("Gerät einrichten") &&
+                    labels.Children[2].Visibility == (device.IsExperimental ? Visibility.Visible : Visibility.Collapsed),
+                    "Connections: stock model " + device.Name + " offers setup regardless of experimental status");
+            }
+            await ScanDevicesAsync(scan: () => Snapshot(pro), setupScan: () => Task.FromResult<IReadOnlyList<SetupDevice>>([
+                new("unsupported-fixture", "Unsupported keyboard", [], 0x342D, 0xFFFF, [], false)]));
+            check(SetupOptions().Length == 0, "Connections: identified devices without a firmware candidate never offer sidebar setup");
 
             var candidate = new DetectedDevice("unverified-usb-320f-5093", "Glorious USB 320F:5093", "320F", "5093", "0001", "USB\\VID_320F&PID_5093\\fixture", "", "");
             var falsePro = candidate with { DeviceId = "pro-iso" };
@@ -66,15 +86,16 @@ public partial class MainWindow
             check(VisibleModels().SequenceEqual(new[] { "pro-iso" }),
                 "Connections: duplicate model entries collapse, and PID5093 cannot be presented as the reviewed PRO");
             await ScanDevicesAsync(scan: () => Snapshot(candidate, falsePro));
-            check(VisibleModels().Length == 0 && !ReadDeviceButton.IsEnabled && !TransferButton.IsEnabled,
-                "Connections: unverified metadata never enables a device action or invents a device button");
+            check(VisibleModels().Length == 0 && !ReadDeviceButton.IsEnabled && !TransferButton.IsEnabled &&
+                SetupOptions().All(device => device.CandidateDeviceIds.SequenceEqual(new[] { "pro-rev2-iso" })),
+                "Connections: stock revision candidates offer only setup, never an alias for the reviewed runtime");
 
             ResetWorkflowFixture("pro-ansi");
             _preferences = _preferences with { StartDevice = "pro-ansi" };
             _startupFinishing = true;
             await ScanDevicesAsync(selectInitial: true, scan: () => Snapshot(DevicePresence("numpad", stock: true)));
-            check(Device.Id == "numpad" && !IsDirty && IsActiveDeviceConnected,
-                "Connections: initial original-firmware presence replaces an unavailable clean start preference while startup remains locked");
+            check(Device.Id == "pro-ansi" && !IsDirty && !IsActiveDeviceConnected && SetupOptions().Length == 1,
+                "Connections: original firmware offers setup without selecting an unreadable editor session");
             _startupFinishing = false;
             ResetWorkflowFixture("pro-ansi");
             _preferences = _preferences with { StartDevice = "numpad" };
@@ -119,15 +140,18 @@ public partial class MainWindow
             await ScanDevicesAsync(scan: () => Snapshot(pro with { InstanceId = pro.InstanceId + "-replacement" }, pad));
             check(!_confirmedDeviceSaves.ContainsKey("pro-iso"), "Connections: a replacement physical instance does not inherit the previous keyboard's save confirmation");
             var listBeforeFailure = VisibleModels(); var projectBeforeFailure = Fingerprint(_project);
+            var stockPad = new SetupDevice("stock-pad", "GMMK Numpad", ["numpad"], 0x320F, 0x5088, [], false);
+            await ScanDevicesAsync(scan: () => Snapshot(pro, pad), setupScan: () => Task.FromResult<IReadOnlyList<SetupDevice>>([stockPad]));
             _confirmedDeviceSaves["pro-iso"] = (projectBeforeFailure, DateTime.Now);
             await ScanDevicesAsync(scan: () => Task.FromException<IReadOnlyList<DetectedDevice>>(new IOException("Synthetic metadata error")));
             check(_connectionScanFailed && _connectionRefreshPending && VisibleModels().SequenceEqual(listBeforeFailure) && Fingerprint(_project) == projectBeforeFailure,
                 "Connections: a scan failure is distinct from unplugging and preserves the last list and draft");
             check(!IsActiveDeviceConnected && !ReadDeviceButton.IsEnabled && !TransferButton.IsEnabled &&
-                  DeviceOptions().All(button => !button.IsEnabled) && _confirmedDeviceSaves.Count == 0,
+                  DeviceOptions().All(button => !button.IsEnabled) && SetupDeviceButtons.Children.OfType<Button>().All(button => !button.IsEnabled) &&
+                  SetupOptions().Single() == stockPad && _confirmedDeviceSaves.Count == 0,
                 "Connections: unknown presence disables device actions and clears stale confirmations");
             await ScanDevicesAsync(scan: () => Snapshot());
-            check(!_connectionScanFailed && VisibleModels().Length == 0 && DeviceModeText.Text == L.T("Kein Gerät verbunden") && Fingerprint(_project) == projectBeforeFailure,
+            check(!_connectionScanFailed && VisibleModels().Length == 0 && SetupOptions().Length == 0 && DeviceModeText.Text == L.T("Kein Gerät verbunden") && Fingerprint(_project) == projectBeforeFailure,
                 "Connections: a successful empty snapshot reports no connected devices without changing the local draft");
 
             await ScanDevicesAsync(scan: () => Snapshot(pro));
@@ -187,7 +211,7 @@ public partial class MainWindow
             _readingDevice = _checkingFirmwareGuide = _startupLoading = _startupFinishing = _startupClosed = _scanning = false;
             IsEnabled = true; _pendingEditDecisionOverride = () => PendingEditChoice.Discard;
             DiscardPendingEdits(); ResetWorkflowFixture("pro-iso");
-            _preferences = preferencesBefore; _devices = devicesBefore;
+            _preferences = preferencesBefore; _devices = devicesBefore; _setupDevices = setupDevicesBefore;
             _connectionScanFailed = scanFailedBefore; _connectionRefreshPending = pendingBefore;
             _connectionRevision = revisionBefore; _nextConnectionScan = nextScanBefore;
             _confirmedDeviceSaves.Clear(); foreach (var entry in confirmationsBefore) _confirmedDeviceSaves.Add(entry.Key, entry.Value);

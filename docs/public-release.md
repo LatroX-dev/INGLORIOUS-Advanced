@@ -27,10 +27,13 @@ The Windows build produces `INGLORIOUS-Advanced-<version>-win-x64-Setup.exe` wit
 
 ```powershell
 pwsh -NoProfile -File scripts/Export-PublicSource.ps1
-pwsh -NoProfile -File scripts/Export-PublicSource.ps1 -Destination <new-public-folder> -Export
+New-Item -ItemType Directory -Force workspace/exports | Out-Null
+pwsh -NoProfile -File scripts/Export-PublicSource.ps1 -Destination workspace/exports/release-source -Export
 ```
 
-The exporter uses an exact reviewed allowlist, checks content for private local identifiers and verifies every copied file. The destination must be new and outside the development source root. Existing directories are never cleaned or merged. The manifest records the exported files. Review that manifest before creating a Git commit.
+The exporter uses an exact reviewed allowlist, checks content for private local identifiers and verifies every copied file. The destination must be a new folder directly under `workspace/exports/` in the source project. Existing directories are never cleaned or merged. The entire `workspace/` directory is excluded from source exports and Git tracking. The manifest records the exported files. Review that manifest before creating a Git commit.
+
+Keep separate publication checkouts under `workspace/public`, temporary validation fixtures under `workspace/checks`, and generated builds under `artifacts/`. Do not create working copies beside the project. Historical working copies belong in `workspace/archive` and are not build inputs. None of these local working directories belongs in a public release.
 
 ## Matching source package
 
@@ -38,7 +41,7 @@ The exporter uses an exact reviewed allowlist, checks content for private local 
 pwsh -NoProfile -File scripts/New-CorrespondingSource.ps1 `
   -PublicSourceDirectory <reviewed-public-folder> `
   -QmkDirectory firmware/qmk_firmware `
-  -Destination artifacts/INGLORIOUS-Advanced-0.6.51-Source `
+  -Destination artifacts/INGLORIOUS-Advanced-0.6.55-Source `
   -Download
 ```
 
@@ -50,7 +53,7 @@ Keep this source package downloadable beside the matching app package. A link to
 
 The Avalonia app includes the same first-installation, backup, update and original-firmware restoration workflow as the Windows WPF app. Its adapter and native USB dependencies are built for Linux x64, macOS Intel or macOS Apple silicon. The package contains the reviewed firmware images, tools and license notices; no separate developer tool installation is required to use its firmware guide.
 
-On Linux, install the build tools `build-essential`, `pkg-config`, `patchelf` and `xvfb` in addition to the common prerequisites. On macOS, install Xcode Command Line Tools. Run this on the matching host, using the 15 binaries produced by the reviewed firmware build:
+On Linux, install the build tools `build-essential`, `pkg-config`, `patchelf` and `xvfb` in addition to the common prerequisites. On macOS, install Xcode Command Line Tools. Run this on the matching host, using the 16 binaries produced by the reviewed firmware build:
 
 ```powershell
 pwsh -NoProfile -File scripts/Build-DesktopRelease.ps1 `
@@ -61,7 +64,7 @@ pwsh -NoProfile -File scripts/Build-DesktopRelease.ps1 `
 
 Use `osx-x64` or `osx-arm64` on the corresponding Mac. The script rejects a mismatched host architecture or firmware catalog. It builds pinned libusb 1.0.30 and dfu-util 0.11 sources, generates a native-tool catalog, publishes the adapter, prepares the setup assets and runs offline checks before packaging. All builds and tests in this script avoid device I/O.
 
-Packages are named `INGLORIOUS-Advanced-0.6.51-<runtime>.tar.gz` and have matching SHA-256 files. macOS packages contain `INGLORIOUS Advanced.app`; Linux packages contain `application/INGLORIOUS Advanced` plus a USB-permission helper. macOS builds use ad-hoc signatures and are not notarized. Sign native tools before generating their catalog and the adapter before generating the setup-tool catalog; do not recursively re-sign pinned files afterward.
+Packages are named `INGLORIOUS-Advanced-0.6.55-<runtime>.tar.gz` and have matching SHA-256 files. macOS packages contain `INGLORIOUS Advanced.app`; Linux packages contain `application/INGLORIOUS Advanced` plus a USB-permission helper. macOS builds use ad-hoc signatures and are not notarized. Sign native tools before generating their catalog and the adapter before generating the setup-tool catalog; do not recursively re-sign pinned files afterward.
 
 `Licenses/Desktop-ThirdParty.txt` preserves the locked desktop dependencies' license texts and notices. `reference/desktop-license-inventory.json` records their versions and provenance. After a deliberate dependency change, restore the locked packages, run `Collect-DesktopLicenses.ps1`, review the changes and rebuild the package. Runtime licenses must be retained in self-contained output.
 

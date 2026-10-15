@@ -35,7 +35,7 @@ public partial class MainWindow
     {
         if (!BoardDescriptorRegistry.TryGet(deviceId, out _) || info is null || info.DeviceId != deviceId || !info.Persistent || (info.Flags & 4) != 0 || info.StagingBytes != 0
             || version is null || version.DeviceId != deviceId || version.BuildId == 0
-            || !FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var target)) return FirmwareGuideState.Unverified;
+            || !FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersionFor(deviceId), out var target)) return FirmwareGuideState.Unverified;
         return version.Version < target ? FirmwareGuideState.UpdateRequired : version.Version > target ? FirmwareGuideState.NewerVersion : FirmwareGuideState.Ready;
     }
 
@@ -44,6 +44,7 @@ public partial class MainWindow
         if (force && deviceId is not null && DeviceCatalog.Get(deviceId).IsOfflineOnly) return;
         if (_screenshotMode || _startupLoading || _startupClosed || _checkingFirmwareGuide || _readingDevice || _scanning || (!force && _automaticFirmwareGuideChecked)) return;
         _checkingFirmwareGuide = true; _automaticFirmwareGuideChecked = true;
+        CoreImportSelection? importedCore = null;
         try
         {
             _firmwareAssessments.Clear(); RefreshFirmwareVersionLabel();
@@ -56,11 +57,12 @@ public partial class MainWindow
             }
             // Original devices use the same discovery and backup path as manual setup.
             var setupDevices = await new DeviceSetupService().ListDevicesAsync();
-            if (setupDevices.Any(candidate => !candidate.IsRuntime &&
+            if (setupDevices.Any(candidate => candidate.HasFirmwareCandidate && !candidate.IsRuntime &&
                 (!force || deviceId is null || candidate.CandidateDeviceIds.Contains(deviceId))))
             {
                 var setup = new DeviceSetupWindow(deviceId) { Owner = this };
                 setup.ShowDialog();
+                if (setup.Completed) importedCore = setup.ImportedCoreSelection;
                 RequestConnectionRefresh();
                 return;
             }
@@ -122,6 +124,8 @@ public partial class MainWindow
         finally
         {
             _checkingFirmwareGuide = false;
+            UpdateSetupDeviceButtons();
+            if (importedCore is not null) AdoptSetupCoreImport(importedCore);
             StartSharedBrightnessIfReady();
         }
     }

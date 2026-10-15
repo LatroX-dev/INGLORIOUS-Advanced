@@ -1,6 +1,6 @@
 # Supported keyboards
 
-The app contains 15 model/layout variants on Windows, macOS and Linux. Two models have been used on physical hardware through the Windows app; the remaining 13 are marked **Experimental**. An experimental label does not bypass device, backup or firmware checks.
+The app contains 16 model/layout variants on Windows, macOS and Linux. Three models have physical-use evidence on Windows; 13 untested variants are marked **Experimental**. The GMMK 3 PRO status applies only to the wired, non-HE 100% ISO variant. Support status does not bypass device, backup or firmware checks.
 
 | Keyboard | Layout | Status | Device ID |
 | --- | --- | --- | --- |
@@ -19,6 +19,7 @@ The app contains 15 model/layout variants on Windows, macOS and Linux. Two model
 | GMMK 3, wired non-HE, 75% | ISO | Experimental | `gmmk3-75-iso` |
 | GMMK 3, wired non-HE, 100% | ANSI | Experimental | `gmmk3-100-ansi` |
 | GMMK 3, wired non-HE, 100% | ISO | Experimental | `gmmk3-100-iso` |
+| GMMK 3 PRO, wired non-HE, 100% | ISO | Hardware tested on Windows | `gmmk3-pro-100-iso` |
 
 All listed variants have an editor layout, configuration protocol and built firmware. First installation, update and original-firmware recovery are implemented in the guide on all three platforms and require its checks to pass. The general workflow still needs its hardware acceptance run; native macOS/Linux package and device validation is also pending. Previous use of a model does not certify every revision, firmware feature, operating system or recovery scenario.
 
@@ -26,7 +27,7 @@ The app shows connected devices only. The physical ANSI/ISO layout is separate f
 
 ## Not supported
 
-- GMMK 3 PRO as a separate model: the available definitions do not establish an independent PRO board identity.
+- Other GMMK 3 PRO sizes, layouts and hardware variants.
 - GMMK HE variants and their Hall-effect features.
 - GMBK and GMMK Eternal.
 - Bluetooth and other wireless modes, including on the Numpad.

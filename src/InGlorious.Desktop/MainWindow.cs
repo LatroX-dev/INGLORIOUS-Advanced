@@ -148,6 +148,7 @@ public sealed partial class MainWindow : Window
             var nav = new StackPanel { Spacing = 5, Margin = new Thickness(12) };
             _deviceButtonsPanel = new StackPanel { Name = "DeviceButtons", Spacing = 4 };
             _deviceButtons.Clear();
+            _setupDeviceButtons.Clear();
             Avalonia.Automation.AutomationProperties.SetName(_deviceButtonsPanel, L.T("Geräte"));
             _connectionHint = Text("", true, 11); _connectionHint.Name = "ConnectionHint";
             nav.Children.Add(_deviceButtonsPanel); nav.Children.Add(_connectionHint);

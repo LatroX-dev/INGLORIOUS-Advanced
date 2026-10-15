@@ -10,7 +10,7 @@ internal static partial class SelfTests
     internal static int Run(string? approvedFirmwareDirectory = null)
     {
         firmwareDirectory = approvedFirmwareDirectory;
-        string root = Path.Combine(Path.GetTempPath(), "inglorious-adapter-tests-" + Guid.NewGuid().ToString("N"));
+        string root = CheckDirectory();
         Directory.CreateDirectory(root);
         try
         {
@@ -20,7 +20,7 @@ internal static partial class SelfTests
             var dfu = NativeToolCatalog.Verify(NativeToolCatalog.DfuName);
             using (Files.Lock(dfu.Path, dfu.Bytes, dfu.Sha256).Stream) checks++;
             NativeCatalogChecks();
-            PacketChecks(); PageWriteChecks(); FileChecks(root); RequestChecks(root); OperationLockChecks(root); StmChecks();
+            PacketChecks(); PageWriteChecks(); FileChecks(root); RequestChecks(root); EngineeringChecks(root); RetainedLoaderChecks(root); OperationLockChecks(root); StmChecks();
             string[] ids = ["pro-iso", "numpad", "pro-ansi", "pro-rev2-ansi", "pro-rev2-iso", "gmmk2-65-ansi", "gmmk2-65-iso", "gmmk2-96-ansi", "gmmk2-96-iso", "gmmk3-65-ansi", "gmmk3-65-iso", "gmmk3-75-ansi", "gmmk3-75-iso", "gmmk3-100-ansi", "gmmk3-100-iso"];
             foreach (string id in ids) EngineChecks(root, id);
             LegacyChecks(root);
@@ -30,9 +30,7 @@ internal static partial class SelfTests
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
         finally
         {
-            string full = Path.GetFullPath(root);
-            if (full.StartsWith(Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath())) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) && Path.GetFileName(full).StartsWith("inglorious-adapter-tests-", StringComparison.Ordinal))
-                Directory.Delete(full, true);
+            CleanCheckDirectory(root);
         }
     }
     private static void Check(bool condition, string label) { checks++; if (!condition) throw new Exception("Check failed: " + label); }
@@ -53,26 +51,27 @@ internal static partial class SelfTests
     }
     private static void PacketChecks()
     {
-        var info = new Echo(); var data = WbProtocol.GetInfo(info);
+        var model = Model.Get("numpad");
+        var info = new Echo(); var data = WbProtocol.GetInfo(info, model);
         Check(data.FlashBytes == 131072 && data.SramBytes == 28672, "WB geometry");
-        info.Chip = 0x00502980; Check(WbProtocol.GetInfo(info).ChipId == info.Chip, "not Numpad full-type pinned");
-        info.Chip = 0; Reject(() => WbProtocol.GetInfo(info), "unknown family"); info.Chip = 0x3A502980;
-        info.Protected = true; Reject(() => WbProtocol.GetInfo(info), "protection never unlocked"); info.Protected = false;
+        info.Chip = 0x00502980; Check(WbProtocol.GetInfo(info, model).ChipId == info.Chip, "not Numpad full-type pinned");
+        info.Chip = 0; Reject(() => WbProtocol.GetInfo(info, model), "unknown family"); info.Chip = 0x3A502980;
+        info.Protected = true; Reject(() => WbProtocol.GetInfo(info, model), "protection never unlocked"); info.Protected = false;
         for (uint address = Model.FlashBase; address < Model.FlashBase + 131072; address += 256)
         {
-            var read = WbProtocol.ReadPacket(address, 256); WbProtocol.ValidatePacket(read, false);
+            var read = WbProtocol.ReadPacket(address, 256, model); WbProtocol.ValidatePacket(read, false, model);
             Check(BinaryPrimitives.ReadUInt32LittleEndian(read.AsSpan(4)) == address && read[8] == 0 && read[9] == 1, "READ address/count");
-            var erase = WbProtocol.ErasePacket(address); WbProtocol.ValidatePacket(erase, true);
+            var erase = WbProtocol.ErasePacket(address, model); WbProtocol.ValidatePacket(erase, true, model);
             Check(erase[0] == 0x5E && BinaryPrimitives.ReadUInt32LittleEndian(erase.AsSpan(8)) == 1, "one page only");
-            Reject(() => WbProtocol.ValidatePacket(erase, false), "readonly erase guard");
-            var write = WbProtocol.WritePacket(address, new byte[256]); WbProtocol.ValidatePacket(write, true);
-            Reject(() => WbProtocol.ValidatePacket(write, false), "readonly program guard");
+            Reject(() => WbProtocol.ValidatePacket(erase, false, model), "readonly erase guard");
+            var write = WbProtocol.WritePacket(address, new byte[256], model); WbProtocol.ValidatePacket(write, true, model);
+            Reject(() => WbProtocol.ValidatePacket(write, false, model), "readonly program guard");
         }
         foreach (uint bad in new uint[] { 0, 0x08000001, 0x08020000, 0x1FFFF7E8, 0xFFFFFFFF })
-        { Reject(() => WbProtocol.ErasePacket(bad), "erase address"); Reject(() => WbProtocol.WritePacket(bad, new byte[256]), "program address"); }
-        foreach (byte op in new byte[] { 0x83, 0x9B, 0x5E, 0x6A }) Reject(() => WbProtocol.ValidatePacket([op, 0xF0], true), "no reset/go/mass erase");
-        Reject(() => WbProtocol.WritePacket(Model.FlashBase, new byte[255]), "partial page");
-        Reject(() => WbProtocol.ReadPacket(Model.FlashBase + 131071, 2), "read end overflow");
+        { Reject(() => WbProtocol.ErasePacket(bad, model), "erase address"); Reject(() => WbProtocol.WritePacket(bad, new byte[256], model), "program address"); }
+        foreach (byte op in new byte[] { 0x83, 0x9B, 0x5E, 0x6A }) Reject(() => WbProtocol.ValidatePacket([op, 0xF0], true, model), "no reset/go/mass erase");
+        Reject(() => WbProtocol.WritePacket(Model.FlashBase, new byte[255], model), "partial page");
+        Reject(() => WbProtocol.ReadPacket(Model.FlashBase + 131071, 2, model), "read end overflow");
         Reject(() => WbProtocol.Check([0x71, 0], 0x72), "wrong ACK command");
         Reject(() => WbProtocol.CheckWrite([0x6A, 0, 0], 0x6A), "long write ACK");
     }
@@ -97,25 +96,26 @@ internal static partial class SelfTests
     }
     private static void PageWriteChecks()
     {
+        var model = Model.Get("numpad");
         byte[] original = Enumerable.Range(0, 131072).Select(n => (byte)(n * 19)).ToArray();
         var identity = new InstallationIdentity(2, Guid.NewGuid(), Files.Hash(original));
         byte[] image = InstallationIdentity.CreateImage(original.AsSpan(0, 4096), 131072, identity);
         int marker = InstallationIdentity.Offset(image.Length);
-        int[] installOrder = WbProtocol.PageOrder(image).ToArray(), restoreOrder = WbProtocol.PageOrder(original).ToArray();
+        int[] installOrder = WbProtocol.PageOrder(image, model).ToArray(), restoreOrder = WbProtocol.PageOrder(original, model).ToArray();
         Check(installOrder.Length == 512 && installOrder.Distinct().Count() == 512 && installOrder[0] == marker, "install marker first, every page once");
         Check(restoreOrder.Length == 512 && restoreOrder.Distinct().Count() == 512 && restoreOrder[^1] == marker, "restore marker last, every page once");
-        var memory = new MemoryWb(original); WbProtocol.WriteImage(memory, image);
+        var memory = new MemoryWb(original); WbProtocol.WriteImage(memory, image, model);
         Check(memory.Data.AsSpan().SequenceEqual(image) && memory.Erases == 512 && memory.Writes == 512 && memory.Reads == 512, "actual page algorithm exact install");
-        WbProtocol.WriteImage(memory, original);
+        WbProtocol.WriteImage(memory, original, model);
         Check(memory.Data.AsSpan().SequenceEqual(original) && memory.Erases == 1024 && memory.Writes == 1024 && memory.Reads == 1024, "actual page algorithm exact restore");
         foreach (int fail in new[] { 0, 1, 127, 511 })
         {
             var failing = new MemoryWb(original) { FailPage = fail };
-            Reject(() => WbProtocol.WriteImage(failing, image), "page failure propagates");
+            Reject(() => WbProtocol.WriteImage(failing, image, model), "page failure propagates");
             Check(failing.Erases == fail + 1 && failing.Writes == fail && failing.Reads == fail, "no retries or later pages after protection failure");
         }
         var verifyFail = new MemoryWb(original) { CorruptRead = true };
-        Reject(() => WbProtocol.WriteImage(verifyFail, image), "page mismatch propagates");
+        Reject(() => WbProtocol.WriteImage(verifyFail, image, model), "page mismatch propagates");
         Check(verifyFail.Erases == 1 && verifyFail.Writes == 1 && verifyFail.Reads == 1, "page mismatch stops immediately");
     }
     private static void RequestChecks(string root)
@@ -307,20 +307,22 @@ internal static partial class SelfTests
     private sealed class Echo : IWbExchange
     {
         internal uint Chip = 0x3A502980; internal bool Protected;
+        internal byte BootVersion = 3; internal uint FlashBytes = 131072, SramBytes = 28672;
         public byte[] Exchange(byte[] request)
         {
             if (Protected) return [request[0], 0x1A];
-            byte[] bytes = new byte[16]; bytes[0] = 1; bytes[2] = 13; bytes[3] = 3;
-            BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4), Chip); BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(8), 131072); BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(12), 28672); return bytes;
+            byte[] bytes = new byte[16]; bytes[0] = 1; bytes[2] = 13; bytes[3] = BootVersion;
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4), Chip); BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(8), FlashBytes); BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(12), SramBytes); return bytes;
         }
     }
-    private sealed class MemoryWb(byte[] initial) : IWbExchange
+    private sealed class MemoryWb(byte[] initial, Model? model = null) : IWbExchange
     {
+        private readonly Model selectedModel = model ?? Model.Get("numpad");
         internal readonly byte[] Data = initial.ToArray(); internal int Erases, Writes, Reads;
         internal int FailPage = -1; internal bool CorruptRead;
         public byte[] Exchange(byte[] request)
         {
-            WbProtocol.ValidatePacket(request, true);
+            WbProtocol.ValidatePacket(request, true, selectedModel);
             int offset = checked((int)(BinaryPrimitives.ReadUInt32LittleEndian(request.AsSpan(4)) - Model.FlashBase));
             if (request[0] == 0x5E)
             {
@@ -344,15 +346,27 @@ internal static partial class SelfTests
         {
             Image = new byte[model.FlashBytes]; Array.Fill(Image, (byte)0xFF); BinaryPrimitives.WriteUInt32LittleEndian(Image, 0x20001000); BinaryPrimitives.WriteUInt32LittleEndian(Image.AsSpan(4), Model.FlashBase + 0x101);
             bool stm = model.Transport == "stm32-dfuse";
-            Fingerprint = new(model.Transport, (ushort)(stm ? 0x0483 : 0x342D), (ushort)(stm ? 0xDF11 : 0xDFA0), 1, "6.7", stm ? "0123456789AB" : "", 1, 0, 0, 0x100, stm ? null : 0x3A502980, stm ? null : (byte)3, Model.FlashBase, model.FlashBytes, model.SramBytes, stm ? "@Internal Flash /0x08000000/128*0002Kg" : null, null, stm ? "usb-serial-and-port" : "transport-session");
+            Fingerprint = new(model.Transport, (ushort)(stm ? 0x0483 : 0x342D), (ushort)(stm ? 0xDF11 : 0xDFA0), 1, "6.7", stm ? "0123456789AB" : "", 1, 0, 0, 0x100, stm ? null : 0x3A502980, model.BootVersion, Model.FlashBase, model.FlashBytes, model.SramBytes, stm ? "@Internal Flash /0x08000000/128*0002Kg" : null, null, stm ? "usb-serial-and-port" : "transport-session");
         }
         public Fingerprint Probe(Model model) => Fingerprint;
         public byte[] ReadAll(Model model) { Reads++; var bytes = Image.ToArray(); if ((ReadFault && Reads % 2 == 0) || (AfterFault && wroteThisCall)) bytes[100] ^= 1; return bytes; }
-        public void WriteAll(Model model, byte[] image, Action beforeFirstWrite)
+        public void WriteAll(Model model, byte[] image, Action beforeFirstWrite, IRetainedLoaderWriteGrant? engineeringGrant = null)
         {
+            if (model.ProtectedPrefixBytes != 0)
+            {
+                if (engineeringGrant == null) throw new InvalidDataException("ENGINEERING_TRANSPORT_GRANT_REQUIRED");
+                engineeringGrant.Consume(model, Fingerprint, image, Image.AsSpan(0, model.ProtectedPrefixBytes).ToArray());
+            }
+            else if (engineeringGrant != null) throw new InvalidDataException("ENGINEERING_AUTHORIZATION_NOT_APPLICABLE");
             Check(Reads - BeforeWriteReads == 2, "two fresh captures before write");
             beforeFirstWrite(); Writes++; wroteThisCall = true;
-            if (WriteFault) throw new IOException("FAKE_PARTIAL_WRITE"); Image = image.ToArray();
+            if (WriteFault) throw new IOException("FAKE_PARTIAL_WRITE");
+            if (model.ProtectedPrefixBytes != 0)
+            {
+                var memory = new MemoryWb(Image, model); WbProtocol.WriteImage(memory, image, model); Image = memory.Data;
+                Check(memory.Erases == 912 && memory.Writes == 912 && memory.Reads == 912, "engineering fake transport uses exact writable pages");
+            }
+            else Image = image.ToArray();
         }
         public object[] Log => [new { reads = Reads, writes = Writes }];
         public void Dispose() => wroteThisCall = false;

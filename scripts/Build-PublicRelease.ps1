@@ -25,6 +25,7 @@ $expectedSdk=(Get-Content -LiteralPath (Join-Path $root 'global.json') -Raw|Conv
 if($sdk-cne$expectedSdk){throw ('Install .NET SDK '+$expectedSdk+' from Microsoft before building.')}
 $tests=@('InGlorious.Checks','InGlorious.BoardRegistryChecks','InGlorious.ModelChecks','InGlorious.DiscoveryChecks','InGlorious.OnboardChecks','InGlorious.MacroLibraryChecks','InGlorious.KeyBindingChecks','InGlorious.LightingPresetChecks','InGlorious.PreferencesChecks','InGlorious.RecordingChecks','InGlorious.PendingChecks','InGlorious.LightingTestChecks','InGlorious.AutostartChecks','InGlorious.StartupGuardChecks','InGlorious.BackgroundChecks','InGlorious.AppStartupChecks','InGlorious.AdapterFileChecks','InGlorious.SoftwareUpdateChecks')
 $executedTests=0
+$tests += @('InGlorious.FeedbackChecks','InGlorious.CoreImportChecks')
 foreach($suite in $tests){
     [xml]$testProject=Get-Content -LiteralPath (Join-Path $root ('tests/'+$suite+'/'+$suite+'.csproj'))
     if(-not$IsWindows-and$testProject.Project.PropertyGroup.TargetFramework.EndsWith('-windows')){continue}
@@ -53,6 +54,7 @@ if(-not$FirmwareDirectory){
         $fixtureDirectory=Join-Path $root ('artifacts/'+$(if($family-eq'port'){'port-fixtures'}else{'gmmk3-port-fixtures'}))
         Invoke-Checked 'dotnet' @('run','--project',(Join-Path $root 'tests/InGlorious.OnboardChecks/InGlorious.OnboardChecks.csproj'),'-c','Release','--',('--'+$family+'-fixtures'),$fixtureDirectory)
     }
+    Invoke-Checked 'dotnet' @('run','--project',(Join-Path $root 'tests/InGlorious.OnboardChecks/InGlorious.OnboardChecks.csproj'),'-c','Release','--','--retained-loader-fixtures',(Join-Path $FirmwareDirectory 'fixtures'))
     Invoke-Checked 'python' @((Join-Path $root 'firmware/Verify-CandidateBuild.py'),$FirmwareDirectory)
     foreach($runner in @('tests/InGlorious.ColorSequenceChecks/Run-ColorSequenceChecks.ps1','firmware/tests/Run-RuntimeChecks.ps1','firmware/tests/Run-EffectsChecks.ps1','firmware/tests/Run-BulkChecks.ps1','firmware/tests/Run-StorageChecks.ps1','tests/TimingChecks/Run-TimingChecks.ps1','tests/InGlorious.PreviewChecks/Run-PreviewChecks.ps1')){
         Invoke-Checked 'pwsh' @('-NoProfile','-File',(Join-Path $root $runner))

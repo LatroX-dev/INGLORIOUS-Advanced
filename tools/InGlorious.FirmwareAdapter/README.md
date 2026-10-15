@@ -2,15 +2,20 @@
 
 This adapter is independent of the original device-bound updater wrappers. It contains no
 user serial number, private port, original-image hash or private binding file. It uses the
-fifteen source-backed board geometries in `Model.Get`; that is not a claim that all fifteen
-boards have been tested on hardware. The coordinator must first establish the normal USB
+sixteen exact board geometries in `Model.Get`, including the retained-loader profile
+described below. This is not a claim that every board has been tested on hardware.
+The coordinator must first establish the normal USB
 model and observe its physical disconnect/reconnect into the bootloader at the same port.
 
 No operation runs on launch or from help. The executable accepts only:
 
 ```
 InGlorious.FirmwareAdapter --request REQUEST.json --response NEW_RESPONSE.json
+InGlorious.FirmwareAdapter --request REQUEST.json --response NEW_RESPONSE.json --engineering
+InGlorious.FirmwareAdapter --request REQUEST.json --response NEW_RESPONSE.json --engineering --engineering-write-authorization AUTHORIZATION.json
 InGlorious.FirmwareAdapter --self-test
+InGlorious.FirmwareAdapter --self-test-engineering --engineering-candidate CANDIDATE.bin --engineering-original ORIGINAL1.bin --engineering-repeat ORIGINAL2.bin
+InGlorious.FirmwareAdapter --self-test-retained-loader --candidate CANDIDATE.bin --original ORIGINAL1.bin --repeat ORIGINAL2.bin
 InGlorious.FirmwareAdapter --discover
 ```
 
@@ -88,8 +93,9 @@ The coordinator validates its embedded source catalog, builds a full image, then
 
 The adapter revalidates geometry, ARM vectors, byte length, checksum and image paths; paths
 must remain below the bundle directory and must not be reparse points. Both the coordinator
-and adapter additionally require the target application's immutable bytes to match the
-embedded `KnownFirmwareCatalog.json` release history. Stock model discovery belongs to the
+and adapter additionally require production target application bytes to match the embedded
+`KnownFirmwareCatalog.json` release history. The engineering profile uses its separate fixed
+policy below. Stock model discovery belongs to the
 coordinator. A checksum alone is not a signature.
 
 `InstallationIdentity.cs` is linked directly from Core: `IGIDENT1`, schema1, board ID, reserved
@@ -127,7 +133,8 @@ physically reconnect; there is no reset, jump or leave command.
   alternate0, FF/FF/00 interface and 64-byte bulk endpoints01/81. The same handle remains open
   through capture/write/verification. Exact manufacturer/product strings are required.
   `GET_INFO` uses the upstream Westberry family mask `(chipId & 0x3FFF)==0x2980`, protocol
-  revision3, 128KiB flash and 28KiB SRAM; there is no Numpad-only complete type-code comparison.
+  revision3, 128KiB flash and 28KiB SRAM for the original WB profiles. Board16 requires
+  revision4, 256KiB flash and 36KiB SRAM in both normal and engineering modes. There is no Numpad-only complete type-code comparison.
   Only INFO0, bounded READ, one aligned 256-byte page erase and full-page programming exist in
   the packet allowlist. A protected/error response stops immediately; no unlock, retry, mass
   erase, option writes, reset or jump is available. Installation writes the checked identity
@@ -149,7 +156,88 @@ that address is not established. The adapter intentionally makes no speculative 
 internal flash. [Westberry FQ95 reference manual](https://www.westberrytech.com/uploads/file/WB32FQ95xx/EN_RM2905025_WB32FQ95xx_V01.pdf)
 
 The WB command encoding is derived from the pinned [Westberry updater source](https://github.com/WestberryTech/wb32-dfu-updater/tree/656f6a56354de86a8213b0d2dc8349b0aeb4b67e).
-The old project-specific reader/writer and private update wrappers remain unchanged.
+Private device-bound updater wrappers are not part of this public workflow.
+
+## Retained-loader board16
+
+The normal `gmmk3-pro-100-iso` profile requires a reviewed resident-loader revision. Its
+code digest is fixed in `RetainedLoaderLayout.cs`; no vendor loader bytes are distributed.
+The application-only catalog entry must declare `applicationOffset:28672`. Image creation
+requires this device's own checked, matching original pair: its first `0x7000` bytes are
+retained and the approved application begins at `0x08007000`. The recovery identity remains
+at `0x37F00`, with the 32KiB configuration area at `0x38000`.
+
+Normal install, update and restore retain all existing consent, identity, original-pair,
+fingerprint and catalog checks. An update preserves the complete configuration and marker.
+A later USB port change is permitted only when every other capture fingerprint field matches
+and the fresh device image has the original backup's installation identity. The current
+request still binds the exact fresh port and fingerprint. Initial installation requires the
+full original capture fingerprint and byte-for-byte equality with both fresh before-reads.
+
+Only a validated, single-use retained-loader grant reaches the native writer. The writer
+rereads and checks the live prefix before consuming it; model-bound packet validation rejects
+every erase/program request in the protected prefix. All 912 writable pages are verified,
+then both complete readbacks include the untouched prefix. Restore can recover a damaged
+application with its matching marker; there is no exception for a lost marker.
+
+`--self-test-retained-loader` takes explicit local paths to a catalog-approved application and
+two original reads. It exercises normal capture/install/update/restore through the actual
+engine with a fake transport, including configuration preservation, wrong images, marker
+loss and one-use grants. Private fixtures stay under `workspace/checks` and are removed.
+The test never opens hardware, loads native USB libraries or starts a hardware tool.
+
+## Scoped engineering profile
+
+The optional `--engineering` flag selects the separately pinned board16 engineering policy
+instead of its normal catalog path. Probe/capture remain read-only. Install/restore
+also require `--engineering-write-authorization FILE`, the ordinary `confirmWrite:true`,
+and every existing backup, fingerprint and installation-identity binding. Engineering update
+is rejected. This CLI option does not extend the normal release catalog.
+
+`EngineeringPolicy.cs` contains one immutable application approval and one immutable
+resident-loader digest. JSON cannot replace either. The current application is linked at
+`0x08007000`; the composed 262144-byte image contains the exact original first `0x7000`
+bytes, approved application bytes, FF gap, board16 recovery marker at `0x37F00`, and trailing
+storage at `0x38000`. Initial storage and marker-page padding must be FF. Application vectors
+must point into the approved application extent and fit 36KiB SRAM.
+
+The authorization is strict camelCase JSON with these fields:
+
+* `schema:1`, `operation` (`install` or `restore`), `deviceId`, and exact `sessionDirectory`.
+* `fingerprint` copied from this adapter's fresh probe/capture and `fingerprintSha256`.
+* `originalSha256`, `installationId`, and `preparedImageSha256` for the exact full write image.
+* `candidateBytes`, `candidateSha256`, and `retainedPrefixSha256` matching the compiled policy.
+
+The selection must match the authorized fingerprint, including bus, positive canonical port
+chain and serial; use the observed empty string `""` when the WB ROM has no serial. The
+authorization is locked and copied into session evidence. Its exact session binding prevents
+replay into another session; the same session directory cannot be reused. A validated transport
+grant is also consumed once. Authorization files and real device paths belong in private
+project artifacts and must not be exported.
+
+Use an actual adapter capture manifest and two matching full reads. A manifest from the
+separate backup helper has a different contract and must not be converted by inventing an
+adapter fingerprint. Before first installation, compare the new original pair with the
+independently preserved original pair. Install still requires fresh device bytes to match the
+locked original exactly; restore still requires its matching installation marker.
+
+The protected prefix is enforced in model-bound packet construction and validation: no erase
+or program command may address below `0x08007000`. Only 912 writable pages are traversed;
+the marker is first during install and last during restore. The original, prepared image and
+fresh device reads must have identical reviewed loader bytes. Native transport rereads this
+prefix immediately before enabling writes. Per-page verification and two complete 256KiB
+readbacks cover the retained prefix as well as the written region. Merely rewriting identical
+loader bytes is forbidden. Marker-loss restoration has no exception: an interrupted marker
+page can still prevent ordinary restore even while the resident loader remains intact.
+
+The `--self-test-engineering` entry requires explicit local paths to the approved relocated
+application and both original reads. It checks their bytes, creates disposable full images,
+bundles and scoped authorizations, then exercises fake capture/install/restore through the real
+engine and bounded WB packet writer. It covers cross-scope rejection, session replay, one-use
+grants, changed prefix/image, full readbacks and missing-marker refusal. It never constructs a
+native backend, loads libusb or starts a hardware tool. Fixtures are created under the source
+project's `workspace/checks` and removed afterward. This is offline evidence, not permission
+or proof of a successful hardware installation or restoration.
 
 ## Build and package
 

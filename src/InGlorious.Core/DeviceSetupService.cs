@@ -15,6 +15,7 @@ public enum SetupOperation { Install, Restore, Update }
 public sealed record SetupDevice(string InstanceId, string Name, IReadOnlyList<string> CandidateDeviceIds,
     ushort VendorId, ushort ProductId, IReadOnlyList<string> LocationPaths, bool IsRuntime)
 {
+    public bool HasFirmwareCandidate => CandidateDeviceIds.Count > 0;
     public bool IsExperimental => CandidateDeviceIds.Any(id => BoardDescriptorRegistry.Get(id).IsExperimental);
     public override string ToString() => Name;
 }
@@ -72,10 +73,10 @@ public sealed partial class DeviceSetupService
         return nodes.Where(node => node.Service != "Unavailable").Select(node =>
         {
             if (StockDeviceCatalog.Match(node.VendorId, node.ProductId) is { } stock)
-                return new SetupDevice(node.InstanceId, DeviceCatalog.ModelGroupName(stock.CandidateDeviceIds), stock.CandidateDeviceIds,
+                return new SetupDevice(node.InstanceId, stock.IdentifiedName ?? DeviceCatalog.ModelGroupName(stock.CandidateDeviceIds), stock.CandidateDeviceIds,
                     node.VendorId, node.ProductId, node.LocationPaths, false);
             if (BoardDescriptorRegistry.TryGetRuntimeUsb(node.VendorId, node.ProductId, out var board))
-                return new SetupDevice(node.InstanceId, DeviceCatalog.Get(board.DeviceId).Name, new[] { board.DeviceId },
+                return new SetupDevice(node.InstanceId, DeviceCatalog.Get(board.DeviceId).Name, board.IsEngineeringOnly ? Array.Empty<string>() : new[] { board.DeviceId },
                     node.VendorId, node.ProductId, node.LocationPaths, true);
             return null;
         }).Where(device => device is not null).Cast<SetupDevice>().ToArray();
@@ -92,6 +93,8 @@ public sealed partial class DeviceSetupService
             if (matches.Length != 1 || !matches[0].CandidateDeviceIds.SequenceEqual(device.CandidateDeviceIds) ||
                 !SamePort(matches[0].LocationPaths, device.LocationPaths)) throw Error("Gerät nicht eindeutig erkannt.");
             device = matches[0];
+            if (!device.HasFirmwareCandidate)
+                throw Error("Für dieses Modell ist noch keine INGLORIOUS-Firmware verfügbar.");
             if (operation == SetupOperation.Install && device.IsRuntime)
                 throw Error("INGLORIOUS ist bereits installiert. Wähle bei Bedarf die Wiederherstellung.");
             if (operation is SetupOperation.Restore or SetupOperation.Update && !device.IsRuntime)
@@ -179,7 +182,6 @@ public sealed partial class DeviceSetupService
     {
         var fingerprint = response.GetProperty("fingerprint");
         var selection = session.Selection;
-        var stm = TransportFor(session.DeviceId!) == "stm32-dfuse";
         if (response.GetProperty("schema").GetInt32() != 1 || response.GetProperty("operation").GetString() != "probe" ||
             response.GetProperty("deviceId").GetString() != session.DeviceId ||
             !Regex.IsMatch(response.GetProperty("fingerprintSha256").GetString() ?? "", "\\A[0-9a-fA-F]{64}\\z") ||
@@ -192,10 +194,11 @@ public sealed partial class DeviceSetupService
             fingerprint.GetProperty("configuration").GetInt32() != 1 || fingerprint.GetProperty("interface").GetInt32() != 0 ||
             fingerprint.GetProperty("alternate").GetInt32() != 0 || fingerprint.GetProperty("flashBase").GetUInt32() != 0x08000000 ||
             fingerprint.GetProperty("flashBytes").GetInt32() != FlashBytesFor(session.DeviceId!) ||
-            fingerprint.GetProperty("sramBytes").GetInt32() != (stm ? 40960 : 28672))
+            fingerprint.GetProperty("sramBytes").GetInt32() != SramBytesFor(session.DeviceId!))
             throw Error("Der Prüfbericht gehört nicht zum erkannten Gerät.");
     }
-    internal static int FlashBytesFor(string id) => TransportFor(id) == "stm32-dfuse" ? 262144 : 131072;
+    internal static int FlashBytesFor(string id) => BoardDescriptorRegistry.Get(id).FlashBytes;
+    internal static int SramBytesFor(string id) => BoardDescriptorRegistry.Get(id).SramBytes;
     internal static bool IsBootloader(SetupUsbNode node) => (node.VendorId, node.ProductId) is (0x0483, 0xDF11) or (0x342D, 0xDFA0);
     internal static bool SamePort(IReadOnlyList<string> left, IReadOnlyList<string> right) => left.Count > 0 && right.Count > 0 &&
         left.Intersect(right, StringComparer.OrdinalIgnoreCase).Any(path => path.StartsWith("USBPORT(", StringComparison.OrdinalIgnoreCase)

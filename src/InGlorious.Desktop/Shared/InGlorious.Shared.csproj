@@ -11,6 +11,9 @@
     <Compile Include="../../InGlorious.Core/UserGuide.cs" Link="UserGuide.cs" />
     <Compile Include="../../InGlorious.Core/AppPreferences.cs" Link="AppPreferences.cs" />
     <Compile Include="../../InGlorious.Core/SoftwareUpdateService.cs" Link="SoftwareUpdateService.cs" />
+    <Compile Include="../../InGlorious.Core/DeviceFeedback.cs" Link="DeviceFeedback.cs" />
+    <Compile Include="../../InGlorious.Core/CoreSettingsImport.cs" Link="CoreSettingsImport.cs" />
+    <Compile Include="../../InGlorious.Core/SupportContact.cs" Link="SupportContact.cs" />
     <Compile Include="../../InGlorious.Core/AppAutostart.cs" Link="AppAutostart.cs" />
     <Compile Include="../../InGlorious.Core/AppAutostartEditor.cs" Link="AppAutostartEditor.cs" />
     <Compile Include="../../InGlorious.Core/WindowsInstallationGuard.cs" Link="WindowsInstallationGuard.cs" />
@@ -24,6 +27,8 @@
     <Compile Include="../../InGlorious.Core/LightingPreviewEngine.cs" Link="LightingPreviewEngine.cs" />
     <Compile Include="../../InGlorious.Core/OnboardProtocol.cs" Link="OnboardProtocol.cs" />
     <Compile Include="../../InGlorious.Core/OnboardClient.cs" Link="OnboardClient.cs" />
+    <Compile Include="../../InGlorious.Core/OnboardDiagnostics.cs" Link="OnboardDiagnostics.cs" />
+    <Compile Include="../../InGlorious.Core/DeviceDiagnosticSession.cs" Link="DeviceDiagnosticSession.cs" />
     <Compile Include="../../InGlorious.Core/StartupDeviceLoader.cs" Link="StartupDeviceLoader.cs" />
     <Compile Include="../../InGlorious.Core/FirmwareRelease.cs" Link="FirmwareRelease.cs" />
     <Compile Include="../../InGlorious.Core/FirmwareChangelog.cs" Link="FirmwareChangelog.cs" />
@@ -32,6 +37,7 @@
     <Compile Include="../../InGlorious.Core/StockDeviceCatalog.cs" Link="StockDeviceCatalog.cs" />
     <Compile Include="../../InGlorious.Core/StockFirmwareInspector.cs" Link="StockFirmwareInspector.cs" />
     <Compile Include="../../InGlorious.Core/InstallationIdentity.cs" Link="InstallationIdentity.cs" />
+    <Compile Include="../../InGlorious.Core/RetainedLoaderLayout.cs" Link="RetainedLoaderLayout.cs" />
     <Compile Include="../../InGlorious.Core/KnownFirmwareImages.cs" Link="KnownFirmwareImages.cs" />
     <Compile Include="../../InGlorious.Core/LegacyFirmwareMigration.cs" Link="LegacyFirmwareMigration.cs" />
     <Compile Include="../../InGlorious.Core/DeviceSetupService.Legacy.cs" Link="DeviceSetupService.Legacy.cs" />

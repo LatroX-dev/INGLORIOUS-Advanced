@@ -1,6 +1,6 @@
 # GMMK 3 development port
 
-Firmware 0.11.0 includes six experimental GMMK 3 targets. No GMMK 3 was physically available for testing. The current app supports original-firmware detection, backup, first installation, update and restoration for these targets through the guided workflow, subject to its device and backup checks. Physical hardware acceptance remains pending; see [model support](model-support.md) and [device setup](device-setup.md).
+Six experimental generic GMMK 3 targets were added in firmware 0.11.0. These six variants have not been physically tested. The current app supports original-firmware detection, backup, first installation, update and restoration for these targets through the guided workflow, subject to its device and backup checks. Physical hardware acceptance remains pending; see [model support](model-support.md) and [device setup](device-setup.md). The separately identified GMMK 3 PRO 100% ISO is described in the [PRO port notes](gmmk3-pro-port.md).
 
 ## Scope and provenance
 

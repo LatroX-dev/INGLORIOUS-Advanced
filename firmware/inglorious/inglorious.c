@@ -37,6 +37,16 @@ static void slider_reset(void);
 #define IG_SLOT_BYTES IG_STORAGE_SLOT_BYTES
 #define IG_SLOT_HEADER IG_STORAGE_HEADER_BYTES
 #define IG_VALID 0xA55A5AA5UL
+// Engineering linking retains this exact RAW13 identity for offline inspection
+// even when GCC folds its response copy. Native tests also verify the handler.
+const uint8_t ig_fw_identity[16] __attribute__((used)) = {
+    (uint8_t)IG_FW_VERSION_FORMAT, (uint8_t)(IG_FW_VERSION_FORMAT >> 8), IG_BOARD, 0,
+    (uint8_t)IG_FW_VERSION_MAJOR, (uint8_t)(IG_FW_VERSION_MAJOR >> 8),
+    (uint8_t)IG_FW_VERSION_MINOR, (uint8_t)(IG_FW_VERSION_MINOR >> 8),
+    (uint8_t)IG_FW_VERSION_PATCH, (uint8_t)(IG_FW_VERSION_PATCH >> 8), 0, 0,
+    (uint8_t)IG_FW_BUILD_ID, (uint8_t)(IG_FW_BUILD_ID >> 8),
+    (uint8_t)(IG_FW_BUILD_ID >> 16), (uint8_t)(IG_FW_BUILD_ID >> 24)
+};
 _Static_assert(IG_MAX_SIZE <= IG_SLOT_BYTES - IG_SLOT_HEADER, "Config must fit one persistent slot");
 _Static_assert(RAW_EPSIZE == 32, "Protocol 1 requires 32-byte RAW HID");
 
@@ -68,6 +78,16 @@ static uint32_t light_test_started;
 static bool light_test_active;
 static const uint8_t light_test_keys[10][2] = IG_LIGHT_TEST_KEYS;
 #include "ig_physical.h"
+
+static matrix_row_t physical_keys_down(uint8_t row) {
+    matrix_row_t bits = matrix_get_row(row);
+    matrix_row_t physical = 0;
+    // Matrix slots without a physical switch are not user input. Keep this
+    // independent of remapping: a real switch assigned KC_NO still counts.
+    for (uint8_t col = 0; col < MATRIX_COLS; ++col)
+        if (ig_physical[row * MATRIX_COLS + col]) physical |= bits & ((matrix_row_t)1U << col);
+    return physical;
+}
 
 static uint16_t u16(const uint8_t *p) { return (uint16_t)p[0] | ((uint16_t)p[1] << 8); }
 static uint32_t u32(const uint8_t *p) { return (uint32_t)u16(p) | ((uint32_t)u16(p + 2) << 16); }
@@ -128,7 +148,7 @@ static uint8_t default_byte(uint16_t offset) {
 #endif
     }
     if (offset < IG_MACRO_OFFSET) {
-        static const uint8_t color[3] = {32,100,220};
+        static const uint8_t color[3] = {255,0,0};
         return color[(offset - IG_RGB_OFFSET) % 3];
     }
     return 0;
@@ -146,6 +166,49 @@ static uint16_t light_test_remaining(uint32_t now) {
     if (elapsed >= IG_LIGHT_TEST_MS || lighting_suspended) { light_test_active = false; return 0; }
     return IG_LIGHT_TEST_MS - elapsed;
 }
+#if IG_BOARD == 16
+// Volatile physical diagnostics: no key suppression, profile edit or flash I/O.
+#define IG_DIAGNOSTIC_MS 10000U
+_Static_assert(MATRIX_ROWS == 14 && MATRIX_COLS == 8, "RAW14 matrix geometry");
+static bool diagnostic_active;
+static uint32_t diagnostic_refreshed;
+static uint8_t diagnostic_seen[14], diagnostic_mode, diagnostic_led;
+static uint16_t diagnostic_cw, diagnostic_ccw;
+static ig_rgb_t diagnostic_color;
+static void diagnostic_stop(void) {
+    diagnostic_active=false; diagnostic_mode=0; diagnostic_led=0;
+    diagnostic_color=(ig_rgb_t){0,0,0};
+    memset(diagnostic_seen,0,sizeof(diagnostic_seen)); diagnostic_cw=diagnostic_ccw=0;
+}
+static uint16_t diagnostic_remaining(uint32_t now) {
+    if(!diagnostic_active) return 0;
+    uint32_t elapsed=now-diagnostic_refreshed;
+    if(elapsed>=IG_DIAGNOSTIC_MS || lighting_suspended) { diagnostic_stop(); return 0; }
+    return IG_DIAGNOSTIC_MS-elapsed;
+}
+static void diagnostic_capture(void) {
+    if(!diagnostic_remaining(timer_read32())) return;
+    for(uint8_t row=0;row<MATRIX_ROWS;row++) {
+        matrix_row_t bits=matrix_get_row(row);
+        for(uint8_t col=0;col<MATRIX_COLS;col++)
+            if(ig_physical[row*MATRIX_COLS+col] && (bits&((matrix_row_t)1U<<col))) diagnostic_seen[row]|=1U<<col;
+    }
+}
+void matrix_scan_user(void) { diagnostic_capture(); }
+bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode;
+    if(diagnostic_remaining(timer_read32()) && record->event.pressed) {
+        if(IS_KEYEVENT(record->event) && record->event.key.row<MATRIX_ROWS && record->event.key.col<MATRIX_COLS &&
+           ig_physical[record->event.key.row*MATRIX_COLS+record->event.key.col])
+            diagnostic_seen[record->event.key.row]|=1U<<record->event.key.col;
+        else if(record->event.type==ENCODER_CW_EVENT) diagnostic_cw++;
+        else if(record->event.type==ENCODER_CCW_EVENT) diagnostic_ccw++;
+    }
+    return true; // The keyboard retains its normal host-visible behavior.
+}
+#else
+static uint16_t diagnostic_remaining(uint32_t now) { (void)now; return 0; }
+#endif
 static uint8_t light_test_drop_red(uint16_t elapsed, uint8_t x, uint8_t y) {
     // QMK physical LED coordinates: x=0..224, y=0..64, including both side strips.
     // The first drops arrive before the pool starts rising; it reaches the top
@@ -300,7 +363,7 @@ static void init_runtime(void) {
     runtime_ready = true;
 }
 static bool any_keys_pressed(void) {
-    for (uint8_t row = 0; row < MATRIX_ROWS; ++row) if (matrix_get_row(row)) return true;
+    for (uint8_t row = 0; row < MATRIX_ROWS; ++row) if (physical_keys_down(row)) return true;
     return false;
 }
 static bool store_staging(void) {
@@ -379,7 +442,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
         }
         case 4:
             if (count != 10) { status = 1; break; }
-            if (light_test_remaining(timer_read32())) { status = 3; break; }
+            if (light_test_remaining(timer_read32()) || diagnostic_remaining(timer_read32())) { status = 3; break; }
             if (!storage_ok) { status = 7; break; }
             if (u16(p) != IG_SIZE && u16(p) != IG_MAX_SIZE) { status = 2; break; }
             if (u32(p + 2) != active_generation) { status = 8; break; }
@@ -389,7 +452,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
             stage_open = true; stage_received = 0; stage_size = u16(p); stage_generation = u32(p + 2); stage_crc = u32(p + 6); size = 2; break;
         case 5:
             if (count != 8) { status = 1; break; }
-            if (light_test_remaining(timer_read32())) { status = 3; break; }
+            if (light_test_remaining(timer_read32()) || diagnostic_remaining(timer_read32())) { status = 3; break; }
             if (!storage_ok) { status = 7; break; }
             if (!stage_open) { status = 4; break; }
             if (u32(p + 4) != active_generation || stage_generation != active_generation) { status = 8; break; }
@@ -407,7 +470,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
         case 8:
             if (count) { status = 1; break; }
             if (!storage_ok) { status = 7; break; }
-            if (stage_open || macro_running || any_keys_pressed() || light_test_remaining(timer_read32())) { status = 3; break; }
+            if (stage_open || macro_running || any_keys_pressed() || light_test_remaining(timer_read32()) || diagnostic_remaining(timer_read32())) { status = 3; break; }
             out[0] = ig_timing_active_interval(); out[1] = ig_timing_saved_interval(); out[2] = out[0] != out[1]; size = 4;
             break;
         case 9: // Read volatile state only; no ADC read, EEPROM or flash access.
@@ -415,27 +478,52 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
             out[0] = brightness; out[1] = active_byte(16); size = 4; break;
         case 10: // Volatile dimmer; reset by power-on, never stored with a profile.
             if (count != 1) { status = 1; break; }
-            if (stage_open || ig_timing_reconnect_pending() || light_test_remaining(timer_read32())) { status = 3; break; }
+            if (stage_open || ig_timing_reconnect_pending() || light_test_remaining(timer_read32()) || diagnostic_remaining(timer_read32())) { status = 3; break; }
             brightness = p[0]; out[0] = brightness; size = 1; break;
         case 11: // Extension discovery leaves the original INFO layout and all config schemas intact.
             if (count) { status = 1; break; }
-            put16(out, 1); put16(out + 2, 3); put16(out + 4, IG_LIGHT_TEST_MS); size = 8; break;
+            put16(out, 1); put16(out + 2, IG_BOARD==16 ? 7 : 3); put16(out + 4, IG_LIGHT_TEST_MS); size = 8; break;
         case 12: { // 0=status, 1=start once, 2=stop. Never persistent and never extends a running deadline.
             if (count != 1) { status = 1; break; }
             if (p[0] > 2) { status = 2; break; }
             uint32_t now = timer_read32();
             uint16_t remaining = light_test_remaining(now);
             if (p[0] == 1) {
-                if (remaining || stage_open || macro_running || any_keys_pressed() || ig_timing_reconnect_pending() || lighting_suspended) { status = 3; break; }
+                if (remaining || stage_open || macro_running || any_keys_pressed() || ig_timing_reconnect_pending() || lighting_suspended || diagnostic_remaining(now)) { status = 3; break; }
                 light_test_started = now; light_test_active = true; remaining = IG_LIGHT_TEST_MS;
             } else if (p[0] == 2) { light_test_active = false; remaining = 0; }
             out[0] = remaining ? 1 : 0; out[1] = remaining ? IG_LIGHT_TEST_PATTERN : 0; put16(out + 2, remaining); size = 4; break;
         }
         case 13: // Read-only release identity; available during staging/macros just like INFO.
             if (count) { status = 1; break; }
-            put16(out, IG_FW_VERSION_FORMAT); out[2] = IG_BOARD;
-            put16(out + 4, IG_FW_VERSION_MAJOR); put16(out + 6, IG_FW_VERSION_MINOR); put16(out + 8, IG_FW_VERSION_PATCH);
-            put32(out + 12, IG_FW_BUILD_ID); size = 16; break;
+            memcpy(out, ig_fw_identity, sizeof(ig_fw_identity)); size = sizeof(ig_fw_identity); break;
+#if IG_BOARD == 16
+        case 14: {
+            if(count!=1) { status=1; break; }
+            if(p[0]>3) { status=2; break; }
+            uint32_t now=timer_read32();
+            uint16_t remaining=diagnostic_remaining(now);
+            // Refresh-only is atomic with expiry: a delayed host poll cannot
+            // restart a session and silently lose its cumulative observations.
+            if(p[0]==3 && !remaining) { status=8; break; }
+            if(p[0]==1 || p[0]==3) {
+                if(!remaining && (stage_open || macro_running || any_keys_pressed() || ig_timing_reconnect_pending() || light_test_remaining(now) || lighting_suspended)) { status=3; break; }
+                if(!remaining) diagnostic_stop();
+                diagnostic_active=true; diagnostic_refreshed=now;
+            } else if(p[0]==2) diagnostic_stop();
+            diagnostic_capture(); remaining=diagnostic_remaining(now);
+            out[0]=1; out[1]=remaining ? 1 : 0; out[2]=MATRIX_ROWS; out[3]=MATRIX_COLS;
+            memcpy(out+4,diagnostic_seen,14); put16(out+18,diagnostic_cw); put16(out+20,diagnostic_ccw); put16(out+22,remaining); size=24; break;
+        }
+        case 15: {
+            if(count!=5) { status=1; break; }
+            if(p[0]>2 || (p[0]!=2 && p[1]) || (p[0]==2 && p[1]>=RGB_MATRIX_LED_COUNT) || (!p[0] && (p[2] || p[3] || p[4]))) { status=2; break; }
+            uint16_t remaining=diagnostic_remaining(timer_read32());
+            if(!remaining) { status=4; break; }
+            diagnostic_mode=p[0]; diagnostic_led=p[1]; diagnostic_color=(ig_rgb_t){p[2],p[3],p[4]};
+            memcpy(out,p,5); put16(out+6,remaining); size=8; break;
+        }
+#endif
         default: status = 9; break;
     }
     reply(command, seq, status, out, status ? 0 : size);
@@ -463,13 +551,16 @@ static void start_macro(uint8_t index, bool physical_trigger) {
     // Momentary layer switches do not produce host key reports, so Fn may remain held.
     // Other physical keys (including modifiers) must not overlap macro-held reports.
     uint8_t pressed = 0;
-    for (uint8_t row = 0; row < MATRIX_ROWS; ++row) { matrix_row_t bits = matrix_get_row(row) & ~held_layer_keys[row]; while (bits) { pressed += bits & 1; bits >>= 1; } }
+    for (uint8_t row = 0; row < MATRIX_ROWS; ++row) { matrix_row_t bits = physical_keys_down(row) & ~held_layer_keys[row]; while (bits) { pressed += bits & 1; bits >>= 1; } }
     if (pressed > (physical_trigger ? 1 : 0)) return;
     uint16_t start = active_u16(IG_MACRO_OFFSET + index * 4), count = active_u16(IG_MACRO_OFFSET + index * 4 + 2);
     if (!count) return;
     macro_position = start; macro_end = start + count; macro_deadline = timer_read32(); macro_running = true;
 }
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (IS_KEYEVENT(record->event) &&
+        (record->event.key.row >= MATRIX_ROWS || record->event.key.col >= MATRIX_COLS ||
+         !ig_physical[record->event.key.row * MATRIX_COLS + record->event.key.col])) return true;
     if (IS_KEYEVENT(record->event) || IS_ENCODEREVENT(record->event)) lighting_activity();
     if (IS_KEYEVENT(record->event) && record->event.key.row < MATRIX_ROWS && record->event.key.col < MATRIX_COLS) {
         matrix_row_t bit = (matrix_row_t)1U << record->event.key.col;
@@ -511,6 +602,7 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         effect_frame_time = timer_read32(); // One timestamp/standby scale across partial frame batches.
         effect_frame_brightness = lighting_scale(effect_frame_time);
         (void)light_test_remaining(effect_frame_time);
+        (void)diagnostic_remaining(effect_frame_time);
     }
     uint8_t effect[8] = {0,128,255,3,0,0,0,0};
     if (active_size == IG_MAX_SIZE) for (uint8_t i = 0; i < 8; ++i) effect[i] = active_byte(IG_SIZE + layer * 8 + i);
@@ -521,6 +613,12 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     if (light_test_active) pattern_elapsed = effect_frame_time - light_test_started;
     else if (screensaver) pattern_elapsed = (effect_frame_time - lighting_last_activity - (uint32_t)active_u16(27) * 1000UL) % IG_LIGHT_TEST_MS;
     for (uint8_t led = led_min; led < led_max && led < RGB_MATRIX_LED_COUNT; ++led) {
+#if IG_BOARD == 16
+        if(diagnostic_active && diagnostic_mode && !lighting_suspended) {
+            ig_rgb_t color=diagnostic_mode==1 || led==diagnostic_led ? diagnostic_color : (ig_rgb_t){0,0,0};
+            lighting_output(led,color.r,color.g,color.b); continue;
+        }
+#endif
         if ((light_test_active || screensaver) && !lighting_suspended) {
             // A start request arriving halfway through an old normal frame waits
             // for the next frame's timestamp, rather than rendering wrapped time.
@@ -612,6 +710,7 @@ static void slider_task(void) {
 void housekeeping_task_user(void) {
     uint32_t now = timer_read32();
     (void)light_test_remaining(now); // Stops even if rendering is idle or the host disappears.
+    (void)diagnostic_remaining(now);
     // Newest first. Drop expired input history permanently so it cannot become
     // recent again after the 32-bit timer wraps during a long-running session.
     while (effect_hit_count && (uint32_t)(now - effect_hits[effect_hit_count - 1].time) >= IG_EFFECT_MAX_HIT_AGE_MS) --effect_hit_count;
@@ -656,6 +755,9 @@ static void recovery_startup(void) {
     bootloader_jump();
 }
 void keyboard_post_init_user(void) {
+#if IG_BOARD == 16
+    diagnostic_stop();
+#endif
     recovery_startup();
     lighting_suspended = false;
     memset(held_layer_keys, 0, sizeof(held_layer_keys));
@@ -666,5 +768,5 @@ void keyboard_post_init_user(void) {
     rgb_matrix_enable_noeeprom();
     rgb_matrix_mode_noeeprom(RGB_MATRIX_SOLID_COLOR);
 }
-void suspend_power_down_user(void) { lighting_suspended = true; light_test_active = false; cancel_macro(); memset(held_layer_keys, 0, sizeof(held_layer_keys)); effect_hit_count = 0; }
+void suspend_power_down_user(void) { lighting_suspended = true; light_test_active = false; (void)diagnostic_remaining(timer_read32()); cancel_macro(); memset(held_layer_keys, 0, sizeof(held_layer_keys)); effect_hit_count = 0; }
 void suspend_wakeup_init_user(void) { lighting_suspended = false; lighting_activity(); effect_hit_count = 0; }

@@ -15,7 +15,7 @@ public sealed record InstallationIdentity(byte BoardId, Guid InstallationId, str
 
     public byte[] Encode()
     {
-        if (BoardId is < 1 or > 15 || InstallationId == Guid.Empty || InstallationId == new Guid("ffffffff-ffff-ffff-ffff-ffffffffffff") || OriginalSha256.Length != 64)
+        if (BoardId is < 1 or > 16 || InstallationId == Guid.Empty || InstallationId == new Guid("ffffffff-ffff-ffff-ffff-ffffffffffff") || OriginalSha256.Length != 64)
             throw new InvalidDataException("Invalid installation identity.");
         var bytes = new byte[Size];
         "IGIDENT1"u8.CopyTo(bytes);
@@ -30,7 +30,7 @@ public sealed record InstallationIdentity(byte BoardId, Guid InstallationId, str
     {
         var record = flash.Slice(Offset(flash.Length), Size);
         if (!record[..8].SequenceEqual("IGIDENT1"u8)) return null;
-        if (record[8] != 1 || record[9] is < 1 or > 15 || record[10] != 0 || record[11] != 0 ||
+        if (record[8] != 1 || record[9] is < 1 or > 16 || record[10] != 0 || record[11] != 0 ||
             BinaryPrimitives.ReadUInt32LittleEndian(record[60..]) != Crc32(record[..60]))
             throw new InvalidDataException("Invalid recovery identity.");
         var id = new Guid(record.Slice(12, 16));
@@ -38,13 +38,22 @@ public sealed record InstallationIdentity(byte BoardId, Guid InstallationId, str
         return new(record[9], id, Convert.ToHexString(record.Slice(28, 32)));
     }
 
-    public static byte[] CreateImage(ReadOnlySpan<byte> firmware, int flashBytes, InstallationIdentity identity)
+    public static byte[] CreateImage(ReadOnlySpan<byte> firmware, int flashBytes, InstallationIdentity identity, ReadOnlySpan<byte> original = default)
     {
-        if (firmware.Length < 8 || firmware.Length > Offset(flashBytes))
+        int applicationOffset = RetainedLoaderLayout.ApplicationOffset(identity.BoardId);
+        if (firmware.Length < 8 || firmware.Length > Offset(flashBytes) - applicationOffset)
             throw new InvalidDataException("Firmware overlaps recovery identity or is empty.");
+        if (applicationOffset != 0)
+        {
+            if (flashBytes != RetainedLoaderLayout.FlashBytes || original.Length != flashBytes || !identity.MatchesOriginal(original) || Read(original) is not null)
+                throw new InvalidDataException("RETAINED_LOADER_ORIGINAL_REQUIRED");
+            RetainedLoaderLayout.ValidatePrefix(original);
+            RetainedLoaderLayout.ValidateApplicationVectors(firmware);
+        }
         var image = new byte[flashBytes];
         Array.Fill(image, (byte)0xFF);
-        firmware.CopyTo(image);
+        if (applicationOffset != 0) original[..applicationOffset].CopyTo(image);
+        firmware.CopyTo(image.AsSpan(applicationOffset));
         identity.Encode().CopyTo(image, Offset(flashBytes));
         return image;
     }

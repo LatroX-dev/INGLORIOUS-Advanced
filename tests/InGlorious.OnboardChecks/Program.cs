@@ -9,6 +9,8 @@ async Task RejectAsync(Func<Task> action, string reason) { try { await action();
 Check(OnboardProtocol.Crc32("123456789"u8) == 0xCBF43926, "IEEE CRC32 reference vector");
 await FirmwareVersionChecks.Run(Check);
 await ExperimentalBoardChecks.Run(Check, args);
+await EngineeringConfigurationChecks.Run(Check);
+await DiagnosticChecks.Run(Check);
 await StartupDeviceChecks.Run(Check);
 Check(!OnboardHidTransport.IsAllowedPath(@"\\?\hid#vid_320f&pid_5088&mi_02#x"), "Stock Numpad path excluded");
 Check(!OnboardHidTransport.IsAllowedPath(@"\\?\hid#vid_320f&pid_5046&mi_02#x"), "Stock PRO path excluded");
@@ -390,7 +392,7 @@ foreach (var id in new[] { "pro-iso", "numpad" })
                 case "unsupported": target.ExtensionStatus = 9; break;
                 case "busy": target.ExtensionStatus = 3; break;
                 case "io": target.ExtensionThrows = true; break;
-                case "unknown-flag": target.ExtensionFlags = 7; break;
+                case "unknown-flag": target.ExtensionFlags = 11; break;
                 case "malformed": target.ExtensionPayloadOverride = [1, 0, 3, 0]; break;
                 case "no-standby": target.ExtraFlags = 96; break;
             }

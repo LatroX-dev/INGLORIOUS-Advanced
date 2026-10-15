@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using Avalonia;
 using Avalonia.Automation;
@@ -19,6 +19,7 @@ public sealed partial class DeviceSetupWindow : Window
     private readonly DeviceSetupService? _service;
     private readonly bool _offlinePreview;
     private readonly string? _preferredDeviceId;
+    private readonly string? _preferredInstanceId;
     private readonly SetupOperation _operation;
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(1) };
     private SetupSession? _session;
@@ -50,9 +51,10 @@ public sealed partial class DeviceSetupWindow : Window
     { "WindowBackground" => "#141618", "Text" => "#E4E7EB", "Muted" => "#A0A7B0", "Accent" => "#EF646B", "Surface" => "#1C1F22", "SurfaceRaised" => "#22262A", "Stroke" => "#353A40", "Experimental" => "#E9B86B", _ => throw new ArgumentException("Unknown palette color.") }));
     private static TextBlock Text(double size, string text = "") => new() { Text = text, FontSize = size, TextWrapping = TextWrapping.Wrap };
 
-    public DeviceSetupWindow(string? preferredDeviceId = null, SetupOperation operation = SetupOperation.Install, bool offlinePreview = false)
+    public DeviceSetupWindow(string? preferredDeviceId = null, SetupOperation operation = SetupOperation.Install, bool offlinePreview = false,
+        string? preferredInstanceId = null)
     {
-        _preferredDeviceId = preferredDeviceId; _operation = operation; _offlinePreview = offlinePreview || Program.Offline;
+        _preferredDeviceId = preferredDeviceId; _preferredInstanceId = preferredInstanceId; _operation = operation; _offlinePreview = offlinePreview || Program.Offline;
         _service = _offlinePreview ? null : new DeviceSetupService();
         Title = OperationTitle + " · INGLORIOUS Advanced";
         Width = 760; Height = 710; MinWidth = 680; MinHeight = 620;
@@ -113,6 +115,9 @@ public sealed partial class DeviceSetupWindow : Window
 
     private string OperationTitle => L.T(_operation switch { SetupOperation.Install => "Gerät einrichten", SetupOperation.Update => "Firmware aktualisieren", _ => "Original-Firmware wiederherstellen" });
     private SetupDevice? SelectedDevice => _session?.Device ?? _devices.SelectedItem as SetupDevice;
+    private string? SelectedTargetVersion => (_session?.DeviceId ?? _runtimeVersion?.DeviceId ??
+        (SelectedDevice?.CandidateDeviceIds.Count == 1 ? SelectedDevice.CandidateDeviceIds[0] : null)) is { } id
+        ? SelectedDevice?.CandidateDeviceIds.Contains(id) == true && BoardDescriptorRegistry.TryGet(id, out _) ? DeviceSetupService.TargetFirmwareVersionFor(id) : null : null;
     internal static bool MatchesSelectedRuntime(OnboardDevice candidate, SetupDevice selected) =>
         selected.IsRuntime && selected.CandidateDeviceIds.Contains(candidate.DeviceId) &&
         BoardDescriptorRegistry.TryGet(candidate.DeviceId, out var board) &&
@@ -120,16 +125,17 @@ public sealed partial class DeviceSetupWindow : Window
     private bool CanAct => !_offlinePreview && ActionReady;
     private bool UpdateVersionReady => _operation != SetupOperation.Update ||
         (_runtimeVersion is { } report && SelectedDevice?.CandidateDeviceIds.Contains(report.DeviceId) == true &&
-         FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var target) && report.Version < target &&
+         FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersionFor(report.DeviceId), out var target) && report.Version < target &&
          (_session?.InstalledFirmwareVersion is not { } captured || FirmwareSemanticVersion.TryParse(captured, out var version) && version == report.Version));
     private bool ActionReady => !_busy && !_readingVersion && !_observing && !_closed && !_error && !_outcomeUncertain && !_writeAttempted && !_firmwareSequence.Started && UpdateVersionReady && (_session is null
-        ? SelectedDevice is not null
+        ? SelectedDevice?.HasFirmwareCandidate == true
         : HasResolvedModel && _progress is { CanCapture: true } && _modelConfirmation.IsChecked == true);
     private bool HasResolvedModel => _session?.DeviceId is { } id && _session.Device.CandidateDeviceIds.Contains(id) && _progress?.DeviceId == id;
 
     private void ApplyDevices(IReadOnlyList<SetupDevice> devices)
     {
         var eligible = devices.Where(device => device.IsRuntime == (_operation != SetupOperation.Install) &&
+            (_preferredInstanceId is null || device.InstanceId == _preferredInstanceId) &&
             (_preferredDeviceId is null || device.CandidateDeviceIds.Contains(_preferredDeviceId))).ToArray();
         _devices.ItemsSource = eligible;
         // Even a preferred model cannot choose between two physical devices silently.
@@ -142,7 +148,7 @@ public sealed partial class DeviceSetupWindow : Window
     private async Task ReadSelectedVersionAsync()
     {
         var selected = SelectedDevice;
-        if (_offlinePreview || _closed || _session is not null || selected?.IsRuntime != true) { _readingVersion = false; Render(); return; }
+        if (_offlinePreview || _closed || _session is not null || selected?.IsRuntime != true || !selected.HasFirmwareCandidate) { _readingVersion = false; Render(); return; }
         int revision = _versionRevision;
         _readingVersion = true; Render();
         try
@@ -228,6 +234,7 @@ public sealed partial class DeviceSetupWindow : Window
             if (_session is null)
             {
                 _session = await _service.BeginAsync(SelectedDevice!, _operation); _revision++;
+                await CaptureCoreImportAsync();
                 _devices.IsEnabled = false;
                 ApplyProgress(new(_session.Stage, L.T("Trenne das Gerät vom USB-Kabel."), _session.DeviceId));
             }
@@ -348,14 +355,14 @@ public sealed partial class DeviceSetupWindow : Window
         _deviceName.Text = productName is null ? L.T("Kein Gerät verbunden") : "\"" + productName + "\"";
         _version.Text = _operation switch
         {
-            SetupOperation.Install => "INGLORIOUS " + DeviceSetupService.TargetFirmwareVersion,
-            SetupOperation.Update when _runtimeVersion is { } report && FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var target) && report.Version < target
-                => "INGLORIOUS " + report.Version + " → " + DeviceSetupService.TargetFirmwareVersion,
+            SetupOperation.Install => SelectedTargetVersion is { } installVersion ? "INGLORIOUS " + installVersion : "INGLORIOUS",
+            SetupOperation.Update when _runtimeVersion is { } report && FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersionFor(report.DeviceId), out var target) && report.Version < target
+                => "INGLORIOUS " + report.Version + " → " + target,
             SetupOperation.Update or SetupOperation.Restore when _runtimeVersion is { } report => "INGLORIOUS " + report.Version,
             _ => _readingVersion ? L.T("Firmware-Version wird gelesen …") : ""
         };
         var experimental = resolvedModel?.IsExperimentalFirmware ?? device?.IsExperimental == true;
-        _experimental.Text = L.T("Experimentelle Unterstützung: noch nicht an diesem Modell getestet.");
+        _experimental.Text = L.T("Experimentelle Unterstützung: noch nicht vollständig geprüft.");
         _experimental.IsVisible = experimental ? true : false;
         ((TextBlock)_modelConfirmation.Content!).Text = L.T("Das erkannte Modell stimmt mit meinem Gerät überein.") + " " + L.T(experimental && _operation != SetupOperation.Restore
             ? "Ich möchte die experimentelle Firmware auf diesem Gerät installieren."
@@ -412,6 +419,13 @@ public sealed partial class DeviceSetupWindow : Window
         }
         _driverHelp.IsVisible = _status.Text == L.T("Für den Update-Modus fehlt der USB-Treiber.") ? true : false;
         _keepOpen.IsVisible = !IsFirmwareOperationRunning && stage is not (SetupStage.Complete or SetupStage.Blocked);
+        if (device is { HasFirmwareCandidate: false })
+        {
+            _heading.Text = L.T("Gerät erkannt");
+            _description.Text = L.T("Für dieses Modell ist noch keine INGLORIOUS-Firmware verfügbar.");
+            _version.Text = "";
+            _version.IsVisible = _step.IsVisible = _stepProgress.IsVisible = _summary.IsVisible = _backup.IsVisible = _keepOpen.IsVisible = false;
+        }
         _status.Foreground = Palette(_error ? "Accent" : "Muted");
         UpdateStatusVisibility();
         RenderCompletion();
@@ -422,7 +436,7 @@ public sealed partial class DeviceSetupWindow : Window
         if (device is null || device.CandidateDeviceIds.Count == 0) return [];
         if (device.CandidateDeviceIds.All(id => id == "numpad"))
             return L.T("Plus (+) + Enter").Split(" + ", StringSplitOptions.None);
-        if (device.IsRuntime || device.CandidateDeviceIds.All(id => id.StartsWith("pro-", StringComparison.Ordinal) || id.StartsWith("gmmk2-", StringComparison.Ordinal)))
+        if (device.IsRuntime || device.CandidateDeviceIds.All(id => id == "gmmk3-pro-100-iso" || id.StartsWith("pro-", StringComparison.Ordinal) || id.StartsWith("gmmk2-", StringComparison.Ordinal)))
             return L.T("Leertaste + B").Split(" + ", StringSplitOptions.None);
         if (device.CandidateDeviceIds.All(id => id.StartsWith("gmmk3-", StringComparison.Ordinal))) return ["Esc"];
         return [];
@@ -449,9 +463,9 @@ public sealed partial class DeviceSetupWindow : Window
 
     private static string BootInstruction(SetupDevice? device)
     {
-        if (device is null) return "";
+        if (device is null || !device.HasFirmwareCandidate) return "";
         if (device.CandidateDeviceIds.All(id => id == "numpad")) return L.T("Halte Plus und Enter beim Einstecken gedrückt. Lass die Tasten nach etwa 3 Sekunden los.");
-        if (device.IsRuntime) return L.T("Halte Leertaste und B beim Einstecken gedrückt. Lass die Tasten nach etwa 3 Sekunden los.");
+        if (device.IsRuntime || device.CandidateDeviceIds.All(id => id == "gmmk3-pro-100-iso")) return L.T("Halte Leertaste und B beim Einstecken gedrückt. Lass die Tasten nach etwa 3 Sekunden los.");
         if (device.CandidateDeviceIds.All(id => id.StartsWith("gmmk3-", StringComparison.Ordinal))) return L.T("Halte Esc beim Einstecken gedrückt. Lass die Taste nach etwa 3 Sekunden los.");
         if (device.CandidateDeviceIds.All(id => id.StartsWith("pro-", StringComparison.Ordinal) || id.StartsWith("gmmk2-", StringComparison.Ordinal))) return L.T("Halte Leertaste und B beim Einstecken gedrückt. Lass die Tasten nach etwa 3 Sekunden los.");
         return L.T("Gerät nicht eindeutig erkannt.");

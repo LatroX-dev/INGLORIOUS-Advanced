@@ -30,6 +30,7 @@ pwsh -NoProfile -File tests/TimingChecks/Run-TimingChecks.ps1
 - **Model ports:** the other thirteen layouts use the same production runtime with independently derived matrix, LED, recovery-key and lighting-test coordinates. Real serializer payloads pass upload, commit and full readback checks. All fifteen models check permanent reactive-history expiry across timer wrap.
 - **Storage:** the actual hash-guarded QMK wear-leveling implementation, with both 2-byte and 8-byte backing writes and both slot geometries. Cases cover cache borrowing, abort without writes, phase failures, full logs, consolidation, dirty-cache recovery, backing read failures and invalid geometry. The physical flash interface is simulated.
 - **WB32 bulk writer:** every supported WB32 board ID, scalar and full-page writes, erase polarity, alignment, bounds, first/middle/final failures, unchanged surrounding bytes and rejected unsupported compile configurations.
+- **Engineering board 16:** separate exact-target selection guards, 256 KiB flash with the final 32 KiB reserved, both directions of the old/new flash-size mismatch, and explicit engineering compile gates. Storage checks include its 7,680-byte slots; the opt-in port harness consumes separately generated offline fixtures.
 - **Effects and color sequences:** all 21 modes, brightness, reactive lifetimes, timing wrap and independent C#/C sequence-pixel comparison. The output-transfer tests compare the integer sRGB table with a separate floating-point reference.
 - **Timing:** bounded polling intervals, deferred debounce, safe delayed USB reconnection, timer wrap and descriptor-patch guards.
 
@@ -42,5 +43,12 @@ python firmware/Verify-CandidateBuild.py firmware/build
 ```
 
 The read-only audit checks all fifteen build outputs against their source manifest, reserved flash region, actual USB descriptors, base keymaps, physical-key masks, LED coordinates/channels, linker memory reservations and compiler stack frames.
+
+The separate [engineering target](../engineering/README.md) requires an explicit
+`--engineering --board gmmk3-pro-100-iso` verification request. It also checks the
+actual linked WB32 EFL descriptor, the 36 KiB RAM extent, the engineering compile
+gate, physical Space+B recovery positions, the relocated vector/startup VTOR,
+and ELF/HEX exclusion of the retained loader and identity page. Default verification still expects
+the same fifteen production-target definitions.
 
 These results do not establish physical flash reliability, atomic power-loss recovery, USB behavior on every host, LED color calibration or maximum runtime stack use. Hardware acceptance is recorded separately in [the model overview](../../docs/model-support.md).

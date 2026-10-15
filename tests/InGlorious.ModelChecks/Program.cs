@@ -33,6 +33,7 @@ foreach (var language in L.SupportedLanguages)
 L.SetLanguage("de");
 try
 {
+    RunNewProfileColorChecks(temp, Check);
     RunProfileImportChecks(temp, Check);
     (string Id, int Keys, int Leds, int Sides, bool Encoder)[] expected = [
         ("pro-iso",84,99,16,true), ("numpad",18,31,14,true),
@@ -41,25 +42,28 @@ try
         ("gmmk2-96-ansi",99,119,20,false), ("gmmk2-96-iso",100,120,20,false),
         ("gmmk3-65-ansi",66,85,20,true), ("gmmk3-65-iso",67,86,20,true),
         ("gmmk3-75-ansi",81,101,20,true), ("gmmk3-75-iso",82,102,20,true),
-        ("gmmk3-100-ansi",105,125,20,true), ("gmmk3-100-iso",106,126,20,true)
+        ("gmmk3-100-ansi",105,125,20,true), ("gmmk3-100-iso",106,126,20,true),
+        ("gmmk3-pro-100-iso",106,126,20,true)
     ];
-    Check(DeviceCatalog.All.Select(d => d.Id).Order().SequenceEqual(expected.Select(d => d.Id).Order()), "Exactly fifteen reviewed editor IDs");
-    Check(DeviceCatalog.All.Count(d => d.IsExperimentalFirmware) == 13 && DeviceCatalog.All.All(d => d.SupportsOnboardConfiguration) && BoardDescriptorRegistry.All.Count == 2, "Thirteen experimental codecs do not enlarge the two-board flash approval set");
+    Check(DeviceCatalog.All.Select(d => d.Id).Order().SequenceEqual(expected.Select(d => d.Id).Order()), "Sixteen exact protocol and editor model identities");
+    Check(DeviceCatalog.All.Count(d => d.IsExperimentalFirmware) == 13 && DeviceCatalog.All.Count(d => d.SupportsOnboardConfiguration) == 16 && BoardDescriptorRegistry.All.Count == 3, "Only the exact hardware-tested PRO variant joins the existing tested models");
     var library = new ProfileLibrary(Path.Combine(temp, "library"));
     foreach (var facts in expected)
     {
         var model = DeviceCatalog.Get(facts.Id);
-        using var reference = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(references, facts.Id + ".json")));
+        // Shared reference geometry does not alias the PRO firmware or USB identity.
+        var referenceId = facts.Id == "gmmk3-pro-100-iso" ? "gmmk3-100-iso" : facts.Id;
+        using var reference = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(references, referenceId + ".json")));
         foreach (var suffix in new[] { ".json", "-default.c" })
         {
-            var entry = manifest.RootElement.EnumerateArray().Single(e => e.GetProperty("file").GetString() == facts.Id + suffix);
-            Check(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(references, facts.Id + suffix)))) == entry.GetProperty("sha256").GetString(), "External oracle hash: " + facts.Id + suffix);
+            var entry = manifest.RootElement.EnumerateArray().Single(e => e.GetProperty("file").GetString() == referenceId + suffix);
+            Check(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(references, referenceId + suffix)))) == entry.GetProperty("sha256").GetString(), "External oracle hash: " + referenceId + suffix);
         }
         var root = reference.RootElement;
         var layout = root.GetProperty("layouts").EnumerateObject().Single();
         var rawKeys = layout.Value.GetProperty("layout").EnumerateArray().ToArray();
         var rawLeds = root.GetProperty("rgb_matrix").GetProperty("layout").EnumerateArray().ToArray();
-        var upstreamDefaults = BaseArguments(File.ReadAllText(Path.Combine(references, facts.Id + "-default.c")), layout.Name);
+        var upstreamDefaults = BaseArguments(File.ReadAllText(Path.Combine(references, referenceId + "-default.c")), layout.Name);
         Check(rawKeys.Length == facts.Keys && rawLeds.Length == facts.Leds, "Physical oracle dimensions " + facts.Id);
         Check(model.Keys.Count == facts.Keys + (facts.Encoder ? 2 : 0) && model.LedCount == facts.Leds, "No phantom keys/LEDs " + facts.Id);
         Check(model.HasEncoder == facts.Encoder && model.HasSlider == (facts.Id == "numpad"), "Physical controls " + facts.Id);
@@ -185,9 +189,13 @@ try
             foreach (var (left,right) in model.LeftSideLedIndices.Zip(model.RightSideLedIndices))
                 Check(frame[left] == frame[right], $"Synchronized side phase mode {mode} for {facts.Id}");
         }
-        var image = OnboardSerializer.Prepare(project); var decoded = OnboardSerializer.Decode(image.Payload);
-        Check(OnboardSerializer.Prepare(decoded).Payload.SequenceEqual(image.Payload), "Every model encodes/decodes all configured data");
-        Check(image.SchemaVersion == 4 && image.Payload[6] == BoardDescriptorRegistry.Get(facts.Id).BoardId, "Every model has an explicit wire ID");
+        if (model.IsOfflineOnly) Reject(() => OnboardSerializer.Prepare(project), "Engineering editor cannot create a transfer payload");
+        else
+        {
+            var image = OnboardSerializer.Prepare(project); var decoded = OnboardSerializer.Decode(image.Payload);
+            Check(OnboardSerializer.Prepare(decoded).Payload.SequenceEqual(image.Payload), "Every active model encodes/decodes all configured data");
+            Check(image.SchemaVersion == 4 && image.Payload[6] == BoardDescriptorRegistry.Get(facts.Id).BoardId, "Every active model has an explicit wire ID");
+        }
         Check(model.HasApprovedFirmwareManagement == BoardDescriptorRegistry.All.Any(board => board.DeviceId == facts.Id), "Codec support never invents firmware-management approval");
         var invalid = ProjectService.Clone(project); invalid.Layers[0].LedEffects[facts.Leds] = new();
         Reject(() => OnboardSerializer.ValidateEditorProject(invalid), "Out-of-layout LED rejected for every model");
@@ -195,9 +203,9 @@ try
         Reject(() => OnboardSerializer.ValidateEditorProject(invalid), "Unknown profile never acquires editor support");
     }
     var profiles = library.Discover(out var warning);
-    Check(warning is null && profiles.Count == 15 && profiles.Select(p => p.DeviceId).Distinct().Count() == 15, "Profile library retains every distinct model");
-    Check(BoardDescriptorRegistry.All.Select(b => b.DeviceId).Order().SequenceEqual(new[]{"numpad","pro-iso"}), "No operation above grants a new firmware target");
-    Console.WriteLine($"PASS {checks} model/reference/profile/effects/macro/OS/offline-gate checks across fifteen models. No hardware APIs or firmware tools are linked.");
+    Check(warning is null && profiles.Count == 16 && profiles.Select(p => p.DeviceId).Distinct().Count() == 16, "Profile library retains every distinct model");
+    Check(BoardDescriptorRegistry.All.Select(b => b.DeviceId).Order().SequenceEqual(new[]{"gmmk3-pro-100-iso","numpad","pro-iso"}), "Profile operations cannot change the three exact hardware-tested models");
+    Console.WriteLine($"PASS {checks} model/reference/profile/effects/macro/OS/offline-gate checks across sixteen models. No hardware APIs or firmware tools are linked.");
 }
 finally
 {
@@ -284,6 +292,59 @@ static void RunProfileImportChecks(string root, Action<bool, string> check)
     }
 }
 
+static void RunNewProfileColorChecks(string temp, Action<bool, string> check)
+{
+    string Json(object value) => JsonSerializer.Serialize(value, ProjectService.JsonOptions);
+    string[] savedColors = ["#8374F8", "#668BFA", "#49BDCA", "#DB86BC"];
+    foreach (var device in DeviceCatalog.All)
+    {
+        var project = ProjectService.Create(device.Id);
+        check(project.Layers.Count == 4 && project.Layers.All(layer => layer.SideLedColor == "#FF0000" &&
+            layer.Keys.Values.All(key => key.Color == "#FF0000") && device.NonKeyLedIndices.All(led =>
+                layer.ExtraLedColors.GetValueOrDefault(led, layer.SideLedColor) == "#FF0000")),
+            "Every new layer starts with pure red keys, sides and logo " + device.Id);
+        if (device.SupportsOnboardConfiguration)
+        {
+            var image = OnboardSerializer.Prepare(project);
+            var shape = OnboardSerializer.Shape(device.Id);
+            var rgbOffset = 32 + 8 * shape.Rows * shape.Cols + 16;
+            check(Enumerable.Range(0, 4 * shape.Leds).All(led => image.Payload.AsSpan(rgbOffset + led * 3, 3).SequenceEqual(new byte[] { 255, 0, 0 })),
+                "New profile encodes pure red for every physical LED on every layer " + device.Id);
+        }
+        foreach (var layer in project.Layers)
+        {
+            var index = 0;
+            foreach (var key in layer.Keys.Values) key.Color = savedColors[index++ % savedColors.Length];
+            layer.SideLedColor = "#8374F8";
+            foreach (var led in device.NonKeyLedIndices) layer.ExtraLedColors[led] = led % 2 == 0 ? "#123456" : "#ABCDEF";
+        }
+        var file = Path.Combine(temp, device.Id + "-saved-colors.json");
+        ProjectService.Save(file, project);
+        var bytes = File.ReadAllBytes(file); var before = Json(project);
+        var loaded = ProjectService.Load(file);
+        check(Json(loaded) == before && Json(ProjectService.Clone(loaded)) == before && File.ReadAllBytes(file).SequenceEqual(bytes),
+            "Loading and cloning preserve saved multicolor profiles and source files " + device.Id);
+        if (device.SupportsOnboardConfiguration)
+        {
+            var payload = OnboardSerializer.Prepare(loaded).Payload;
+            check(OnboardSerializer.Prepare(OnboardSerializer.Decode(payload)).Payload.SequenceEqual(payload),
+                "Device decoding preserves existing colors instead of applying new-profile red " + device.Id);
+        }
+    }
+    var legacy = System.Text.Json.Nodes.JsonNode.Parse(Json(ProjectService.Create("pro-iso")))!;
+    foreach (var layer in legacy["layers"]!.AsArray())
+    {
+        layer!.AsObject().Remove("sideLedColor");
+        foreach (var key in layer["keys"]!.AsObject()) key.Value!.AsObject().Remove("color");
+    }
+    var legacyFile = Path.Combine(temp, "omitted-legacy-colors.json");
+    File.WriteAllText(legacyFile, legacy.ToJsonString());
+    var legacyBytes = File.ReadAllBytes(legacyFile);
+    var legacyLoaded = ProjectService.Load(legacyFile);
+    check(legacyLoaded.Layers.All(layer => layer.SideLedColor == "#8374F8" && layer.Keys.Values.All(key => key.Color == "#7367F0")) &&
+        File.ReadAllBytes(legacyFile).SequenceEqual(legacyBytes), "Older files with omitted colors retain their original fallback colors without file changes");
+}
+
 static void RunGlobalEffectSwitchChecks(DeviceDefinition device, Action<bool, string> check)
 {
     static string Json(object value) => JsonSerializer.Serialize(value, ProjectService.JsonOptions);
@@ -326,9 +387,12 @@ static void RunGlobalEffectSwitchChecks(DeviceDefinition device, Action<bool, st
             }
             check(frame[keys[0].LedIndex!.Value] == default && frame[keys[1].LedIndex!.Value] == new PreviewRgb(36, 184, 96), "Black remains unlit and a stored color remains static at full brightness");
         }
-        var payload = OnboardSerializer.Prepare(project).Payload; var decoded = OnboardSerializer.Decode(payload);
-        check(!GlobalEffectSwitch.IsEnabled(decoded.Layers[0].LightingEffect) && Json(decoded.Layers[0].LightingEffect) == Json(disabled), "Off and all retained effect parameters survive the device codec");
-        check(OnboardSerializer.Prepare(decoded).Payload.SequenceEqual(payload), "Off configuration is byte-exact after device read and re-encoding");
+        if (!device.IsOfflineOnly)
+        {
+            var payload = OnboardSerializer.Prepare(project).Payload; var decoded = OnboardSerializer.Decode(payload);
+            check(!GlobalEffectSwitch.IsEnabled(decoded.Layers[0].LightingEffect) && Json(decoded.Layers[0].LightingEffect) == Json(disabled), "Off and all retained effect parameters survive the device codec");
+            check(OnboardSerializer.Prepare(decoded).Payload.SequenceEqual(payload), "Off configuration is byte-exact after device read and re-encoding");
+        }
         var preset = LightingPresetStore.Capture(project, 0, "Static colors");
         var applied = LightingPresetStore.Apply(ProjectService.Create(device.Id), 2, preset);
         check(!GlobalEffectSwitch.IsEnabled(applied.Layers[2].LightingEffect) && Json(applied.Layers[2].LedEffects) == individual, "Lighting presets preserve off and individual effects");

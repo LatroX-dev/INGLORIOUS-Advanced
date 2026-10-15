@@ -1,6 +1,7 @@
 **/bin/
 **/obj/
 AGENTS.md
+/workspace/
 artifacts/
 source-export-manifest.json
 backups/

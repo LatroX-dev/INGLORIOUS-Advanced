@@ -13,4 +13,5 @@
   <ItemGroup><Compile Include="../../src/InGlorious.Core/FirmwareRelease.cs" Link="FirmwareRelease.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/InGlorious.Core/FirmwareChangelog.cs" Link="FirmwareChangelog.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/InGlorious.Core/BoardDescriptorRegistry.cs" Link="BoardDescriptorRegistry.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../tools/InGlorious.Device/DeviceArguments.cs" Link="DeviceArguments.cs" /></ItemGroup>
 </Project>
