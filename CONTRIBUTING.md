@@ -51,7 +51,7 @@ Generated builds go under `artifacts/`. Separate local checkouts, source exports
 ## Changes
 
 - Keep customer text short and state a clear next step.
-- Update all supported languages for UI changes. Keep changelogs short and in English.
+- Update all supported languages for UI changes. Keep changelogs short and in English. Collect unpublished changes under Unreleased, then combine them under the actual public release version. Do not add separate changelog sections for local test builds.
 - Include before/after screenshots for visible changes, without private profiles or identifiers.
 - Preserve existing license and copyright notices. See `COPYRIGHT.md` for component scope.
 - Keep personal firmware, profiles, device serials, machine paths and diagnostic logs out of commits.
