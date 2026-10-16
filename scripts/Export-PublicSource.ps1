@@ -142,10 +142,10 @@ $allow.Add('tests/InGlorious.OnboardChecks/StartupDeviceChecks.cs')
 foreach ($name in @('effect_oracle.c','Run-PreviewChecks.ps1')) { $allow.Add('tests/InGlorious.PreviewChecks/'+$name) }
 foreach ($name in @('sequence_oracle.c','Run-ColorSequenceChecks.ps1')) { $allow.Add('tests/InGlorious.ColorSequenceChecks/'+$name) }
 foreach ($name in @('.gitignore','.gitattributes','docs/public-release.md','docs/model-support.md','scripts/Test-ModelReferences.ps1','scripts/Export-PublicSource.ps1','scripts/Build-BrandIcon.ps1','scripts/Install-InGlorious.ps1','scripts/New-WindowsPackage.ps1','scripts/Test-WindowsInstaller.ps1')) { $allow.Add($name) }
-foreach ($name in @('README.md','LICENSE','COPYRIGHT.md','THIRD-PARTY-NOTICES.md','CONTRIBUTING.md','SECURITY.md','CHANGELOG.md','global.json','NuGet.Config','Directory.Build.props',
+foreach ($name in @('README.md','LICENSE','COPYRIGHT.md','THIRD-PARTY-NOTICES.md','CONTRIBUTING.md','SECURITY.md','SUPPORT.md','CODE_OF_CONDUCT.md','CHANGELOG.md','global.json','NuGet.Config','Directory.Build.props',
     'docs/getting-started.md','docs/hardware-acceptance.md','docs/license-audit.md','docs/images/windows-lighting.png','docs/images/windows-device.png','docs/images/experimental-layout.png','docs/images/pro-ansi.png','docs/images/gmmk3-100-ansi.png','docs/images/linux-numpad.png','docs/images/macos-pro-ansi.png','docs/images/native-provenance.json',
     'scripts/Initialize-BuildDependencies.ps1','scripts/build-dependencies.json','scripts/Build-PublicRelease.ps1','scripts/Test-PublicSourceExport.ps1','scripts/Copy-RuntimeNotices.ps1',
-    '.github/workflows/build.yml','.github/ISSUE_TEMPLATE/bug_report.yml','.github/ISSUE_TEMPLATE/config.yml','.github/ISSUE_TEMPLATE/device_support.yml','.github/ISSUE_TEMPLATE/feature_request.yml',
+    '.github/workflows/build.yml','.github/FUNDING.yml','.github/pull_request_template.md','.github/ISSUE_TEMPLATE/bug_report.yml','.github/ISSUE_TEMPLATE/config.yml','.github/ISSUE_TEMPLATE/device_support.yml','.github/ISSUE_TEMPLATE/feature_request.yml',
     'src/InGlorious.Desktop/packages.lock.json','src/InGlorious.Desktop/Shared/packages.lock.json',
     'Licenses/Apache-2.0.txt','Licenses/Avalonia-MIT.txt','Licenses/GPL-2.0.txt','Licenses/HidSharp-Apache-2.0.txt','Licenses/LGPL-2.1.txt','Licenses/dotnet-WindowsDesktop-MIT.txt',
     'Licenses/Avalonia-BuildServices-MIT.txt','Licenses/MicroCom-MIT.txt','Licenses/Tmds-DBus-MIT.txt','Licenses/Desktop-ThirdParty.txt','Licenses/dotnet-Runtime-MIT.txt','Licenses/dotnet-Runtime-ThirdParty.txt',
@@ -201,6 +201,30 @@ function Assert-NoPrivateText([string]$Relative,[byte[]]$Bytes) {
         $publicContact = "inglorious@latrox.dev"
         $mailToken = '[A-Za-z0-9.!#$%&''*+/=?^_`{|}~@-]'
         $scan = $scan -replace ('(?<!'+$mailToken+')'+[regex]::Escape($publicContact)+'(?!'+$mailToken+')'), 'PUBLIC_CONTACT_EMAIL'
+        # Only the approved Ko-fi URL and the complete single-entry funding file
+        # are public. A matching handle in any other location remains private.
+        $publicKoFi = 'https://ko-fi.com/latrox'
+        $urlStart = '(?<![^\s("''<>])'
+        $urlEnd = '(?=[\s)"''<>]|$)'
+        if ($scan.Contains($publicKoFi,[StringComparison]::Ordinal)) {
+            $scan = $scan -creplace ($urlStart+[regex]::Escape($publicKoFi)+$urlEnd), 'PUBLIC_FUNDING_URL'
+        }
+        if ($Relative -ceq '.github/FUNDING.yml') {
+            $fundingName = $publicKoFi.Substring($publicKoFi.LastIndexOf('/')+1)
+            $scan = $scan -creplace ('\Ako_fi: '+[regex]::Escape($fundingName)+'(?:\r?\n)?\z'), 'ko_fi: PUBLIC_FUNDING_ACCOUNT'
+        }
+        # Badge exceptions cover complete reviewed endpoints, not arbitrary
+        # account/repository paths. Query strings are retained for privacy checks.
+        foreach ($badge in @(
+            'https://img.shields.io/github/stars/LatroX-dev/INGLORIOUS-Advanced',
+            'https://img.shields.io/github/downloads/LatroX-dev/INGLORIOUS-Advanced/total',
+            'https://img.shields.io/github/v/release/LatroX-dev/INGLORIOUS-Advanced',
+            'https://img.shields.io/github/actions/workflow/status/LatroX-dev/INGLORIOUS-Advanced/build.yml'
+        )) {
+            if ($scan.Contains($badge,[StringComparison]::Ordinal)) {
+                $scan = $scan -creplace ($urlStart+[regex]::Escape($badge)+'(?=[?\s)"''<>]|$)'), 'PUBLIC_REPOSITORY_BADGE'
+            }
+        }
         foreach ($value in $private) {
             if ($scan.Contains($value,[StringComparison]::OrdinalIgnoreCase)) { throw ('Private local identifier detected in allowlisted file: '+$Relative) }
         }

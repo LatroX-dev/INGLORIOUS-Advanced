@@ -6,7 +6,7 @@ Security fixes target the latest published release. Older app and firmware combi
 
 ## Report a vulnerability
 
-Use this repository's **Security → Report a vulnerability** form for issues involving firmware writes, backup association, malicious profiles, native tool loading or arbitrary code execution. If private vulnerability reporting is unavailable, open an issue asking for a private reporting channel without publishing exploit details, personal captures or device identifiers.
+Use this repository's **Security → Report a vulnerability** form for issues involving firmware writes, backup association, malicious profiles, native tool loading or arbitrary code execution. If private vulnerability reporting is unavailable, email [inglorious@latrox.dev](mailto:inglorious@latrox.dev). Do not publish exploit details, personal captures or device identifiers in a public issue.
 
 Include the app version, operating system, affected model and a minimal reproduction with synthetic data. Never attach original firmware, personal profile contents or unredacted logs. Review diagnostic files before sharing them: they may contain local paths and USB identifiers.
 

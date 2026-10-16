@@ -9,7 +9,7 @@ body:
     id: version
     attributes:
       label: App and firmware versions
-      placeholder: App 0.6.40, firmware 0.11.0
+      placeholder: App version from Settings; firmware version from Device
     validations:
       required: true
   - type: input

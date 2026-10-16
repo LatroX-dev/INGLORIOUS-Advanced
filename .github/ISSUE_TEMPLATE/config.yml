@@ -1,1 +1,8 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Help, setup and recovery
+    url: https://github.com/LatroX-dev/INGLORIOUS-Advanced/blob/main/SUPPORT.md
+    about: Find guides and contact options before opening a report.
+  - name: Report a security vulnerability
+    url: https://github.com/LatroX-dev/INGLORIOUS-Advanced/security/policy
+    about: Use the private reporting options. Do not post exploit details in a public issue.

@@ -1,5 +1,14 @@
 # INGLORIOUS Advanced
 
+[![Latest release](https://img.shields.io/github/v/release/LatroX-dev/INGLORIOUS-Advanced?color=ef4444)](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases/latest)
+[![Build and verify](https://github.com/LatroX-dev/INGLORIOUS-Advanced/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/LatroX-dev/INGLORIOUS-Advanced/actions/workflows/build.yml)
+[![GitHub stars](https://img.shields.io/github/stars/LatroX-dev/INGLORIOUS-Advanced?style=flat)](https://github.com/LatroX-dev/INGLORIOUS-Advanced/stargazers)
+[![Release downloads](https://img.shields.io/github/downloads/LatroX-dev/INGLORIOUS-Advanced/total)](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
+[![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/latrox)
+
+**[Download](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases/latest) · [Setup & recovery](docs/getting-started.md) · [Supported keyboards](docs/model-support.md) · [Changelog](CHANGELOG.md) · [Help](SUPPORT.md)**
+
 Configure Glorious keyboards with per-key lighting, effects, key assignments, macros and four layers. Settings run on the keyboard after transfer, so the app can be closed.
 
 I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
@@ -133,9 +142,17 @@ These screenshots were captured on native macOS and Linux runners using syntheti
 
 ## Contact and feedback
 
+See [Help & support](SUPPORT.md) for setup questions, bug reports and feature requests. Feedback from owners of supported keyboards helps improve the app and its device support.
+
 Use **Device → Feedback & contact** to preview a voluntary report and open it on GitHub or in your email app. Nothing is submitted automatically. GitHub reports are public; do not include personal data or backup files.
 
 Public contact: [inglorious@latrox.dev](mailto:inglorious@latrox.dev).
+
+## Support the project
+
+If INGLORIOUS Advanced is useful to you, you can [support its development on Ko-fi](https://ko-fi.com/latrox). Donations are optional; the app and firmware remain free and open source.
+
+A [GitHub star](https://github.com/LatroX-dev/INGLORIOUS-Advanced/stargazers), a hardware report or a [contribution](CONTRIBUTING.md) also helps.
 
 ## Build and contribute
 

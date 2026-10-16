@@ -2,6 +2,8 @@
 
 Changes to INGLORIOUS Advanced should make keyboard configuration easier without weakening model, backup or write checks. The macOS and Linux versions are Early Alpha.
 
+For usage questions or device reports, see [Help & support](SUPPORT.md). Please follow the [Code of conduct](CODE_OF_CONDUCT.md) when contributing. For a larger change, open a [feature request](https://github.com/LatroX-dev/INGLORIOUS-Advanced/issues/new/choose) first to discuss the scope.
+
 ## Build
 
 Install Git, PowerShell 7.2+, Python 3, `tar` and the exact .NET SDK in `global.json`. The full Windows x64 build needs several gigabytes of free disk space; its first firmware-toolchain download is about 600 MB. Native Linux/macOS packages require a matching host and the reviewed firmware outputs. Use the clean-build instructions in [docs/public-release.md](docs/public-release.md). The Windows WPF app is in `src/InGlorious.Core`; the Avalonia app for macOS/Linux is in `src/InGlorious.Desktop`. Both use the shared firmware coordinator.
