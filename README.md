@@ -25,11 +25,11 @@ INGLORIOUS Advanced is an independent project. It is not affiliated with or endo
 
 ## Demo
 
-[![Watch the 55-second INGLORIOUS Advanced demo](docs/images/demo-preview.png)](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases/download/v0.6.57/INGLORIOUS-Advanced-Demo-en.mp4)
+https://github.com/user-attachments/assets/5097bc01-0c87-4f6c-bcde-ef262cdd0d00
 
 Select keys, change their color, choose an effect and transfer the configuration to a GMMK PRO ISO. Recorded in the Windows app.
 
-**[Watch the 55-second demo](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases/download/v0.6.57/INGLORIOUS-Advanced-Demo-en.mp4)** · [English captions](docs/demo/INGLORIOUS-Advanced-Demo-en.srt) · [Music credits](docs/demo/README.md)
+**[Download the video](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases/download/v0.6.57/INGLORIOUS-Advanced-Demo-en.mp4)** · [English captions](docs/demo/INGLORIOUS-Advanced-Demo-en.srt) · [Music credits](docs/demo/README.md)
 
 ## Get started
 
