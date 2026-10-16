@@ -1,0 +1,31 @@
+1
+00:00:03,000 --> 00:00:08,000
+Select the keys you want to change.
+
+2
+00:00:08,000 --> 00:00:13,000
+Choose a color.
+
+3
+00:00:13,000 --> 00:00:17,000
+Add an animated effect.
+
+4
+00:00:17,000 --> 00:00:26,000
+Choose Horizontal wave.
+
+5
+00:00:26,000 --> 00:00:31,000
+Apply the effect to your selection.
+
+6
+00:00:31,000 --> 00:00:35,000
+Preview the result.
+
+7
+00:00:35,000 --> 00:00:46,000
+Send the configuration to the keyboard.
+
+8
+00:00:46,000 --> 00:00:51,000
+Saved to onboard memory.

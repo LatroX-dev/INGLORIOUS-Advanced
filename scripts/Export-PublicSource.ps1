@@ -48,6 +48,9 @@ foreach ($name in @('feedback.json','core-import.json')) { $allow.Add('src/InGlo
 foreach ($suite in @('InGlorious.FeedbackChecks','InGlorious.CoreImportChecks')) { $allow.Add('tests/'+$suite+'/'+$suite+'.csproj'); $allow.Add('tests/'+$suite+'/Program.cs') }
 $allow.Add('.github/ISSUE_TEMPLATE/device-feedback.md')
 $allow.Add('docs/core-import.md')
+$allow.Add('docs/images/demo-preview.png')
+$allow.Add('docs/demo/README.md')
+$allow.Add('docs/demo/INGLORIOUS-Advanced-Demo-en.srt')
 $allow.Add('src/InGlorious.Core/SetupFirmwareCatalog.json')
 $allow.Add('src/InGlorious.Core/Locales/device-test.json')
 $allow.Add('tests/InGlorious.OnboardChecks/DiagnosticChecks.cs')

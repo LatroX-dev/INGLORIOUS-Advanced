@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.56
 
 - Fixed key labels and favorite-color help staying in German when using another app language.
 
