@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -13,6 +13,7 @@ public sealed partial class DeviceSetupWindow
     private readonly StackPanel _completion = new() { Margin = new(0, 18, 0, 0), IsVisible = false };
     private readonly Button _lightingButton = new() { Name = "SetupLightingTest", HorizontalAlignment = HorizontalAlignment.Left, MinHeight = 38 };
     private readonly TextBlock _lightingStatus = Text(13), _typingHint = Text(13);
+    private readonly TextBlock _numLockHint = new() { Text = L.T("Für Ziffern Num-Lock einschalten. Standardbelegung: Fn + 0."), TextWrapping = TextWrapping.Wrap, Margin = new(0, 8, 0, 0) };
     private readonly TextBox _typingTest = new() { Name = "SetupTypingTest", MinHeight = 40, MaxLength = 32, Margin = new(0, 8, 0, 0) };
     private string? _returnedHidPath;
     private bool _lightingRunning;
@@ -33,7 +34,7 @@ public sealed partial class DeviceSetupWindow
         _completion.Children.Add(new TextBlock { Text = L.T("Dauert etwa 21 Sekunden."), Margin = new(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap });
         _completion.Children.Add(new TextBlock { Text = L.T("Während des Lichttests keine Tasten drücken."), Margin = new(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap });
         _lightingStatus.Margin = new(0, 8, 0, 0); _completion.Children.Add(_lightingStatus);
-        _typingHint.Margin = new(0, 18, 0, 0); _completion.Children.Add(_typingHint); _completion.Children.Add(_typingTest);
+        _typingHint.Margin = new(0, 18, 0, 0); _completion.Children.Add(_typingHint); _completion.Children.Add(_numLockHint); _completion.Children.Add(_typingTest);
         AutomationProperties.SetName(_typingTest, L.T("Hier Tasten testen"));
         _lightingButton.Click += async (_, _) => await RunCompletionLightingAsync();
         _typingTest.TextChanged += (_, _) => { if (!_offlinePreview && TypingCompletes) Close(); };
@@ -46,6 +47,7 @@ public sealed partial class DeviceSetupWindow
         _completion.IsVisible = CompletionTestsVisible ? true : false;
         _lightingButton.IsEnabled = !_offlinePreview && LightingReady;
         _typingTest.IsEnabled = !_offlinePreview && !_lightingRunning;
+        _numLockHint.IsVisible = DeviceId == "numpad";
         _typingHint.Text = L.T(DeviceId == "numpad" ? "Tippe 1234567890, um abzuschließen, oder klicke auf „Fertig“."
             : "Schreibe INGLORIOUS, um abzuschließen, oder klicke auf „Fertig“.");
     }

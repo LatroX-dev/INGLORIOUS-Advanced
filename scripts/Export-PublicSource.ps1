@@ -27,6 +27,7 @@ if (-not (Get-Item -LiteralPath $root).PSIsContainer) { throw 'SourceRoot must b
 
 # Exact relative paths only. New files never enter this list through recursion or a glob.
 $app = @(
+    'DeviceTypingTest.cs',
     'FirmwareAdapterProcess.cs','PosixDeviceSetupEnvironment.cs','PlatformUsbIdentity.cs','AppAutostart.cs','AppAutostartEditor.cs','WindowsInstallationGuard.cs','BackgroundApplicationSession.cs','WindowsTrayIcon.cs','MainWindow.Background.cs','ApplicationInstance.cs','DeviceSetupFirmwareSequence.cs','LegacyFirmwareMigration.cs','DeviceSetupService.Legacy.cs',
     'App.xaml','App.xaml.cs','AppPreferences.cs','AppSettingsWindow.xaml','AppSettingsWindow.xaml.cs','SoftwareUpdateService.cs','SoftwareUpdateWindow.cs','MainWindow.SoftwareUpdate.cs','BackupService.cs','ColorPaletteStore.cs','ColorPickerWindow.cs',
     'DeviceScanner.cs','StockDeviceCatalog.cs','StockFirmwareInspector.cs','InstallationIdentity.cs','KnownFirmwareImages.cs','DeviceSetupService.cs','DeviceSetupService.Storage.cs','WindowsDeviceSetupEnvironment.cs','DeviceSetupWindow.cs','DeviceSetupWindow.Checks.cs','DeviceSetupWindow.Completion.cs','MainWindow.Setup.cs','InGlorious.Core.csproj','MainWindow.xaml','MainWindow.xaml.cs','Models.cs','UserGuide.cs','HelpWindow.cs','MainWindow.Help.cs',

@@ -29,6 +29,7 @@
     <Compile Include="../../InGlorious.Core/OnboardClient.cs" Link="OnboardClient.cs" />
     <Compile Include="../../InGlorious.Core/OnboardDiagnostics.cs" Link="OnboardDiagnostics.cs" />
     <Compile Include="../../InGlorious.Core/DeviceDiagnosticSession.cs" Link="DeviceDiagnosticSession.cs" />
+    <Compile Include="../../InGlorious.Core/DeviceTypingTest.cs" Link="DeviceTypingTest.cs" />
     <Compile Include="../../InGlorious.Core/StartupDeviceLoader.cs" Link="StartupDeviceLoader.cs" />
     <Compile Include="../../InGlorious.Core/FirmwareRelease.cs" Link="FirmwareRelease.cs" />
     <Compile Include="../../InGlorious.Core/FirmwareChangelog.cs" Link="FirmwareChangelog.cs" />

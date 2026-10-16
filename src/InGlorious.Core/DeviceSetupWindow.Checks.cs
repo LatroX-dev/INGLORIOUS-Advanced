@@ -214,6 +214,9 @@ public sealed partial class DeviceSetupWindow
             ShowOfflineStep("complete", model.Id);
             check(CompletionTestsVisible == (_operation != SetupOperation.Restore) && !_lightingButton.IsEnabled,
                 "Setup: " + model.Id + " " + _operation + " shows its post-flash test without allowing offline device access");
+            check(_deviceTestButton.Visibility == Visibility.Visible && !_deviceTestButton.IsEnabled &&
+                (_numLockHint.Visibility == Visibility.Visible) == (model.Id == "numpad"),
+                "Setup: all models offer device testing after install/update, with the Num Lock hint only for Numpad");
             _typingTest.Text = model.Id == "numpad" ? "123456789" : "INGLORIOU";
             check(!TypingCompletes, "Setup: incomplete typing never finishes the wizard");
             _typingTest.Text = model.Id == "numpad" ? "1234567890" : "iNgLoRiOuS";

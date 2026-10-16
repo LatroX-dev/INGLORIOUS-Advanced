@@ -275,7 +275,7 @@
                                 <Grid x:Name="DeviceSupportActions">
                                     <Grid.ColumnDefinitions><ColumnDefinition x:Name="DeviceTestColumn" /><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                                    <TextBlock x:Name="DeviceTestHint" Text="{local:Tr Key='Tasten, Drehknopf und LEDs einzeln prüfen.'}" Style="{StaticResource HelpText}" Margin="0,0,24,12" />
+                                    <TextBlock x:Name="DeviceTestHint" Text="{local:Tr Key='Tasten und Eingaben prüfen.'}" Style="{StaticResource HelpText}" Margin="0,0,24,12" />
                                     <Button x:Name="DeviceTestAction" Grid.Row="1" local:UiIcons.Kind="keyboard" Content="{local:Tr Key='Gerät testen'}" Click="DeviceTest_Click" HorizontalAlignment="Left" MinHeight="38" Margin="0,0,24,0" />
                                     <TextBlock Grid.Column="1" Text="{local:Tr Key='Gespeicherte Farben und Belegungen aus Glorious CORE übernehmen.'}" Style="{StaticResource HelpText}" Margin="0,0,24,12" />
                                     <Button x:Name="ImportCoreSettings" Grid.Column="1" Grid.Row="1" local:UiIcons.Kind="import" Content="{local:Tr Key='CORE-Einstellungen importieren'}" Click="CoreImport_Click" HorizontalAlignment="Left" MinHeight="38" Margin="0,0,24,0" />
@@ -532,6 +532,7 @@
                                 <Button x:Name="OpenLayerSwitchButton" local:UiIcons.Kind="layers" Content="{local:Tr Key='Fn / Ebenenwechsel …'}" Click="OpenLayerSwitch_Click" Margin="0,0,0,8"/>
                                 <Button local:UiIcons.Kind="action" Content="{local:Tr Key='Betriebssystem-Aktion …'}" Click="AssignOsAction_Click" Margin="0,0,0,12"/>
                                 <TextBlock x:Name="CurrentBindingText" Style="{StaticResource HelpText}" Margin="0,0,0,13" />
+                                <TextBlock x:Name="NumpadNumLockHint" Text="{local:Tr Key='Für Ziffern Num-Lock einschalten. Standardbelegung: Fn + 0.'}" Style="{StaticResource HelpText}" Margin="0,0,0,13" Visibility="Collapsed" />
                                 <ComboBox x:Name="BindingCategory" SelectionChanged="BindingCategory_SelectionChanged" SelectedIndex="0" Margin="0,0,0,10">
                                     <ComboBoxItem Content="{local:Tr Key='Alle Funktionen'}" />
                                     <ComboBoxItem Content="{local:Tr Key='Buchstaben und Zahlen'}" />

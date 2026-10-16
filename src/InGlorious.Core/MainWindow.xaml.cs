@@ -627,6 +627,23 @@ public partial class MainWindow : Window
         }
         else { _selection.Clear(); _selection.Add(keyId); }
         RenderKeyboard(); RefreshInspector();
+        RevealSelectedKeyBinding();
+    }
+
+    private void RevealSelectedKeyBinding()
+    {
+        if (_activeTab != 1 || _editingSlider || _selection.Count != 1) return;
+        var code = Assignment(_selection.Single()).Binding;
+        if (!BindingChoice.Items.Cast<BindingOption>().Any(option => option.Code == code))
+        {
+            // A search from the previous key must not hide this key's assignment.
+            BindingSearch.Clear(); BindingCategory.SelectedIndex = 0; RefreshBindingChoices();
+        }
+        BindingChoice.SelectedValue = code;
+        if (BindingChoice.SelectedItem is not BindingOption selected) return;
+        BindingChoice.UpdateLayout();
+        BindingChoice.BringIntoView();
+        BindingChoice.ScrollIntoView(selected);
     }
 
     private void RefreshInspector()
@@ -699,6 +716,7 @@ public partial class MainWindow : Window
     {
         var slider = _editingSlider && Device.Id == "numpad";
         BindingTargetButtons.Visibility = Device.Id == "numpad" ? Visibility.Visible : Visibility.Collapsed;
+        NumpadNumLockHint.Visibility = Device.Id == "numpad" ? Visibility.Visible : Visibility.Collapsed;
         KeyBindingPanel.Visibility = slider ? Visibility.Collapsed : Visibility.Visible;
         SliderPanel.Visibility = slider ? Visibility.Visible : Visibility.Collapsed;
         foreach (var (button, selected) in new[] { (KeyBindingsButton, !slider), (SliderBindingsButton, slider) })
@@ -1435,7 +1453,7 @@ public partial class MainWindow : Window
     private static string SliderModeLabel(int mode) => mode switch { 1 => L.T("MIDI-Controller"), 2 => L.T("Relative Lautstärke"), 3 => L.T("Beleuchtung dimmen"), _ => L.T("Deaktiviert") };
     private void RefreshDeviceSettingsCore()
     {
-        DeviceTestAction.Visibility = Device.Id == RetainedLoaderLayout.DeviceId ? Visibility.Visible : Visibility.Collapsed;
+        DeviceTestAction.Visibility = Device.IsOfflineOnly ? Visibility.Collapsed : Visibility.Visible;
         DeviceTestHint.Visibility = DeviceTestAction.Visibility;
         DeviceTestColumn.Width = DeviceTestAction.Visibility == Visibility.Visible ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         PollingChoice.SelectedValue = _project.DeviceSettings.UsbPollingIntervalMs.ToString(CultureInfo.InvariantCulture);

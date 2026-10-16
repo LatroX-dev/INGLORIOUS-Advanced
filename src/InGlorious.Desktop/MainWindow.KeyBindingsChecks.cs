@@ -1,5 +1,8 @@
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using InGlorious.Core;
 
 namespace InGlorious.Desktop;
@@ -54,6 +57,22 @@ public sealed partial class MainWindow
                 _page = "Tastenbelegung"; Build(); return _state;
             }
             var state = Fresh(); var initial = EditorState.Fingerprint(state.Project); var profilePath = state.Path;
+            _editingSlider = false; Build();
+            var encoder = _state.Device.Keys.First(candidate => candidate.IsEncoder);
+            _root.GetLogicalDescendants().OfType<TextBox>().Single(control => control.Name == "BindingSearch").Text = "not-a-binding";
+            _keyButtons[encoder.Id].RaiseEvent(new RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+            UpdateLayout();
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+            UpdateLayout();
+            var bindings = _root.GetLogicalDescendants().OfType<ListBox>().Single(control => control.Name == "BindingChoices");
+            var listScroll = bindings.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+            check((bindings.SelectedItem as BindingRow)?.Code == state.Layer.Keys[encoder.Id].Binding &&
+                listScroll is not null && listScroll.Offset.Y > 0 && bindings.ContainerFromIndex(bindings.SelectedIndex) is not null,
+                "clicking the numpad encoder reveals and scrolls to its assigned direction in the rendered binding list");
+            check(_root.GetLogicalDescendants().OfType<TextBlock>().Single(control => control.Name == "NumpadNumLockHint").Text ==
+                L.T("Für Ziffern Num-Lock einschalten. Standardbelegung: Fn + 0.") &&
+                EditorState.Fingerprint(state.Project) == initial && !state.CanUndo,
+                "numpad bindings explain the default Num-Lock shortcut without modifying the profile");
             foreach (var slider in new[] { false, true })
             {
                 _editingSlider = slider; Build();

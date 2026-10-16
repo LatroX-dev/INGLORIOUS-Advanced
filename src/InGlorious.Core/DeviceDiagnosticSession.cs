@@ -11,7 +11,7 @@ public sealed class DeviceDiagnosticSession : IAsyncDisposable
     public OnboardFirmwareVersion? Version { get; }
     private DeviceDiagnosticSession(OnboardClient client, OnboardFirmwareVersion? version) { _client = client; Version = version; }
 
-    public static async Task<DeviceDiagnosticSession> StartAsync(OnboardDevice device, CancellationToken token)
+    public static async Task<DeviceDiagnosticSession?> TryStartAsync(OnboardDevice device, CancellationToken token)
     {
         if (DeviceSetupService.IsGloriousCoreRunning() is not false)
             throw new IOException(L.T("Schließe Glorious CORE, bevor du fortfährst."));
@@ -19,11 +19,20 @@ public sealed class DeviceDiagnosticSession : IAsyncDisposable
         try
         {
             var version = await client.GetFirmwareVersionAsync(token);
-            await client.DeviceTestAsync(1, token);
+            // Unsupported diagnostics are a valid capability result, not a connection failure.
+            // A local typing test must never send diagnostic commands to those devices.
+            if (await client.TryStartDeviceTestAsync(token) is null)
+            {
+                await client.DisposeAsync();
+                return null;
+            }
             return new(client, version);
         }
         catch { await client.DisposeAsync(); throw; }
     }
+
+    public static async Task<DeviceDiagnosticSession> StartAsync(OnboardDevice device, CancellationToken token) =>
+        await TryStartAsync(device, token) ?? throw new NotSupportedException(L.T("Für den vollständigen Gerätetest ist ein Firmware-Update erforderlich."));
 
     public async Task<OnboardDeviceTestStatus> PollAsync(CancellationToken token)
     {

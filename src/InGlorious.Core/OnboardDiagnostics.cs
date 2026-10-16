@@ -14,6 +14,14 @@ public sealed record OnboardDeviceTestStatus(bool Active, byte[] SeenRows, ushor
 
 public sealed partial class OnboardClient
 {
+    public async Task<OnboardDeviceTestStatus?> TryStartDeviceTestAsync(CancellationToken token = default)
+    {
+        // A valid missing capability permits a local typing test. Transport and
+        // validation errors still propagate; they must not look like a successful test.
+        return (await GetExtensionsAsync(token)).SupportsDeviceTest
+            ? await DeviceTestAsync(1, token) : null;
+    }
+
     public async Task<OnboardDeviceTestStatus> DeviceTestAsync(byte action, CancellationToken token = default)
     {
         if (action > 3) throw new ArgumentOutOfRangeException(nameof(action));

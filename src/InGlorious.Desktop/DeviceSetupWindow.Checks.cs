@@ -141,6 +141,7 @@ public sealed partial class DeviceSetupWindow
         }
         _session!.DeviceId = "foreign-device"; Render();
         check(!ActionReady, "Setup: a model outside the selected physical device candidates cannot proceed");
+        check(!_deviceTestButton.IsVisible, "Setup: an unrecognized model cannot expose a device test or interrupt rendering");
         ShowOfflineStep("confirm");
         _modelConfirmation.IsChecked = true;
         check(!ActionReady && !CanAct && !NeedsObservation, "Setup: no operation exposes a second write action or starts a scan after backup");
@@ -210,6 +211,9 @@ public sealed partial class DeviceSetupWindow
             ShowOfflineStep("complete", model.Id);
             check(CompletionTestsVisible == (_operation != SetupOperation.Restore) && !_lightingButton.IsEnabled,
                 "Setup: " + model.Id + " " + _operation + " shows its post-flash test without allowing offline device access");
+            check(_deviceTestButton.IsVisible && !_deviceTestButton.IsEnabled && _completion.IsVisible == (_operation != SetupOperation.Restore),
+                "Setup: " + model.Id + " offers device testing after installation and update while offline preview remains inert");
+            check(_numLockHint.IsVisible == (model.Id == "numpad"), "Setup: only the numpad completion explains enabling Num-Lock for digits");
             _typingTest.Text = model.Id == "numpad" ? "123456789" : "INGLORIOU";
             check(!TypingCompletes, "Setup: incomplete typing never finishes the wizard");
             _typingTest.Text = model.Id == "numpad" ? "1234567890" : "iNgLoRiOuS";

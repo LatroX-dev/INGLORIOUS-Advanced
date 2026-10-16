@@ -16,13 +16,15 @@ public sealed partial class MainWindow
         var count = 0;
         void Check(bool condition, string name) { count++; if (!condition) throw new InvalidOperationException("Check failed: " + name); }
         void Reject(Action action, string name) { var rejected = false; try { action(); } catch (InvalidDataException) { rejected = true; } Check(rejected, name); }
-        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.55", "visible product assembly metadata uses INGLORIOUS 0.6.55");
+        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.57", "visible product assembly metadata uses INGLORIOUS 0.6.57");
         await RunConnectionsChecksAsync(Check);
         await RunProfileReplacementChecksAsync(Check);
         await RunKeyBindingChecksAsync(Check);
         RunExperimentalLabelsChecks(Check);
         RunLanguagePreferenceChecks(Check);
         AppAutostartEditor.RunOfflineChecks(Check);
+        foreach (var id in new[] { "numpad", "pro-iso", RetainedLoaderLayout.DeviceId })
+            new DeviceTestWindow(id, null, preview: true).RunOfflineChecks(Check);
         RunSettingsLayoutChecks(Check);
         await RunSoftwareUpdateChecks(Check);
         var settingsPreview = CreateSettingsWindow(_preferences, offlinePreview: true);
@@ -360,8 +362,8 @@ public sealed partial class MainWindow
                 check(_root.GetLogicalDescendants().OfType<Button>().Any(button => Equals(button.Content, L.T("Gerät einrichten"))) &&
                     _root.GetLogicalDescendants().OfType<Button>().Any(button => Equals(button.Content, L.T("Original-Firmware wiederherstellen"))),
                     "every device page exposes installation and original restore");
-                check(_root.GetLogicalDescendants().OfType<Button>().Any(button => button.Name == "DeviceTestButton" && button.IsVisible) == (device.Id == RetainedLoaderLayout.DeviceId),
-                    "the detailed device test is offered only for the exact diagnostic-capable PRO model");
+                check(_root.GetLogicalDescendants().OfType<Button>().Any(button => button.Name == "DeviceTestButton" && button.IsVisible) == !device.IsOfflineOnly,
+                    "device testing is reachable for every supported connected keyboard and numpad");
                 check(_readDeviceButton!.IsEnabled && _transferButton!.IsEnabled && button.IsEnabled && device.SupportsOnboardConfiguration,
                     "experimental label does not add opt-in or disable connected runtime configuration");
                 check(OnboardSerializer.Prepare(_state.Project).Payload.Length > 0 && !_state.Dirty && EditorState.Fingerprint(_state.Project) == before,
@@ -770,6 +772,21 @@ public sealed partial class MainWindow
             _state.LayerIndex = 1; Build();
             check(Find<TextBlock>("BindingFunctionHint").Text == LayerGuidance.BindingDescription("KC_TRNS") && Find<Button>("UseUnderlyingBinding").IsEnabled,
                 "the inherited binding explains its lower-layer behavior");
+            check((Find<ListBox>("BindingChoices").SelectedItem as BindingRow)?.Code == "KC_TRNS",
+                "binding selection follows the edited layer");
+            _state.LayerIndex = 0; Build();
+            Find<TextBox>("BindingSearch").Text = "not-a-binding";
+            var encoder = _state.Device.Keys.First(key => key.IsEncoder);
+            _keyButtons[encoder.Id].RaiseEvent(new RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+            UpdateLayout();
+            check(Find<TextBox>("BindingSearch").Text == "" &&
+                (Find<ListBox>("BindingChoices").SelectedItem as BindingRow)?.Code == _state.Layer.Keys[encoder.Id].Binding &&
+                EditorState.Fingerprint(_state.Project) == initial && !_state.CanUndo,
+                "preview selection reveals the encoder direction assignment without retaining another key's search or editing the profile");
+            _state.SelectKey(fn, false); _state.SetBinding("TG(2)"); Build();
+            check((Find<ListBox>("BindingChoices").SelectedItem as BindingRow)?.Code == "TG(2)",
+                "the binding list can select an existing nondefault layer switch");
+            _state.Undo(); Changed(); Build();
             var applied = 0; _pendingApply = () => { applied++; return true; }; _offlinePromptChoice = 0;
             OpenLayerBindingEditorAsync().GetAwaiter().GetResult();
             check(_page == "Tastenbelegung" && _pendingApply is not null && applied == 0 && EditorState.Fingerprint(_state.Project) == initial,

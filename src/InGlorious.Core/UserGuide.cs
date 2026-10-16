@@ -21,6 +21,7 @@ public static class UserGuide
         })),
         new("bindings", "Tastenbelegung", Array.AsReadOnly(new GuideSection[]
         {
+            new("GMMK Numpad", "Für Ziffern Num-Lock einschalten. Standardbelegung: Fn + 0."),
             new("Tasten und Drehgeber", "Wähle eine Taste in der Vorschau, suche eine Funktion und übernimm sie. Mehrere ausgewählte Tasten erhalten dieselbe Belegung. Die beiden Drehrichtungen des Drehgebers lassen sich getrennt belegen. Belegungen gelten für die oben ausgewählte Ebene."),
             new("Fn und Zusatztasten", "Strg, Shift oder Alt hältst du zusammen mit einer anderen Taste gedrückt, etwa Strg+C. Fn öffnet stattdessen eine zusätzliche Belegung auf diesem Gerät."),
             new("Import und Export", "Beim Import und Export wählst du die Ebenen aus. Nur die gewählten Ebenen werden mit ihren Namen, Belegungen und zugewiesenen Makros übernommen; ihre Nummern bleiben gleich. Farben und Effekte bleiben erhalten. Den Schieberegler kannst du separat einbeziehen. Importiere auf demselben Gerätemodell und speichere danach mit „Auf Tastatur übertragen“."),

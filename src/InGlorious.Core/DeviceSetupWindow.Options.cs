@@ -73,7 +73,7 @@ public sealed partial class DeviceSetupWindow
         _coreImportSection.Visibility = _coreImportButton.Visibility;
         Grid.SetColumn(_feedbackSection, _coreImportPreview is null ? 0 : 1);
         Grid.SetColumnSpan(_feedbackSection, _coreImportPreview is null ? 2 : 1);
-        _deviceTestButton.Visibility = DeviceId == RetainedLoaderLayout.DeviceId ? Visibility.Visible : Visibility.Collapsed;
+        _deviceTestButton.Visibility = DeviceId is not null ? Visibility.Visible : Visibility.Collapsed;
         _coreImportButton.IsEnabled = _deviceTestButton.IsEnabled = _feedbackButton.IsEnabled = !_offlinePreview && LightingReady;
     }
 }

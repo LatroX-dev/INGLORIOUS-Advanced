@@ -1,8 +1,10 @@
 # Changelog
 
-## 0.6.56
+## 0.6.57
 
 - Fixed key labels and favorite-color help staying in German when using another app language.
+- Added a Numpad typing test after setup and firmware updates, and on the Device page.
+- The key list now scrolls to the selected key automatically.
 
 ## 0.6.55
 

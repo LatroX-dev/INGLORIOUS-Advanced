@@ -277,6 +277,24 @@ public partial class MainWindow
         check(BindingChoice.Items.Cast<BindingOption>().Select(option => option.Code).ToHashSet().SetEquals(new[] { "MO(2)", "TG(2)", "TO(2)" }), "Layer category and text search expose hold, toggle and direct switch");
         BindingSearch.Text = "not-a-binding"; RefreshBindingChoices();
         check(BindingChoice.Items.Count == 0 && BindingChoice.SelectedIndex == -1 && Fingerprint(_project) == before && _undo.Count == history, "Empty search has no stale binding selection or draft mutation");
+        var encoder = Device.Keys.First(key => key.IsEncoder);
+        SelectKey(encoder.Id); UpdateLayout();
+        check(BindingSearch.Text == "" && BindingCategory.SelectedIndex == 0 &&
+            (BindingChoice.SelectedItem as BindingOption)?.Code == Assignment(encoder.Id).Binding,
+            "Selecting a preview key reveals its existing assignment even when the previous search hid it");
+        var scroller = NavigationDescendants(BindingChoice).OfType<ScrollViewer>().FirstOrDefault();
+        check(scroller is not null && scroller.VerticalOffset > 0,
+            "Selecting an encoder scrolls its lower-list media binding into view");
+        BindingCategory.SelectedIndex = 5; BindingSearch.Text = "KC_VOL"; RefreshBindingChoices();
+        SelectKey(encoder.Id);
+        check(BindingCategory.SelectedIndex == 5 && BindingSearch.Text == "KC_VOL",
+            "Selecting a key retains a search and category that already include its assignment");
+        _layerIndex = 1; SelectKey(encoder.Id);
+        check((BindingChoice.SelectedItem as BindingOption)?.Code == "KC_TRNS" && BindingCategory.SelectedIndex == 0,
+            "The revealed assignment follows the edited layer rather than the base binding");
+        check(Fingerprint(_project) == before && _undo.Count == history,
+            "Revealing an existing assignment never assigns a function or changes undo history");
+        _layerIndex = 0;
         SetTab(4);
         UpdateLayout();
         check(!KeyboardWorkspace.IsVisible && DeviceOverview.IsVisible, "Device settings show the device overview without editable key targets or a hidden ancestor");

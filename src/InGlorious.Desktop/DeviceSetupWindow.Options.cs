@@ -10,7 +10,7 @@ public sealed partial class DeviceSetupWindow
 {
     private CoreImportPreview? _coreImportPreview;
     private readonly Button _coreImportButton = new() { Content = MainWindow.ButtonContent("CORE-Einstellungen importieren") };
-    private readonly Button _deviceTestButton = new() { Content = MainWindow.ButtonContent("Gerät testen"), MinHeight = 38 };
+    private readonly Button _deviceTestButton = new() { Name = "SetupDeviceTest", Content = MainWindow.ButtonContent("Gerät testen"), MinHeight = 38 };
     private readonly Button _feedbackButton = new() { Content = MainWindow.ButtonContent("Rückmeldung & Kontakt") };
     private readonly Grid _completionOptions = new() { ColumnDefinitions = new("*,*"), ColumnSpacing = 24 };
     private Control? _coreImportSection, _feedbackSection;
@@ -81,7 +81,7 @@ public sealed partial class DeviceSetupWindow
             Grid.SetColumn(_feedbackSection, hasCoreImport ? 1 : 0);
             Grid.SetColumnSpan(_feedbackSection, hasCoreImport ? 1 : 2);
         }
-        _deviceTestButton.IsVisible = DeviceId == RetainedLoaderLayout.DeviceId;
+        _deviceTestButton.IsVisible = DeviceId is { } id && DeviceCatalog.All.Any(device => device.Id == id && !device.IsOfflineOnly);
         _coreImportButton.IsEnabled = _deviceTestButton.IsEnabled = _feedbackButton.IsEnabled = !_offlinePreview && LightingReady;
     }
 }

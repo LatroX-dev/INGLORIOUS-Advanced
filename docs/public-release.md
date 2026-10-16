@@ -41,7 +41,7 @@ Keep separate publication checkouts under `workspace/public`, temporary validati
 pwsh -NoProfile -File scripts/New-CorrespondingSource.ps1 `
   -PublicSourceDirectory <reviewed-public-folder> `
   -QmkDirectory firmware/qmk_firmware `
-  -Destination artifacts/INGLORIOUS-Advanced-0.6.56-Source `
+  -Destination artifacts/INGLORIOUS-Advanced-0.6.57-Source `
   -Download
 ```
 
@@ -64,7 +64,7 @@ pwsh -NoProfile -File scripts/Build-DesktopRelease.ps1 `
 
 Use `osx-x64` or `osx-arm64` on the corresponding Mac. The script rejects a mismatched host architecture or firmware catalog. It builds pinned libusb 1.0.30 and dfu-util 0.11 sources, generates a native-tool catalog, publishes the adapter, prepares the setup assets and runs offline checks before packaging. All builds and tests in this script avoid device I/O.
 
-Packages are named `INGLORIOUS-Advanced-0.6.56-<runtime>.tar.gz` and have matching SHA-256 files. macOS packages contain `INGLORIOUS Advanced.app`; Linux packages contain `application/INGLORIOUS Advanced` plus a USB-permission helper. macOS builds use ad-hoc signatures and are not notarized. Sign native tools before generating their catalog and the adapter before generating the setup-tool catalog; do not recursively re-sign pinned files afterward.
+Packages are named `INGLORIOUS-Advanced-0.6.57-<runtime>.tar.gz` and have matching SHA-256 files. macOS packages contain `INGLORIOUS Advanced.app`; Linux packages contain `application/INGLORIOUS Advanced` plus a USB-permission helper. macOS builds use ad-hoc signatures and are not notarized. Sign native tools before generating their catalog and the adapter before generating the setup-tool catalog; do not recursively re-sign pinned files afterward.
 
 `Licenses/Desktop-ThirdParty.txt` preserves the locked desktop dependencies' license texts and notices. `reference/desktop-license-inventory.json` records their versions and provenance. After a deliberate dependency change, restore the locked packages, run `Collect-DesktopLicenses.ps1`, review the changes and rebuild the package. Runtime licenses must be retained in self-contained output.
 

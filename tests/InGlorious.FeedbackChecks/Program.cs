@@ -23,6 +23,23 @@ internal static class Program
     {
         var app = new App(); app.InitializeComponent(); // Resources only; never starts the application or hardware services.
         L.SetLanguage("en");
+        foreach (var model in new[] { "numpad", "pro-iso", "gmmk3-pro-100-iso" })
+        {
+            var testWindow = new DeviceTestWindow(model, null, preview: true);
+            typeof(DeviceTestWindow).GetMethod("RunOfflineChecks", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .Invoke(testWindow, [new Action<bool, string>(Check)]);
+            testWindow.Close();
+        }
+        Check(DeviceTypingTest.KeyLabel("Home") == "Home" && DeviceTypingTest.KeyLabel("Left") == "←" &&
+            DeviceTypingTest.KeyLabel("NumPad0") == "0" && DeviceTypingTest.KeyLabel("D7") == "7", "local key test labels navigation and digits");
+        L.SetLanguage("de");
+        Check(DeviceTypingTest.KeyLabel("Home") == "Pos1" && DeviceTypingTest.KeyLabel("Y") == "Y", "local input labels translate functions without changing typed letters");
+        foreach (var source in new[] { "Tipptest", "Klicke in das Feld und drücke die Tasten, die du prüfen möchtest.",
+            "Die Eingabe kann auch von anderen angeschlossenen Tastaturen kommen.", "Für Ziffern Num-Lock einschalten. Standardbelegung: Fn + 0.",
+            "Zuletzt gedrückt: {0}", "Noch keine Taste gedrückt.", "Tasten und Eingaben prüfen." })
+            foreach (var language in L.SupportedLanguages.Where(language => language.Code != "de"))
+                Check(L.Catalog.TryGetValue(source, out var translated) && !string.IsNullOrWhiteSpace(translated.GetValueOrDefault(language.Code)), "typing-test language coverage " + language.Code);
+        L.SetLanguage("en");
         var id = "gmmk3-pro-100-iso";
         var context = DeviceFeedbackContext.Create(id, new(id, new(0, 11, 2), 0x000B0201));
         Check(context.DeviceId == id && context.DeviceName == DeviceCatalog.Get(id).Name && context.FirmwareVersion == "0.11.2", "exact model and reported version");

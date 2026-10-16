@@ -9,13 +9,13 @@ public sealed partial class MainWindow
 {
     private Control BuildDeviceSupportActions()
     {
-        var hasDeviceTest = _state.Device.Id == RetainedLoaderLayout.DeviceId;
+        var hasDeviceTest = !_state.Device.IsOfflineOnly;
         var actions = new Grid { Name = "DeviceSupportActions", ColumnDefinitions = new(hasDeviceTest ? "*,*,*" : "*,*"), ColumnSpacing = 24 };
         var column = 0;
         if (hasDeviceTest)
         {
             var test = AsyncButton("Gerät testen", () => OpenDeviceTestAsync(_state.Device.Id)); test.Name = "DeviceTestButton";
-            var testSection = DeviceActionSection("Tasten, Drehknopf und LEDs einzeln prüfen.", test);
+            var testSection = DeviceActionSection("Tasten und Eingaben prüfen.", test);
             Grid.SetColumn(testSection, column++); actions.Children.Add(testSection);
         }
         var import = AsyncButton("CORE-Einstellungen importieren", ImportCoreSettingsAsync);

@@ -9,7 +9,7 @@ public sealed partial class DeviceSetupWindow
 {
     private readonly StackPanel _completion = new() { Margin = new(0, 18, 0, 0), Visibility = Visibility.Collapsed };
     private readonly Button _lightingButton = new() { Name = "SetupLightingTest", HorizontalAlignment = HorizontalAlignment.Left, MinHeight = 38 };
-    private readonly TextBlock _lightingStatus = Text(13), _typingHint = Text(13);
+    private readonly TextBlock _lightingStatus = Text(13), _typingHint = Text(13), _numLockHint = Text(12);
     private readonly TextBox _typingTest = new() { Name = "SetupTypingTest", MinHeight = 40, MaxLength = 32, Margin = new(0, 8, 0, 0) };
     private string? _returnedUsbInstanceId;
     private bool _lightingRunning;
@@ -32,6 +32,8 @@ public sealed partial class DeviceSetupWindow
         _lightingStatus.Margin = new(0, 8, 0, 0); _completion.Children.Add(_lightingStatus);
         AutomationProperties.SetLiveSetting(_lightingStatus, AutomationLiveSetting.Polite);
         _typingHint.Margin = new(0, 18, 0, 0); _completion.Children.Add(_typingHint); _completion.Children.Add(_typingTest);
+        _numLockHint.Text = L.T("Für Ziffern Num-Lock einschalten. Standardbelegung: Fn + 0.");
+        _numLockHint.Margin = new(0, 6, 0, 0); _completion.Children.Add(_numLockHint);
         AutomationProperties.SetName(_typingTest, L.T("Hier Tasten testen"));
         _lightingButton.Click += async (_, _) => await RunCompletionLightingAsync();
         _typingTest.TextChanged += (_, _) => { if (!_offlinePreview && TypingCompletes) Close(); };
@@ -44,6 +46,7 @@ public sealed partial class DeviceSetupWindow
         _completion.Visibility = CompletionTestsVisible ? Visibility.Visible : Visibility.Collapsed;
         _lightingButton.IsEnabled = !_offlinePreview && LightingReady;
         _typingTest.IsEnabled = !_offlinePreview && !_lightingRunning;
+        _numLockHint.Visibility = DeviceId == "numpad" ? Visibility.Visible : Visibility.Collapsed;
         _typingHint.Text = L.T(DeviceId == "numpad" ? "Tippe 1234567890, um abzuschließen, oder klicke auf „Fertig“."
             : "Schreibe INGLORIOUS, um abzuschließen, oder klicke auf „Fertig“.");
     }

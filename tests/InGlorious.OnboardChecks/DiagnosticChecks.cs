@@ -60,6 +60,17 @@ static class DiagnosticChecks
             catch (Exception e) when (e is NotSupportedException or IOException) { rejected = true; }
             check(rejected && !transport.Commands.Contains(OnboardProtocol.DeviceTest), "Diagnostic start requires supported and idle persistent firmware: " + issue);
         }
+        transport.Commands.Clear(); transport.Inner.ExtensionFlags = 3;
+        transport.Inner.ReportedStaging = 0; transport.Inner.Persistent = true;
+        check(await client.TryStartDeviceTestAsync() is null && !transport.Commands.Contains(OnboardProtocol.DeviceTest),
+            "Valid unsupported diagnostics permit local input without sending a diagnostic command");
+        transport.Inner.ExtensionFlags = 7;
+        check((await client.TryStartDeviceTestAsync())?.Active == true, "Supported firmware still starts the physical diagnostic session");
+        transport.Fault = "length";
+        var malformedNotFallback = false;
+        try { await client.TryStartDeviceTestAsync(); } catch (InvalidDataException) { malformedNotFallback = true; }
+        check(malformedNotFallback, "Malformed diagnostic response cannot silently become a local input test");
+        transport.Fault = "";
         foreach (var (command, payload) in new (byte, byte[])[] { (14,[0]),(14,[1]),(14,[2]),(14,[3]),(15,[0,0,0,0,0]),(15,[1,0,255,255,255]),(15,[2,125,255,0,0]) })
         {
             var packet = OnboardProtocol.Packet(command, 4, payload); OnboardProtocol.ValidateRequest(packet);

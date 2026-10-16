@@ -13,7 +13,7 @@ Configure Glorious keyboards with per-key lighting, effects, key assignments, ma
 
 I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
 
-**App 0.6.56 · Firmware 0.11.4**
+**App 0.6.57 · Firmware 0.11.4**
 
 Get installers and packages from the [Releases page](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases). macOS and Linux builds are Early Alpha; physical-device testing is still limited.
 
@@ -25,11 +25,11 @@ INGLORIOUS Advanced is an independent project. It is not affiliated with or endo
 
 ## Demo
 
-[![Watch the 55-second INGLORIOUS Advanced demo](docs/images/demo-preview.png)](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases/download/v0.6.56/INGLORIOUS-Advanced-Demo-en.mp4)
+[![Watch the 55-second INGLORIOUS Advanced demo](docs/images/demo-preview.png)](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases/download/v0.6.57/INGLORIOUS-Advanced-Demo-en.mp4)
 
 Select keys, change their color, choose an effect and transfer the configuration to a GMMK PRO ISO. Recorded in the Windows app.
 
-**[Watch the 55-second demo](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases/download/v0.6.56/INGLORIOUS-Advanced-Demo-en.mp4)** · [English captions](docs/demo/INGLORIOUS-Advanced-Demo-en.srt) · [Music credits](docs/demo/README.md)
+**[Watch the 55-second demo](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases/download/v0.6.57/INGLORIOUS-Advanced-Demo-en.mp4)** · [English captions](docs/demo/INGLORIOUS-Advanced-Demo-en.srt) · [Music credits](docs/demo/README.md)
 
 ## Get started
 

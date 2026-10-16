@@ -262,9 +262,20 @@ public sealed partial class MainWindow
             if (_editingSlider) { BuildSliderEditor(); return; }
         }
         var selectedBinding = Text(L.F($"Auf Ebene {_state.LayerIndex}: {SelectedBindingSummary()}"), true); selectedBinding.Name = "CurrentKeyBindingSummary"; _editor.Children.Add(selectedBinding);
+        if (_state.Device.Id == "numpad")
+        {
+            var numLockHint = Text(L.T("Für Ziffern Num-Lock einschalten. Standardbelegung: Fn + 0."), true, 11);
+            numLockHint.Name = "NumpadNumLockHint"; _editor.Children.Add(numLockHint);
+        }
         var layerEntry = AsyncButton("Fn / Ebenenwechsel …", OpenLayerBindingEditorAsync); layerEntry.Name = "OpenLayerBindingEditor"; _editor.Children.Add(layerEntry);
         var search = Input("", L.T("Belegung suchen")); search.Name = "BindingSearch";
         var list = new ListBox { Name = "BindingChoices", Height = 230 };
+        list.Loaded += (_, _) =>
+        {
+            if (list.SelectedItem is not BindingRow selected) return;
+            // Use the control lifecycle so queued callbacks do not retain old editors.
+            list.BringIntoView(); list.ScrollIntoView(selected);
+        };
         var hint = Text("", true, 11); hint.Name = "BindingFunctionHint";
         var modifiersOnly = false;
         void UpdateHint()
@@ -276,9 +287,12 @@ public sealed partial class MainWindow
         void Filter()
         {
             var selected = (list.SelectedItem as BindingRow)?.Code ?? (_state.SelectedKeys.Count == 1 ? _state.Layer.Keys[_state.SelectedKeys.Single()].Binding : null);
-            var rows = BindingCatalog.All.Where(b => (!modifiersOnly || IsModifierBinding(b.Code)) &&
-                (DisplayBinding(b.Code).Contains(search.Text ?? "", StringComparison.CurrentCultureIgnoreCase) || b.Code.Contains(search.Text ?? "", StringComparison.OrdinalIgnoreCase)))
-                .Select(b => new BindingRow(b.Code, DisplayBinding(b.Code))).ToArray();
+            var rows = BindingCatalog.All.Select(binding => binding.Code)
+                .Concat(Enumerable.Range(0, 4).SelectMany(layer => new[] { "MO", "TG", "TO" }.Select(action => $"{action}({layer})")))
+                .Concat(_state.Project.Macros.Select(macro => "MACRO:" + macro.Id)).Distinct()
+                .Where(code => (!modifiersOnly || IsModifierBinding(code)) &&
+                    (DisplayBinding(code).Contains(search.Text ?? "", StringComparison.CurrentCultureIgnoreCase) || code.Contains(search.Text ?? "", StringComparison.OrdinalIgnoreCase)))
+                .Select(code => new BindingRow(code, DisplayBinding(code))).ToArray();
             list.ItemsSource = rows; list.SelectedItem = rows.FirstOrDefault(row => row.Code == selected); UpdateHint();
         }
         Button modifiers = null!;
