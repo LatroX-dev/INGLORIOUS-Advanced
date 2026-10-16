@@ -33,6 +33,7 @@ foreach (var language in L.SupportedLanguages)
 L.SetLanguage("de");
 try
 {
+    RunKeyLegendLanguageChecks(Check);
     RunNewProfileColorChecks(temp, Check);
     RunProfileImportChecks(temp, Check);
     (string Id, int Keys, int Leds, int Sides, bool Encoder)[] expected = [
@@ -398,6 +399,60 @@ static void RunGlobalEffectSwitchChecks(DeviceDefinition device, Action<bool, st
         check(!GlobalEffectSwitch.IsEnabled(applied.Layers[2].LightingEffect) && Json(applied.Layers[2].LedEffects) == individual, "Lighting presets preserve off and individual effects");
     }
     check(GlobalEffectSwitch.IsEnabled(new() { Mode = 0, Brightness = 0 }) && GlobalEffectSwitch.IsEnabled(new() { Mode = 0, Brightness = 254 }), "An intentional static dimmer is an active global setting, not discarded as off");
+}
+
+static void RunKeyLegendLanguageChecks(Action<bool, string> check)
+{
+    var iso = DeviceCatalog.Get("gmmk3-100-iso");
+    var ansi = DeviceCatalog.Get("gmmk3-100-ansi");
+    var profile = ProjectService.Create(iso.Id);
+    var payload = OnboardSerializer.Prepare(profile).Payload;
+    var physicalKeys = DeviceCatalog.All.SelectMany(device => device.Keys)
+        .Select(key => (Key: key, key.Label, key.DefaultBinding, key.X, key.Y, key.W, key.H, key.LedIndex)).ToArray();
+    (string Binding, string German, string English, string Accessible)[] functional =
+    [
+        ("KC_LCTL", "Strg", "Ctrl", "Ctrl"), ("KC_RCTL", "Strg", "Ctrl", "Ctrl"),
+        ("KC_DEL", "Entf", "Del", "Delete"), ("KC_INS", "Einfg", "Ins", "Insert"),
+        ("KC_HOME", "Pos1", "Home", "Home"), ("KC_END", "Ende", "End", "End"),
+        ("KC_PGUP", "Bild ↑", "PgUp", "Page Up"), ("KC_PGDN", "Bild ↓", "PgDn", "Page Down"),
+        ("KC_PSCR", "Druck", "PrtSc", "Print Screen")
+    ];
+    try
+    {
+        foreach (var language in new[] { "de", "en", "de", "en" })
+        {
+            L.SetLanguage(language);
+            foreach (var device in new[] { iso, ansi })
+            {
+                foreach (var (binding, german, english, accessible) in functional)
+                {
+                    var key = device.Keys.Single(key => key.DefaultBinding == binding);
+                    check(key.DisplayLabel == (language == "de" ? german : english), $"Functional key legend follows {language} on the existing {device.Id} model: {binding}");
+                    check(key.AccessibleLabel == (language == "de" ? german : accessible), $"Accessible key name remains complete in {language}: {device.Id}/{binding}");
+                }
+            }
+            foreach (var (binding, germanIso, usAnsi) in new[] { ("KC_Y", "Z", "Y"), ("KC_Z", "Y", "Z"), ("KC_LBRC", "Ü", "["), ("KC_SCLN", "Ö", ";"), ("KC_QUOT", "Ä", "'"), ("KC_MINS", "ß", "-"), ("KC_PDOT", ",", ".") })
+            {
+                check(iso.Keys.Single(key => key.DefaultBinding == binding).DisplayLabel == germanIso, "UI language preserves ISO-DE character legends: " + binding);
+                check(ansi.Keys.Single(key => key.DefaultBinding == binding).DisplayLabel == usAnsi, "UI language preserves ANSI character legends: " + binding);
+            }
+            var mute = new KeyDefinition("mute", "Stumm", 0, 0, DefaultBinding: "KC_MUTE");
+            check(mute.DisplayLabel == (language == "de" ? "Stumm" : "Mute") && mute.AccessibleLabel == mute.DisplayLabel, "Unabbreviated functional legends and accessible names use the app language");
+            var knob = iso.Keys.Single(key => key.Label == "Knob");
+            check(knob.DisplayLabel == (language == "de" ? "Drücken" : "Press") && knob.AccessibleLabel == (language == "de" ? "Drehregler drücken" : "Press the knob"), "Knob localization survives the key legend change");
+        }
+        foreach (var language in L.SupportedLanguages)
+        {
+            L.SetLanguage(language.Code);
+            check(iso.Keys.Single(key => key.DefaultBinding == "KC_LCTL").DisplayLabel == L.T("Strg")
+                && iso.Keys.Single(key => key.DefaultBinding == "KC_PSCR").AccessibleLabel == L.T("Druck"), "Functional and accessible names use the shared catalog in " + language.Code);
+        }
+        check(physicalKeys.All(before => before.Key.Label == before.Label && before.Key.DefaultBinding == before.DefaultBinding
+            && before.Key.X == before.X && before.Key.Y == before.Y && before.Key.W == before.W && before.Key.H == before.H && before.Key.LedIndex == before.LedIndex),
+            "Language switching does not change stored key labels, bindings, geometry or LED mapping");
+        check(OnboardSerializer.Prepare(profile).Payload.SequenceEqual(payload), "Language switching leaves the transmitted keyboard configuration byte-for-byte unchanged");
+    }
+    finally { L.SetLanguage("de"); }
 }
 
 static List<string> BaseArguments(string source, string layout)

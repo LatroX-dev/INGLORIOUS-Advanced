@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fixed key labels and favorite-color help staying in German when using another app language.
+
 ## 0.6.55
 
 - Added GMMK 3 PRO 100% ISO wired, non-HE support, including original-firmware recovery.

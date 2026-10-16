@@ -10,12 +10,12 @@ public record KeyDefinition(string Id, string Label, double X, double Y, double 
     public int? LedIndex { get; init; }
     public bool IsIsoEnter { get; init; }
     public bool IsEncoder => Id.StartsWith("encoder:", StringComparison.Ordinal);
-    public string DisplayLabel => Label == "Knob" ? L.T("Drücken") : Label;
+    public string DisplayLabel => Label == "Knob" ? L.T("Drücken") : BindingCatalog.CompactLegend(Label);
     public string AccessibleLabel => Id switch
     {
         "encoder:ccw" => L.T("Nach links drehen"),
         "encoder:cw" => L.T("Nach rechts drehen"),
-        _ => Label == "Knob" ? L.T("Drehregler drücken") : Label
+        _ => Label == "Knob" ? L.T("Drehregler drücken") : L.T(Label)
     };
 }
 // Preview geometry in key units, independent of QMK's normalized effect coordinates.
@@ -393,16 +393,21 @@ public static class BindingCatalog
         ["KC_ESC"]="Esc", ["KC_PSCR"]="Druck", ["KC_MUTE"]="Stumm", ["KC_GRV"]="^", ["KC_MINS"]="ß", ["KC_EQL"]="´", ["KC_BSPC"]="⌫", ["KC_DEL"]="Entf", ["KC_TAB"]="Tab", ["KC_LBRC"]="Ü", ["KC_RBRC"]="+", ["KC_CAPS"]="Caps", ["KC_SCLN"]="Ö", ["KC_QUOT"]="Ä", ["KC_NUHS"]="#", ["KC_ENT"]="Enter", ["KC_LSFT"]="Shift", ["KC_RSFT"]="Shift", ["KC_NUBS"]="<", ["KC_COMM"]=",", ["KC_DOT"]=".", ["KC_SLSH"]="-", ["KC_Y"]="Z", ["KC_Z"]="Y", ["KC_LCTL"]="Strg", ["KC_RCTL"]="Strg", ["KC_LGUI"]="Win", ["KC_RGUI"]="Win R", ["KC_LALT"]="Alt", ["KC_RALT"]="Alt Gr", ["KC_SPC"]="Space", ["MO(1)"]="Fn", ["KC_LEFT"]="←", ["KC_RGHT"]="→", ["KC_UP"]="↑", ["KC_DOWN"]="↓", ["KC_PGUP"]="Bild ↑", ["KC_PGDN"]="Bild ↓", ["KC_HOME"]="Pos1", ["KC_END"]="Ende", ["KC_INS"]="Einfg", ["KC_TRNS"]="Durchreichen", ["KC_NO"]="Deaktiviert", ["KC_VOLU"]="Lauter", ["KC_VOLD"]="Leiser", ["KC_MPLY"]="Play/Pause", ["KC_MNXT"]="Nächster Titel", ["KC_MPRV"]="Vorheriger Titel", ["KC_MSTP"]="Stopp", ["KC_CALC"]="Rechner", ["KC_MAIL"]="E-Mail öffnen", ["KC_MYCM"]="Dateimanager öffnen", ["KC_NUM"]="Num Lock", ["KC_PSLS"]="/", ["KC_PAST"]="*", ["KC_PMNS"]="−", ["KC_PPLS"]="+", ["KC_PENT"]="Enter", ["KC_PDOT"]=",", ["RM_TOGG"]="RGB an/aus", ["RM_VALU"]="RGB heller", ["RM_VALD"]="RGB dunkler", ["RM_NEXT"]="RGB Effekt weiter"
     };
     public static IReadOnlyList<BindingOption> All { get; } = Create();
-    // Physical ANSI legends are separate from translated action names and the host's keyboard layout.
+    // Only character legends depend on the physical layout. Functional labels are
+    // translated at display time, without changing the stored labels or bindings.
     public static string AnsiKeyLabel(string code) => code switch
     {
         "KC_Y" => "Y", "KC_Z" => "Z", "KC_GRV" => "`", "KC_MINS" => "-", "KC_EQL" => "=",
         "KC_LBRC" => "[", "KC_RBRC" => "]", "KC_BSLS" => "\\", "KC_SCLN" => ";", "KC_QUOT" => "'",
         "KC_COMM" => ",", "KC_DOT" or "KC_PDOT" => ".", "KC_SLSH" => "/",
-        "KC_LCTL" or "KC_RCTL" => "Ctrl", "KC_RALT" => "Alt", "KC_DEL" => "Del", "KC_INS" => "Ins",
-        "KC_HOME" => "Home", "KC_END" => "End", "KC_PGUP" => "PgUp", "KC_PGDN" => "PgDn",
-        "KC_PSCR" => "PrtSc", _ => KeyLabel(code)
+        "KC_RALT" => "Alt", _ => KeyLabel(code)
     };
+    // Keep narrow keycaps readable; tooltips and accessibility retain the full names.
+    internal static string CompactLegend(string label) => L.CurrentLanguage == "en" ? label switch
+    {
+        "Druck" => "PrtSc", "Entf" => "Del", "Einfg" => "Ins",
+        "Bild ↑" => "PgUp", "Bild ↓" => "PgDn", _ => L.T(label)
+    } : L.T(label);
     public static string KeyLabel(string code) => Labels.TryGetValue(code, out var name) ? name : code.StartsWith("KC_P") && code.Length == 5 && char.IsDigit(code[4]) ? code[4].ToString() : code.StartsWith("KC_") ? code[3..] : code;
     public static string FunctionLabel(string code)
     {

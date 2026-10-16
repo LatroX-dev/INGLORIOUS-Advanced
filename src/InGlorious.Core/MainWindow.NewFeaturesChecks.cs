@@ -34,6 +34,7 @@ public partial class MainWindow
                 check(EffectInputFingerprint() == input && HasPendingEffect && Fingerprint(_project) == before && _undo.Count == undo,
                     id + ": " + language.Code + " switches labels without losing pending effect or changing history");
                 check(Equals(SettingsButton.ToolTip, L.T("Einstellungen")) && ((LightingEffectOption)EffectChoice.Items[2]).Label == L.T("Farbwechsel"), id + ": translated static and dynamic labels update together");
+                check(PaletteHint.Text == (_paletteError ?? L.T("Für alle Geräte und Profile.")), id + ": favorite-color help updates when the app language changes");
             }
             ApplyUiLanguage("de"); DiscardPendingEdits();
             SetTab(3); UpdateLayout(); check(!LayerOverview.IsVisible, id + ": redundant large layer cards stay removed");

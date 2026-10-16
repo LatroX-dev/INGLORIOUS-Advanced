@@ -22,6 +22,7 @@ public partial class MainWindow
             L.SetLanguage(language);
             RefreshSharedBrightness();
             RefreshAll();
+            RenderColorPalette();
             EffectChoice.Items.Refresh(); BindingChoice.Items.Refresh(); StepKeyChoice.Items.Refresh();
             for (var i = 0; i < fields.Length; ++i) fields[i].Text = texts[i];
             SetEffectColors(colors);
