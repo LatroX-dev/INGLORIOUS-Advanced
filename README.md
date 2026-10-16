@@ -154,6 +154,15 @@ If INGLORIOUS Advanced is useful to you, you can [support its development on Ko-
 
 A [GitHub star](https://github.com/LatroX-dev/INGLORIOUS-Advanced/stargazers), a hardware report or a [contribution](CONTRIBUTING.md) also helps.
 
+### Star history
+
+<a href="https://www.star-history.com/?repos=LatroX-dev%2FINGLORIOUS-Advanced&type=date&legend=top-left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=LatroX-dev/INGLORIOUS-Advanced&type=date&theme=dark&legend=top-left" />
+    <img alt="INGLORIOUS Advanced GitHub stars over time" src="https://api.star-history.com/chart?repos=LatroX-dev/INGLORIOUS-Advanced&type=date&legend=top-left" />
+  </picture>
+</a>
+
 ## Build and contribute
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the clean build, offline checks and contribution scope. [Release preparation](docs/public-release.md) covers packaging and corresponding source; [firmware documentation](firmware/README.md) contains the device protocol and build details.

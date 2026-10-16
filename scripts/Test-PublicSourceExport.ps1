@@ -162,6 +162,27 @@ try {
   [IO.File]::WriteAllText($model,$original+"`n// "+$otherEndpoint)
   Rejected {&$exporter -SourceRoot $fixture} 'Unreviewed download and workflow badge endpoints must fail closed.'
  }
+ $publicStarHistory=@(
+  'https://www.star-history.com/?repos=LatroX-dev%2FINGLORIOUS-Advanced&type=date&legend=top-left',
+  'https://api.star-history.com/chart?repos=LatroX-dev/INGLORIOUS-Advanced&type=date&theme=dark&legend=top-left',
+  'https://api.star-history.com/chart?repos=LatroX-dev/INGLORIOUS-Advanced&type=date&legend=top-left'
+ )
+ foreach($chart in $publicStarHistory){
+  foreach($markup in @(('<img src="'+$chart+'" />'),('[Star history]('+$chart+')'))){
+   [IO.File]::WriteAllText($model,$original+"`n// "+$markup)
+   Check ((&$exporter -SourceRoot $fixture).mode-eq'plan-only') 'Reviewed complete Star History URLs are permitted in image and link markup.'
+  }
+  foreach($otherChart in @(
+   ('prefix'+$chart),($chart+'/extra'),($chart+'&device='+$privateContactToken),
+   $chart.Replace('INGLORIOUS-Advanced','INGLORIOUS-Advanced-private'),
+   $chart.Replace('https:','http:'),$chart.Replace('star-history.com/','star-history.com.evil.invalid/'),
+   ('https://example.invalid/?chart='+$chart),$chart.Replace('type=date','type=timeline'),
+   $chart.Replace('?repos=','?token=unreviewed&repos=')
+  )){
+   [IO.File]::WriteAllText($model,$original+"`n// "+$otherChart)
+   Rejected {&$exporter -SourceRoot $fixture} 'Star History exceptions must reject altered endpoints, adjacent names, nested URLs and additional query values.'
+  }
+ }
  [IO.File]::WriteAllText($model,$original)
  $last=&$exporter -SourceRoot $fixture
  Check ($last.mode-eq'plan-only') 'Restoring clean fixture yields a valid plan again.'

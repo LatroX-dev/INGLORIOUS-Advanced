@@ -225,6 +225,17 @@ function Assert-NoPrivateText([string]$Relative,[byte[]]$Bytes) {
                 $scan = $scan -creplace ($urlStart+[regex]::Escape($badge)+'(?=[?\s)"''<>]|$)'), 'PUBLIC_REPOSITORY_BADGE'
             }
         }
+        # Only this repository's complete reviewed chart and viewer URLs are
+        # public. Added query values, other repositories and nested URLs remain checked.
+        foreach ($starHistory in @(
+            'https://www.star-history.com/?repos=LatroX-dev%2FINGLORIOUS-Advanced&type=date&legend=top-left',
+            'https://api.star-history.com/chart?repos=LatroX-dev/INGLORIOUS-Advanced&type=date&theme=dark&legend=top-left',
+            'https://api.star-history.com/chart?repos=LatroX-dev/INGLORIOUS-Advanced&type=date&legend=top-left'
+        )) {
+            if ($scan.Contains($starHistory,[StringComparison]::Ordinal)) {
+                $scan = $scan -creplace ($urlStart+[regex]::Escape($starHistory)+$urlEnd), 'PUBLIC_REPOSITORY_STAR_HISTORY'
+            }
+        }
         foreach ($value in $private) {
             if ($scan.Contains($value,[StringComparison]::OrdinalIgnoreCase)) { throw ('Private local identifier detected in allowlisted file: '+$Relative) }
         }
