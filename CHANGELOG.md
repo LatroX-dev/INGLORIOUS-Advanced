@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.64
+## 0.6.65
 
 - Adjust keyboard brightness with the knob or assigned keys, even with the app closed.
 - Choose knob presets, adjust their sensitivity and hold the knob to switch between selected functions.

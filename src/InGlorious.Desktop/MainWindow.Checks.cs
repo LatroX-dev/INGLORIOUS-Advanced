@@ -16,7 +16,12 @@ public sealed partial class MainWindow
         var count = 0;
         void Check(bool condition, string name) { count++; if (!condition) throw new InvalidOperationException("Check failed: " + name); }
         void Reject(Action action, string name) { var rejected = false; try { action(); } catch (InvalidDataException) { rejected = true; } Check(rejected, name); }
-        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.64", "visible product assembly metadata uses INGLORIOUS 0.6.64");
+        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.65", "visible product assembly metadata uses INGLORIOUS 0.6.65");
+        if (Program.Arguments.Contains("--feedback-checks"))
+        {
+            await RunExperimentalFeedbackInvitationChecksAsync(Check);
+            return $"PASS {count} focused offline feedback checks; no hardware or user-data access.";
+        }
         await RunConnectionsChecksAsync(Check);
         await RunProfileReplacementChecksAsync(Check);
         await RunKeyBindingChecksAsync(Check);

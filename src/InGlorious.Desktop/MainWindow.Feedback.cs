@@ -82,10 +82,25 @@ public sealed partial class MainWindow
         check(ReferenceEquals(preferences, _preferences) && !_feedbackInvitationOpen,
             "Experimental feedback: offline setup and transfer never load or save invitation preferences, or open a popup");
         var settingsOwner = new Window(); var unrelatedOwner = new Window();
-        var preferenceFixture = System.IO.Path.Combine(AppContext.BaseDirectory, "offline-feedback-settings-" + Guid.NewGuid().ToString("N") + ".json");
+        var applicationFiles = Directory.GetFileSystemEntries(AppContext.BaseDirectory).Order(StringComparer.Ordinal).ToArray();
+        var smoke = Array.IndexOf(Program.Arguments, "--smoke");
+        var reportPath = smoke >= 0 && smoke + 1 < Program.Arguments.Length && !Program.Arguments[smoke + 1].StartsWith("--", StringComparison.Ordinal)
+            ? Path.GetFullPath(Program.Arguments[smoke + 1]) : null;
+        var fixtureRoot = reportPath is not null ? Path.GetDirectoryName(reportPath)! : Path.Combine(Environment.CurrentDirectory, "artifacts", "checks");
+        var applicationRoot = Path.GetFullPath(AppContext.BaseDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        fixtureRoot = Path.GetFullPath(fixtureRoot);
+        if (fixtureRoot.Equals(applicationRoot, comparison) || fixtureRoot.StartsWith(applicationRoot + Path.DirectorySeparatorChar, comparison))
+            throw new InvalidOperationException("Feedback checks require an output directory outside the application package.");
+        var fixtureDirectory = Path.Combine(fixtureRoot, "feedback-settings-" + Guid.NewGuid().ToString("N"));
+        if (Directory.Exists(fixtureDirectory)) throw new IOException("The feedback fixture directory already exists.");
+        Directory.CreateDirectory(fixtureDirectory);
+        var preferenceFixture = Path.Combine(fixtureDirectory, "preferences.json");
         try
         {
             AppPreferencesStore.Save(new AppPreferences(), preferenceFixture);
+            check(File.Exists(preferenceFixture + ".lock"),
+                "Experimental feedback: the fixture exercises the preference store's persistent lock file");
             var edit = AppPreferencesStore.BeginEdit(preferenceFixture);
             var originalBytes = File.ReadAllBytes(preferenceFixture);
             _settingsEditOwner = settingsOwner;
@@ -107,8 +122,13 @@ public sealed partial class MainWindow
         finally
         {
             _settingsEditOwner = null; _deferredFeedbackInvitations.Clear(); settingsOwner.Close(); unrelatedOwner.Close();
-            if (File.Exists(preferenceFixture)) File.Delete(preferenceFixture);
+            File.Delete(preferenceFixture);
+            File.Delete(preferenceFixture + ".lock");
+            Directory.Delete(fixtureDirectory);
         }
+        check(!Directory.Exists(fixtureDirectory) &&
+            applicationFiles.SequenceEqual(Directory.GetFileSystemEntries(AppContext.BaseDirectory).Order(StringComparer.Ordinal)),
+            "Experimental feedback: preference data and lock leave no fixture directory or application-package residue");
         var language = L.CurrentLanguage;
         try
         {
