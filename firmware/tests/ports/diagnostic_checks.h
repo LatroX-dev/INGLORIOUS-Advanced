@@ -4,7 +4,7 @@ static void check_diagnostics(void) {
     boot(false);
     check(command(11,NULL,0)==0 && response[8]==1,"extension format");
 #if IG_BOARD == 16
-    check(u16(response+10)==7,"diagnostic capability advertised");
+    check(u16(response+10)==127,"diagnostic and ordered knob capabilities advertised");
     uint8_t before[sizeof(backing)], action=0, overlay[5]={0};
     memcpy(before,backing,sizeof(before));
     uint32_t generation=active_generation, crc=active_crc;
@@ -83,7 +83,7 @@ static void check_diagnostics(void) {
     rgb_matrix_indicators_advanced_user(0,RGB_MATRIX_LED_COUNT); check(!memcmp(restored,pixels,sizeof(restored)),"stopping restores normal profile rendering at the same effect time");
     check(!writes && active_generation==generation && active_crc==crc && !memcmp(before,backing,sizeof(before)),"all diagnostics preserve complete stored profile and generation without writes");
 #else
-    check(u16(response+10)==3,"older boards do not advertise diagnostics");
+    check(u16(response+10)==(IG_HAS_ENCODER ? 123 : 3),"other boards advertise only supported extensions");
     uint8_t action=1, overlay[5]={1,0,255,0,0};
     check(command(14,&action,1)==9 && command(15,overlay,5)==9 && !writes,"unsupported diagnostics cannot mutate older boards");
 #endif

@@ -129,7 +129,7 @@ foreach($target in $targets) {
  Write-Host ($target.name+': built '+$bytes.Length+' bytes, reserved code limit '+$limit+' bytes.')
 }
 $manifest=[ordered]@{
- schema=1;createdUtc=[DateTime]::UtcNow.ToString('o');qmkCommit=$expectedCommit;protocolSchema=1;configSchemas=@(1,2,3,4);firmwareVersion=$firmwareVersion;firmwareBuildId=$firmwareBuildId
+ schema=1;createdUtc=[DateTime]::UtcNow.ToString('o');qmkCommit=$expectedCommit;protocolSchema=1;configSchemas=@(1,2,3,4,5,6,7);firmwareVersion=$firmwareVersion;firmwareBuildId=$firmwareBuildId
  compiler='QMK-MSYS1.12.0, arm-none-eabi-gcc15.2.0';lto=$false
  compilerVersion=$compilerVersion;submodules=$submodules
  hardwareFlashed=$false;hardwareAcceptanceTested=$false;powerLossTested=$false

@@ -192,9 +192,10 @@ public sealed partial class MainWindow
         {
             _busy = true; _root.IsEnabled = false; await _sharedBrightness.StopAsync();
             var device = await ChooseDeviceAsync(); if (device is null) return;
-            _busy = true; _root.IsEnabled = false; _confirmed.Remove(device.DeviceId); UpdateFooter();
+            _busy = true; _root.IsEnabled = false; RequireDeviceConfigurationRead(device.DeviceId); UpdateFooter();
             var read = await PlatformDeviceService.ReadAsync(device);
             if (!await MayReplace(_state)) return;
+            MarkDeviceConfigurationRead(read.Project, read.Info);
             _sessions[device.DeviceId] = _state = EditorState.FromDevice(read.Project);
             _startupNotices.Remove(device.DeviceId);
             _startupReadFingerprints.Remove(device.DeviceId);
@@ -209,8 +210,10 @@ public sealed partial class MainWindow
     private async Task TransferAsync()
     {
         if (_state.Device.IsOfflineOnly || !await GuardNavigation() || Program.Offline) return;
+        if (DeviceConfigurationNeedsRead) { Status(DeviceConfigurationReadNotice); return; }
         var snapshot = ProjectService.Clone(_state.Project);
         var image = OnboardSerializer.Prepare(snapshot);
+        string? feedbackDeviceId = null;
         try
         {
         OnboardDevice? target;
@@ -224,7 +227,7 @@ public sealed partial class MainWindow
         try
         {
             info = await PlatformDeviceService.GetInfoAsync(target);
-            if (image.RequiresScreensaver) extensions = await PlatformDeviceService.GetExtensionsAsync(target);
+            if (image.RequiresScreensaver || image.RequiresKnobCycle) extensions = await PlatformDeviceService.GetExtensionsAsync(target);
         }
         finally { _busy = false; _root.IsEnabled = true; }
         if (PlatformDeviceService.UnsupportedReason(info, image, extensions) is { } unsupported)
@@ -261,13 +264,16 @@ public sealed partial class MainWindow
                             : L.T("Die gespeicherten Einstellungen werden geprüft …");
                     }), () => writeStarted = true);
                 if (!result.Transfer.ReadbackVerified) throw new IOException("Device readback was not verified.");
+                MarkDeviceConfigurationRead(snapshot);
                 _confirmed[target.DeviceId] = EditorState.Fingerprint(snapshot); progress.Value = 100;
                 completionNotice = result.UsbNotice;
+                feedbackDeviceId = target.DeviceId;
                 saved = true;
             }
             catch (Exception ex)
             {
                 Trace.TraceError("Configuration transfer failed: {0}", ex);
+                if (writeStarted) RequireDeviceConfigurationRead(target.DeviceId);
                 status.Text = ex is FirmwareUpdateRequiredException ? ex.Message : L.T(writeStarted
                     ? "Das Ergebnis ist unklar. Prüfe zuerst den Gerätestand."
                     : "Die Übertragung wurde nicht gestartet. Versuche es erneut.");
@@ -292,7 +298,9 @@ public sealed partial class MainWindow
                 var exact = read.Info.Persistent && read.Payload.AsSpan().SequenceEqual(image.Payload);
                 if (exact)
                 {
+                    MarkDeviceConfigurationRead(read.Project, read.Info);
                     _confirmed[target.DeviceId] = EditorState.Fingerprint(snapshot); saved = true;
+                    feedbackDeviceId = target.DeviceId;
                     if (read.Info.SupportsTiming) completionNotice = L.T("Bitte verbinde das USB-Kabel erneut, damit die neue Abfragerate aktiv wird.");
                 }
                 else { _confirmed.Remove(target.DeviceId); status.Text = L.T("Änderungen noch nicht übertragen"); go.IsEnabled = true; }
@@ -308,7 +316,15 @@ public sealed partial class MainWindow
             Text(L.T("Der bisherige Gerätestand wird automatisch gesichert."), true), status, progress, Row(guide, readBack, close, go)) };
         await dialog.ShowDialog(this);
         }
-        finally { _busy = false; _root.IsEnabled = true; await UpdateBrightnessService(); }
+        finally
+        {
+            _busy = false; _root.IsEnabled = true; await UpdateBrightnessService();
+            if (feedbackDeviceId is not null)
+            {
+                _firmwareAssessments.TryGetValue(feedbackDeviceId, out var assessment);
+                await MaybeOfferExperimentalFeedbackAsync(feedbackDeviceId, DeviceFeedbackTrigger.ConfigurationTransfer, assessment?.Version);
+            }
+        }
     }
     private bool _closing;
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
@@ -346,21 +362,43 @@ public sealed partial class MainWindow
             try
             {
                 var smoke = Array.IndexOf(Program.Arguments, "--smoke");
-                if (smoke >= 0) { var report = await RunSmoke(); if (smoke + 1 < Program.Arguments.Length) await File.WriteAllTextAsync(Program.Arguments[smoke + 1], report); }
+                if (smoke >= 0)
+                {
+                    string report;
+                    if (Program.Arguments.Contains("--knob-checks"))
+                    {
+                        var checkedCount = 0;
+                        void CheckRelevant(bool valid, string description) { if (!valid) throw new InvalidOperationException(description); checkedCount++; }
+                        await RunKnobPresetChecksAsync(CheckRelevant); RunLayerGuidanceChecks(CheckRelevant); RunSliderNavigationChecks(CheckRelevant);
+                        report = $"PASS {checkedCount} focused offline knob/layer checks; no hardware or user-data access.";
+                    }
+                    else report = await RunSmoke();
+                    if (smoke + 1 < Program.Arguments.Length) await File.WriteAllTextAsync(Program.Arguments[smoke + 1], report);
+                }
                 var shot = Array.IndexOf(Program.Arguments, "--screenshot");
                 if (shot >= 0 && shot + 1 < Program.Arguments.Length)
                 {
-                    if (Program.Arguments.Contains("--help") || Program.Arguments.Contains("--close-prompt") || Program.Arguments.Contains("--picker") || Program.Arguments.Contains("--device-setup") || Program.Arguments.Contains("--device-test") || Program.Arguments.Contains("--settings"))
+                    if (Program.Arguments.Contains("--help") || Program.Arguments.Contains("--close-prompt") || Program.Arguments.Contains("--picker") || Program.Arguments.Contains("--device-setup") || Program.Arguments.Contains("--device-test") || Program.Arguments.Contains("--settings") || Program.Arguments.Contains("--knob-cycle-options") || Program.Arguments.Contains("--os-actions"))
                     {
                         var helpTopic = Array.IndexOf(Program.Arguments, "--help-topic");
+                        if (Program.Arguments.Contains("--knob-cycle-all")) _state.Layer.KnobCycleMask = 255;
                         var prompt = Program.Arguments.Contains("--help") ? CreateUserGuide(helpTopic >= 0 && helpTopic + 1 < Program.Arguments.Length ? Program.Arguments[helpTopic + 1] : CurrentGuideTopic())
+                            : Program.Arguments.Contains("--knob-cycle-options") ? CreateKnobCycleOptionsWindow(_state.Layer)
+                            : Program.Arguments.Contains("--os-actions") ? CreateOsActionWindow()
                             : Program.Arguments.Contains("--device-test") ? new DeviceTestWindow(_state.Device.Id, null, preview: true)
                             : Program.Arguments.Contains("--settings") ? CreateSettingsWindow(_preferences, offlinePreview: true)
                             : Program.Arguments.Contains("--device-setup") ? CreateOfflineSetupPreview() : Program.Arguments.Contains("--picker") ? CreateColorPicker("#EF646B") : CreatePrompt("Ungespeichertes Profil", L.F($"Änderungen an „{_state.Project.Name}“ zuerst speichern?"), "Abbrechen", "Profil speichern", "Verwerfen");
                         if ((Program.Arguments.Contains("--help") || Program.Arguments.Contains("--settings") || Program.Arguments.Contains("--device-test")) && Program.Arguments.Contains("--minimum")) { prompt.Width = prompt.MinWidth; prompt.Height = prompt.MinHeight; }
                         prompt.Opened += async (_, _) =>
                         {
-                            try { await Task.Delay(200); using var captured = new RenderTargetBitmap(new PixelSize((int)prompt.ClientSize.Width, (int)prompt.ClientSize.Height), new Vector(96, 96)); captured.Render(prompt); captured.Save(Program.Arguments[shot + 1], PngBitmapEncoderOptions.Default); }
+                            if (Program.Arguments.Contains("--knob-compact")) ConstrainKnobDialog(prompt, 1280 / 1.5, 720 / 1.5);
+                            try
+                            {
+                                await Task.Delay(200);
+                                if (Program.Arguments.Contains("--knob-scroll-bottom") && prompt.Content is Grid knobLayout && knobLayout.Children.FirstOrDefault() is ScrollViewer knobScroll)
+                                { knobScroll.Offset = new Vector(0, knobScroll.Extent.Height); prompt.UpdateLayout(); }
+                                using var captured = new RenderTargetBitmap(new PixelSize((int)prompt.ClientSize.Width, (int)prompt.ClientSize.Height), new Vector(96, 96)); captured.Render(prompt); captured.Save(Program.Arguments[shot + 1], PngBitmapEncoderOptions.Default);
+                            }
                             catch (Exception ex) { Console.Error.WriteLine(ex); Environment.ExitCode = 1; }
                             finally { prompt.Close(); }
                         };
@@ -368,7 +406,26 @@ public sealed partial class MainWindow
                     }
                     var page = Array.IndexOf(Program.Arguments, "--page");
                     if (page >= 0 && page + 1 < Program.Arguments.Length) _page = Program.Arguments[page + 1];
+                    if (Program.Arguments.Contains("--sample-key"))
+                    {
+                        var sample = _state.Device.Keys.FirstOrDefault(key => key.DefaultBinding == (_page == "Ebenen" ? "MO(1)" : "KC_A"))
+                            ?? _state.Device.Keys.First(key => !key.IsEncoder && key.Label != "Knob");
+                        _state.SelectKey(sample.Id, false);
+                    }
                     if (Program.Arguments.Contains("--slider") && _state.Device.Id == "numpad") { _page = "Tastenbelegung"; _editingSlider = true; }
+                    if ((Program.Arguments.Contains("--knob-presets") || Program.Arguments.Contains("--knob-manual")) && _state.Device.HasEncoder)
+                    {
+                        _page = "Tastenbelegung"; _editingSlider = false; _state.SelectKey("encoder:ccw", false);
+                        KnobPresets.Apply(_state.Layer, "brightness"); _state.Layer.KnobCycleEnabled = true;
+                        if (Program.Arguments.Contains("--knob-press-by-function"))
+                        {
+                            _state.Layer.KnobPressByFunction = true;
+                            KnobPresets.SetPressBinding(_state.Layer, 1, "KC_MUTE");
+                            KnobPresets.SetPressBinding(_state.Layer, 4, "KC_MPLY");
+                        }
+                        if (Program.Arguments.Contains("--knob-both")) _state.SelectKey("encoder:cw", true);
+                        _knobModeState = _state; _knobModeLayer = _state.LayerIndex; _knobManual = Program.Arguments.Contains("--knob-manual");
+                    }
                     if (Program.Arguments.Contains("--effects")) _showEffects = true;
                     if (Program.Arguments.Contains("--standby")) _page = "Gerät";
                     if (Program.Arguments.Contains("--sides")) _state.Surface = "left";

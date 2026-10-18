@@ -20,6 +20,8 @@
 #define KC_NUM 83
 #define KC_VOLU 0xA9
 #define KC_VOLD 0xAA
+#define KC_MNXT 0xAB
+#define KC_MPRV 0xAC
 #define RGB_MATRIX_SOLID_COLOR 1
 #define LED_FLAG_UNDERGLOW 2
 #define B6 6
@@ -30,6 +32,8 @@ typedef struct { uint8_t matrix_co[MATRIX_ROWS][MATRIX_COLS]; point_t point[RGB_
 extern led_config_t g_led_config;
 typedef struct { struct { bool pressed; int type; struct { uint8_t row, col; } key; } event; } keyrecord_t;
 #define IS_KEYEVENT(event) ((event).type == 1)
+#define ENCODER_CW_EVENT 2
+#define ENCODER_CCW_EVENT 3
 #define IS_ENCODEREVENT(event) ((event).type == 2 || (event).type == 3)
 typedef enum { WEAR_LEVELING_FAILED, WEAR_LEVELING_SUCCESS, WEAR_LEVELING_CONSOLIDATED } wear_leveling_status_t;
 extern uint32_t layer_state, default_layer_state;
@@ -53,6 +57,12 @@ uint32_t timer_elapsed32(uint32_t since);
 int16_t analogReadPin(int pin);
 void midi_send_cc(int *device, uint8_t channel, uint8_t controller, uint8_t value);
 void tap_code(uint8_t code);
+void tap_code16(uint16_t code);
+bool is_key_pressed(uint8_t code);
+uint8_t get_weak_mods(void);
+void add_weak_mods(uint8_t mods);
+void set_weak_mods(uint8_t mods);
+void send_keyboard_report(void);
 void gpio_write_pin_high(int pin);
 void gpio_set_pin_output(int pin);
 void matrix_scan(void);

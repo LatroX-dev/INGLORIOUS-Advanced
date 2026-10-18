@@ -151,6 +151,42 @@ internal static class StartupDeviceChecks
         check(StartupDeviceLoader.SelectDevice("unknown", bothResults) == "pro-iso", "Unknown preference selects the first actual successful result deterministically");
         check(BoardDescriptorRegistry.Experimental.All(board => StartupDeviceLoader.SelectDevice(board.DeviceId, bothResults) == "pro-iso"), "Connected supported devices take precedence over disconnected startup preferences");
         foreach (var transport in both.Values) OnlyRead(transport, "both models");
+        var selective = new ObservedTransport(new EmulatedDevice("numpad", Defaults("numpad")));
+        var subset = await StartupDeviceLoader.LoadAsync(_ => Found(Device("pro-iso"), Device("numpad")), selected =>
+        {
+            check(selected.DeviceId == "numpad", "Reconnect refresh never opens an unrelated connected model");
+            return new(selective, selected.DeviceId);
+        }, deviceIds: ["numpad"]);
+        check(subset.Count == 1 && subset[0].DeviceId == "numpad" && subset[0].Loaded,
+            "Reconnect refresh returns only its requested exact device and reconstructs current configuration");
+        OnlyRead(selective, "selective reconnect read");
+        var selectiveFailure = await StartupDeviceLoader.LoadAsync(_ => Task.FromException<IReadOnlyList<OnboardDevice>>(new IOException("Unavailable metadata")),
+            _ => throw new Exception("Open after enumeration failure"), deviceIds: ["numpad"]);
+        check(selectiveFailure.Count == 1 && selectiveFailure[0].DeviceId == "numpad" && selectiveFailure[0].State == StartupDeviceState.ReadFailed,
+            "A selective refresh failure cannot invalidate other device sessions");
+        var emptyRefresh = await StartupDeviceLoader.LoadAsync(_ => throw new Exception("Empty refresh must not discover hardware"),
+            _ => throw new Exception("Empty refresh must not open hardware"), deviceIds: ["unsupported"]);
+        check(emptyRefresh.Count == 0, "Empty or unsupported refresh requests do not enumerate or open hardware");
+        foreach (var replacement in new[] { "removed", "different-path", "ambiguous", "query-failed" })
+        {
+            var discoveries = 0;
+            var original = Device("numpad");
+            var transport = new ObservedTransport(new EmulatedDevice("numpad", Defaults("numpad")));
+            Task<IReadOnlyList<OnboardDevice>> Discover(CancellationToken _)
+            {
+                if (++discoveries == 1) return Found(original);
+                return replacement switch
+                {
+                    "removed" => Found(),
+                    "different-path" => Found(Device("numpad", "replacement")),
+                    "ambiguous" => Found(original, Device("numpad", "replacement")),
+                    _ => Task.FromException<IReadOnlyList<OnboardDevice>>(new IOException("Final connection check failed"))
+                };
+            }
+            var result = await StartupDeviceLoader.LoadAsync(Discover, _ => new(transport, "numpad"), deviceIds: ["numpad"]);
+            Failed(result, "numpad", "connection changed after read: " + replacement);
+            OnlyRead(transport, "connection changed after read: " + replacement);
+        }
         check(!new StartupDeviceResult("pro-iso", StartupDeviceState.Loaded).Loaded, "A bare Loaded enum without validated model and info is not a usable loaded result");
     }
 

@@ -21,6 +21,7 @@ public sealed partial class MainWindow : Window
     private readonly ProfileLibrary _profiles = new(Paths.DataRoot);
     private readonly Dictionary<string, string> _confirmed = [];
     private string _page = "Beleuchtung", _status = "";
+    private long _statusRevision;
     private bool _busy, _building, _navigating, _allowClose;
     private Func<bool>? _pendingApply;
     private Grid _root = null!;
@@ -69,9 +70,9 @@ public sealed partial class MainWindow : Window
         InitializeOfflineConnections();
         Build();
         _animation.Tick += (_, _) => Animate(); _animation.Start();
-        Closing += OnClosing; Closed += (_, _) => { _startupWindowClosed = true; _startupCancellation?.Cancel(); StopSoftwareUpdates(); _animation.Stop(); StopConnections(); SaveWindowPreferences(); };
+        Closing += OnClosing; Closed += (_, _) => { _startupWindowClosed = true; _startupCancellation?.Cancel(); StopSoftwareUpdates(); _animation.Stop(); StopConnections(); StopKnobStatus(); SaveWindowPreferences(); };
         KeyDown += OnKeyDown;
-        Opened += (_, _) => InitializeWindowOnce();
+        Opened += (_, _) => { InitializeWindowOnce(); StartKnobStatus(); };
     }
     private EditorState OpenSession(string id, bool allowLocalProfile = true)
     {
@@ -90,8 +91,9 @@ public sealed partial class MainWindow : Window
                     session = new(project, path);
                 }
             }
-            catch (Exception ex) { _status = L.F($"{Path.GetFileName(path)} konnte nicht geladen werden: {ex.Message}"); }
+            catch (Exception ex) { Status(L.F($"{Path.GetFileName(path)} konnte nicht geladen werden: {ex.Message}")); }
         }
+        if (_deviceReadRequired.ContainsKey(id)) RegisterAutomaticFallback(session);
         return _sessions[id] = session;
     }
     private TextBlock Text(string value, bool muted = false, double size = 13)
@@ -121,7 +123,7 @@ public sealed partial class MainWindow : Window
     private ComboBox Choice(IEnumerable<string> labels, int selected = 0) => new() { ItemsSource = labels.ToArray(), SelectedIndex = selected, MinWidth = 130 };
     private void Run(Action action)
     { if (_busy) return; try { action(); } catch (Exception ex) { Status(ex.Message); } }
-    private void Status(string message) { _status = message; if (_statusText is not null) { _statusText.Text = message; ToolTip.SetTip(_statusText, message); } }
+    private void Status(string message) { _statusRevision++; _status = message; if (_statusText is not null) { _statusText.Text = message; ToolTip.SetTip(_statusText, message); } }
     private void Changed()
     { _pendingApply = null; RebuildPreview(); UpdateFooter(); }
 
@@ -144,7 +146,7 @@ public sealed partial class MainWindow : Window
             var utilities = Row(BuildSoftwareUpdateHint(), help, settings); Grid.SetColumn(utilities, 2); header.Children.Add(utilities);
             _root.Children.Add(header);
 
-            var body = new Grid { Name = "WorkspaceColumns", ColumnDefinitions = new(_page == "Gerät" ? "176,*" : "176,*,320") }; Grid.SetRow(body, 1); _root.Children.Add(body);
+            var body = new Grid { Name = "WorkspaceColumns", ColumnDefinitions = new(_page == "Gerät" ? "176,*" : "176,*,340") }; Grid.SetRow(body, 1); _root.Children.Add(body);
             var nav = new StackPanel { Spacing = 5, Margin = new Thickness(12) };
             _deviceButtonsPanel = new StackPanel { Name = "DeviceButtons", Spacing = 4 };
             _deviceButtons.Clear();
@@ -206,11 +208,14 @@ public sealed partial class MainWindow : Window
             if (_page == "Gerät") workspace.Children.Add(BuildDeviceWorkspace());
             var workspaceScroll = new ScrollViewer { Name = "WorkspaceScroll", Content = workspace, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
             Grid.SetColumn(workspaceScroll, 1); body.Children.Add(workspaceScroll);
-            _editor = new StackPanel { Spacing = 9, Margin = new Thickness(16) };
+            _bindingPrimaryAction = null;
+            _editor = new StackPanel { Spacing = 10, Margin = new Thickness(18, 16) };
             if (_page != "Gerät")
             {
                 var inspectorHeader = new Grid { Name = "InspectorHeader", ColumnDefinitions = new("*,Auto"), ColumnSpacing = 10 };
-                inspectorHeader.Children.Add(Heading(_page));
+                var inspectorTitle = Text(L.T(_page), size: 17); inspectorTitle.FontWeight = FontWeight.SemiBold;
+                inspectorTitle.VerticalAlignment = VerticalAlignment.Center; inspectorHeader.Children.Add(inspectorTitle);
+                inspectorHeader.Margin = new Thickness(0, 0, 0, 7);
                 if (_page == "Beleuchtung")
                 {
                     var presets = AsyncButton("Beleuchtungsvorlagen", OpenLightingPresetsAsync); presets.Name = "LightingPresetsButton";
@@ -228,11 +233,27 @@ public sealed partial class MainWindow : Window
                     case "Makros": BuildMacroEditor(); break;
                     default: _editor.Children.Add(Text(L.T("Ein Profil enthält Farben, Belegungen, Ebenen und Makros für ein Gerät."), true)); break;
                 }
+                if (ShowsManualBindings)
+                {
+                    var osAction = AsyncButton("Betriebssystem-Aktion …", ShowOsActionAsync); osAction.Name = "OsActionHeaderButton";
+                    osAction.Width = osAction.Height = 32; osAction.MinHeight = 0; osAction.Padding = new Thickness(7); osAction.VerticalAlignment = VerticalAlignment.Center;
+                    osAction.Content = new Avalonia.Controls.Shapes.Path { Data = Geometry.Parse("M13 3 L21 3 L21 11 M21 3 L10 14 M10 5 L4 5 L4 21 L19 21 L19 15"), Stroke = Brush("#E4E7EB"), Fill = Brushes.Transparent, StrokeThickness = 1.7, Stretch = Stretch.Uniform, Width = 16, Height = 16 };
+                    osAction.IsEnabled = _state.Surface == "keys" && _state.SelectedKeys.Count > 0;
+                    ToolTip.SetTip(osAction, L.T("Betriebssystem-Aktion …")); Avalonia.Automation.AutomationProperties.SetName(osAction, L.T("Betriebssystem-Aktion …"));
+                    Grid.SetColumn(osAction, 1); inspectorHeader.Children.Add(osAction);
+                }
                 var inspectorContent = new Grid { RowDefinitions = new("*,Auto") };
                 inspectorContent.Children.Add(new ScrollViewer { Content = _editor });
                 if (_page == "Tastenbelegung")
                 {
-                    var bindingFiles = BuildBindingFileActions(); Grid.SetRow(bindingFiles, 1); inspectorContent.Children.Add(bindingFiles);
+                    var bindingFooter = new StackPanel { Spacing = 6 };
+                    if (_bindingPrimaryAction is not null)
+                    {
+                        _bindingPrimaryAction.HorizontalAlignment = HorizontalAlignment.Stretch;
+                        _bindingPrimaryAction.HorizontalContentAlignment = HorizontalAlignment.Center;
+                        _bindingPrimaryAction.Margin = new Thickness(18, 10, 18, 0); bindingFooter.Children.Add(_bindingPrimaryAction);
+                    }
+                    bindingFooter.Children.Add(BuildBindingFileActions()); Grid.SetRow(bindingFooter, 1); inspectorContent.Children.Add(bindingFooter);
                 }
                 var inspector = new Border { Name = "RightInspector", Background = Brush("#1C1F22"), Child = inspectorContent };
                 Grid.SetColumn(inspector, 2); body.Children.Add(inspector);
@@ -309,7 +330,8 @@ public sealed partial class MainWindow : Window
             var multiple = false;
             button.PointerPressed += (_, e) => multiple = (e.KeyModifiers & (KeyModifiers.Shift | KeyModifiers.Control)) != 0;
             button.Click += async (_, _) => { if (!await GuardNavigation()) return; _state.SelectKey(key.Id, multiple); SimulateKey(key); _globalEffect = false; _editingSlider = false; Build(); };
-            ToolTip.SetTip(button, key.AccessibleLabel + " · " + DisplayBinding(_state.Layer.Keys[key.Id].Binding));
+            var tip = key.AccessibleLabel + " · " + DisplayBinding(_state.Layer.Keys[key.Id].Binding);
+            if (key.IsEncoder || key.Label == "Knob") SetKnobToolTip(button, tip); else ToolTip.SetTip(button, tip);
             Avalonia.Automation.AutomationProperties.SetName(button, key.AccessibleLabel);
             Canvas.SetLeft(button, edge + (key.X - (key.IsIsoEnter ? .25 : 0)) * unit); Canvas.SetTop(button, topInset + key.Y * unit); _keyboard.Children.Add(button); _keyButtons[key.Id] = button;
         }

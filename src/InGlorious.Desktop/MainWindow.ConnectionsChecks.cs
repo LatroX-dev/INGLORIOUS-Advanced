@@ -10,6 +10,7 @@ public sealed partial class MainWindow
     {
         if (!Program.Offline) throw new InvalidOperationException("Connection checks require offline mode.");
         var savedState = _state; var savedSessions = _sessions.ToArray(); var savedConfirmed = _confirmed.ToArray();
+        var savedRequired = _deviceReadRequired.ToArray(); var savedFallbacks = _startupFallbackNotices.ToArray(); var savedNotices = _startupNotices.ToArray();
         var savedIds = _connectedDeviceIds; var savedFailure = _connectionsFailed;
         var savedSetupDevices = _connectedSetupDevices; var savedSetupReader = _readSetupConnections;
         var savedPending = _pendingApply; var savedPrompt = _offlinePromptChoice; var savedPage = _page;
@@ -68,7 +69,9 @@ public sealed partial class MainWindow
             ApplyConnectionSnapshot(["numpad", "unknown", "pro-iso", "numpad"]);
             check(_selectorDeviceIds.SequenceEqual(new[] { "pro-iso", "numpad" }) && _deviceButtons.Count == 2 && _deviceButtons["pro-iso"].Classes.Contains("active-device") && !_deviceButtons["numpad"].Classes.Contains("active-device"),
                 "positive models are deduplicated, unknowns excluded and no offline catalog is appended");
-            check(_readDeviceButton.IsEnabled && _transferButton!.IsEnabled, "matching connected profile enables device actions");
+            check(_readDeviceButton.IsEnabled && !_transferButton!.IsEnabled && DeviceConfigurationNeedsRead, "newly connected profile requires a current read before transfer");
+            MarkDeviceConfigurationRead(_state.Project); UpdateConnectionActions();
+            check(_readDeviceButton.IsEnabled && _transferButton!.IsEnabled, "verified configuration read enables transfer");
             check(!_deviceButtonsPanel.GetLogicalDescendants().OfType<ComboBox>().Any() &&
                 _deviceButtonsPanel.GetLogicalDescendants().OfType<Avalonia.Controls.Shapes.Path>().Any(icon => icon.Name == "KeyboardDeviceIcon") &&
                 _deviceButtonsPanel.GetLogicalDescendants().OfType<Avalonia.Controls.Shapes.Path>().Any(icon => icon.Name == "NumpadDeviceIcon") &&
@@ -156,6 +159,9 @@ public sealed partial class MainWindow
         {
             _state = savedState; _sessions.Clear(); foreach (var item in savedSessions) _sessions.Add(item.Key, item.Value);
             _confirmed.Clear(); foreach (var item in savedConfirmed) _confirmed.Add(item.Key, item.Value);
+            _deviceReadRequired.Clear(); foreach (var item in savedRequired) _deviceReadRequired.Add(item.Key, item.Value);
+            _startupFallbackNotices.Clear(); foreach (var item in savedFallbacks) _startupFallbackNotices.Add(item.Key, item.Value);
+            _startupNotices.Clear(); foreach (var item in savedNotices) _startupNotices.Add(item.Key, item.Value);
             _connectedDeviceIds = savedIds; _connectionsFailed = savedFailure; _pendingApply = savedPending; _offlinePromptChoice = savedPrompt;
             _connectedSetupDevices = savedSetupDevices; _readSetupConnections = savedSetupReader;
             _page = savedPage; _showEffects = savedEffects;

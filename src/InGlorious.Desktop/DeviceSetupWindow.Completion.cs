@@ -2,6 +2,8 @@ using System.Diagnostics;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using InGlorious.Core;
@@ -10,43 +12,87 @@ namespace InGlorious.Desktop;
 
 public sealed partial class DeviceSetupWindow
 {
-    private readonly StackPanel _completion = new() { Margin = new(0, 18, 0, 0), IsVisible = false };
+    private readonly Grid _completion = new() { Name = "SetupCompletion", RowDefinitions = new("*,Auto"), RowSpacing = 14, IsVisible = false, VerticalAlignment = VerticalAlignment.Top };
+    private readonly Grid _testCards = new() { Name = "SetupTestCards", ColumnDefinitions = new("*,*"), ColumnSpacing = 16 };
     private readonly Button _lightingButton = new() { Name = "SetupLightingTest", HorizontalAlignment = HorizontalAlignment.Left, MinHeight = 38 };
     private readonly TextBlock _lightingStatus = Text(13), _typingHint = Text(13);
     private readonly TextBlock _numLockHint = new() { Text = L.T("Für Ziffern Num-Lock einschalten. Standardbelegung: Fn + 0."), TextWrapping = TextWrapping.Wrap, Margin = new(0, 8, 0, 0) };
-    private readonly TextBox _typingTest = new() { Name = "SetupTypingTest", MinHeight = 40, MaxLength = 32, Margin = new(0, 8, 0, 0) };
     private string? _returnedHidPath;
-    private bool _lightingRunning;
+    private string _completionInput = "";
+    private bool _lightingRunning, _completionWasVisible;
+    private string CompletionTarget => DeviceId == "numpad" ? "1234567890" : "INGLORIOUS";
     private bool CompletionTestsVisible => _progress?.Stage == SetupStage.Complete && _writeAttempted && _operation != SetupOperation.Restore;
     private bool LightingReady => CompletionTestsVisible && !_closed && !_busy && !_lightingRunning && !string.IsNullOrWhiteSpace(_returnedHidPath);
     private bool TypingCompletes => CompletionTestsVisible && !_closed && !_busy && !_lightingRunning &&
-        string.Equals((_typingTest.Text ?? "").Trim(), DeviceId == "numpad" ? "1234567890" : "INGLORIOUS", StringComparison.OrdinalIgnoreCase);
+        string.Equals(_completionInput, CompletionTarget, StringComparison.OrdinalIgnoreCase);
+
+    private bool CanReceiveCompletionInput(bool activeWindow) => CompletionTestsVisible && !_closed && !_busy && !_lightingRunning &&
+        activeWindow && IsEnabled && !OwnedWindows.Any(window => window.IsVisible);
+
+    private bool ReceiveCompletionText(string? text, bool activeWindow)
+    {
+        if (!CanReceiveCompletionInput(activeWindow) || string.IsNullOrEmpty(text)) return false;
+        _completionInput = DeviceTypingTest.AdvanceCompletionPrefix(_completionInput, text, CompletionTarget);
+        if (!_offlinePreview && TypingCompletes) Close();
+        return true;
+    }
+
+    private void ReceiveCompletionKey(KeyEventArgs e, bool activeWindow, bool released)
+    {
+        if (!CanReceiveCompletionInput(activeWindow) || !DeviceTypingTest.IsTestNavigationKey(e.Key.ToString())) return;
+        if (!released)
+        {
+            if (e.Key == Key.Back && _completionInput.Length > 0) _completionInput = _completionInput[..^1];
+            else if (e.Key is Key.Delete or Key.Escape) _completionInput = "";
+        }
+        e.Handled = true;
+    }
 
     private void InitializeCompletionControls()
     {
         _lightingButton.Content = MainWindow.ButtonContent("Beleuchtung testen"); _lightingButton.Classes.Add("primary");
-        _lightingButton.Margin = new(0, 0, 12, 0);
-        var lightingActions = new WrapPanel();
-        lightingActions.Children.Add(_lightingButton); lightingActions.Children.Add(_deviceTestButton);
-        _completion.Children.Add(lightingActions);
+        _deviceTestButton.HorizontalAlignment = HorizontalAlignment.Left;
+        var lighting = new StackPanel { Spacing = 8 };
+        lighting.Children.Add(_lightingButton);
+        lighting.Children.Add(new TextBlock { Text = L.T("Dauert etwa 21 Sekunden."), TextWrapping = TextWrapping.Wrap });
+        lighting.Children.Add(new TextBlock { Text = L.T("Während des Lichttests keine Tasten drücken."), TextWrapping = TextWrapping.Wrap });
+        lighting.Children.Add(_lightingStatus);
+        var typing = new StackPanel { Spacing = 8 };
+        typing.Children.Add(_deviceTestButton);
+        typing.Children.Add(_typingHint); typing.Children.Add(_numLockHint);
+        _numLockHint.Margin = new(0);
+        var lightingCard = CompletionCard(lighting); var typingCard = CompletionCard(typing);
+        _testCards.Children.Add(lightingCard); Grid.SetColumn(typingCard, 1); _testCards.Children.Add(typingCard);
+        _completion.Children.Add(_testCards);
         AutomationProperties.SetName(_lightingButton, L.T("Beleuchtung testen"));
         AutomationProperties.SetName(_deviceTestButton, L.T("Gerät testen"));
-        _completion.Children.Add(new TextBlock { Text = L.T("Dauert etwa 21 Sekunden."), Margin = new(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap });
-        _completion.Children.Add(new TextBlock { Text = L.T("Während des Lichttests keine Tasten drücken."), Margin = new(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap });
-        _lightingStatus.Margin = new(0, 8, 0, 0); _completion.Children.Add(_lightingStatus);
-        _typingHint.Margin = new(0, 18, 0, 0); _completion.Children.Add(_typingHint); _completion.Children.Add(_numLockHint); _completion.Children.Add(_typingTest);
-        AutomationProperties.SetName(_typingTest, L.T("Hier Tasten testen"));
         _lightingButton.Click += async (_, _) => await RunCompletionLightingAsync();
-        _typingTest.TextChanged += (_, _) => { if (!_offlinePreview && TypingCompletes) Close(); };
+        _flowBody.Focusable = true;
+        AddHandler(KeyDownEvent, (_, e) => ReceiveCompletionKey(e, IsActive, released: false), RoutingStrategies.Tunnel);
+        AddHandler(KeyUpEvent, (_, e) => ReceiveCompletionKey(e, IsActive, released: true), RoutingStrategies.Tunnel);
+        AddHandler(TextInputEvent, (_, e) =>
+        {
+            if (ReceiveCompletionText(e.Text, IsActive)) e.Handled = true;
+        }, RoutingStrategies.Tunnel);
+        Deactivated += (_, _) => _completionInput = "";
         InitializeCompletionOptions();
     }
+
+    private static Border CompletionCard(Control content) => new()
+    {
+        Background = Palette("Surface"), BorderBrush = Palette("Stroke"), BorderThickness = new(1),
+        CornerRadius = new(6), Padding = new(12), Child = content
+    };
 
     private void RenderCompletion()
     {
         RenderCompletionOptions();
-        _completion.IsVisible = CompletionTestsVisible ? true : false;
+        _completion.IsVisible = CompletionTestsVisible;
+        if (!CompletionTestsVisible || _busy || _lightingRunning) _completionInput = "";
+        if (CompletionTestsVisible && !_completionWasVisible && !_offlinePreview) _flowBody.Focus();
+        _completionWasVisible = CompletionTestsVisible;
         _lightingButton.IsEnabled = !_offlinePreview && LightingReady;
-        _typingTest.IsEnabled = !_offlinePreview && !_lightingRunning;
+        _lightingStatus.IsVisible = !string.IsNullOrWhiteSpace(_lightingStatus.Text) && !_lightingRunning;
         _numLockHint.IsVisible = DeviceId == "numpad";
         _typingHint.Text = L.T(DeviceId == "numpad" ? "Tippe 1234567890, um abzuschließen, oder klicke auf „Fertig“."
             : "Schreibe INGLORIOUS, um abzuschließen, oder klicke auf „Fertig“.");
@@ -96,9 +142,7 @@ public sealed partial class DeviceSetupWindow
     {
         if (_offlinePreview || !LightingReady || _session is not { } session) return;
         _lightingRunning = true; Render();
-        _lightingStatus.Text = L.T(DeviceId == "numpad"
-            ? "Alle LEDs leuchten weiß, dann die Ziffern 1 bis 0 nacheinander. Rote Tropfen fallen von oben und füllen die Beleuchtung von unten auf. Zum Schluss leuchten alle LEDs rot, dann kehrt die normale Beleuchtung zurück."
-            : "Alle LEDs leuchten weiß, dann die Buchstaben von INGLORIOUS nacheinander. Rote Tropfen fallen von oben und füllen die Beleuchtung von unten auf. Zum Schluss leuchten alle LEDs rot, dann kehrt die normale Beleuchtung zurück.");
+        _lightingStatus.Text = "";
         try
         {
             // MainWindow keeps shared brightness paused for the entire modal firmware flow.

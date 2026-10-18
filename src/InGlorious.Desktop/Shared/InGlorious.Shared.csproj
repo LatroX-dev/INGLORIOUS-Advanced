@@ -27,6 +27,7 @@
     <Compile Include="../../InGlorious.Core/LightingPreviewEngine.cs" Link="LightingPreviewEngine.cs" />
     <Compile Include="../../InGlorious.Core/OnboardProtocol.cs" Link="OnboardProtocol.cs" />
     <Compile Include="../../InGlorious.Core/OnboardClient.cs" Link="OnboardClient.cs" />
+    <Compile Include="../../InGlorious.Core/OnboardTransportPool.cs" Link="OnboardTransportPool.cs" />
     <Compile Include="../../InGlorious.Core/OnboardDiagnostics.cs" Link="OnboardDiagnostics.cs" />
     <Compile Include="../../InGlorious.Core/DeviceDiagnosticSession.cs" Link="DeviceDiagnosticSession.cs" />
     <Compile Include="../../InGlorious.Core/DeviceTypingTest.cs" Link="DeviceTypingTest.cs" />

@@ -7,6 +7,24 @@ public static class FirmwareChangelog
 {
     private static readonly FirmwareSemanticVersion Version08 = new(0, 8, 0);
     private static readonly FirmwareSemanticVersion Version09 = new(0, 9, 0);
+    private static readonly FirmwareReleaseNotes KnobFeedbackNotes = new(new(0, 11, 8), Array.AsReadOnly(new[]
+    {
+        "Set a different short-press action for each knob function.",
+        "See the active knob function and get a brief light signal when switching."
+    }));
+    private static readonly FirmwareReleaseNotes KnobOrderNotes = new(new(0, 11, 7), Array.AsReadOnly(new[]
+    {
+        "Choose the order of knob functions."
+    }));
+    private static readonly FirmwareReleaseNotes KnobCycleNotes = new(new(0, 11, 6), Array.AsReadOnly(new[]
+    {
+        "New knob actions for scrolling, zoom, tabs and undo/redo.",
+        "Adjust knob sensitivity and hold to switch between selected functions."
+    }));
+    private static readonly FirmwareReleaseNotes BrightnessBindingNotes = new(new(0, 11, 5), Array.AsReadOnly(new[]
+    {
+        "Adjust keyboard brightness with the knob or assigned keys."
+    }));
     private static readonly FirmwareReleaseNotes LightingTestNotes = new(new(0, 11, 4), Array.AsReadOnly(new[]
     {
         "Fixed lighting tests being blocked when no key is pressed."
@@ -26,6 +44,7 @@ public static class FirmwareChangelog
     // Customer-facing features, improvements and bugfixes: short English bullets, without technical details.
     private static readonly IReadOnlyList<FirmwareReleaseNotes> Notes = Array.AsReadOnly(new[]
     {
+        BrightnessBindingNotes,
         LightingTestNotes,
         RedDefaultsNotes,
         new FirmwareReleaseNotes(new(0, 11, 1), Array.AsReadOnly(new[]
@@ -54,19 +73,21 @@ public static class FirmwareChangelog
         // No guessed starting version for an unknown device or a missing/default version report.
         // This catalog contains released changes only. Never derive a pending
         // change from a device response or an undocumented future target.
-        var newestDocumentedVersion = Notes[0].Version;
+        var newestDocumentedVersion = KnobFeedbackNotes.Version;
         if (!installed.HasValue || installed.Value == default || installed.Value >= target || installed.Value >= newestDocumentedVersion)
             return Array.Empty<FirmwareReleaseNotes>();
         IReadOnlyList<FirmwareReleaseNotes>? notes = deviceId switch
         {
             "pro-iso" => Notes,
             "numpad" => NumpadNotes,
-            "gmmk3-pro-100-iso" => [LightingTestNotes, new(new(0, 11, 3), Array.AsReadOnly(new[]
+            "gmmk3-pro-100-iso" => [BrightnessBindingNotes, LightingTestNotes, new(new(0, 11, 3), Array.AsReadOnly(new[]
             { "Red default lighting when no saved colors are available.", "Individual key, knob and LED tests." }))],
-            _ when BoardDescriptorRegistry.ProtocolBoards.Any(board => board.DeviceId == deviceId) => [LightingTestNotes, RedDefaultsNotes],
+            _ when BoardDescriptorRegistry.ProtocolBoards.Any(board => board.DeviceId == deviceId) => [BrightnessBindingNotes, LightingTestNotes, RedDefaultsNotes],
             _ => null
         };
         if (notes is null) return Array.Empty<FirmwareReleaseNotes>();
+        if (BoardDescriptorRegistry.ProtocolBoards.Any(board => board.DeviceId == deviceId && board.HasEncoder))
+            notes = Array.AsReadOnly(new[] { KnobFeedbackNotes, KnobOrderNotes, KnobCycleNotes }.Concat(notes).ToArray());
         return Array.AsReadOnly(notes.Where(note => installed.Value < note.Version && note.Version <= target && note.Version <= newestDocumentedVersion).ToArray());
     }
 }

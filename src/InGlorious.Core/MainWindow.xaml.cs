@@ -80,6 +80,8 @@ public partial class MainWindow : Window
         _savedFingerprint = Fingerprint(_project);
         _sourceFingerprint = _savedFingerprint;
         InitializeComponent();
+        KnobCycleCheck.Style = KeyBindingSelectionWindow.CreateChoiceStyle();
+        KnobCycleCheck.Content = new TextBlock { Text = L.T("Lange drücken: Funktion wechseln"), TextWrapping = TextWrapping.Wrap };
         if (_screenshotMode)
         {
             var fixtureIndex = Array.IndexOf(args, "--connected-devices");
@@ -145,6 +147,21 @@ public partial class MainWindow : Window
                 RefreshAll();
             }
             if (args.Contains("--binding")) SetTab(1);
+            if (args.Contains("--knob-presets") && Device.HasEncoder)
+            {
+                SetTab(1); KnobPresets.Apply(Layer, "brightness"); Layer.KnobCycleEnabled = true;
+                Layer.KnobCycleMask = 1 | 2 | 8 | 16;
+                if (args.Contains("--knob-press-by-function"))
+                {
+                    Layer.KnobPressByFunction = true;
+                    KnobPresets.SetPressBinding(Layer, 1, "KC_MUTE"); KnobPresets.SetPressBinding(Layer, 4, "KC_MPLY");
+                }
+                SelectKey(Device.Keys.Single(key => key.Label == "Knob").Id); RefreshInspector();
+            }
+            if (args.Contains("--knob-manual") && Device.HasEncoder)
+            {
+                SetTab(1); SelectKnobManualTarget("encoder:ccw");
+            }
             if (args.Contains("--slider"))
             {
                 var modeIndex = Array.IndexOf(args, "--slider-mode");
@@ -189,6 +206,20 @@ public partial class MainWindow : Window
             }
         }
         if (_defaultLoadError is not null) Status(_defaultLoadError);
+        if (screenshotIndex >= 0 && screenshotIndex + 1 < args.Length && args.Contains("--knob-options"))
+        {
+            if (args.Contains("--knob-options-all")) Layer.KnobCycleMask = 255;
+            var dialog = new KnobOptionsWindow(Layer) { Owner = this };
+            if (args.Contains("--knob-options-small")) dialog.MaxHeight = 500;
+            dialog.ContentRendered += async (_, _) =>
+            {
+                await Task.Delay(150);
+                try { SaveVisualScreenshot((FrameworkElement)dialog.Content, Path.GetFullPath(args[screenshotIndex + 1])); }
+                catch (Exception ex) { File.WriteAllText(Path.Combine(Paths.DataRoot, "screenshot-error.txt"), ex.ToString()); Environment.ExitCode = 1; }
+                finally { dialog.Close(); }
+            };
+            dialog.ShowDialog(); Close(); return;
+        }
         if (screenshotIndex >= 0 && screenshotIndex + 1 < args.Length && args.Contains("--help"))
         {
             var topicIndex = Array.IndexOf(args, "--help-topic");
@@ -235,6 +266,7 @@ public partial class MainWindow : Window
         {
             var stepIndex = Array.IndexOf(args, "--setup-step");
             var setup = new DeviceSetupWindow(Device.Id, args.Contains("--setup-restore") ? SetupOperation.Restore : args.Contains("--setup-update") ? SetupOperation.Update : SetupOperation.Install, offlinePreview: true) { Owner = this };
+            if (args.Contains("--minimum")) { setup.Width = setup.MinWidth; setup.Height = setup.MinHeight; }
             setup.ShowOfflineStep(stepIndex >= 0 && stepIndex + 1 < args.Length ? args[stepIndex + 1] : "select", Device.Id);
             setup.Loaded += async (_, _) =>
             {
@@ -298,6 +330,7 @@ public partial class MainWindow : Window
         if (screenshotIndex >= 0 && screenshotIndex + 1 < args.Length && args.Contains("--device-test"))
         {
             var test = new DeviceTestWindow(Device.Id, null, preview: true) { Owner = this };
+            if (args.Contains("--minimum")) { test.Width = test.MinWidth; test.Height = test.MinHeight; }
             test.Loaded += async (_, _) =>
             {
                 await Task.Delay(180);
@@ -375,13 +408,15 @@ public partial class MainWindow : Window
         var current = _devices.FirstOrDefault(d => d.IsSupported && d.DeviceId == _project.DeviceId);
         var offline = Device.IsOfflineOnly;
         ExperimentalDeviceNotice.Visibility = Device.IsExperimentalFirmware ? Visibility.Visible : Visibility.Collapsed;
+        DeviceFeedbackHint.Text = DeviceFeedbackContext.Invitation(Device);
         DeviceHardwareOverview.Visibility = offline ? Visibility.Collapsed : Visibility.Visible;
         OfflineDeviceOverview.Visibility = offline ? Visibility.Visible : Visibility.Collapsed;
         DeviceModeText.Text = _connectionScanFailed ? L.T("Gerätesuche fehlgeschlagen") : ConnectedDevices.Length == 0 ? L.T("Kein Gerät verbunden")
             : IsActiveDeviceConnected ? L.T("USB verbunden") : L.T("Gerät nicht verbunden");
         DeviceModeText.Visibility = !_connectionScanFailed && (IsActiveDeviceConnected || ConnectedDevices.Length == 0 && _setupDevices.Length > 0) ? Visibility.Collapsed : Visibility.Visible;
         DeviceModeText.Foreground = Brush(IsActiveDeviceConnected ? "#75D9CF" : "#A0A7B0");
-        ReadDeviceButton.IsEnabled = TransferButton.IsEnabled = !offline && IsActiveDeviceConnected;
+        ReadDeviceButton.IsEnabled = !offline && IsActiveDeviceConnected;
+        TransferButton.IsEnabled = ReadDeviceButton.IsEnabled && !DeviceConfigurationNeedsRead;
         ManageFirmwareButton.IsEnabled = RestoreOriginalFirmwareButton.IsEnabled = !offline && IsActiveDeviceConnected;
         ManageFirmwareButton.Visibility = offline ? Visibility.Collapsed : Visibility.Visible;
         DeviceRecoveryOverview.Visibility = offline ? Visibility.Collapsed : Visibility.Visible;
@@ -390,6 +425,7 @@ public partial class MainWindow : Window
             action.ToolTip = !IsActiveDeviceConnected ? L.T("Gerät nicht verbunden") : null;
         ReadDeviceButton.ToolTip = TransferButton.ToolTip = offline ? L.T("Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar.")
             : !IsActiveDeviceConnected ? L.T(_connectionScanFailed ? "Gerätesuche fehlgeschlagen" : "Gerät nicht verbunden") : null;
+        if (!offline && IsActiveDeviceConnected && DeviceConfigurationNeedsRead) TransferButton.ToolTip = DeviceConfigurationReadNotice;
         ConnectionText.Text = _screenshotMode ? L.T("Offline-Vorschau · USB-Status wird hier nicht geprüft.") : _scanning ? L.T("USB-Geräte werden geprüft …") : current is not null ? L.F($"USB erkannt · {current.VendorId}:{current.ProductId}") : L.T("Im normalen USB-Betrieb nicht erkannt. Lokaler Entwurf ist möglich.");
     }
 
@@ -466,6 +502,7 @@ public partial class MainWindow : Window
             System.Windows.Automation.AutomationProperties.SetName(button, key.AccessibleLabel);
             button.Click += (_, _) => { PreviewKeyHit(key.Id); SelectKey(key.Id); };
             if (key.Label == "Knob") button.Template = (ControlTemplate)FindResource("RoundKeyTemplate");
+            if (key.IsEncoder || key.Label == "Knob") AttachKnobRuntimeTooltip(button);
             if (key.IsIsoEnter)
             {
                 // QMK's 1.25 × 2 ISO definition includes a 0.25u extension on the upper left.
@@ -612,7 +649,11 @@ public partial class MainWindow : Window
         return LayerGuidance.BindingLabel(binding) ?? BindingCatalog.FunctionLabel(binding);
     }
 
-    private static string ShortBinding(string binding) => binding.StartsWith("MACRO:", StringComparison.Ordinal) ? L.T("MAKRO") : binding.Replace("KC_", "", StringComparison.Ordinal);
+    private static string ShortBinding(string binding) => binding switch
+    {
+        "RM_VALU" => "☀ +", "RM_VALD" => "☀ −",
+        _ => binding.StartsWith("MACRO:", StringComparison.Ordinal) ? L.T("MAKRO") : binding.Replace("KC_", "", StringComparison.Ordinal)
+    };
 
     private void SelectKey(string keyId)
     {
@@ -641,16 +682,27 @@ public partial class MainWindow : Window
         }
         BindingChoice.SelectedValue = code;
         if (BindingChoice.SelectedItem is not BindingOption selected) return;
+        if (IsKnobPresetSelection() && !IsKnobManualMode)
+        {
+            InspectorScroll.ScrollToTop();
+            return;
+        }
+        UpdateLayout(); FitBindingListToSidebar();
         BindingChoice.UpdateLayout();
-        BindingChoice.BringIntoView();
+        if (!IsKnobPresetSelection()) BindingChoice.BringIntoView();
         BindingChoice.ScrollIntoView(selected);
+        if (IsKnobPresetSelection()) Dispatcher.BeginInvoke(() =>
+        {
+            // The list scroll completes after layout; keep the knob settings visible above it.
+            if (_activeTab == 1 && IsKnobPresetSelection()) InspectorScroll.ScrollToTop();
+        }, System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
     private void RefreshInspector()
     {
         var keys = Device.Keys.Where(k => _selection.Contains(k.Id)).ToList();
-        SelectionText.Text = keys.Count switch { 0 => L.T("Keine Taste ausgewählt"), 1 => L.F($"{keys[0].Label} ausgewählt"), _ => L.F($"{keys.Count} Tasten ausgewählt") };
-        InspectorTitle.Text = keys.Count switch { 0 => L.T("Taste auswählen"), 1 => keys[0].Label, _ => L.F($"{keys.Count} Tasten") };
+        SelectionText.Text = keys.Count switch { 0 => L.T("Keine Taste ausgewählt"), 1 => L.F($"{(keys[0].Label == "Knob" ? L.T("Drehregler") : keys[0].Label)} ausgewählt"), _ => L.F($"{keys.Count} Tasten ausgewählt") };
+        InspectorTitle.Text = keys.Count switch { 0 => L.T("Taste auswählen"), 1 => keys[0].Label == "Knob" ? L.T("Drehregler") : keys[0].Label, _ => L.F($"{keys.Count} Tasten") };
         InspectorSubtitle.Text = keys.Count switch { 0 => L.T("Wähle eine Taste in der Vorschau."), 1 => L.F($"Ebene {_layerIndex} · {BindingLabel(Assignment(keys[0].Id).Binding)}{(keys[0].LedIndex is null ? L.T(" · Keine eigene RGB-LED") : "")}"), _ => L.F($"Gemeinsam bearbeiten · Ebene {_layerIndex}") };
         if (keys.Count > 0)
         {
@@ -680,6 +732,7 @@ public partial class MainWindow : Window
         AssignMacroButton.Content = _macroAssigning ? L.T("Makro zuweisen") : L.T("Taste auswählen …");
         AssignMacroButton.IsEnabled = CurrentMacro?.Steps.Count > 0 && (!_macroAssigning || keys.Count > 0);
         AssignBindingButton.IsEnabled = ResetBindingButton.IsEnabled = DisableBindingButton.IsEnabled = keys.Count > 0;
+        RefreshKnobPresets();
         RefreshLayerGuidance();
         RefreshBindingFunctionHint();
         ApplyColorButton.IsEnabled = SelectedEffectLeds().Length > 0;
@@ -715,8 +768,8 @@ public partial class MainWindow : Window
     private void RefreshBindingTarget()
     {
         var slider = _editingSlider && Device.Id == "numpad";
-        BindingTargetButtons.Visibility = Device.Id == "numpad" ? Visibility.Visible : Visibility.Collapsed;
-        NumpadNumLockHint.Visibility = Device.Id == "numpad" ? Visibility.Visible : Visibility.Collapsed;
+        BindingTargetButtons.Visibility = Device.Id == "numpad" && !IsKnobPresetSelection() ? Visibility.Visible : Visibility.Collapsed;
+        NumpadNumLockHint.Visibility = Device.Id == "numpad" && !IsKnobPresetSelection() ? Visibility.Visible : Visibility.Collapsed;
         KeyBindingPanel.Visibility = slider ? Visibility.Collapsed : Visibility.Visible;
         SliderPanel.Visibility = slider ? Visibility.Visible : Visibility.Collapsed;
         foreach (var (button, selected) in new[] { (KeyBindingsButton, !slider), (SliderBindingsButton, slider) })
@@ -1162,7 +1215,8 @@ public partial class MainWindow : Window
         _selection.Clear(); _undo.Clear(); _redo.Clear();
     }
 
-    private void Status(string text) => StatusText.Text = text;
+    private long _statusRevision;
+    private void Status(string text) { _statusRevision++; StatusText.Text = text; }
     private void ShowError(string text, Exception? ex = null)
     {
         Status(text);
@@ -1215,6 +1269,9 @@ public partial class MainWindow : Window
         if (binding == "KC_TRNS" && _layerIndex == 0) { Status(L.T("Die Basisebene benötigt eine eigene Belegung. Durchreichen ist auf den Ebenen 1–3 möglich.")); return; }
         if (binding.StartsWith("MO(", StringComparison.Ordinal) && Device.Keys.Any(k => k.IsEncoder && _selection.Contains(k.Id))) { Status(L.T("Drehbewegungen lassen sich nicht gedrückt halten. Wähle für den Drehgeber eine Taste oder „Umschalten“.")); return; }
         if (_selection.All(id => Assignment(id).Binding == binding)) return;
+        var candidate = ProjectService.Clone(_project);
+        foreach (var id in _selection) candidate.Layers[_layerIndex].Keys[id].Binding = binding;
+        if (KnobPresets.HasInvalidCycle(candidate)) { Status(L.T("Deaktiviere zuerst den Wechsel per langem Druck.")); return; }
         BeginChange();
         foreach (var id in _selection)
         {
@@ -1232,11 +1289,74 @@ public partial class MainWindow : Window
         if (BindingChoice.SelectedItem is BindingOption choice) ApplyBinding(choice.Code);
         else Status(L.T("Wähle zuerst eine Taste oder Funktion aus der Liste."));
     }
-    private void OpenLayerSwitch_Click(object sender, RoutedEventArgs e)
+    private bool _refreshingKnobPresets;
+    private sealed record KnobPresetRow(string Id, string Label);
+    private bool IsKnobPresetSelection() => !_editingSlider && KnobPresets.IsSelection(Device, _selection);
+    private void RefreshKnobPresets()
     {
-        if (_readingDevice || _startupLoading || _startupFinishing) return;
-        SetTab(3);
-        if (_activeTab == 3) LayerPanel.BringIntoView();
+        if (KnobPresetPanel is null) return;
+        RefreshKnobEditorView();
+        Dispatcher.BeginInvoke(FitBindingListToSidebar, System.Windows.Threading.DispatcherPriority.Loaded);
+        if (!IsKnobPresetSelection()) return;
+        _refreshingKnobPresets = true;
+        try
+        {
+            var current = KnobPresets.Find(Layer);
+            var rows = KnobPresets.All.Select(p => new KnobPresetRow(p.Id, p.Label)).ToList();
+            if (current is null) rows.Insert(0, new("", L.T("Eigene Belegung")));
+            KnobPresetChoice.ItemsSource = rows;
+            KnobPresetChoice.SelectedItem = rows.Single(row => row.Id == (current?.Id ?? ""));
+            KnobStepChoice.ItemsSource = new[] { 1, 2, 3, 4, 5 };
+            KnobStepChoice.SelectedItem = Layer.KnobStep;
+            KnobUndoLayoutChoice.ItemsSource = new[] { "QWERTY", "QWERTZ", "AZERTY" };
+            KnobUndoLayoutChoice.SelectedIndex = Layer.KnobUndoLayout;
+            KnobUndoLayoutPanel.Visibility = current?.Id is "undo" or "undo-mac" || Layer.KnobCycleEnabled && (Layer.KnobCycleMask & 128) != 0 ? Visibility.Visible : Visibility.Collapsed;
+            KnobCycleOptionsButton.Visibility = Layer.KnobCycleEnabled ? Visibility.Visible : Visibility.Collapsed;
+            KnobCycleCheck.IsChecked = Layer.KnobCycleEnabled;
+            if (KnobCycleCheck.Content is TextBlock cycleLabel) cycleLabel.Text = L.T("Lange drücken: Funktion wechseln");
+            KnobCycleCheck.IsEnabled = Layer.KnobCycleEnabled || KnobPresets.CanCycle(_project, _layerIndex);
+            KnobCycleHint.Text = !KnobCycleCheck.IsEnabled
+                ? L.T("Zum Wechseln darf der kurze Druck keine Fn-Taste, Ebene oder Tastenkombination sein.")
+                : Layer.KnobCycleEnabled ? L.F($"700 ms halten: {KnobPresets.CycleSummary(Layer)}. Kurzes Drücken behält seine Belegung.") : "";
+            KnobCycleHint.Visibility = KnobCycleHint.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        finally { _refreshingKnobPresets = false; RefreshKnobEditorView(); }
+    }
+    private void KnobPreset_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_refreshingKnobPresets || KnobPresetChoice.SelectedItem is not KnobPresetRow { Id.Length: > 0 } row) return;
+        ApplyKnobPreset(row.Id);
+    }
+    private void ApplyKnobPreset(string presetId)
+    {
+        if (_readingDevice || _startupLoading || _startupFinishing || !IsKnobPresetSelection()) { RefreshKnobPresets(); return; }
+        if (!ResolvePendingEdits()) { RefreshKnobPresets(); return; }
+        var candidate = ProjectService.Clone(_project);
+        KnobPresets.Apply(candidate.Layers[_layerIndex], presetId);
+        if (Fingerprint(candidate) == Fingerprint(_project)) return;
+        if (!ValidateKnobCandidate(candidate)) { RefreshKnobPresets(); return; }
+        BeginChange();
+        KnobPresets.Apply(Layer, presetId);
+        FinishChange(L.T("Drehregler-Vorlage zugewiesen."));
+        RevealSelectedKeyBinding();
+    }
+    private void KnobCycle_Click(object sender, RoutedEventArgs e)
+    {
+        if (_refreshingKnobPresets) return;
+        var enabled = KnobCycleCheck.IsChecked == true;
+        if (_readingDevice || _startupLoading || _startupFinishing || !IsKnobPresetSelection() || !ResolvePendingEdits() ||
+            enabled && !KnobPresets.CanCycle(_project, _layerIndex)) { RefreshKnobPresets(); return; }
+        if (Layer.KnobCycleEnabled == enabled) return;
+        var preset = KnobPresets.Find(Layer)?.Id;
+        var mac = enabled && (preset is "zoom-mac" or "undo-mac" ||
+            preset is not ("zoom" or "undo") && OsActionCatalog.CurrentSystem == "macos");
+        var candidate = ProjectService.Clone(_project);
+        candidate.Layers[_layerIndex].KnobCycleEnabled = enabled; candidate.Layers[_layerIndex].KnobCycleMacZoom = mac;
+        if (!ValidateKnobCandidate(candidate)) { RefreshKnobPresets(); return; }
+        BeginChange();
+        Layer.KnobCycleEnabled = enabled;
+        Layer.KnobCycleMacZoom = mac;
+        FinishChange(L.T(enabled ? "Wechsel per langem Druck aktiviert." : "Wechsel per langem Druck deaktiviert."));
     }
     private void AssignLayerSwitch_Click(object sender, RoutedEventArgs e)
     {
@@ -1298,6 +1418,7 @@ public partial class MainWindow : Window
     private void BindingCategory_SelectionChanged(object sender, SelectionChangedEventArgs e) => RefreshBindingChoices();
     private static int BindingCategoryId(string code)
     {
+        if (BindingCatalog.IsLightingBrightness(code)) return 9;
         if (code.StartsWith("MACRO:")) return 8;
         if (code == "KC_TRNS" || code.StartsWith("MO(") || code.StartsWith("TG(") || code.StartsWith("TO(")) return 7;
         if (code is "KC_LCTL" or "KC_RCTL" or "KC_LSFT" or "KC_RSFT" or "KC_LALT" or "KC_RALT" or "KC_LGUI" or "KC_RGUI") return 6;
@@ -1311,7 +1432,7 @@ public partial class MainWindow : Window
         if (BindingChoice is null || BindingCategory is null || BindingSearch is null) return;
         var previous = (BindingChoice.SelectedItem as BindingOption)?.Code;
         var query = BindingSearch.Text.Trim(); var group = BindingCategory.SelectedIndex;
-        var options = BindingCatalog.All.Where(b => !b.Code.StartsWith("RM_", StringComparison.Ordinal)).Select(b => new BindingOption(b.Code, BindingCatalog.FunctionLabel(b.Code)))
+        var options = BindingCatalog.All.Where(b => BindingCatalog.IsAssignable(b.Code)).Select(b => new BindingOption(b.Code, BindingCatalog.FunctionLabel(b.Code)))
             .Concat(Enumerable.Range(0, 4).SelectMany(i => new[] { "MO", "TG", "TO" }.Select(operation =>
                 new BindingOption($"{operation}({i})", LayerGuidance.BindingLabel($"{operation}({i})")!))))
             .Concat(_project.Macros.Select(m => new BindingOption("MACRO:" + m.Id, L.T("Makro · ") + m.Name)))
@@ -1519,6 +1640,7 @@ public partial class MainWindow : Window
     {
         if (Device.IsOfflineOnly) { Status(L.T("Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar.")); return; }
         if (!IsActiveDeviceConnected) { Status(L.T("Gerät nicht verbunden")); return; }
+        if (DeviceConfigurationNeedsRead) { Status(DeviceConfigurationReadNotice); return; }
         if (_readingDevice) return;
         if (!ResolvePendingEdits()) return;
         CommitNames();
@@ -1529,13 +1651,17 @@ public partial class MainWindow : Window
             transfer.ShowDialog();
             if (transfer.DeviceSaveVerified)
             {
+                MarkDeviceConfigurationRead(_project);
                 _confirmedDeviceSaves[Device.Id] = (Fingerprint(_project), DateTime.Now);
                 _startupResults.Remove(Device.Id);
                 UpdateSourceHint();
                 if (transfer.CompletionNotice is { } notice) Status(notice);
+                _firmwareAssessments.TryGetValue(Device.Id, out var feedbackAssessment);
+                MaybeOfferExperimentalFeedback(Device.Id, DeviceFeedbackTrigger.ConfigurationTransfer, feedbackAssessment?.RuntimeVersion?.Report);
             }
             else if (transfer.DeviceStateUncertain)
             {
+                RequireDeviceConfigurationRead(Device.Id);
                 _confirmedDeviceSaves.Remove(Device.Id);
                 UpdateSourceHint();
             }
@@ -1576,6 +1702,7 @@ public partial class MainWindow : Window
     private void RecordDeviceRead(AppProject project, OnboardInfo? info = null)
     {
         if (project.DeviceId != Device.Id) throw new InvalidDataException(L.T("Die Konfiguration gehört zu einem anderen Gerät."));
+        MarkDeviceConfigurationRead(project, info);
         if (info?.Persistent == false)
         {
             _confirmedDeviceSaves.Remove(Device.Id);
@@ -1591,6 +1718,7 @@ public partial class MainWindow : Window
 
     private void InvalidateDeviceConfirmation(string deviceId)
     {
+        RequireDeviceConfigurationRead(deviceId);
         _confirmedDeviceSaves.Remove(deviceId);
         UpdateSourceHint();
     }
@@ -1676,7 +1804,9 @@ public partial class MainWindow : Window
         MacroValidation.Text = macro is null ? L.T("Erstelle ein Makro, um Schritte hinzuzufügen.") : MacroWarnings(macro);
         if (macro is not null)
         {
-            var usages = _project.Layers.SelectMany((l, i) => Device.Keys.Where(k => l.Keys[k.Id].Binding == "MACRO:" + macro.Id).Select(k => L.F($"{k.AccessibleLabel} (Ebene {i})"))).ToArray();
+            var usages = _project.Layers.SelectMany((l, i) => Device.Keys.Where(k => l.Keys[k.Id].Binding == "MACRO:" + macro.Id).Select(k => L.F($"{k.AccessibleLabel} (Ebene {i})"))
+                .Concat(l.KnobPressBindings.Where(pair => pair.Value == "MACRO:" + macro.Id).Select(pair =>
+                    L.F($"{L.T("Drehregler") + " · " + KnobPresets.CycleOptions.Single(option => option.Bit == pair.Key).Label} (Ebene {i})")))).ToArray();
             MacroUsage.Text = L.F($"{macro.Steps.Count}/128 Schritte · {macro.Steps.Where(s => s.Kind == "delay").Sum(s => s.DelayMs)} ms Pausen\n") + (usages.Length == 0 ? L.T("Noch keiner Taste zugewiesen.") : L.T("Zugewiesen: ") + string.Join(", ", usages));
         }
         else MacroUsage.Text = L.T("Ein Makro aufnehmen oder mit „Neu“ Schritt für Schritt anlegen.");
@@ -1786,12 +1916,9 @@ public partial class MainWindow : Window
     private void DeleteMacro_Click(object sender, RoutedEventArgs e)
     {
         var macro = CurrentMacro; if (macro is null) return;
-        if (MessageBox.Show(this, L.F($"„{macro.Name}“ löschen? Zugewiesene Tasten werden auf „Keine Aktion“ gesetzt. Du kannst dies rückgängig machen."), L.T("Makro löschen"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (MessageBox.Show(this, L.F($"„{macro.Name}“ löschen?") + "\n\n" + L.T("Zugewiesene Tasten und Drehregler-Aktionen werden deaktiviert."), L.T("Makro löschen"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         BeginChange();
-        _project.Macros.Remove(macro);
-        foreach (var layer in _project.Layers)
-            foreach (var assignment in layer.Keys.Values)
-                if (assignment.Binding == $"MACRO:{macro.Id}") assignment.Binding = "KC_NO";
+        _project = SharedMacroLibrary.RemoveFromProfile(_project, macro.Id);
         RefreshMacros(); FinishChange(L.T("Makro gelöscht · Rückgängig mit Strg+Z."));
     }
 
@@ -1957,14 +2084,18 @@ public partial class MainWindow : Window
         var settings = new AppSettingsWindow(current, offlinePreview: _screenshotMode, connectedDevices: ConnectedDevices) { Owner = this };
         settings.SetupAction = () => OpenDeviceSetupAsync(owner: settings);
         settings.RestoreSetupAction = () => OpenDeviceSetupAsync(operation: SetupOperation.Restore, owner: settings);
-        if (settings.ShowDialog() != true) return;
-        bool enableSoftwareUpdates = !_preferences.CheckForSoftwareUpdates && settings.Preferences.CheckForSoftwareUpdates;
-        _preferences = settings.Preferences;
-        Resources["HelpVisibility"] = _preferences.ShowHelp ? Visibility.Visible : Visibility.Collapsed;
-        ApplyUiLanguage(_preferences.Language);
-        Status(L.T("App-Einstellungen gespeichert"));
-        if (enableSoftwareUpdates) _ = CheckSoftwareUpdateInBackgroundAsync();
-        if (settings.RequestedSoftwareUpdate is { } installation) InstallSoftwareUpdate(installation);
+        try
+        {
+            if (settings.ShowDialog() != true) return;
+            bool enableSoftwareUpdates = !_preferences.CheckForSoftwareUpdates && settings.Preferences.CheckForSoftwareUpdates;
+            _preferences = settings.Preferences;
+            Resources["HelpVisibility"] = _preferences.ShowHelp ? Visibility.Visible : Visibility.Collapsed;
+            ApplyUiLanguage(_preferences.Language);
+            Status(L.T("App-Einstellungen gespeichert"));
+            if (enableSoftwareUpdates) _ = CheckSoftwareUpdateInBackgroundAsync();
+            if (settings.RequestedSoftwareUpdate is { } installation) InstallSoftwareUpdate(installation);
+        }
+        finally { OfferPendingSetupFeedback(); }
     }
 
     private async void Window_Closed(object? sender, EventArgs e)
@@ -1972,6 +2103,7 @@ public partial class MainWindow : Window
         _startupClosed = true;
         _softwareUpdateCancellation.Cancel();
         StopConnectionMonitor();
+        StopKnobStatusMonitor();
         _startupCancellation.Cancel();
         StopLightingPreview();
         await _sharedBrightness.StopAsync();
@@ -2153,6 +2285,28 @@ public partial class MainWindow : Window
         KeyboardView.MaxHeight = Math.Clamp(ActualHeight - 350, 280, 480);
     }
 
+    private void BindingViewport_SizeChanged(object sender, SizeChangedEventArgs e)
+        => Dispatcher.BeginInvoke(FitBindingListToSidebar, System.Windows.Threading.DispatcherPriority.Loaded);
+
+    private void FitBindingListToSidebar()
+    {
+        if (BindingChoice is null || !BindingChoice.IsVisible || !BindingPanel.IsVisible || InspectorScroll.ViewportHeight <= 0) return;
+        var compact = InspectorScroll.ViewportHeight < 400;
+        KnobModeTabs.Height = compact ? 34 : 38;
+        KnobModeTabs.Margin = new(0, 0, 0, compact ? 8 : 18);
+        KnobManualTargets.Margin = new(0, 0, 0, compact ? 8 : 16);
+        BindingSearchLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        BindingPanel.UpdateLayout();
+        var otherControls = BindingPanel.DesiredSize.Height - BindingChoice.ActualHeight;
+        var height = Math.Clamp(InspectorScroll.ViewportHeight - otherControls - 6, 120, 220);
+        if (Math.Abs(BindingChoice.Height - height) > .5)
+        {
+            BindingChoice.Height = height;
+            BindingChoice.UpdateLayout();
+            if (BindingChoice.SelectedItem is { } selected) BindingChoice.ScrollIntoView(selected);
+        }
+    }
+
     private async Task<string> RunUiSmoke()
     {
         var checks = new List<string>();
@@ -2178,6 +2332,7 @@ public partial class MainWindow : Window
         AppSettingsWindow.RunOfflineChecks(Check);
         await RunStartupChecksAsync(Check);
         await RunConnectionChecksAsync(Check);
+        await RunKnobRuntimeChecksAsync(Check);
         SwitchDevice("pro-iso");
         var key = Device.Keys.First(k => k.LedIndex is not null).Id;
         _selection.Clear(); _selection.Add(key);

@@ -1,6 +1,22 @@
 using System.Buffers.Binary;
 using InGlorious.Core;
 
+if (args is ["--knob-fixtures", var fixtureDirectory])
+{
+    KnobFixtureExport.Write(fixtureDirectory);
+    return;
+}
+if (args is ["--knob-order-fixtures", var orderFixtureDirectory])
+{
+    KnobFixtureExport.Write(orderFixtureDirectory, ordered: true);
+    return;
+}
+if (args is ["--knob-press-fixtures", var pressFixtureDirectory])
+{
+    KnobPressFixtureExport.Write(pressFixtureDirectory);
+    return;
+}
+
 var checks = 0;
 void Check(bool value, string reason) { if (!value) throw new Exception(reason); checks++; }
 void Reject(Action action, string reason) { try { action(); } catch (InvalidDataException) { checks++; return; } throw new Exception(reason); }
@@ -8,6 +24,12 @@ async Task RejectAsync(Func<Task> action, string reason) { try { await action();
 
 Check(OnboardProtocol.Crc32("123456789"u8) == 0xCBF43926, "IEEE CRC32 reference vector");
 await FirmwareVersionChecks.Run(Check);
+await BrightnessBindingChecks.Run(Check);
+KnobPresetChecks.Run(Check);
+await KnobTransferChecks.Run(Check);
+await KnobStatusChecks.Run(Check);
+await KnobPressChecks.Run(Check);
+await OnboardTransportPoolChecks.Run(Check);
 await ExperimentalBoardChecks.Run(Check, args);
 await EngineeringConfigurationChecks.Run(Check);
 await DiagnosticChecks.Run(Check);
@@ -247,7 +269,7 @@ foreach (var id in new[] { "pro-iso", "numpad" })
         new EmulatedDevice(id, initial.Payload) { EffectsSupported = true, ReportedSchema = 2 },
         new EmulatedDevice(id, initial.Payload) { EffectsSupported = true, ReportedSchema = 3 },
         new EmulatedDevice(id, initial.Payload) { ExtraFlags = 32 },
-        new EmulatedDevice(id, initial.Payload) { EffectsSupported = true, ReportedStaging = effectShape.Size + 1 }
+        new EmulatedDevice(id, initial.Payload) { EffectsSupported = true, ReportedStaging = OnboardSerializer.Shape(id, 7).Size + 1 }
     })
     {
         await using var client = new OnboardClient(malformedInfo, id);
@@ -256,6 +278,8 @@ foreach (var id in new[] { "pro-iso", "numpad" })
     }
     transport = new EmulatedDevice(id, image.Payload) { EffectsSupported = true, ReportedStaging = effectShape.Size };
     await using (var client = new OnboardClient(transport, id)) Check((await client.GetInfoAsync()).StagingBytes == effectShape.Size, "A complete schema 2 staging buffer can coexist with a legacy active configuration");
+    transport = new EmulatedDevice(id, image.Payload) { EffectsSupported = true, ReportedStaging = OnboardSerializer.Shape(id, 7).Size };
+    await using (var client = new OnboardClient(transport, id)) Check((await client.GetInfoAsync()).StagingBytes == OnboardSerializer.Shape(id, 7).Size, "A complete schema 7 staging buffer can coexist with a legacy active configuration");
     transport = new EmulatedDevice(id, effectImage.Payload) { EffectsSupported = true, ReportedSchema = 1, ReportedSize = shape.Size };
     await using (var client = new OnboardClient(transport, id)) await RejectAsync(() => client.ReadAsync(), "Active blob size inconsistency cannot produce a truncated successful read");
     transport = new EmulatedDevice(id, initial.Payload) { EffectsSupported = true };
@@ -392,7 +416,7 @@ foreach (var id in new[] { "pro-iso", "numpad" })
                 case "unsupported": target.ExtensionStatus = 9; break;
                 case "busy": target.ExtensionStatus = 3; break;
                 case "io": target.ExtensionThrows = true; break;
-                case "unknown-flag": target.ExtensionFlags = 11; break;
+                case "unknown-flag": target.ExtensionFlags = 35; break;
                 case "malformed": target.ExtensionPayloadOverride = [1, 0, 3, 0]; break;
                 case "no-standby": target.ExtraFlags = 96; break;
             }
@@ -438,6 +462,11 @@ sealed class EmulatedDevice(string id, byte[] initial) : IOnboardTransport
     public byte ExtensionStatus;
     public bool ExtensionThrows;
     public byte[]? ExtensionPayloadOverride;
+    public FirmwareSemanticVersion FirmwareVersion = new(0, 11, 5);
+    public byte FirmwareVersionStatus;
+    public byte[]? FirmwareVersionPayloadOverride;
+    public Exception? FirmwareVersionFailure;
+    public Action? BeforeFirmwareVersionReply;
     public int? ReportedSchema, ReportedSize, ReportedStaging;
     public int CommitDelayMs;
     public Task<byte[]> ExchangeAsync(byte[] packet, CancellationToken ct)
@@ -467,14 +496,27 @@ sealed class EmulatedDevice(string id, byte[] initial) : IOnboardTransport
                 response = ExtensionPayloadOverride ?? new byte[8];
                 if (ExtensionPayloadOverride is null) { Put16(response, 0, 1); Put16(response, 2, ExtensionFlags); Put16(response, 4, (ExtensionFlags & 1) != 0 ? 21000 : 0); }
                 break;
+            case OnboardProtocol.GetFirmwareVersion:
+                BeforeFirmwareVersionReply?.Invoke();
+                ct.ThrowIfCancellationRequested();
+                if (FirmwareVersionFailure is not null) throw FirmwareVersionFailure;
+                response = FirmwareVersionPayloadOverride ?? new byte[16];
+                if (FirmwareVersionPayloadOverride is null)
+                {
+                    Put16(response, 0, 1); response[2] = OnboardSerializer.Shape(id).Board;
+                    Put16(response, 4, FirmwareVersion.Major); Put16(response, 6, FirmwareVersion.Minor); Put16(response, 8, FirmwareVersion.Patch);
+                    Put32(response, 12, 0x000B0501);
+                }
+                break;
             case OnboardProtocol.ReconnectUsb:
                 var savedInterval = OnboardSerializer.Decode(Active).DeviceSettings.UsbPollingIntervalMs;
                 response = [(byte)ActiveIntervalMs, (byte)savedInterval, (byte)(ActiveIntervalMs != savedInterval ? 1 : 0), (byte)(BadReconnectAck ? 1 : 0)]; break;
             default: throw new Exception("Unexpected command");
         }
-        var reply = OnboardProtocol.Packet(command is OnboardProtocol.ReconnectUsb or OnboardProtocol.GetExtensions ? OnboardProtocol.Info : command, WrongSequence ? (byte)(packet[4] + 1) : packet[4], response);
+        var reply = OnboardProtocol.Packet(command is OnboardProtocol.ReconnectUsb or OnboardProtocol.GetExtensions or OnboardProtocol.GetFirmwareVersion ? OnboardProtocol.Info : command, WrongSequence ? (byte)(packet[4] + 1) : packet[4], response);
         reply[3] = command;
         if (command == OnboardProtocol.GetExtensions) reply[5] = ExtensionStatus;
+        if (command == OnboardProtocol.GetFirmwareVersion) reply[5] = FirmwareVersionStatus;
         return command == OnboardProtocol.Commit && CommitDelayMs > 0 ? DelayedReply(reply, ct) : Task.FromResult(reply);
     }
     private async Task<byte[]> DelayedReply(byte[] reply, CancellationToken ct) { await Task.Delay(CommitDelayMs, ct); return reply; }

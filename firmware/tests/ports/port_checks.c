@@ -14,6 +14,10 @@ static ig_rgb_t pixels[RGB_MATRIX_LED_COUNT];
 static uint8_t registered[256];
 static uint32_t now;
 static unsigned checks, replies, writes, jumps, scans, release_at, fail_write;
+static unsigned knob_taps;
+static uint16_t knob_tapped_code;
+static uint8_t weak_mods, last_registered_mods, last_registered_code;
+static unsigned keyboard_reports;
 static int raised_cs = -1, output_cs = -1;
 static bool borrowed;
 static uint8_t active_interval = 1, mock_saved_interval = 1, debounce_ms = 5;
@@ -54,7 +58,7 @@ uint16_t keycode_at_keymap_location_raw(uint8_t layer, uint8_t row, uint8_t col)
 }
 matrix_row_t matrix_get_row(uint8_t row) { check(row < MATRIX_ROWS, "matrix row"); return pressed[row]; }
 void raw_hid_send(uint8_t *packet, uint8_t length) { check(length == 32, "RAW frame length"); memcpy(response, packet, length); replies++; }
-void register_code(uint8_t code) { registered[code] = 1; }
+void register_code(uint8_t code) { registered[code] = 1; last_registered_mods = weak_mods; last_registered_code = code; }
 void unregister_code(uint8_t code) { registered[code] = 0; }
 uint32_t timer_read32(void) { return now; }
 uint32_t timer_elapsed32(uint32_t start) { return now - start; }
@@ -68,6 +72,12 @@ void gpio_set_pin_output(int pin) { check(raised_cs == pin, "inactive SPI chip s
 void matrix_scan(void) { scans++; if (release_at && scans == release_at) memset(pressed, 0, sizeof(pressed)); }
 void wait_ms(uint16_t ms) { now += ms; }
 void bootloader_jump(void) { jumps++; }
+void tap_code16(uint16_t code) { knob_taps++; knob_tapped_code = code; }
+bool is_key_pressed(uint8_t code) { return registered[code] != 0; }
+uint8_t get_weak_mods(void) { return weak_mods; }
+void add_weak_mods(uint8_t mods) { weak_mods |= mods; }
+void set_weak_mods(uint8_t mods) { weak_mods = mods; }
+void send_keyboard_report(void) { keyboard_reports++; }
 bool ig_timing_valid(uint8_t interval, uint8_t delay) { return (interval == 1 || interval == 2 || interval == 4 || interval == 8) && delay <= 40; }
 void ig_timing_init(uint8_t interval, uint8_t delay) { active_interval = mock_saved_interval = interval; debounce_ms = delay; reconnect = false; }
 bool ig_timing_update(uint8_t interval, uint8_t delay) { if (!ig_timing_valid(interval, delay)) return false; mock_saved_interval = interval; debounce_ms = delay; return true; }
@@ -84,6 +94,8 @@ static void boot(bool erase) {
     stage_open = macro_running = runtime_ready = false; stage_received = 0; active_slot = -1;
     lighting_suspended = light_test_active = false; layer_state = default_layer_state = 0;
     writes = fail_write = jumps = scans = release_at = 0; now = 0; raised_cs = output_cs = -1;
+    knob_taps = knob_tapped_code = 0;
+    weak_mods = last_registered_mods = last_registered_code = 0; keyboard_reports = 0;
     g_led_config = reference_leds;
     keyboard_pre_init_user(); keyboard_post_init_user();
     check(storage_ok && runtime_ready && !borrowed && writes == 0, "boot loads without storage writes");
@@ -240,8 +252,48 @@ static void check_physical_activity(void) {
 }
 #include "diagnostic_checks.h"
 
+static void check_brightness_bindings(void) {
+    boot(false);
+    uint32_t generation=active_generation, crc=active_crc;
+    unsigned initial_writes=writes;
+    uint8_t saved[sizeof(backing)]; memcpy(saved,backing,sizeof(saved));
+    check(key_allowed(0x7849,false) && key_allowed(0x784A,false) && key_allowed(0x7849,true) && key_allowed(0x784A,true),
+          "brightness binding allowlist is shared across model ports");
+    keyrecord_t event={.event={.pressed=true,.type=ENCODER_CCW_EVENT,.key={255,255}}};
+    brightness=255;
+    for(unsigned i=0;i<20;i++) {
+        event.event.pressed=true;
+        check(!process_record_user(0x784A,&event),"dimmer down is handled locally");
+        uint8_t current=brightness; event.event.pressed=false;
+        check(!process_record_user(0x784A,&event) && brightness==current,"dimmer release is consumed without change");
+    }
+    check(!brightness,"repeated down detents clamp at zero");
+    event.event.type=ENCODER_CW_EVENT; event.event.pressed=true;
+    check(!process_record_user(0x7849,&event) && brightness==17,"up detent recovers from lights off");
+#if IG_BOARD == 16
+    uint8_t action=1;
+    check(command(14,&action,1)==0 && diagnostic_active,"start independent device diagnostics");
+    check(!process_record_user(0x7849,&event) && brightness==34 && diagnostic_active,
+          "brightness binding preserves active diagnostics like ordinary encoder input");
+    action=2; check(command(14,&action,1)==0,"stop independent device diagnostics");
+#endif
+    check(writes==initial_writes && active_generation==generation && active_crc==crc && !memcmp(saved,backing,sizeof(saved)),
+          "brightness actions preserve all saved settings and flash across ports");
+}
+
+#define KNOB_TEST_NOW now
+#define KNOB_TEST_PIXELS pixels
+#define KNOB_TEST_ROWS pressed
+#if IG_HAS_ENCODER
+static void knob_test_install_length(const uint8_t *config, uint16_t length) { upload(config,length); check(commit(config,length)==0,"knob configuration commit"); }
+static void knob_test_stage_length(const uint8_t *config, uint16_t length) { upload(config,length); }
+static uint8_t knob_test_commit_length(const uint8_t *config, uint16_t length) {return commit(config,length);}
+static void knob_test_install(const uint8_t *config) { knob_test_install_length(config,IG_MAX_SIZE); }
+static void knob_test_reboot(void) { keyboard_post_init_user(); }
+#endif
+#include "../knob_cycle_checks.h"
 int main(int argc,char **argv) {
-    check(argc==4,"three serializer fixtures supplied"); uint16_t default_length=load(argv[1],defaults); check(default_length==IG_SIZE,"schema1 default");
+    check(argc>=4 && argc<=7,"three serializer fixtures supplied"); uint16_t default_length=load(argv[1],defaults); check(default_length==IG_SIZE,"schema1 default");
     check(sizeof(staging)==sizeof(uint8_t *),"no full duplicate staging allocation");
     check(sizeof(ig_physical)==sizeof(reference_physical) && !memcmp(ig_physical,reference_physical,sizeof(reference_physical)),"physical matrix agrees with QMK reference");
     boot(true);
@@ -258,13 +310,13 @@ int main(int argc,char **argv) {
     for(uint16_t i=IG_KEYS_OFFSET;i<IG_ENCODER_OFFSET;i++) check(default_byte(i)==defaults[i],"all four default keymap layers");
     check(command(1,NULL,0)==0 && response[8]==IG_BOARD && response[9]==MATRIX_ROWS && response[10]==MATRIX_COLS && response[12]==RGB_MATRIX_LED_COUNT,"board identity and dimensions");
 #if IG_BOARD == 16
-    static const uint8_t expected_version[16]={1,0,16,0,0,0,11,0,4,0,0,0,1,4,11,0};
+    static const uint8_t expected_version[16]={1,0,16,0,0,0,11,0,8,0,0,0,1,8,11,0};
 #else
-    static const uint8_t expected_version[16]={1,0,IG_BOARD,0,0,0,11,0,4,0,0,0,1,4,11,0};
+    static const uint8_t expected_version[16]={1,0,IG_BOARD,0,0,0,11,0,8,0,0,0,1,8,11,0};
 #endif
     check(command(13,NULL,0)==0 && response[6]==16 && !memcmp(response+8,expected_version,16),"exact candidate version identity, reserved fields and build ID");
     uint8_t config[IG_MAX_SIZE], before[sizeof(backing)];
-    for(int fixture=1;fixture<argc;fixture++) {
+    for(int fixture=1;fixture<4;fixture++) {
         uint16_t length=load(argv[fixture],config); check(validate_config(config,length),"desktop payload semantically accepted");
         memcpy(before,backing,sizeof(backing)); unsigned initial_writes=writes;
         upload(config,length); check(writes==initial_writes && !memcmp(before,backing,sizeof(backing)),"upload is entirely volatile");
@@ -284,6 +336,13 @@ int main(int argc,char **argv) {
         }
         boot(false);
     }
-    check_recovery(); check_lighting(); check_reactive_expiry(); check_diagnostics(); check_physical_activity();
+    check_recovery(); check_lighting(); check_reactive_expiry(); check_diagnostics(); check_physical_activity(); check_brightness_bindings();
+    boot(false); knob_cycle_checks(config);
+    boot(false); knob_order_checks(config);
+    boot(false); knob_status_checks(config);
+    boot(false); knob_press_checks(config);
+    if(argc>=5 && argv[4][0]) { boot(false); knob_fixture_checks(argv[4],false); }
+    if(argc>=6) { boot(false); knob_fixture_checks(argv[5],true); }
+    if(argc==7) { boot(false); knob_press_fixture_checks(argv[6]); }
     printf("PASS board%d: %u native port checks; no hardware access.\n",IG_BOARD,checks); return 0;
 }

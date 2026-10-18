@@ -1,6 +1,6 @@
-# INGLORIOUS firmware protocol 1 / configuration schemas 1, 2, 3 and 4
+# INGLORIOUS firmware protocol 1 / configuration schemas 1 through 7
 
-This is the implementation contract for **firmware 0.11.4**, assigned build ID `0x000B0401`. The installation and update catalog supplies this release for all 16 model/layout variants; hardware validation is tracked separately in [the model overview](../docs/model-support.md). All multi-byte integers are little-endian. No packet enters a bootloader, resets the MCU, writes firmware, changes protection, or exposes arbitrary memory. Command 8 explicitly schedules a USB re-enumeration to apply a saved keyboard polling interval.
+This is the implementation contract for **firmware 0.11.8**, assigned build ID `0x000B0801`. Candidate builds cover all 16 model/layout variants; hardware validation is tracked separately in [the model overview](../docs/model-support.md). All multi-byte integers are little-endian. No packet enters a bootloader, resets the MCU, writes firmware, changes protection, or exposes arbitrary memory. Command 8 explicitly schedules a USB re-enumeration to apply a saved keyboard polling interval.
 
 ## Identity and transport
 
@@ -8,7 +8,7 @@ Development USB VID `0xFEED`, PRO PID `0x1C01`, Numpad PID `0x1C02`; these are p
 
 Candidate0.10 adds board IDs3..9 and corresponding development PIDs1C03..1C09. The exact dimensions, products and capabilities are in [`targets.json`](targets.json). IDs3/4/5 are PRO rev1 ANSI, rev2 ANSI, rev2 ISO; IDs6/7/8/9 are GMMK2 65 ANSI,65 ISO,96 ANSI,96 ISO. All keyboards return lighting pattern1; only Numpad returns pattern2. The reserved encoder area must be zero on GMMK2; slider mode must be zero on all boards except Numpad. Runtime support is independent of stock recognition and firmware installation permission.
 
-| Board | Schema1 bytes | Schema2/3/4 bytes | Schema3/4 macro events |
+| Board | Schema1 bytes | Schema2/3/4/5 bytes | Schema3/4/5 macro events |
 | --- | ---: | ---: | ---: |
 | 1 | 5140 | 6360 | 668 |
 | 2 | 3780 | 4184 | 702 |
@@ -25,6 +25,8 @@ Candidate0.10 adds board IDs3..9 and corresponding development PIDs1C03..1C09. T
 | 14 | 5644 | 7176 | 655 |
 | 15 | 5656 | 7200 | 655 |
 | 16 | 5656 | 7200 | 655 |
+
+Schema6 adds exactly8 bytes to the extended size above on encoder-equipped boards; schema7 adds another64 bytes after the order records. Board IDs6..9 have no encoder and reject schemas5/6/7. All older lengths, event capacities, slot locations and existing field offsets remain unchanged.
 
 Candidate 0.11 adds GMMK 3 wired, non-HE board IDs 10..15 / PIDs 1C0A..1C0F in 65 ANSI, 65 ISO, 75 ANSI, 75 ISO, 100 ANSI, 100 ISO order. Each has an encoder and no slider. Their slot capacity is 7,648 payload bytes rather than the 7,136 bytes on IDs 1..9. Slots start at 1,024 and 8,704, with a 32-byte header. The second ends at 16,384. The 75/100 logo LED is an independent RGB LED, excluded from side pairing. It uses the existing per-LED color/effect fields without a wire-format extension.
 
@@ -47,13 +49,14 @@ Common packet: bytes 0..1 ASCII `IG`, byte 2 protocol `1`, byte 3 command, byte 
 | `0x08 APPLY_USB_INTERVAL` | empty, idle device required | active interval byte, saved interval byte, queued byte(0/1), reserved zero |
 | `0x09 READ_RUNTIME_BRIGHTNESS` | empty | brightness byte, active slider mode byte, two reserved zero bytes |
 | `0x0A SET_RUNTIME_BRIGHTNESS` | one brightness byte0..255 | the exact accepted brightness byte |
-| `0x0B GET_EXTENSIONS` | empty | version u16=1, flags u16(bit0=bounded manual light test, bit1=standby screensaver), durationMs u16, reserved u16=0; release0.9 reports flags3, duration21000 |
+| `0x0B GET_EXTENSIONS` | empty | version u16=1, flags u16(bit0=bounded manual light test, bit1=standby screensaver, bit2=board16 diagnostics, bit3=encoder presets/cycling, bit4=ordered encoder presets, bit5=read-only live knob status, bit6=per-function knob press), durationMs u16=21000, reserved u16=0 |
 | `0x0C LIGHT_TEST` | action byte: 0=status, 1=start, 2=stop | active byte0/1, pattern byte0=idle/1=keyboard/2=Numpad, remainingMs u16 |
 | `0x0D GET_FIRMWARE_VERSION` | empty | 16-byte release identity described below; no state changes |
 | `0x0E PHYSICAL_DIAGNOSTICS` | action byte: 0=status, 1=start/refresh, 2=stop, 3=refresh-only | 24 bytes described in board 16 diagnostics below |
 | `0x0F DIAGNOSTIC_LEDS` | mode, LED index, R, G, B | echoed request, reserved zero, remainingMs u16; requires active session |
+| `0x10 READ_KNOB_STATUS` | empty | 24 bytes described in live knob status below; encoder boards only |
 
-INFO payload: board byte0 (1 PRO, 2 Numpad), rows byte1, cols byte2, layers byte3=4, LEDs byte4, macro slots byte5=32, max events per macro byte6=128, flags byte7 (bit0 persistent storage available, bit1 slider present, bit2 staging active, bit3 schema2 effects supported, bit4 runtime timing and command8 supported, bit5 schema3 color sequences supported, bit6 volatile brightness commands9/10 supported, bit7 schema4 autonomous standby supported), **active** blob size u16 at8, **active** event capacity u16 at10 (768 in schema1/2; PRO668 or Numpad702 in schema3/4), active generation u32 at12, active CRC32 u32 at16, received staging bytes u16 at20, **active** config schema u16 at22 (1,2,3,4). Firmware0.6 sets bits3..7 even while preserving an active schema1 blob. It accepts either supported size at BEGIN; schema2/3/4 have the same length. The active size is not an upload-capacity restriction. An older host that rejects unknown capability bits must stop before writing; a newer host must check the relevant capabilities before uploading settings. In particular schema3 requires bit5 even if its stored color sequences are currently unused by the chosen effects.
+INFO payload: board byte0 (1 PRO, 2 Numpad), rows byte1, cols byte2, layers byte3=4, LEDs byte4, macro slots byte5=32, max events per macro byte6=128, flags byte7 (bit0 persistent storage available, bit1 slider present, bit2 staging active, bit3 schema2 effects supported, bit4 runtime timing and command8 supported, bit5 schema3 color sequences supported, bit6 volatile brightness commands9/10 supported, bit7 schema4 autonomous standby supported), **active** blob size u16 at8, **active** event capacity u16 at10 (768 in schema1/2; PRO668 or Numpad702 in schema3/4/5/6/7), active generation u32 at12, active CRC32 u32 at16, received staging bytes u16 at20, **active** config schema u16 at22 (1,2,3,4,5,6,7). Firmware0.6 sets bits3..7 even while preserving an active schema1 blob. Current firmware accepts each supported size at BEGIN; schema2/3/4/5 have the same length, schema6 adds8 bytes and schema7 adds72 bytes on encoder boards. The active size is not an upload-capacity restriction. An older host that rejects unknown capability bits must stop before writing; a newer host must check the relevant capabilities before uploading settings. In particular schema3 requires bit5 even if its stored color sequences are currently unused by the chosen effects.
 
 `GET_FIRMWARE_VERSION`, added in release0.8.0, reports the firmware's own explicit release identity in normal USB mode. Its request is empty. The successful16-byte payload for release0.9.1 is: format u16 at0=`1`; board u8 at2=`1` PRO or`2` Numpad; flags u8 at3=`0` (reserved); major u16 at4=`0`; minor u16 at6=`9`; patch u16 at8=`1`; reserved u16 at10=`0`; build identifier u32 at12=`0x00090101`. Release0.8.0 retains minor8 and build`0x00080001`. The build identifier is an assigned release identifier, **not** a binary hash, signature or authenticity proof. Hosts validate format, board, flags, reserved fields and a nonzero build, then compare the three numeric version components. A valid unsupported-command status9 means an older firmware cannot report its version; a timeout or malformed answer means the query failed and must not be treated as a version. USB `bcdDevice`, INFO capabilities, active config schema and extension-protocol version are not release numbers.
 
@@ -65,37 +68,37 @@ CRC32 is reflected IEEE, polynomial `0xEDB88320`, initial value `0xFFFFFFFF`, fi
 
 ## Config blob layout
 
-Schema1: PRO rows11, cols8, LEDs99, bytes **5140**; Numpad rows5, cols4, LEDs31, bytes **3780**. Formula `32 + 4*rows*cols*2 + 4*2*2 + 4*leds*3 + 32*4 + 768*4`. Schema2 preserves every keymap/RGB/macro offset and appends `32 + 4*leds*3` bytes: PRO **6360**, Numpad **4184**. Schema3 and schema4 have exactly the schema2 length and effect offsets; it dedicates the end of the original macro-event area to color sequences, reducing event capacity as documented below. No firmware boot automatically rewrites a legacy configuration.
+Schema1: PRO rows11, cols8, LEDs99, bytes **5140**; Numpad rows5, cols4, LEDs31, bytes **3780**. Formula `32 + 4*rows*cols*2 + 4*2*2 + 4*leds*3 + 32*4 + 768*4`. Schema2 preserves every keymap/RGB/macro offset and appends `32 + 4*leds*3` bytes: PRO **6360**, Numpad **4184**. Schema3, schema4 and schema5 have exactly the schema2 length and effect offsets; it dedicates the end of the original macro-event area to color sequences, reducing event capacity as documented below. No firmware boot automatically rewrites a legacy configuration.
 
 Header, 32 bytes:
 
 | Offset | Value |
 | --- | --- |
 | 0..3 | ASCII `IGCF` |
-| 4..5 | schema u16 =1,2,3,4, must match exact blob length |
-| 6 | board1..9 from targets.json |
+| 4..5 | schema u16 =1,2,3,4,5,6,7, must match exact blob length |
+| 6 | board1..16 from targets.json |
 | 7 | layers =4 |
 | 8,9,10 | rows, cols, LEDs |
 | 11 | macro slots =32 |
-| 12..13 | event capacity u16: schema1/2=768; schema3/4 PRO668/Numpad702 |
+| 12..13 | event capacity u16: schema1/2=768; schema3/4/5/6/7 PRO668/Numpad702 |
 | 14..15 | used event count u16, 0..event capacity |
 | 16 | slider mode: 0 disabled, 1 MIDI CC, 2 relative media volume, 3 lighting brightness |
-| 17 | zero |
+| 17 | schema5/6/7: enabled encoder-cycle layers, bit0..3; schema7 additionally enables per-function press for layers0..3 in bit4..7. Encoder required. Older schemas: zero |
 | 18..19 | slider calibration minimum u16 (default0) |
 | 20..21 | slider calibration maximum u16 (default1023), strictly greater than minimum |
 | 22 | MIDI channel 0..15 (default0) |
 | 23 | MIDI controller0..127 (default62) |
-| 24 | schema1 zero; schema2/3/4 USB keyboard polling interval in ms:1,2,4,8 |
-| 25 | schema1 zero; schema2/3/4 debounce in ms:0..40 |
-| 26 | schema4 standby enabled0/1; otherwise zero |
-| 27..28 | schema4 standby timeout seconds u16:10..3600; otherwise zero |
-| 29 | schema4 standby mode0=off,1=dim,2=screensaver; mode2 requires GET_EXTENSIONS bit1, even if byte26 is0; otherwise zero |
-| 30 | schema4 dim brightness percent1..100; otherwise zero |
-| 31 | zero |
+| 24 | schema1 zero; schema2/3/4/5/6/7 USB keyboard polling interval in ms:1,2,4,8 |
+| 25 | schema1 zero; schema2/3/4/5/6/7 debounce in ms:0..40 |
+| 26 | schema4/5/6/7 standby enabled0/1; otherwise zero |
+| 27..28 | schema4/5/6/7 standby timeout seconds u16:10..3600; otherwise zero |
+| 29 | schema4/5/6/7 standby mode0=off,1=dim,2=screensaver; mode2 requires GET_EXTENSIONS bit1, even if byte26 is0; otherwise zero |
+| 30 | schema4/5/6/7 dim brightness percent1..100; otherwise zero |
+| 31 | schema5/6/7: Command instead of Ctrl for zoom/undo on cycling layers, bit0..3; must be a subset of byte17 low four bits. Older schemas: zero |
 
 After header, in order:
 
-1. Keymap `u16[4][rows][cols]`, row-major. Missing physical positions must be KC_NO0. Allowed basic QMK keycodes0..255, QMK modded basic codes0x0100..0x1FFF, TO(layer)0x5200..0x5203, MO(layer)0x5220..0x5223, TG(layer)0x5260..0x5263, macro0..31 as0x7700..0x771F. KC_TRNS1 falls through. Other QMK functions, boot/reset codes and arbitrary custom actions are rejected.
+1. Keymap `u16[4][rows][cols]`, row-major. Missing physical positions must be KC_NO0. Allowed basic QMK keycodes0..255, QMK modded basic codes0x0100..0x1FFF, TO(layer)0x5200..0x5203, MO(layer)0x5220..0x5223, TG(layer)0x5260..0x5263, macro0..31 as0x7700..0x771F, and from firmware0.11.5 brightness up0x7849/down0x784A. Encoder-equipped boards also accept shortcut codes0x7E42..0x7E4B from0.11.6. KC_TRNS1 falls through. Other QMK functions, boot/reset codes and arbitrary custom actions are rejected.
 2. Encoder `u16[4][2]`, index0 counterclockwise, index1 clockwise. Same keycode vocabulary; momentary layers are rejected for encoder impulses. Encoder press is an ordinary matrix key.
 3. Per-layer LED RGB bytes `[4][leds][3]` in QMK LED index order, R/G/B. Includes side lights; no missing-LED placeholders. Configured values are raw0..255, multiplied by a runtime brightness scale. No host animation stream is required.
 4. Macro descriptors `[32]`, each start-event u16 and event-count u16. Each count <=128; ranges must lie within used event count. Empty descriptors have start0,count0. Sharing immutable event ranges is allowed.
@@ -105,7 +108,7 @@ Slider mode2 sends bounded relative consumer volume steps after physical movemen
 
 ## Board 16 physical diagnostics (0.11.3)
 
-GET_EXTENSIONS format 1 adds flag `0x04` only for board 16; its combined flags are 7. The original fifteen targets remain at flags 3. No stored configuration layout changes. Hosts must check this flag before using commands 14 or 15.
+GET_EXTENSIONS format 1 adds flag `0x04` only for board 16. Release0.11.6 reports combined flags15 for board16,11 for other encoder boards and3 for encoderless boards. Release0.11.7 also advertises ordered presets with flag `0x10`: combined flags31,27 and3 respectively. Hosts must check the diagnostic flag before using commands14 or15.
 
 RAW14 takes one action byte: 0 reads status, 1 starts or refreshes an active session, 2 stops, and 3 refreshes only an already-active session. Action 3 returns status 8 (conflict) if the session expired, stopped or was suspended; it never restarts or clears observations to satisfy a late poll. Hosts use action 1 only for explicit user start and action 3 for periodic refresh. The successful 24-byte payload is format 1 at byte 0, active boolean at 1, matrix rows 14 at 2, columns 8 at 3, fourteen cumulative row bitmasks at 4..17, clockwise counter u16 at 18, counterclockwise counter u16 at 20, and watchdog milliseconds remaining u16 at 22. Row bits latch physical pressed positions since session start, exclude matrix holes, and survive release, remapping and refresh. Encoder counters count pressed encoder events before keycode processing, including unmapped bindings, and wrap modulo 65536. Stop, expiry and suspend clear the session observations.
 
@@ -115,7 +118,7 @@ The session lasts at most 10000 ms without RAW14 action 1 or 3, using wrap-safe 
 
 ## Schema2 lighting extension
 
-At the schema1 end offset, four 8-byte global effect records appear in layer order. Each contains mode0..20, speed0..255, brightness0..255, target1=keys/2=sides/3=all, flags (bit0 reverse, bit1 synchronized side coordinates), and three reserved zero bytes. In schema3/4, record byte5 is a color-sequence ID0..8; bytes6/7 remain zero. Default record: `00 80 FF 03 00 00 00 00`.
+At the schema1 end offset, four 8-byte global effect records appear in layer order. Each contains mode0..20, speed0..255, brightness0..255, target1=keys/2=sides/3=all, flags (bit0 reverse, bit1 synchronized side coordinates), and three reserved zero bytes. In schema3/4/5/6/7, record byte5 is a color-sequence ID0..8. Bytes6/7 remain zero in schema3/4; schema5/6/7 uses them for the knob selection mask and packed step/undo layout described below. Default record: `00 80 FF 03 00 00 00 00`.
 
 After these32 bytes are per-LED overrides `[4][leds][3]`, layer-major in the same physical LED order as RGB. An inherited record is exactly `FF 00 00`. Otherwise byte0 contains mode0..20 in bits0..4 and reverse in bit7; bits5/6 must be zero. Byte1 is speed, byte2 brightness. An explicit override applies regardless of the global target; its side-sync geometry flag comes from the global layer record. All LEDs including side strips can be configured independently. The host copies paired side colors/overrides when the user enables mirroring; firmware's side-sync flag aligns effect phase by mapping right-side X to the corresponding left-side X, without silently copying colors.
 
@@ -153,7 +156,7 @@ Factory defaults remain schema1. A host can use schema1 when all effects inherit
 
 Each global effect and explicit per-LED override can retain an ordered sequence of1..8 RGB colors. Empty means the previous generated hue behavior. Only mode2 renders these colors; switching to another mode preserves them without changing that mode's output. Repeated colors inside a sequence are permitted. The entire configuration holds up to eight distinct sequences, shared across all four layers. Colors are compared as RGB bytes; order and repetition matter. Exceeding the color, unique-sequence or macro-event limits is an error, never truncation.
 
-Let `L` be the board's LED count and `V1Size` the schema1 size. Reserve `R = (200 + 2*L + 3) & ~3` bytes at `P = V1Size - R`. PRO has R400, P4740 and668 macro events; Numpad has R264, P3516 and702 events. Header12 must report that exact capacity. Event storage ends at P; unused event bytes before P are zero. The maximum staging allocation remains6360/4184 bytes, unchanged from schema2. No additional RAM-resident palette or active-config blob is allocated.
+Let `L` be the board's LED count and `V1Size` the schema1 size. Reserve `R = (200 + 2*L + 3) & ~3` bytes at `P = V1Size - R`. PRO has R400, P4740 and668 macro events; Numpad has R264, P3516 and702 events. Header12 must report that exact capacity. Event storage ends at P; unused event bytes before P are zero. Schemas2–5 use6360/4184 bytes, unchanged from schema2; schema6 appends8 bytes and schema7 appends72 bytes while retaining the same palette and macro-event capacity. No additional RAM-resident palette or active-config blob is allocated.
 
 At P is an eight-entry pool. Each25-byte entry contains a color count0..8 followed by eight RGB triples. Bytes beyond count are zero. Empty entries are all zero and follow all nonempty entries; duplicate entries, holes and unreferenced nonempty entries are invalid. ID0 means no custom sequence; IDs1..8 select pool entries0..7.
 
@@ -168,6 +171,50 @@ Firmware0.5 reads valid schema1/2 slots without changing their bytes, generation
 INFO bit6 gates commands9/10. Command9 only reads the existing brightness scale and current slider mode; it does not sample ADC, write EEPROM or change generation. PRO always reports slider mode0. Command10 changes only the runtime0..255 scale and echoes it. It rejects a pending upload, USB re-enumeration or active manual lighting test with status3; key presses and the automatic screensaver do not block it. During screensaver output the new value is retained for normal lighting, without scaling the overlay. Invalid lengths, reserved bytes and nonzero padding are rejected before the assignment. These commands never persist configuration, allocate storage, change timing, reset the MCU or enter a bootloader. Brightness starts at255 after a cold power cycle; autonomous Numpad brightness mode then uses the physical slider position.
 
 An optional desktop relay can read Numpad brightness and set PRO brightness only when it changes. That relay requires the desktop app to remain running. Local Numpad dimming and all stored lighting continue without the app; there is no direct USB device-to-device link. A timeout must not be treated as a confirmed set, and these calls do not use the persistent COMMIT API.
+
+Firmware 0.11.5 also accepts direct key and encoder bindings `RM_VALU` (`0x7849`) and `RM_VALD` (`0x784A`). Hosts must verify `GET_FIRMWARE_VERSION` is at least 0.11.5 before uploading a configuration containing either code; the protocol and configuration schemas are unchanged. Each press raises or lowers the same runtime dimmer by 17, saturated at 0 and 255. Releases are consumed without a second step, and modifiers do not reverse the direction. The runtime consumes both events before QMK's RGB processing, so these actions never schedule an EEPROM write. Bindings persist with the profile; the resulting dimmer level does not. Physical activity retains the existing standby wake, light-test cancellation and macro-release behavior. A later movement of the Numpad brightness slider replaces the current dimmer value with its physical position.
+
+## Encoder presets and long press (0.11.6)
+
+`GET_EXTENSIONS` bit3 advertises this feature on encoder-equipped boards. Hosts must also verify release0.11.6 or later before uploading schema5 or custom shortcut bindings. Schema5 has the same length, offsets, event capacity, color-sequence rules and standby fields as schema4. Header byte17 enables cycling per layer and byte31 selects Mac zoom/undo on those cycling layers. Byte17 must be0..15; byte31 must be a subset of it. Encoderless boards reject schema5. Firmware boot never rewrites an old profile.
+
+Each layer's8-byte global effect record repurposes its final two reserved bytes in schema5. Offset6 is a nonempty preset selection mask: bit0 volume, bit1 brightness, bit2 tracks, bit3 vertical scroll, bit4 zoom, bit5 horizontal scroll, bit6 tabs, bit7 undo/redo. Default selection is31, the original five modes. Offset7 packs the multiplier1..5 in bits0..2 and the undo key layout in bits3..4:0 QWERTY,1 QWERTZ,2 AZERTY. Layout3 and bits5..7 are rejected. The default packed byte is1. Schema1..4 require both bytes zero. Hosts select schema5 when any cycle is enabled or any mask/step/layout differs from its default; firmware rejects a redundant schema5 configuration with none of these changes.
+
+Each layer has a volatile current mode. A700ms hold of the physical knob advances through the selected modes in the mask order above. A saved pair matching a selected preset appears only once; a saved custom pair remains an additional choice. An unselected preset is skipped after the initial saved mode. Boot or profile commit restores the saved pair. Mode changes and rotations never write EEPROM/flash and do not change readback bytes. Clockwise/right increases volume/brightness, selects next track/tab, scrolls down/right, zooms in or performs redo; counterclockwise/left does the reverse. Scroll uses QMK mouse-key codes `MS_WHLU=0x00D9`, `MS_WHLD=0x00DA`, `MS_WHLL=0x00DB` and `MS_WHLR=0x00DC`; the generated overlay verifies mouse-key support in each pinned encoder board definition.
+
+Zoom codes are `IG_ZOOM_IN=0x7E42`, `IG_ZOOM_OUT=0x7E43`, `IG_ZOOM_IN_MAC=0x7E44`, `IG_ZOOM_OUT_MAC=0x7E45`. The first pair sends Ctrl with keypad plus/minus, the second sends GUI/Command with keypad plus/minus. Keypad codes avoid punctuation-layout dependence. Tabs use `IG_TAB_PREVIOUS=0x7E46` for Ctrl+Shift+Tab and `IG_TAB_NEXT=0x7E47` for Ctrl+Tab. Undo/redo use `IG_UNDO=0x7E48` and `IG_REDO=0x7E49` for Ctrl+Z/Ctrl+Shift+Z, or `IG_UNDO_MAC=0x7E4A` and `IG_REDO_MAC=0x7E4B` for the corresponding GUI/Command shortcuts. The chosen host layout translates Z to HID KC_Z, KC_Y or KC_W. Each operation retains existing real modifiers and restores existing weak modifiers exactly; if its target key is already held, it sends nothing rather than releasing someone else's key. Key-up never repeats the shortcut. Application support for these shortcuts is host-dependent.
+
+The multiplier applies only to real encoder events whose complete current direction pair is a recognized volume, brightness, vertical/horizontal wheel or zoom preset. Transparent directions resolve through the active/default layer stack, with QMK's layer-zero fallback; the highest active layer selects the multiplier. Tracks, tabs, undo/redo, ordinary physical key assignments and custom mixed direction pairs always use one action. The maximum multiplier is5; brightness saturates at0/255. Mouse and volume repeats use the existing QMK report path. No extra persistent state or host timer is used. An inherited undo binding uses the undo layout of the layer that supplied the action, including physical keys and deferred knob taps; a runtime cycle mode uses its owning layer.
+
+Cycling changes neither the saved press binding nor its configured direction pair. A short press emits the original action on release; a long press changes mode once and suppresses that short action. Enabled layers require a press code below0xE0, a macro, brightness or supported shortcut action. Modifier-only, modded/chord and TO/MO/TG layer bindings are rejected. For a transparent press every potentially active lower layer is checked, including layers that could be skipped in the current stack; the base press must provide a nontransparent fallback. Macro taps use the existing bounded runner and overlap checks.
+
+The active highest layer owns the gesture. A layer change, another physical key, suspension or an upload/reconnect/diagnostic operation cancels a pending gesture without emitting a late action. An already-held external MO/Fn key is allowed when its layer remains active. During an existing diagnostic/upload/reconnect operation, or when another ordinary key or modifier was already held, knob events retain their ordinary QMK behavior; they do not start a deferred gesture. The physical knob position is generated from pinned board geometry and cannot be changed by remapping.
+
+## Ordered encoder presets (0.11.7)
+
+Schema6 preserves the entire schema5 prefix and appends four little-endian `u16` permutation ranks, one per layer, at `Schema5Size + layer * 2`. Its exact payload length is `Schema5Size + 8`. It does not move the effect records, per-LED overrides, color palette, standby settings or macro events. Hosts require both a fresh firmware version of at least0.11.7 and `GET_EXTENSIONS` bit4 before uploading schema6. Encoderless boards reject this schema.
+
+Each rank is a standard lexicographic Lehmer rank in0..40319 for the eight preset bits `[1,2,4,8,16,32,64,128]`. Rank0 is that default order; rank40319 is its reverse. Decode using factorial divisors `[5040,720,120,24,6,2,1,1]`, selecting and removing the indexed remaining item at each position. Ranks outside the range are rejected before persistence. At least one layer must have a nonzero rank; otherwise the host uses the appropriate older schema and firmware rejects redundant schema6. A custom order may be saved while cycling is disabled, without requiring another nondefault knob setting.
+
+The existing per-layer selection mask filters this complete permutation; unchecked modes are skipped without losing their relative positions. The current saved preset remains the initial mode. A custom saved direction pair occupies one additional slot before/after the ordered presets. Holding the knob advances to the next selected mode in that layer's order, and releasing after a long press still sends no short action. Reboot or profile transfer resets the volatile mode to the saved pair while retaining the stored order. Existing schema1–5 profiles keep their original sequence and are never rewritten on boot.
+
+## Live knob state and feedback (0.11.8)
+
+Encoder targets add extension bits5 (`0x20`, live status) and6 (`0x40`, per-function press). Combined flags are127 on board16,123 on other encoder targets and3 on encoderless targets. Bit5 requires the earlier encoder/order flags; bit6 additionally requires bit5. Hosts check a fresh release identity of at least0.11.8 and the relevant extension before using these features. Unsupported targets return status9 for RAW16; the host must not infer a live mode from an editor profile.
+
+RAW16 returns24 bytes: format1 at0; actual highest active layer at1; recognized preset bit at2 (zero for a custom pair); flags at3 (bit0 cycling enabled, bit1 visual signal active); resolved counterclockwise and clockwise keycodes as u16 at4/6; long-press change counter u32 at8; active persisted generation/CRC u32 at12/16; source layers for those two bindings at20/21; effective encoder multiplier1..5 at22; reserved0 at23. Preset bits use the schema5 selection-mask vocabulary. Mac and Ctrl variants share the zoom/undo bit, while the actual keycodes distinguish them. Transparent mappings resolve through the currently active/default layer stack. Custom pairs report multiplier1.
+
+The counter advances only when a completed long hold changes the actual direction pair. A single selected mode that resolves to the same pair produces no change event. Layer changes, short presses, reads and configuration transfer do not increment it. Reboot resets the counter; configuration transfer resets the temporary mode but retains the counter. Reading does not send input, wake standby or write storage. Generation and CRC identify the persisted configuration separately from the live function.
+
+A real long-press function change overlays a600-ms pulse on normal lighting:100-ms fade-in and500-ms fade-out. RGB signals are white for custom, cyan for volume, yellow for brightness, purple for tracks, blue for vertical scroll, green for zoom, indigo for horizontal scroll, orange for tabs and pink for undo/redo. The existing runtime dimmer also scales the pulse, so a zero brightness remains dark. The pulse never changes saved colors or effects. Uploads, diagnostics, suspend, lighting tests, standby and layer changes suppress/cancel it; existing test output retains priority. A partial RGB frame whose timestamp predates the switch cannot prematurely expire the new signal.
+
+## Per-function short press (schema7, firmware0.11.8)
+
+Schema7 retains the complete schema6 prefix and appends64 bytes: four layer records, each eight little-endian u16 keycodes in fixed preset-bit order `[1,2,4,8,16,32,64,128]`. Its size is `Schema5Size +72`. Header17 bits4..7 enable per-function press for the corresponding layers; disabled tables are preserved. A table value1 (`KC_TRNS`) means inherit the ordinary physical knob press, while0 (`KC_NO`) disables that function's press. Missing app dictionary entries encode as1. Schema7 is required exactly when a mode is enabled or at least one table value differs from1; otherwise the host selects an older canonical schema. Unlike schema6, all order ranks may be zero in schema7.
+
+Explicit entries permit bounded taps only: ordinary nonmodifier keys, consumer actions, wheels, supported brightness/shortcut actions and existing nonempty macros. Modifier holds, chords and layer-switch actions are rejected. Inherited general bindings retain their original QMK down/up behavior when cycling is disabled, including modifier/Fn holds. The existing stricter cycle-safety checks still apply when cycling is enabled. Every table is validated even when disabled; Mac flags remain a subset of only the cycle-enable low nibble.
+
+The actual resolved direction pair selects the function entry at physical key-down. Both OS variants of zoom or undo use their common function entry, even when one is an extra saved-mode slot. An unrecognized custom pair falls back to general press. The selected action and source layer are latched until release, so rotating or changing layers cannot replace the pending short action. A long cycle suppresses the short action. Suspension and conflicting physical input cancel pending taps; no late release action is emitted. An ordinary basic key already held elsewhere is not tapped or released by an override. These mappings persist on the keyboard and require no app process.
 
 ## Schema4 autonomous lighting standby (firmware0.6; screensaver added in0.9)
 

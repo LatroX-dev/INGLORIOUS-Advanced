@@ -50,7 +50,9 @@ public sealed partial class MainWindow
         Watch(Rename, name); _editor.Children.Add(name); _editor.Children.Add(Button("Umbenennen", () => ApplyEdited(Rename)));
         var keys = BindingCatalog.All.Where(b => MacroPhysicalKeys.IsSupported(b.Code)).ToArray(); var key = Choice(keys.Select(b => b.Label));
         var type = Choice(new[] { L.T("Tastendruck"), L.T("Drücken"), L.T("Loslassen"), L.T("Pause") }); var delay = Number(50, 0, 10000);
-        _editor.Children.Add(Heading("Schritt hinzufügen")); _editor.Children.Add(key); _editor.Children.Add(type); _editor.Children.Add(delay);
+        _editor.Children.Add(new Separator { Margin = new Thickness(0, 8) });
+        _editor.Children.Add(Heading("Schritt hinzufügen")); _editor.Children.Add(key); _editor.Children.Add(type);
+        _editor.Children.Add(Text(L.T("Pause (ms)"), true, 12)); _editor.Children.Add(delay);
         _editor.Children.Add(AsyncButton("Hinzufügen", async () =>
         {
             if (!await GuardNavigation()) return;
@@ -70,9 +72,11 @@ public sealed partial class MainWindow
         }));
         _editor.Children.Add(AsyncButton("Makro entfernen", async () =>
         {
-            if (!await GuardNavigation() || await Ask("Makro entfernen", L.T("Zugewiesene Tasten werden deaktiviert."), "Abbrechen", "Entfernen") != 1) return;
-            _state.Change(p => { p.Macros.RemoveAll(m => m.Id == macro.Id); foreach (var layer in p.Layers) foreach (var assignment in layer.Keys.Values) if (assignment.Binding == "MACRO:" + macro.Id) assignment.Binding = "KC_NO"; }); _macroId = null; Changed(); Build();
+            if (!await GuardNavigation() || await Ask("Makro entfernen", L.T("Zugewiesene Tasten und Drehregler-Aktionen werden deaktiviert."), "Abbrechen", "Entfernen") != 1) return;
+            var withoutMacro = SharedMacroLibrary.RemoveFromProfile(_state.Project, macro.Id);
+            _state.Change(p => { p.Macros = withoutMacro.Macros; p.Layers = withoutMacro.Layers; }); _macroId = null; Changed(); Build();
         }));
+        _editor.Children.Add(new Separator { Margin = new Thickness(0, 8) });
         var targetKeys = _state.Device.Keys.ToArray(); var assignment = Choice(targetKeys.Select(k => k.AccessibleLabel));
         _editor.Children.Add(Heading("Taste zuweisen")); _editor.Children.Add(assignment);
         _editor.Children.Add(Button("Makro zuweisen", () =>

@@ -195,10 +195,17 @@ public partial class MainWindow
     {
         if (_connectionRefreshPending && DateTime.UtcNow >= _nextConnectionScan && CanRefreshConnections())
             await ScanDevicesAsync();
+        if (_configurationRefreshPending.Count > 0 && CanRefreshConnections()) await RefreshDeviceConfigurationsAsync();
     }
 
     private void ApplyConnectionSnapshot(IReadOnlyList<DetectedDevice> devices, bool selectInitial = false, IReadOnlyList<SetupDevice>? setupDevices = null)
     {
+        var changedConnections = DeviceCatalog.All.Where(model => !model.IsOfflineOnly).Where(model =>
+        {
+            var previous = _devices.Where(device => IsRuntimeDevice(device) && device.DeviceId == model.Id).Select(device => device.InstanceId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var present = devices.Where(device => IsRuntimeDevice(device) && device.DeviceId == model.Id).Select(device => device.InstanceId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return !previous.SetEquals(present);
+        }).Select(model => model.Id).ToArray();
         foreach (var id in _confirmedDeviceSaves.Keys.ToArray())
         {
             var previous = _devices.Where(device => device.IsSupported && device.DeviceId == id).Select(device => device.InstanceId).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -208,12 +215,11 @@ public partial class MainWindow
         _devices = devices.ToArray();
         _setupDevices = setupDevices is null ? StockSetupDevices(devices) : StockSetupDevices(setupDevices);
         _connectionScanFailed = false;
-        // Initial selection happens while the editor is still locked. Hotplug never
-        // changes a draft, resolves pending inputs, or reads a configuration again.
+        // Initial selection happens while the editor is still locked. Later connections
+        // invalidate the old read; the refresh preserves drafts and pending inputs.
         var connected = ConnectedDevices;
-        foreach (var device in connected)
-            if (_startupResults.TryGetValue(device.Id, out var startup) && startup.State == StartupDeviceState.NotConnected)
-                _startupResults.Remove(device.Id);
+        if (!selectInitial)
+            foreach (var id in changedConnections) RequireDeviceConfigurationRead(id);
         if (selectInitial && !connected.Any(device => device.Id == Device.Id) && connected.Length > 0 && !IsDirty && !HasPendingEdits)
         {
             var target = connected.FirstOrDefault(device => device.Id == _preferences.ResolveStartDevice())?.Id ?? connected[0].Id;
@@ -224,6 +230,9 @@ public partial class MainWindow
         }
         BuildDeviceButtons();
         UpdateSourceHint();
+        RequestDeviceConfigurationRefresh(selectInitial
+            ? connected.Where(device => _deviceReadRequired.ContainsKey(device.Id)).Select(device => device.Id)
+            : changedConnections.Where(id => connected.Any(device => device.Id == id)));
     }
 
     private async Task ScanDevicesAsync(bool selectInitial = false,

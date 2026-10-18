@@ -97,6 +97,9 @@ public sealed class EditorState
         if (SelectedKeys.Count == 0) throw new InvalidDataException(L.T("Wähle zuerst mindestens eine Taste in der Geräteansicht."));
         if (binding == "KC_TRNS" && LayerIndex == 0) throw new InvalidDataException(L.T("Die Basisebene benötigt eine eigene Belegung. Durchreichen ist auf den Ebenen 1–3 möglich."));
         if (binding.StartsWith("MO(") && Device.Keys.Any(k => k.IsEncoder && SelectedKeys.Contains(k.Id))) throw new InvalidDataException(L.T("Drehbewegungen lassen sich nicht gedrückt halten. Wähle für den Drehgeber eine Taste oder „Umschalten“."));
+        var candidate = ProjectService.Clone(Project);
+        foreach (var key in SelectedKeys) candidate.Layers[LayerIndex].Keys[key].Binding = binding;
+        if (KnobPresets.HasInvalidCycle(candidate)) throw new InvalidDataException(L.T("Deaktiviere zuerst den Wechsel per langem Druck."));
         Change(p => { foreach (var key in SelectedKeys) p.Layers[LayerIndex].Keys[key].Binding = binding; });
     }
     public void AssignOsAction(OsAction action)

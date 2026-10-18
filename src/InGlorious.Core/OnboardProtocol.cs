@@ -13,9 +13,12 @@ public sealed record OnboardImage(string DeviceId, byte[] Payload, int MacroEven
     public int SchemaVersion => Payload.Length >= 6 ? OnboardSerializer.Get16(Payload, 4) : 0;
     public bool RequiresEffects => SchemaVersion >= 2 && OnboardSerializer.HasEffects(Payload);
     public bool RequiresTiming => SchemaVersion >= 2 && Payload.Length >= 26 && (Payload[24] != 1 || Payload[25] != 5);
-    public bool RequiresColorSequences => SchemaVersion == 3 || SchemaVersion == 4 && Payload[OnboardSerializer.SequenceOffset(DeviceId)] != 0;
-    public bool RequiresStandby => SchemaVersion == 4;
-    public bool RequiresScreensaver => SchemaVersion == 4 && Payload.Length > 29 && Payload[29] == 2;
+    public bool RequiresColorSequences => SchemaVersion == 3 || SchemaVersion >= 4 && Payload[OnboardSerializer.SequenceOffset(DeviceId)] != 0;
+    public bool RequiresStandby => SchemaVersion >= 4;
+    public bool RequiresScreensaver => SchemaVersion >= 4 && Payload.Length > 29 && Payload[29] == 2;
+    public bool RequiresKnobCycle => SchemaVersion >= 5;
+    public bool RequiresKnobOrder => SchemaVersion >= 6;
+    public bool RequiresKnobPress => SchemaVersion >= 7;
 }
 
 public static class OnboardSerializer
@@ -29,11 +32,11 @@ public static class OnboardSerializer
     }
     internal static int ValidateShape(BoardDescriptor shape, int schemaVersion)
     {
-        if (schemaVersion is not 1 and not 2 and not 3 and not 4) throw new InvalidDataException("Unbekanntes Geräte-Konfigurationsformat.");
+        if (schemaVersion is < 1 or > 7) throw new InvalidDataException("Unbekanntes Geräte-Konfigurationsformat.");
         if (shape.BoardId == 0 || shape.Rows is < 1 or > 255 || shape.Cols is < 1 or > 255 || shape.LedCount is < 1 or > 255 || shape.PayloadCapacity is < 1 or > ushort.MaxValue)
             throw new InvalidDataException("Ungültige Konfigurationsabmessungen.");
         var legacy = 3248 + 8 * shape.Rows * shape.Cols + 12 * shape.LedCount;
-        var size = legacy + (schemaVersion >= 2 ? 32 + 12 * shape.LedCount : 0);
+        var size = legacy + (schemaVersion >= 2 ? 32 + 12 * shape.LedCount : 0) + (schemaVersion >= 6 ? 8 : 0) + (schemaVersion >= 7 ? 64 : 0);
         if (shape.LegacySize != legacy || size > shape.PayloadCapacity) throw new InvalidDataException("Konfiguration überschreitet den Speicher dieses Geräts.");
         return size;
     }
@@ -90,7 +93,7 @@ public static class OnboardSerializer
         var hasEffects = project.Layers.Any(layer => !DefaultEffect(layer.LightingEffect) || layer.LedEffects.Count != 0);
         var hasTiming = project.DeviceSettings.UsbPollingIntervalMs != 1 || project.DeviceSettings.DebounceMs != 5;
         var hasColors = project.Layers.Any(l => l.LightingEffect.Colors.Count != 0 || l.LedEffects.Values.Any(e => e.Colors.Count != 0));
-        var schemaVersion = !project.Standby.IsDefault ? 4 : hasColors ? 3 : hasEffects || hasTiming ? 2 : 1;
+        var schemaVersion = project.Layers.Any(layer => layer.KnobPressByFunction || layer.KnobPressBindings.Count != 0) ? 7 : project.Layers.Any(layer => !KnobPresets.IsDefaultOrder(layer.KnobCycleOrder)) ? 6 : project.Layers.Any(layer => layer.KnobCycleEnabled || layer.KnobCycleMask != 31 || layer.KnobStep != 1 || layer.KnobUndoLayout != 0) ? 5 : !project.Standby.IsDefault ? 4 : hasColors ? 3 : hasEffects || hasTiming ? 2 : 1;
         var s = Shape(project.DeviceId, schemaVersion);
         var device = DeviceCatalog.Get(project.DeviceId);
         var used = project.Macros.Sum(m => m.Steps.Count);
@@ -102,10 +105,16 @@ public static class OnboardSerializer
         data[8] = (byte)s.Rows; data[9] = (byte)s.Cols; data[10] = (byte)s.Leds; data[11] = 32;
         Put16(data, 12, macroCapacity); Put16(data, 14, used);
         data[16] = (byte)project.Slider.Mode;
+        if (schemaVersion >= 5)
+            for (var layer = 0; layer < 4; layer++) if (project.Layers[layer].KnobCycleEnabled)
+            {
+                data[17] |= (byte)(1 << layer);
+                if (project.Layers[layer].KnobCycleMacZoom) data[31] |= (byte)(1 << layer);
+            }
         Put16(data, 18, project.Slider.Minimum); Put16(data, 20, project.Slider.Maximum);
         data[22] = (byte)project.Slider.MidiChannel; data[23] = (byte)project.Slider.MidiController;
         if (schemaVersion >= 2) { data[24] = (byte)project.DeviceSettings.UsbPollingIntervalMs; data[25] = (byte)project.DeviceSettings.DebounceMs; }
-        if (schemaVersion == 4)
+        if (schemaVersion >= 4)
         {
             data[26] = (byte)(project.Standby.Enabled ? 1 : 0);
             Put16(data, 27, project.Standby.TimeoutSeconds);
@@ -169,6 +178,11 @@ public static class OnboardSerializer
                 data[offset + 2] = (byte)effect.Brightness;
                 data[offset + 3] = (byte)effect.Target;
                 data[offset + 4] = (byte)((effect.Reverse ? 1 : 0) | (project.Layers[layer].SynchronizeSides ? 2 : 0));
+                if (schemaVersion >= 5)
+                {
+                    data[offset + 6] = (byte)project.Layers[layer].KnobCycleMask;
+                    data[offset + 7] = (byte)(project.Layers[layer].KnobStep | project.Layers[layer].KnobUndoLayout << 3);
+                }
                 for (var led = 0; led < s.Leds; led++)
                 {
                     var ledOffset = effectsOffset + 32 + (layer * s.Leds + led) * 3;
@@ -183,6 +197,16 @@ public static class OnboardSerializer
             }
         }
         if (hasColors) WriteSequences(project, data);
+        if (schemaVersion >= 6)
+            for (var layer = 0; layer < 4; layer++) Put16(data, Shape(project.DeviceId, 2).Size + layer * 2, KnobPresets.EncodeOrder(project.Layers[layer].KnobCycleOrder));
+        if (schemaVersion >= 7)
+            for (var layer = 0; layer < 4; layer++)
+            {
+                if (project.Layers[layer].KnobPressByFunction) data[17] |= (byte)(1 << (4 + layer));
+                for (var function = 0; function < 8; function++)
+                    Put16(data, Shape(project.DeviceId, 6).Size + layer * 16 + function * 2,
+                        EncodeBinding(KnobPresets.GetPressBinding(project.Layers[layer], 1 << function), project.Macros));
+            }
         var warnings = new List<string> { "Profil-, Ebenen- und Makronamen bleiben in der Profildatei; im Gerät werden die Funktionen gespeichert." };
         if (hasEffects) warnings.Add("Effekte und erweiterte Beleuchtungseinstellungen benötigen INGLORIOUS-Firmware mit Effektunterstützung.");
         if (hasTiming) warnings.Add("USB-Abfrageintervall und Entprellzeit benötigen Firmware mit Unterstützung für Geräteeinstellungen. Ein geändertes USB-Abfrageintervall wird erst nach erneuter USB-Anmeldung wirksam.");
@@ -236,7 +260,7 @@ public static class OnboardSerializer
     }
     public static AppProject Decode(byte[] data, bool allowEngineering = false)
     {
-        if (data.Length < 32 || !data.AsSpan(0, 4).SequenceEqual("IGCF"u8) || Get16(data, 4) is not 1 and not 2 and not 3 and not 4)
+        if (data.Length < 32 || !data.AsSpan(0, 4).SequenceEqual("IGCF"u8) || Get16(data, 4) is < 1 or > 7)
             throw new InvalidDataException("Unbekanntes Geräte-Konfigurationsformat.");
         var schemaVersion = Get16(data, 4);
         var id = BoardDescriptorRegistry.GetByBoardId(data[6]).DeviceId;
@@ -245,13 +269,15 @@ public static class OnboardSerializer
         var s = Shape(id, schemaVersion);
         var legacySize = Shape(id).Size;
         var macroCapacity = MacroCapacity(id, schemaVersion);
-        if (data.Length != s.Size || data[7] != 4 || data[8] != s.Rows || data[9] != s.Cols || data[10] != s.Leds || data[11] != 32 || Get16(data, 12) != macroCapacity || Get16(data, 14) > macroCapacity || data[17] != 0 || data.AsSpan(schemaVersion == 1 ? 24 : schemaVersion == 4 ? 31 : 26, schemaVersion == 1 ? 8 : schemaVersion == 4 ? 1 : 6).IndexOfAnyExcept((byte)0) >= 0)
+        if (data.Length != s.Size || data[7] != 4 || data[8] != s.Rows || data[9] != s.Cols || data[10] != s.Leds || data[11] != 32 || Get16(data, 12) != macroCapacity || Get16(data, 14) > macroCapacity ||
+            (schemaVersion >= 5 ? (schemaVersion < 7 && data[17] > 15) || !DeviceCatalog.Get(id).HasEncoder : data[17] != 0) ||
+            (schemaVersion >= 5 ? (data[31] & ~(data[17] & 15)) != 0 : data.AsSpan(schemaVersion == 1 ? 24 : schemaVersion == 4 ? 31 : 26, schemaVersion == 1 ? 8 : schemaVersion == 4 ? 1 : 6).IndexOfAnyExcept((byte)0) >= 0))
             throw new InvalidDataException("Unpassende Konfigurationsgröße oder reservierte Daten.");
         var result = ProjectService.Create(id);
         result.Name = DeviceCatalog.Get(id).Name;
         result.Slider = new() { Mode = data[16], Minimum = Get16(data, 18), Maximum = Get16(data, 20), MidiChannel = data[22], MidiController = data[23] };
         if (schemaVersion >= 2) result.DeviceSettings = new() { UsbPollingIntervalMs = data[24], DebounceMs = data[25] };
-        if (schemaVersion == 4)
+        if (schemaVersion >= 4)
         {
             if (data[26] > 1) throw new InvalidDataException(L.T("Ungültige Standby-Einstellungen."));
             result.Standby = new() { Enabled = data[26] == 1, TimeoutSeconds = Get16(data, 27), Mode = data[29], DimBrightnessPercent = data[30] };
@@ -304,11 +330,28 @@ public static class OnboardSerializer
             throw new InvalidDataException("Belegung eines nicht vorhandenen Drehgebers.");
         for (var layer = 0; layer < 4; layer++)
         {
+            if (schemaVersion >= 6) result.Layers[layer].KnobCycleOrder = KnobPresets.DecodeOrder(Get16(data, Shape(id, 2).Size + layer * 2));
+            if (schemaVersion >= 7)
+            {
+                result.Layers[layer].KnobPressByFunction = (data[17] & (1 << (4 + layer))) != 0;
+                for (var function = 0; function < 8; function++)
+                    KnobPresets.SetPressBinding(result.Layers[layer], 1 << function,
+                        DecodeBinding(Get16(data, Shape(id, 6).Size + layer * 16 + function * 2), macroIds, true));
+            }
+            result.Layers[layer].KnobCycleEnabled = schemaVersion >= 5 && (data[17] & (1 << layer)) != 0;
+            result.Layers[layer].KnobCycleMacZoom = schemaVersion >= 5 && (data[31] & (1 << layer)) != 0;
             if (schemaVersion >= 2)
             {
                 var offset = legacySize + layer * 8;
-                if (data[offset] > 20 || data[offset + 3] is < 1 or > 3 || (data[offset + 4] & ~3) != 0 || (schemaVersion < 3 && data[offset + 5] != 0) || data[offset + 6] != 0 || data[offset + 7] != 0)
+                if (data[offset] > 20 || data[offset + 3] is < 1 or > 3 || (data[offset + 4] & ~3) != 0 || (schemaVersion < 3 && data[offset + 5] != 0) ||
+                    (schemaVersion >= 5 ? data[offset + 6] == 0 || (data[offset + 7] & 7) is < 1 or > 5 || (data[offset + 7] >> 3) > 2 : data[offset + 6] != 0 || data[offset + 7] != 0))
                     throw new InvalidDataException("Ungültige Beleuchtungseinstellungen oder reservierte Effektdaten.");
+                if (schemaVersion >= 5)
+                {
+                    result.Layers[layer].KnobCycleMask = data[offset + 6];
+                    result.Layers[layer].KnobStep = data[offset + 7] & 7;
+                    result.Layers[layer].KnobUndoLayout = data[offset + 7] >> 3;
+                }
                 result.Layers[layer].LightingEffect = new()
                 {
                     Mode = data[offset], Speed = data[offset + 1], Brightness = data[offset + 2],
@@ -353,7 +396,8 @@ public static class OnboardSerializer
             result.Layers[layer].SideLedColor = result.Layers[layer].ExtraLedColors.Values.FirstOrDefault() ?? "#8374F8";
         }
         if (sequences is not null && (schemaVersion == 3 && sequenceSeen == 0 || sequences.Skip(1).Count(c => c.Count != 0) != sequenceSeen)) throw new InvalidDataException(L.T("Ungültiger Farbfolgenverweis."));
-        _ = Prepare(result, allowEngineering); // Apply the editor's stricter macro and binding constraints before adoption.
+        var prepared = Prepare(result, allowEngineering); // Apply the editor's stricter macro and binding constraints before adoption.
+        if (schemaVersion >= 5 && prepared.SchemaVersion != schemaVersion) throw new InvalidDataException(L.T("Ungültige Drehregler-Einstellungen."));
         return result;
     }
 
@@ -362,7 +406,7 @@ public static class OnboardSerializer
         var separator = id.IndexOf('c');
         return (int.Parse(id.AsSpan(1, separator - 1)), int.Parse(id.AsSpan(separator + 1)));
     }
-    private static ushort EncodeBinding(string binding, IReadOnlyList<MacroDefinition> macros)
+    internal static ushort EncodeBinding(string binding, IReadOnlyList<MacroDefinition> macros)
     {
         if (Codes.TryGetValue(binding, out var basic)) return basic;
         if (binding.StartsWith("MACRO:", StringComparison.Ordinal))
@@ -404,6 +448,11 @@ public static class OnboardSerializer
         consecutive = "KC_LCTL KC_LSFT KC_LALT KC_LGUI KC_RCTL KC_RSFT KC_RALT KC_RGUI".Split(' ');
         for (var i = 0; i < consecutive.Length; i++) Add(consecutive[i], 0xE0 + i);
         Add("KC_MUTE", 0xA8); Add("KC_VOLU", 0xA9); Add("KC_VOLD", 0xAA); Add("KC_MNXT", 0xAB); Add("KC_MPRV", 0xAC); Add("KC_MSTP", 0xAD); Add("KC_MPLY", 0xAE); Add("KC_MAIL", 0xB1); Add("KC_CALC", 0xB2); Add("KC_MYCM", 0xB3);
+        Add("RM_VALU", 0x7849); Add("RM_VALD", 0x784A);
+        Add("MS_WHLU", 0xD9); Add("MS_WHLD", 0xDA); Add("MS_WHLL", 0xDB); Add("MS_WHLR", 0xDC);
+        Add("IG_ZOOM_IN", 0x7E42); Add("IG_ZOOM_OUT", 0x7E43); Add("IG_ZOOM_IN_MAC", 0x7E44); Add("IG_ZOOM_OUT_MAC", 0x7E45);
+        Add("IG_TAB_PREV", 0x7E46); Add("IG_TAB_NEXT", 0x7E47);
+        Add("IG_UNDO", 0x7E48); Add("IG_REDO", 0x7E49); Add("IG_UNDO_MAC", 0x7E4A); Add("IG_REDO_MAC", 0x7E4B);
         return result;
     }
 }
@@ -416,10 +465,10 @@ public sealed class OnboardCommandException(byte status, string message) : IOExc
 public static class OnboardProtocol
 {
     public const byte Info = 1, Read = 2, Write = 3, Begin = 4, Commit = 5, Abort = 6, ReconnectUsb = 8, ReadRuntimeBrightness = 9, SetRuntimeBrightness = 10, GetExtensions = 11, LightingTest = 12, GetFirmwareVersion = 13;
-    public const byte DeviceTest = 14, DeviceTestLed = 15;
+    public const byte DeviceTest = 14, DeviceTestLed = 15, ReadKnobStatus = 16;
     public static byte[] Packet(byte command, byte sequence, ReadOnlySpan<byte> payload)
     {
-        if ((command is < 1 or > 6 && command is not ReconnectUsb and not ReadRuntimeBrightness and not SetRuntimeBrightness and not GetExtensions and not LightingTest and not GetFirmwareVersion and not DeviceTest and not DeviceTestLed) || payload.Length > 24 || (command is ReconnectUsb or ReadRuntimeBrightness or GetExtensions or GetFirmwareVersion && payload.Length != 0) || (command == SetRuntimeBrightness && payload.Length != 1) || (command == LightingTest && (payload.Length != 1 || payload[0] > 2)) || (command == DeviceTest && (payload.Length != 1 || payload[0] > 3)) || (command == DeviceTestLed && (payload.Length != 5 || payload[0] > 2 || (payload[0] != 2 && payload[1] != 0) || (payload[0] == 0 && payload[2..].IndexOfAnyExcept((byte)0) >= 0)))) throw new ArgumentOutOfRangeException(nameof(payload));
+        if ((command is < 1 or > 6 && command is not ReconnectUsb and not ReadRuntimeBrightness and not SetRuntimeBrightness and not GetExtensions and not LightingTest and not GetFirmwareVersion and not DeviceTest and not DeviceTestLed and not ReadKnobStatus) || payload.Length > 24 || (command is ReconnectUsb or ReadRuntimeBrightness or GetExtensions or GetFirmwareVersion or ReadKnobStatus && payload.Length != 0) || (command == SetRuntimeBrightness && payload.Length != 1) || (command == LightingTest && (payload.Length != 1 || payload[0] > 2)) || (command == DeviceTest && (payload.Length != 1 || payload[0] > 3)) || (command == DeviceTestLed && (payload.Length != 5 || payload[0] > 2 || (payload[0] != 2 && payload[1] != 0) || (payload[0] == 0 && payload[2..].IndexOfAnyExcept((byte)0) >= 0)))) throw new ArgumentOutOfRangeException(nameof(payload));
         var result = new byte[32]; result[0] = (byte)'I'; result[1] = (byte)'G'; result[2] = 1; result[3] = command; result[4] = sequence; result[6] = (byte)payload.Length;
         payload.CopyTo(result.AsSpan(8)); return result;
     }

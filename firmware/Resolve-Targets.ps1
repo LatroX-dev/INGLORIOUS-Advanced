@@ -20,9 +20,9 @@ foreach($target in $targets){
  if($target.boardId-eq16){
   if($target.name-cne'gmmk3-pro-100-iso'-or$target.deviceId-cne$target.name-or$target.qmk-cne'gmmk/inglorious3pro/p100/iso'-or$target.runtimeProductId-cne'1C10'-or$target.mcu-cne'WB32FQ95'-or$target.flashBytes-ne262144-or$target.ramBytes-ne36864){throw 'Retained-loader board identity or geometry changed'}
   if($target.applicationOffsetBytes-ne28672-or$target.protectedPrefixBytes-ne28672-or$target.identityBytes-ne256){throw 'Board 16 requires its protected resident-loader and identity-page layout'}
-  if($target.firmwareVersion-cne'0.11.4'-or$target.firmwareBuildId-cne'000B0401'-or$target.versionHeaderPath-cne'boards/gmmk3-pro-100-iso/ig_board_version.h'){throw 'Board 16 version identity changed'}
+  if($target.firmwareVersion-cne'0.11.8'-or$target.firmwareBuildId-cne'000B0801'-or$target.versionHeaderPath-cne'boards/gmmk3-pro-100-iso/ig_board_version.h'){throw 'Board 16 version identity changed'}
  }else{
-  foreach($pair in @{applicationOffsetBytes=0;protectedPrefixBytes=0;identityBytes=0;firmwareVersion='0.11.4';firmwareBuildId='000B0401';versionHeaderPath='inglorious/ig_version.h'}.GetEnumerator()){
+  foreach($pair in @{applicationOffsetBytes=0;protectedPrefixBytes=0;identityBytes=0;firmwareVersion='0.11.8';firmwareBuildId='000B0801';versionHeaderPath='inglorious/ig_version.h'}.GetEnumerator()){
    $target|Add-Member -NotePropertyName $pair.Key -NotePropertyValue $pair.Value -Force
   }
  }

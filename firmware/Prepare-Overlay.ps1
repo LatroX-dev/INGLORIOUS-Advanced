@@ -87,6 +87,7 @@ foreach($target in $targets){
  $json=Get-Content -Raw -LiteralPath (Join-Path $qmk $jsonRelative) | ConvertFrom-Json
  $keys=@($json.layouts.($target.layout).layout)
  $hasEncoder=$json.features.PSObject.Properties['encoder'] -and $json.features.encoder
+ if($hasEncoder -and (!$json.features.PSObject.Properties['mousekey'] -or !$json.features.mousekey)){throw "Encoder presets require the pinned mouse-key feature: $($target.name)"}
  if($json.processor-cne$target.mcu-or$json.matrix_pins.rows.Count-ne$target.rows-or$json.matrix_pins.cols.Count-ne$target.cols-or$keys.Count-ne$target.keys-or$json.rgb_matrix.layout.Count-ne$target.leds-or[bool]$hasEncoder-ne$target.encoder){throw "Manifest disagrees with QMK for $($target.name)"}
  $codes=Get-BaseArguments ([IO.File]::ReadAllText((Join-Path $qmk $keymapRelative))) $target.layout
  if($codes.Count-ne$keys.Count){throw "Base key count mismatch: $($target.name)"}
@@ -107,6 +108,7 @@ foreach($target in $targets){
  $recover=if($target.slider){@('KC_PPLS','KC_PENT')}else{@('KC_SPC','KC_B')}
  $r1=Find-Key $recover[0] $keys $codes;$r2=Find-Key $recover[1] $keys $codes
  $boardHeader="// Generated from pinned QMK base keycodes, not remappable bindings.`n#pragma once`n#define IG_HAS_ENCODER $([int]$target.encoder)`n#define IG_LIGHT_TEST_PATTERN $(if($target.slider){2}else{1})`n#define IG_LIGHT_TEST_KEYS { "+($positions-join', ')+" }`n#define IG_RECOVERY_KEY1_ROW $($r1[0])`n#define IG_RECOVERY_KEY1_COL $($r1[1])`n#define IG_RECOVERY_KEY2_ROW $($r2[0])`n#define IG_RECOVERY_KEY2_COL $($r2[1])`n"
+ if($target.encoder){$push=Find-Key $(if($target.slider){'KC_CALC'}else{'KC_MUTE'}) $keys $codes;$boardHeader+="#define IG_ENCODER_KEY_ROW $($push[0])`n#define IG_ENCODER_KEY_COL $($push[1])`n"}
  # Validate inherited external-flash CS against pinned sources, not LED-driver CS.
  $externalPins=@();$parent=$board
  while($parent.StartsWith((Join-Path $qmk 'keyboards/gmmk'),[StringComparison]::OrdinalIgnoreCase)){

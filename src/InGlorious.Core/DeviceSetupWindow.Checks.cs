@@ -17,7 +17,7 @@ public sealed partial class DeviceSetupWindow
             runtime ? BoardDescriptorRegistry.RuntimeVendorId : stock.VendorId, runtime ? board.RuntimeProductId : stock.ProductId, [], runtime);
         _session = null; _progress = null; _writeAttempted = _outcomeUncertain = false; _busy = _observing = _readingVersion = _error = false;
         _firmwareSequence = new();
-        _returnedUsbInstanceId = null; _lightingRunning = false; _lightingStatus.Text = ""; _typingTest.Clear();
+        _returnedUsbInstanceId = null; _lightingRunning = false; _lightingStatus.Text = ""; _typingSequence = "";
         ApplyDevices([device]);
         _runtimeVersion = runtime ? new(id, new(0, 0, 1), 1) : null; // Synthetic older report; no hardware identity or data.
         var stage = step.ToLowerInvariant() switch
@@ -45,6 +45,8 @@ public sealed partial class DeviceSetupWindow
     internal void RunOfflineChecks(Action<bool, string> check)
     {
         if (!_offlinePreview) throw new InvalidOperationException("Setup checks are offline only.");
+        bool HasInput(DependencyObject element) => element is TextBox || LogicalTreeHelper.GetChildren(element).OfType<DependencyObject>().Any(HasInput);
+        check(!HasInput(_completion), "Setup: post-install and update tests contain no entry field");
         if (_operation == SetupOperation.Install)
         {
             var selected = new DeviceSetupWindow(offlinePreview: true, preferredInstanceId: "selected-stock");
@@ -217,12 +219,18 @@ public sealed partial class DeviceSetupWindow
             check(_deviceTestButton.Visibility == Visibility.Visible && !_deviceTestButton.IsEnabled &&
                 (_numLockHint.Visibility == Visibility.Visible) == (model.Id == "numpad"),
                 "Setup: all models offer device testing after install/update, with the Num Lock hint only for Numpad");
-            _typingTest.Text = model.Id == "numpad" ? "123456789" : "INGLORIOU";
+            RecordCompletionText(model.Id == "numpad" ? "123456789" : "INGLORIOU");
             check(!TypingCompletes, "Setup: incomplete typing never finishes the wizard");
-            _typingTest.Text = model.Id == "numpad" ? "1234567890" : "iNgLoRiOuS";
+            var partial = _typingSequence;
+            _busy = true; RecordCompletionText(ExpectedTypingSequence);
+            check(_typingSequence == partial && !TypingCompletes, "Setup: busy operations never capture typed completion");
+            _busy = false; OnDeactivated(EventArgs.Empty);
+            check(_typingSequence == "", "Setup: leaving the guide clears incomplete test input before another window or modal");
+            RecordCompletionText(model.Id == "numpad" ? "1234567890" : "iNgLoRiOuS");
             check(TypingCompletes == (_operation != SetupOperation.Restore), "Setup: exact digits or case-independent name finishes only the INGLORIOUS test");
             _lightingRunning = true; Render(); var lightClosing = new CancelEventArgs(); WindowClosing(this, lightClosing);
-            check(lightClosing.Cancel && !_close.IsEnabled && !TypingCompletes && !_typingTest.IsEnabled,
+            RecordCompletionText(ExpectedTypingSequence);
+            check(lightClosing.Cancel && !_close.IsEnabled && !TypingCompletes && _typingSequence == "",
                 "Setup: lighting observation and cleanup finish before closing or accepting typed completion");
             _lightingRunning = false;
 
@@ -248,6 +256,61 @@ public sealed partial class DeviceSetupWindow
         foreach (var key in new[] { "Plus (+) + Enter", "Leertaste + B" })
             check(L.Catalog[key].Count == L.SupportedLanguages.Count - 1 && L.Catalog[key].Values.All(value => value.Split(" + ").Length == 2),
                 "Setup: translated boot combinations remain two separate keycaps in every supported language");
+        RunCompactLayoutChecks(check);
         ShowOfflineStep("select");
+    }
+
+    private void RunCompactLayoutChecks(Action<bool, string> check)
+    {
+        var language = L.CurrentLanguage;
+        try
+        {
+            foreach (var supported in L.SupportedLanguages)
+            {
+                L.SetLanguage(supported.Code);
+                foreach (var id in new[] { "numpad", "gmmk3-pro-100-iso", "gmmk3-75-iso" })
+                {
+                    var window = new DeviceSetupWindow(id, _operation, offlinePreview: true);
+                    try
+                    {
+                        var content = (FrameworkElement)window.Content;
+                        foreach (var step in new[] { "select", "connect", "backup", "reconnect", "complete", "blocked" })
+                        {
+                            window.ShowOfflineStep(step, id);
+                            if (step == "complete")
+                            {
+                                window._coreImportPreview = new(id, 0, 100, new() { [DeviceCatalog.Get(id).Keys[0].Id] = "#FF0000" }, new(), 0, 0);
+                                window._lightingStatus.Text = L.T("Prüfe, ob die Tasten und Seitenleisten aufgeleuchtet haben."); window.Render();
+                            }
+                            // Client size leaves space for native title bar at the window's minimum size.
+                            foreach (var size in new[] { new Size(744, 580), new Size(1000, 520) })
+                            {
+                            content.Measure(size); content.Arrange(new Rect(size)); content.UpdateLayout();
+                            var body = window._flowBody;
+                            var available = ((Grid)body.Parent).RowDefinitions[1].ActualHeight;
+                            var flowBottom = window._flowContent.TranslatePoint(new Point(0, window._flowContent.ActualHeight), body).Y;
+                            check(flowBottom <= available + 1, $"Setup: {_operation}/{step} instructions fit without scrolling: {supported.Code}/{id} ({flowBottom:0}/{available:0})");
+                            if (window.CompletionTestsVisible)
+                            {
+                                var bottom = window._completion.TranslatePoint(new Point(0, window._completion.ActualHeight), body).Y;
+                                check(bottom <= available + 1, $"Setup: test cards and completion actions fit without scrolling: {supported.Code}/{id} ({bottom:0}/{available:0})");
+                                check(window._statusScroll.Visibility == Visibility.Collapsed && window._typingHint.Visibility == Visibility.Visible && window._deviceTestButton.Visibility == Visibility.Visible,
+                                    "Setup: visual and quick typing tests remain available without duplicate completion status");
+                                check(window._feedbackHint.Text == DeviceFeedbackContext.Invitation(DeviceCatalog.Get(id)), "Setup: voluntary feedback invitation matches model support status");
+                                foreach (var control in new FrameworkElement[] { window._lightingButton, window._lightingStatus, window._typingHint, window._numLockHint, window._deviceTestButton, window._coreImportButton, window._feedbackHint, window._feedbackButton })
+                                {
+                                    if (control.Visibility != Visibility.Visible) continue;
+                                    var controlBottom = control.TranslatePoint(new Point(0, control.ActualHeight), body).Y;
+                                    check(controlBottom <= available + 1, $"Setup: completion control {control.Name} is reachable without scrolling: {supported.Code}/{id}/{size} ({controlBottom:0}/{available:0})");
+                                }
+                            }
+                            }
+                        }
+                    }
+                    finally { window.Close(); }
+                }
+            }
+        }
+        finally { L.SetLanguage(language); }
     }
 }

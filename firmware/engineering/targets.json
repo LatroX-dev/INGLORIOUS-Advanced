@@ -2,7 +2,7 @@
   "schema": 1,
   "engineering": true,
   "releaseCandidate": false,
-  "defaultManifestSha256": "17AC707E8FDFB9A0439812F598C09ECC5FFCF6A3836057F7899A274BB4C0DDFB",
+  "defaultManifestSha256": "5F4B305CF941E9F33E6CC5D668BBCD021DAFF3CC77D2F25BB0ACDD3D6A26D925",
   "qmkCommit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1",
   "runtimeVendorId": "FEED",
   "storageBytes": 32768,
@@ -34,10 +34,10 @@
       "sourceDerivative": "gmmk3-100-iso",
       "hardwareAcceptanceTested": false,
       "variant": "GMMK 3 PRO 100% ISO wired (non-HE)",
-      "firmwareBuildId": "000B0401",
+      "firmwareBuildId": "000B0801",
       "versionHeaderPath": "boards/gmmk3-pro-100-iso/ig_board_version.h",
       "verifiedStockVendorId": "342D",
-      "firmwareVersion": "0.11.4"
+      "firmwareVersion": "0.11.8"
     }
   ]
 }

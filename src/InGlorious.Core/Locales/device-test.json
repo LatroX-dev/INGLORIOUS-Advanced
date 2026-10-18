@@ -1,4 +1,56 @@
 {
+  "Drücke die Tasten, die du prüfen möchtest.": {
+    "en": "Press the keys you want to test.",
+    "es": "Pulsa las teclas que quieras probar.",
+    "fr": "Appuie sur les touches que tu souhaites tester.",
+    "it": "Premi i tasti che vuoi provare.",
+    "pt-BR": "Pressione as teclas que deseja testar.",
+    "pl": "Naciśnij klawisze, które chcesz sprawdzić.",
+    "tr": "Test etmek istediğin tuşlara bas.",
+    "ru": "Нажми клавиши, которые хочешь проверить.",
+    "ja": "テストしたいキーを押してください。",
+    "ko": "테스트하려는 키를 누르세요.",
+    "zh-Hans": "按下要测试的按键。"
+  },
+  "Pause-Taste": {
+    "en": "Pause",
+    "es": "Pausa",
+    "fr": "Pause",
+    "it": "Pausa",
+    "pt-BR": "Pause",
+    "pl": "Pause",
+    "tr": "Pause",
+    "ru": "Pause",
+    "ja": "Pause",
+    "ko": "Pause",
+    "zh-Hans": "Pause"
+  },
+  "Zeichentaste": {
+    "en": "Character key",
+    "es": "Tecla de carácter",
+    "fr": "Touche de caractère",
+    "it": "Tasto carattere",
+    "pt-BR": "Tecla de caractere",
+    "pl": "Klawisz znaku",
+    "tr": "Karakter tuşu",
+    "ru": "Символьная клавиша",
+    "ja": "文字キー",
+    "ko": "문자 키",
+    "zh-Hans": "字符键"
+  },
+  "Gelb zeigt die empfangene Eingabe. Bei eigenen Belegungen kann die Position abweichen.": {
+    "en": "Yellow shows the received input. Custom key assignments may appear at a different position.",
+    "es": "El amarillo muestra la entrada recibida. Con asignaciones personalizadas, la posición puede variar.",
+    "fr": "Le jaune indique la saisie reçue. Avec des affectations personnalisées, la position peut différer.",
+    "it": "Il giallo indica l’input ricevuto. Con assegnazioni personalizzate, la posizione può essere diversa.",
+    "pt-BR": "O amarelo indica a entrada recebida. Com atribuições personalizadas, a posição pode ser diferente.",
+    "pl": "Żółty kolor pokazuje odebrane wejście. Przy własnych przypisaniach klawiszy pozycja może się różnić.",
+    "tr": "Sarı, alınan girdiyi gösterir. Özel tuş atamalarında konum farklı olabilir.",
+    "ru": "Жёлтым показан полученный ввод. При своих назначениях клавиш положение может отличаться.",
+    "ja": "黄色は受信した入力を示します。キー割り当てを変更している場合、表示位置が異なることがあります。",
+    "ko": "노란색은 수신된 입력을 나타냅니다. 키 할당을 변경한 경우 위치가 다르게 표시될 수 있습니다.",
+    "zh-Hans": "黄色表示收到的输入。使用自定义按键分配时，显示位置可能不同。"
+  },
   "Gerät testen": {
     "en": "Test device",
     "es": "Probar dispositivo",
@@ -349,19 +401,6 @@
     "ja": "入力テスト",
     "ko": "입력 테스트",
     "zh-Hans": "输入测试"
-  },
-  "Klicke in das Feld und drücke die Tasten, die du prüfen möchtest.": {
-    "en": "Click in the field and press the keys you want to test.",
-    "es": "Haz clic en el campo y pulsa las teclas que quieras probar.",
-    "fr": "Cliquez dans le champ et appuyez sur les touches à tester.",
-    "it": "Fai clic nel campo e premi i tasti che vuoi provare.",
-    "pt-BR": "Clique no campo e pressione as teclas que deseja testar.",
-    "pl": "Kliknij pole i naciśnij klawisze, które chcesz sprawdzić.",
-    "tr": "Alana tıklayıp test etmek istediğiniz tuşlara basın.",
-    "ru": "Нажмите на поле и нажимайте клавиши, которые хотите проверить.",
-    "ja": "入力欄をクリックして、確認したいキーを押してください。",
-    "ko": "입력란을 클릭하고 테스트할 키를 누르세요.",
-    "zh-Hans": "点击输入框，然后按下要测试的按键。"
   },
   "Die Eingabe kann auch von anderen angeschlossenen Tastaturen kommen.": {
     "en": "Input can also come from other connected keyboards.",

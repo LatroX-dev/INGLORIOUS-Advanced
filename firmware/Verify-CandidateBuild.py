@@ -68,6 +68,7 @@ if args.engineering:
 verify(manifest['targetManifestSha256'] == sha(target_path), 'Target manifest changed after build')
 verify(manifest['qmkCommit'] == targets['qmkCommit'], 'QMK commit mismatch')
 verify(manifest['hardwareFlashed'] is False and manifest['hardwareAcceptanceTested'] is False, 'Offline provenance missing')
+verify(manifest['configSchemas'] == [1, 2, 3, 4, 5, 6, 7], 'Declared configuration schemas differ from runtime support')
 verify(manifest['targets'] == [t['deviceId'] for t in selected], 'Build selection differs from requested targets')
 verify(manifest['engineering'] == args.engineering and manifest['includesResidentLoader'] is False, 'Application-only build classification differs')
 verify([t['deviceId'] for t in manifest['targetBuilds']] == manifest['targets'], 'Per-target identity selection differs')
@@ -123,7 +124,7 @@ for target in selected:
     build_ids = re.findall(r'^#define IG_FW_BUILD_ID 0x([0-9A-Fa-f]{8})UL$', identity_text, re.M)
     verify(len(build_ids) == 1 and identity['firmwareVersion'] == '.'.join(map(str,version_parts)) and
            identity['firmwareBuildId'] == build_ids[0].upper(), f'{name}: manifest version differs from selected header')
-    verify((identity['firmwareVersion'],identity['firmwareBuildId']) == ('0.11.4','000B0401'), f'{name}: release version changed')
+    verify((identity['firmwareVersion'],identity['firmwareBuildId']) == ('0.11.8','000B0801'), f'{name}: release version changed')
     if len(selected) == 1:
         verify(all(manifest[field] == identity[field] for field in ('firmwareVersion','firmwareBuildId','identityVersionHeaderPath',
                    'identityVersionHeaderSha256','applicationOffsetBytes','protectedPrefixBytes','identityBytes')), 'Single-target identity/layout differs')
@@ -179,6 +180,14 @@ for target in selected:
         offset, count = int(matches[0][0], 16) - application_base, int(matches[0][1], 16)
         verify(0 <= offset <= len(binary)-count, f'{name}: constant range {section}')
         return binary[offset:offset+count]
+    def runtime_local_constant(section):
+        # GCC numbers function-local constants in declaration order. Anchor to
+        # the runtime object rather than a suffix that changes with new locals.
+        matches = re.findall(r'^\s*\.rodata\.' + re.escape(section) + r'\.[0-9]+\s+(0x[0-9a-f]+)\s+(0x[0-9a-f]+)\s+[^\r\n]*keymaps/inglorious/inglorious\.o$', map_text, re.M)
+        verify(len(matches) == 1, f'{name}: missing runtime-local constant {section}')
+        offset, count = int(matches[0][0], 16) - application_base, int(matches[0][1], 16)
+        verify(0 <= offset <= len(binary)-count, f'{name}: runtime-local constant range {section}')
+        return binary[offset:offset+count]
     expected_identity = struct.pack('<HBB4HI', 1, target['boardId'], 0, *version_parts, 0, int(build_ids[0],16))
     if retained:
         verify(flash_constant('ig_fw_identity') == expected_identity, f'{name}: linked RAW13 identity differs from selected version')
@@ -189,7 +198,9 @@ for target in selected:
         constants = [(int(address,16)-application_base,int(size,16)) for address,size in constants if int(address,16)>=application_base]
         verify(len(constants)==1 and constants[0][1]==16 and binary[constants[0][0]:constants[0][0]+16]==expected_identity,
                f'{name}: compiled RAW13 constant differs from selected version')
-    verify(flash_constant('color.0') == bytes((255,0,0)), f'{name}: fallback is not pure red in the image')
+    verify(runtime_local_constant('color') == bytes((255,0,0)), f'{name}: fallback is not pure red in the image')
+    if target['encoder']:
+        verify(runtime_local_constant('factorial') == struct.pack('<8H', 5040,720,120,24,6,2,1,1), f'{name}: knob order factors differ in the image')
     keyboard_path = ROOT / 'qmk_firmware/keyboards' / target['qmk'] / 'keyboard.json'
     reference_id = target.get('sourceDerivative',target['deviceId'])
     reference_path = ROOT.parent / 'reference/qmk' / (reference_id + '.json')

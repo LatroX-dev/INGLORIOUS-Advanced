@@ -16,22 +16,23 @@ public sealed partial class MainWindow
         var count = 0;
         void Check(bool condition, string name) { count++; if (!condition) throw new InvalidOperationException("Check failed: " + name); }
         void Reject(Action action, string name) { var rejected = false; try { action(); } catch (InvalidDataException) { rejected = true; } Check(rejected, name); }
-        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.57", "visible product assembly metadata uses INGLORIOUS 0.6.57");
+        Check(typeof(MainWindow).Assembly.GetName().Name == "INGLORIOUS Advanced" && typeof(MainWindow).Assembly.GetName().Version?.ToString(3) == "0.6.64", "visible product assembly metadata uses INGLORIOUS 0.6.64");
         await RunConnectionsChecksAsync(Check);
         await RunProfileReplacementChecksAsync(Check);
         await RunKeyBindingChecksAsync(Check);
         RunExperimentalLabelsChecks(Check);
+        await RunExperimentalFeedbackInvitationChecksAsync(Check);
         RunLanguagePreferenceChecks(Check);
         AppAutostartEditor.RunOfflineChecks(Check);
-        foreach (var id in new[] { "numpad", "pro-iso", RetainedLoaderLayout.DeviceId })
-            new DeviceTestWindow(id, null, preview: true).RunOfflineChecks(Check);
+        foreach (var id in DeviceCatalog.All.Select(device => device.Id))
+            await new DeviceTestWindow(id, null, preview: true).RunOfflineChecksAsync(Check);
         RunSettingsLayoutChecks(Check);
         await RunSoftwareUpdateChecks(Check);
         var settingsPreview = CreateSettingsWindow(_preferences, offlinePreview: true);
         var startupPreview = SettingsControls(settingsPreview).OfType<ToggleSwitch>().Single(control => control.Name == "AutostartCheck");
         Check(startupPreview.IsChecked == false && !startupPreview.IsEnabled && !settingsPreview.GetLogicalDescendants().OfType<Button>().Single(control => control.Name == "SaveSettings").IsEnabled,
             "Settings: offline startup switch is neutral and cannot modify the system");
-        RunStartupSessionChecks(Check);
+        await RunStartupSessionChecksAsync(Check);
         RunBackgroundWindowChecks(Check);
         RunHelpChecks(Check);
         Check(ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark, "window inherits dark application theme");
@@ -270,6 +271,7 @@ public sealed partial class MainWindow
                 Check(_deviceState.Text == L.T("Gerät nicht verbunden"), "disconnected candidate has clear footer status");
                 Check(_root!.GetLogicalDescendants().OfType<Button>().Where(b => b.Name is "ReadDeviceButton" or "TransferButton").All(b => !b.IsEnabled), "disconnected candidate cannot access device actions");
                 ApplyConnectionSnapshot([device.Id]);
+                MarkDeviceConfigurationRead(_state.Project); UpdateConnectionActions();
                 Check(_root!.GetLogicalDescendants().OfType<Button>().Where(b => b.Name is "ReadDeviceButton" or "TransferButton").All(b => b.IsEnabled), "connected candidate can read and transfer its own configuration");
                 Check(BuildFirmwareVersionPanel().GetLogicalDescendants().OfType<Button>().Any(b => b.Name == "ReadFirmwareVersion"), "candidate has a real runtime version query action");
                 Check(BuildDeviceWorkspace().GetLogicalDescendants().OfType<Button>().Any(b => Equals(b.Content, L.T("Gerät einrichten"))), "experimental devices retain first installation");
@@ -344,12 +346,16 @@ public sealed partial class MainWindow
                 _state = new EditorState(device.Id); _state.MarkInitialClean(); _page = "Gerät"; Build();
                 var before = EditorState.Fingerprint(_state.Project);
                 ApplyConnectionSnapshot([device.Id]);
+                MarkDeviceConfigurationRead(_state.Project); UpdateConnectionActions();
                 var labels = _root.GetLogicalDescendants().OfType<TextBlock>().ToArray();
                 var button = _deviceButtons[device.Id];
                 var buttonLabels = button.GetLogicalDescendants().OfType<TextBlock>().Where(label => label.Name == "ExperimentalDeviceBadge").ToArray();
                 check(buttonLabels.Length == (device.IsExperimentalFirmware ? 1 : 0), "only experimental connected buttons receive a label");
                 check(labels.Count(label => label.Name == "ExperimentalHeaderBadge") == (device.IsExperimentalFirmware ? 1 : 0), "active header distinguishes experimental from stable models");
                 check(labels.Count(label => label.Name == "ExperimentalDeviceNotice") == (device.IsExperimentalFirmware ? 1 : 0), "device page explains missing model hardware testing only where relevant");
+                check(labels.Single(label => label.Name == "DeviceFeedbackHint").Text == DeviceFeedbackContext.Invitation(device) &&
+                    _root.GetLogicalDescendants().OfType<Button>().Any(button => button.Name == "DeviceFeedbackContact" && button.IsVisible),
+                    "device feedback invitation follows the selected model and remains beside its voluntary button");
                 if (device.IsOfflineOnly)
                 {
                     check(!_readDeviceButton!.IsEnabled && !_transferButton!.IsEnabled && !device.HasApprovedFirmwareManagement,
@@ -711,10 +717,10 @@ public sealed partial class MainWindow
             _layerChoice.SelectedIndex = 2;
             check(_state.LayerIndex == 2 && EditorState.Fingerprint(_state.Project) == initial && ! _state.CanUndo,
                 "choosing an editor layer changes no device configuration or history");
-            _state.LayerIndex = 0; Build(); OpenLayerBindingEditorAsync().GetAwaiter().GetResult();
+            _state.LayerIndex = 0; Build(); ShowPageAsync("Ebenen").GetAwaiter().GetResult();
             check(_page == "Ebenen" && _state.SelectedKeys.SetEquals([fn]) && Find<ComboBox>("LayerBindingTarget").SelectedIndex == 1 &&
                 Find<ComboBox>("LayerBindingBehavior").SelectedIndex == 0 && EditorState.Fingerprint(_state.Project) == initial,
-                "Fn entry retains the selected key and reflects its existing target and hold behavior without editing it");
+                "Layer navigation retains the selected key and reflects its existing target and hold behavior without editing it");
             check(Find<ComboBox>("LayerBindingTarget").Items.Cast<string>().All(label => _state.Project.Layers.Any(layer => label.EndsWith(layer.Name))),
                 "layer action destinations include the editable layer names");
             for (var mode = 0; mode < 3; mode++)
@@ -764,7 +770,7 @@ public sealed partial class MainWindow
             check(!Find<Button>("AssignLayerBinding").IsEnabled, "rotary movement cannot be assigned a held Fn action");
             Find<ComboBox>("LayerBindingBehavior").SelectedIndex = 1;
             check(Find<Button>("AssignLayerBinding").IsEnabled, "rotary movement can still toggle a layer");
-            _state.SelectKey(fn, false); _page = "Tastenbelegung"; Build(); Click("ModifierBindings");
+            _state.SelectKey(fn, false); _page = "Tastenbelegung"; Build(); Find<ComboBox>("BindingCategory").SelectedIndex = 1;
             var modifiers = Find<ListBox>("BindingChoices").Items.Cast<BindingRow>().ToArray();
             check(modifiers.Length == 8 && modifiers.All(row => IsModifierBinding(row.Code) && !row.Label.Contains("KC_")) &&
                 modifiers.Select(row => row.Label).Distinct().Count() == 8 && Find<TextBlock>("BindingFunctionHint").Text == LayerGuidance.ModifierHint,
@@ -778,6 +784,7 @@ public sealed partial class MainWindow
             Find<TextBox>("BindingSearch").Text = "not-a-binding";
             var encoder = _state.Device.Keys.First(key => key.IsEncoder);
             _keyButtons[encoder.Id].RaiseEvent(new RoutedEventArgs(Avalonia.Controls.Button.ClickEvent));
+            SetKnobModeAsync(true).GetAwaiter().GetResult();
             UpdateLayout();
             check(Find<TextBox>("BindingSearch").Text == "" &&
                 (Find<ListBox>("BindingChoices").SelectedItem as BindingRow)?.Code == _state.Layer.Keys[encoder.Id].Binding &&
@@ -788,9 +795,9 @@ public sealed partial class MainWindow
                 "the binding list can select an existing nondefault layer switch");
             _state.Undo(); Changed(); Build();
             var applied = 0; _pendingApply = () => { applied++; return true; }; _offlinePromptChoice = 0;
-            OpenLayerBindingEditorAsync().GetAwaiter().GetResult();
+            ShowPageAsync("Ebenen").GetAwaiter().GetResult();
             check(_page == "Tastenbelegung" && _pendingApply is not null && applied == 0 && EditorState.Fingerprint(_state.Project) == initial,
-                "canceling pending edits stops Fn navigation without losing input or changing the profile");
+                "canceling pending edits stops layer navigation without losing input or changing the profile");
         }
         finally
         {
@@ -852,6 +859,9 @@ public sealed partial class MainWindow
             Click(_keyButtons[_state.Device.Keys[0].Id]); check(!_editingSlider && Find<ComboBox>("SliderMode") is null, "physical key click returns to key editor");
             _state = new EditorState("pro-iso"); _editingSlider = true; _page = "Tastenbelegung"; Build();
             check(Find<ComboBox>("SliderMode") is null && Find<Button>("BindingSliderTab") is null && Find<Button>("PreviewSlider") is null, "PRO never exposes slider controls");
+            check(Find<Button>("OsActionHeaderButton") is not null, "a previous numpad slider view does not hide PRO OS actions");
+            _state.SelectKey(_state.Device.Keys.Single(key => key.Label == "Knob").Id, false); Build();
+            check(Find<ComboBox>("KnobPresetChoice") is not null, "a previous numpad slider view does not hide PRO knob presets");
         }
         finally { _offlinePromptChoice = null; _pendingApply = null; _editingSlider = false; _state = original; }
     }

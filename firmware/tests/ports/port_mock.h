@@ -11,6 +11,8 @@
 #define KC_NUM 83
 #define KC_VOLU 0xA9
 #define KC_VOLD 0xAA
+#define KC_MNXT 0xAB
+#define KC_MPRV 0xAC
 #define RGB_MATRIX_SOLID_COLOR 1
 #define LED_FLAG_UNDERGLOW 2
 #define B6 6
@@ -49,3 +51,9 @@ void gpio_set_pin_output(int pin);
 void matrix_scan(void);
 void wait_ms(uint16_t milliseconds);
 void bootloader_jump(void);
+void tap_code16(uint16_t code);
+bool is_key_pressed(uint8_t code);
+uint8_t get_weak_mods(void);
+void add_weak_mods(uint8_t mods);
+void set_weak_mods(uint8_t mods);
+void send_keyboard_report(void);

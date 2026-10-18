@@ -34,7 +34,10 @@ public sealed partial class MainWindow
         var loaded = AppPreferencesStore.Load();
         var session = loaded.Warning is null ? AppPreferencesStore.BeginEdit() : AppPreferencesStore.BeginEdit(loaded.Preferences);
         var current = session.Preferences;
-        await CreateSettingsWindow(current, session, offlinePreview: false, initialSection: initialSection).ShowDialog(this);
+        var dialog = CreateSettingsWindow(current, session, offlinePreview: false, initialSection: initialSection);
+        _settingsEditOwner = dialog;
+        try { await dialog.ShowDialog(this); }
+        finally { await FinishSettingsFeedbackAsync(dialog); }
     }
 
     private Window CreateSettingsWindow(AppPreferences current, AppPreferencesEditSession? session = null, bool offlinePreview = true, string initialSection = "Allgemein")

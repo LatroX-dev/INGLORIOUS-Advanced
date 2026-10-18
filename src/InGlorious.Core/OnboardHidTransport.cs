@@ -15,7 +15,9 @@ public sealed record OnboardDevice(string DeviceId, string Name, string Path)
 /// <summary>Only the InGlorious raw-HID collection may be opened for I/O. Stock devices never match.</summary>
 public sealed class OnboardHidTransport : IOnboardTransport
 {
-    private readonly FileStream _stream;
+    private readonly FileStream? _stream;
+    private readonly IOnboardTransport? _shared;
+    private OnboardHidTransport(IOnboardTransport shared) => _shared = shared;
     private OnboardHidTransport(SafeFileHandle handle) => _stream = new FileStream(handle, FileAccess.ReadWrite, 33, true);
     public static IReadOnlyList<OnboardDevice> FindDevices(bool allowEngineering = false)
     {
@@ -55,18 +57,38 @@ public sealed class OnboardHidTransport : IOnboardTransport
 
     public static OnboardHidTransport Open(OnboardDevice device, bool allowEngineering = false)
     {
+        ValidateExpected(device, allowEngineering);
+        // Revalidate metadata on every acquisition, even if another app service already owns the stream.
+        using (var metadata = Native.CreateFileW(device.Path, 0, 3, IntPtr.Zero, 3, 0, IntPtr.Zero))
+        {
+            if (metadata.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error());
+            ValidateIdentity(metadata, device, allowEngineering);
+        }
+        return new(OnboardTransportPool.Acquire(device.Path, device.DeviceId + "\n" + device.Name + "\n" + device.UsbInstanceId,
+            () => OpenNative(device, allowEngineering)));
+    }
+    private static void ValidateExpected(OnboardDevice device, bool allowEngineering)
+    {
         if (!BoardDescriptorRegistry.TryGet(device.DeviceId, out var board) ||
             !BoardDescriptorRegistry.TryGetRuntimeHidPath(device.Path, out var pathBoard, allowEngineering) || board != pathBoard ||
             (board.IsEngineeringOnly && !IsPhysicalUsbRoot(device.UsbInstanceId)))
             throw new InvalidDataException("Nur INGLORIOUS-Firmware wird zur Konfiguration geöffnet.");
+    }
+    private static void ValidateIdentity(SafeFileHandle handle, OnboardDevice device, bool allowEngineering)
+    {
+        var current = Identify(handle, device.Path, allowEngineering);
+        if (current == null || current.DeviceId != device.DeviceId || current.Name != device.Name) throw new InvalidDataException("Die Geräteidentität oder HID-Schnittstelle hat sich geändert.");
+        if (device.UsbInstanceId is not null && !string.Equals(device.UsbInstanceId, ReadUsbRootForInterface(device.Path), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Die USB-Zuordnung des Geräts hat sich geändert.");
+    }
+    private static OnboardHidTransport OpenNative(OnboardDevice device, bool allowEngineering)
+    {
+        ValidateExpected(device, allowEngineering);
         var handle = Native.CreateFileW(device.Path, 0xC0000000, 3, IntPtr.Zero, 3, 0x40000000, IntPtr.Zero);
         if (handle.IsInvalid) { var error = Marshal.GetLastWin32Error(); handle.Dispose(); throw new Win32Exception(error); }
         try
         {
-            var current = Identify(handle, device.Path, allowEngineering);
-            if (current == null || current.DeviceId != device.DeviceId || current.Name != device.Name) throw new InvalidDataException("Die Geräteidentität oder HID-Schnittstelle hat sich geändert.");
-            if (device.UsbInstanceId is not null && !string.Equals(device.UsbInstanceId, ReadUsbRootForInterface(device.Path), StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("Die USB-Zuordnung des Geräts hat sich geändert.");
+            ValidateIdentity(handle, device, allowEngineering);
             return new(handle);
         }
         catch { handle.Dispose(); throw; }
@@ -141,16 +163,17 @@ public sealed class OnboardHidTransport : IOnboardTransport
     }
     public async Task<byte[]> ExchangeAsync(byte[] packet, CancellationToken cancellationToken)
     {
+        if (_shared is not null) return await _shared.ExchangeAsync(packet, cancellationToken).ConfigureAwait(false);
         OnboardProtocol.ValidateRequest(packet);
         var output = new byte[33]; packet.CopyTo(output, 1);
-        await _stream.WriteAsync(output, cancellationToken);
+        await _stream!.WriteAsync(output, cancellationToken).ConfigureAwait(false);
         // HID transfers are report-based: reject short reports instead of combining unrelated packets.
         var input = new byte[33];
-        var count = await _stream.ReadAsync(input, cancellationToken);
+        var count = await _stream.ReadAsync(input, cancellationToken).ConfigureAwait(false);
         if (count != 33 || input[0] != 0) throw new IOException("Unvollständiger Raw-HID-Bericht.");
         return input.AsSpan(1).ToArray();
     }
-    public ValueTask DisposeAsync() => _stream.DisposeAsync();
+    public ValueTask DisposeAsync() => _shared?.DisposeAsync() ?? _stream!.DisposeAsync();
 
     [StructLayout(LayoutKind.Sequential)] private struct InterfaceData { public int Size; public Guid Guid; public uint Flags; public IntPtr Reserved; }
     [StructLayout(LayoutKind.Sequential)] private struct DeviceInfoData { public int Size; public Guid ClassGuid; public uint DevInst; public IntPtr Reserved; }

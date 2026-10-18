@@ -152,22 +152,67 @@ try
     Check(pad.Commands.All(c => c == 1) && pro.Commands.All(c => c == 1), "Legacy firmware receives no runtime commands");
     var guideIds = new[] { "start", "lighting", "bindings", "macros", "layers", "profiles", "device", "standby", "settings" };
     Check(UserGuide.Topics.Select(topic => topic.Id).SequenceEqual(guideIds), "Guide topics are a stable, flat navigation covering the application");
-    Check(UserGuide.Topics.All(topic => topic.Sections.Count is >= 2 and <= 3), "Guide articles remain short and structured");
+    Check(UserGuide.Topics.All(topic => topic.Sections.Count is >= 2 and <= 6 && topic.Sections.All(section => section.Body.Length <= 650)), "Guide articles retain a bounded number of short, structured sections");
     var guideText = UserGuide.Topics.SelectMany(topic => new[] { topic.Title }.Concat(topic.Sections.SelectMany(section => new[] { section.Heading, section.Body })))
         .Concat(new[] { "Anleitung", "Themen", "Schließen", "Funktion", "Reglerbereich", "Kanal", "Controller", "Minimum", "Maximum",
             "Nur anpassen, wenn der Regler nicht den gesamten Bereich erreicht.", "Steuert einen MIDI-Controller in einer kompatiblen Anwendung.",
             "Ändert die Lautstärke durch Bewegen des Reglers.", "Regelt die Helligkeit der GMMK Numpad-Beleuchtung.", "Keine Aktion beim Bewegen des Reglers." }).Distinct().ToArray();
     var priorLanguage = L.CurrentLanguage;
+    const string knobCycleFormat = "700 ms halten: {0}. Kurzes Drücken behält seine Belegung.";
+    var knobText = new[] {
+        "Vorlagen", "Manuell", "Kurzes Drücken", "Bearbeiten", "Nach links drehen", "Nach rechts drehen", "Drücken", "Pause (ms)",
+        "Drehen", "Reihenfolge …", "Reihenfolge", "Funktion hinzufügen", "Hinzufügen", "Nach oben", "Nach unten", "Entfernen",
+        "Drehregler", "Eigene Belegung", "Lange drücken: Funktion wechseln", "Schritte pro Rastung",
+        "Gilt für Lautstärke, Helligkeit, Scrollen und Zoom.", "Funktionen auswählen …", "Drehregler-Funktionen",
+        "Mit langem Druck durchwechseln", "Tastenkürzel für", "Tastaturlayout für Rückgängig",
+        "700 ms halten. Kurzes Drücken behält seine Belegung.", knobCycleFormat,
+        "Zoom, Tabs und Rückgängig hängen von der geöffneten Anwendung ab.",
+        "Zum Wechseln darf der kurze Druck keine Fn-Taste, Ebene oder Tastenkombination sein.",
+        "Drehregler-Vorlage zugewiesen.", "Wechsel per langem Druck aktiviert.", "Wechsel per langem Druck deaktiviert.",
+        "Drehregler-Einstellungen übernommen.", "Ungültige Drehregler-Einstellungen.",
+        "Deaktiviere zuerst den Wechsel per langem Druck.",
+        "Diese Drehregler-Einstellungen benötigen ein Firmware-Update. Es wird nichts übertragen.",
+        "Diese Drehregler-Funktion ist für dieses Gerät nicht verfügbar."
+    }.Concat(KnobPresets.All.Select(preset => preset.SourceLabel))
+        .Concat(KnobPresets.CycleOptions.Select(option => option.SourceLabel)).Distinct().ToArray();
+    var knobLayer = ProjectService.Create("numpad").Layers[0];
+    KnobPresets.Apply(knobLayer, "brightness"); knobLayer.KnobCycleEnabled = true; knobLayer.KnobCycleMask = 255;
     foreach (var language in L.SupportedLanguages)
     {
         L.SetLanguage(language.Code);
         foreach (var source in guideText)
         {
             Check(!string.IsNullOrWhiteSpace(source), "Guide and slider texts cannot be empty");
-            if (language.Code == "de") Check(L.T(source) == source, "German guide preserves its source text");
+            if (language.Code == "de" || source == "GMMK Numpad") Check(L.T(source) == source, "German guide and product names preserve their source text");
             else Check(L.Catalog.TryGetValue(source, out var values) && values.TryGetValue(language.Code, out var value)
-                && !string.IsNullOrWhiteSpace(value) && L.T(source) == value, language.Code + ": guide and slider use their explicit translation without fallback");
+                && !string.IsNullOrWhiteSpace(value) && L.T(source) == value, language.Code + ": guide and slider use their explicit translation without fallback: " + source);
         }
+        foreach (var source in knobText)
+            Check(language.Code == "de" ? L.T(source) == source :
+                L.Catalog.TryGetValue(source, out var translations) && translations.TryGetValue(language.Code, out var translated) &&
+                !string.IsNullOrWhiteSpace(translated) && L.T(source) == translated,
+                language.Code + ": visible knob text has an explicit translation: " + source);
+        var expectedCycle = string.Join(" → ", KnobPresets.CycleOptions.Select(option => L.T(option.SourceLabel)));
+        var actualCycle = KnobPresets.CycleSummary(knobLayer);
+        Check(actualCycle == expectedCycle, language.Code + ": the live cycle summary uses localized function labels");
+        var formattedHint = L.F($"700 ms halten: {KnobPresets.CycleSummary(knobLayer)}. Kurzes Drücken behält seine Belegung.");
+        Check(formattedHint == string.Format(CultureInfo.GetCultureInfo(language.Code), L.T(knobCycleFormat), expectedCycle) &&
+            formattedHint.Contains(expectedCycle, StringComparison.Ordinal) && !formattedHint.Contains("{0}", StringComparison.Ordinal),
+            language.Code + ": the actual WPF cycle hint localizes its surrounding sentence and retains the selected functions");
+        if (language.Code == "en")
+        {
+            Check(L.T("Funktionen auswählen …") == "Choose functions …", "English function picker uses the exact WPF resource key");
+            Check(formattedHint.StartsWith("Hold for 700 ms: Volume → Brightness", StringComparison.Ordinal) &&
+                formattedHint.EndsWith("A short press keeps its assigned action.", StringComparison.Ordinal),
+                "English WPF cycle hint cannot mix translated actions with a German sentence");
+        }
+        var orderedLayer = ProjectService.Clone(ProjectService.Create("numpad")).Layers[0];
+        KnobPresets.Apply(orderedLayer, "brightness");
+        orderedLayer.KnobCycleOrder = [128, 32, 16, 8, 64, 4, 2, 1];
+        orderedLayer.KnobCycleMask = 128 | 16 | 2;
+        var expectedOrdered = string.Join(" → ", new[] { "Rückgängig / Wiederholen", "Zoom", "Helligkeit" }.Select(L.T));
+        Check(KnobPresets.CycleSummary(orderedLayer) == expectedOrdered,
+            language.Code + ": reordered cycle summary follows the saved order with localized labels");
     }
     L.SetLanguage(priorLanguage);
     Console.WriteLine($"PASS {checks} integration checks; {L.Catalog.Count} localized sources");

@@ -1,9 +1,29 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param([string]$ReportPath, [switch]$Engineering, [Alias('Board')][string]$TargetBoard='all', [string]$FixtureDirectory)
+param([string]$ReportPath, [switch]$Engineering, [Alias('Board')][string]$TargetBoard='all', [string]$FixtureDirectory, [string]$KnobFixtureDirectory, [string]$KnobOrderFixtureDirectory, [string]$KnobPressFixtureDirectory)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+$knobFixtures=@()
+$knobOrderFixtures=@()
+$knobPressFixtures=@()
+if($KnobPressFixtureDirectory){
+    if(!$KnobOrderFixtureDirectory){throw 'Press fixtures require the preceding schema5 and schema6 fixtures.'}
+    $KnobPressFixtureDirectory=[IO.Path]::GetFullPath($KnobPressFixtureDirectory)
+    if(!$KnobPressFixtureDirectory.StartsWith($root+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Press fixtures must stay inside the project.'}
+    $knobPressFixtures=@(Get-ChildItem -LiteralPath $KnobPressFixtureDirectory -File | Where-Object{$_.Extension-eq'.bin'-or$_.Name-eq'manifest.json'} | Sort-Object Name | ForEach-Object{@{file=$_.Name;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash}})
+}
+if($KnobOrderFixtureDirectory){
+    if(!$KnobFixtureDirectory){throw 'Ordered knob checks also require the schema5 knob fixtures.'}
+    $KnobOrderFixtureDirectory=[IO.Path]::GetFullPath($KnobOrderFixtureDirectory)
+    if(!$KnobOrderFixtureDirectory.StartsWith($root+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Ordered knob fixtures must stay inside the project.'}
+    $knobOrderFixtures=@(Get-ChildItem -LiteralPath $KnobOrderFixtureDirectory -File | Where-Object{$_.Extension-eq'.bin'-or$_.Name-eq'manifest.json'} | Sort-Object Name | ForEach-Object{@{file=$_.Name;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash}})
+}
+if($KnobFixtureDirectory){
+    $KnobFixtureDirectory=[IO.Path]::GetFullPath($KnobFixtureDirectory)
+    if(!$KnobFixtureDirectory.StartsWith($root+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Knob fixtures must stay inside the project.'}
+    $knobFixtures=@(Get-ChildItem -LiteralPath $KnobFixtureDirectory -File | Where-Object{$_.Extension-eq'.bin'-or$_.Name-eq'manifest.json'} | Sort-Object Name | ForEach-Object{@{file=$_.Name;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash}})
+}
 $compilerDirectory = Join-Path $root 'firmware/toolchain/qmk-msys/{app}/mingw64/bin'
 $compiler = Join-Path $compilerDirectory 'gcc.exe'
 if (-not (Test-Path -LiteralPath $compiler)) { throw 'Local QMK-MSYS native GCC is required. Nothing is downloaded.' }
@@ -68,7 +88,11 @@ try {
             $expected = @($fixtures | Where-Object file -eq ([IO.Path]::GetFileName($path)))
             if($expected.Count -ne 1 -or $expected[0].boardId -ne $board.boardId -or (Get-Item -LiteralPath $path).Length -ne $expected[0].bytes -or (Get-FileHash -LiteralPath $path).Hash -ne $expected[0].sha256) { throw 'Serializer fixture identity/hash mismatch.' }
         }
-        $lines = @(& $executable @paths)
+        $fixtureArgs=@($paths)
+        if($KnobFixtureDirectory){$fixtureArgs += [IO.Path]::GetFullPath($KnobFixtureDirectory)}
+        if($KnobOrderFixtureDirectory){$fixtureArgs += $KnobOrderFixtureDirectory}
+        if($KnobPressFixtureDirectory){$fixtureArgs += $KnobPressFixtureDirectory}
+        $lines = @(& $executable @fixtureArgs)
         if ($LASTEXITCODE -ne 0) { throw ('Native port checks failed: '+$board.name) }
         $lines | Write-Output
         $match = [regex]::Match(($lines -join "`n"), 'PASS board(\d+): (\d+) native port checks; no hardware access\.')
@@ -78,6 +102,10 @@ try {
 } finally { $env:PATH=$priorPath }
 if($ReportPath) {
     $report = [ordered]@{schema=1;testedUtc=[DateTime]::UtcNow.ToString('o');hardwareAccess=$false;results=$results;sourceSha256=(Get-FileHash -LiteralPath (Join-Path $root 'firmware/inglorious/inglorious.c')).Hash;harnessSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'ports/port_checks.c')).Hash;scope='Actual common C runtime across additional models with real desktop payloads and pinned physical geometry. For GMMK3, the separate reference audit checks derivation from preserved manufacturer sources. Storage fault injection uses a mock; the separate storage harness tests the patched real wear-leveling driver.'}
+    $report.knobCycleTestsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'knob_cycle_checks.h')).Hash
+    $report.knobFixtures=$knobFixtures
+    $report.knobOrderFixtures=$knobOrderFixtures
+    $report.knobPressFixtures=$knobPressFixtures
     $stream=[IO.FileStream]::new([IO.Path]::GetFullPath($ReportPath),[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
     try{$stream.Write($utf8.GetBytes(($report|ConvertTo-Json -Depth 8)));$stream.Flush($true)}finally{$stream.Dispose()}
 }

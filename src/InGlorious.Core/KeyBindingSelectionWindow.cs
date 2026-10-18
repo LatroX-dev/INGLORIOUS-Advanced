@@ -77,7 +77,7 @@ public sealed class KeyBindingSelectionWindow : Window
         return choice;
     }
 
-    private static Style CreateChoiceStyle() => (Style)XamlReader.Parse("""
+    internal static Style CreateChoiceStyle() => (Style)XamlReader.Parse("""
         <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="CheckBox">
           <Setter Property="Foreground" Value="{DynamicResource Text}"/>
           <Setter Property="Cursor" Value="Hand"/>

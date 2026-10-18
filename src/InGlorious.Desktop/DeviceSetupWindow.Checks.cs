@@ -1,5 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.LogicalTree;
 using InGlorious.Core;
 
 namespace InGlorious.Desktop;
@@ -17,7 +19,7 @@ public sealed partial class DeviceSetupWindow
             runtime ? BoardDescriptorRegistry.RuntimeVendorId : stock.VendorId, runtime ? board.RuntimeProductId : stock.ProductId, [], runtime);
         _session = null; _progress = null; _writeAttempted = _outcomeUncertain = false; _busy = _observing = _readingVersion = _error = false;
         _firmwareSequence = new();
-        _returnedHidPath = null; _lightingRunning = false; _lightingStatus.Text = ""; _typingTest.Clear();
+        _returnedHidPath = null; _lightingRunning = false; _lightingStatus.Text = ""; _completionInput = "";
         ApplyDevices([device]);
         _runtimeVersion = runtime ? new(id, new(0, 0, 1), 1) : null; // Synthetic older report; no hardware identity or data.
         var stage = step.ToLowerInvariant() switch
@@ -190,7 +192,7 @@ public sealed partial class DeviceSetupWindow
             check(_heading.Text == L.T("Jetzt normal neu verbinden") && _deviceName.Text == "\"" + model.Name + "\"" &&
                 _description.Text == L.Format("Trenne \"{0}\" einmal vom USB-Kabel und stecke es ohne gedrückte Tasten wieder ein.", model.Name) &&
                 _status.Text == L.T("Nach dem Wiederanschließen geht es automatisch weiter.") && _activity.IsVisible &&
-                _activity.Margin == new Avalonia.Thickness(0, 0, 0, 18) && _status.Margin == new Avalonia.Thickness(0, 0, 0, 14),
+                _activity.Margin == new Avalonia.Thickness(0, 0, 0, 18) && _statusScroll.IsVisible,
                 "Setup: " + model.Id + " reconnect matches the update instructions and visible automatic observation");
             var warning = L.T("Die USB-Verbindung konnte nicht geprüft werden. Die App versucht es erneut.");
             ApplyProgress(new(SetupStage.Reconnect, warning, model.Id));
@@ -214,14 +216,40 @@ public sealed partial class DeviceSetupWindow
             check(_deviceTestButton.IsVisible && !_deviceTestButton.IsEnabled && _completion.IsVisible == (_operation != SetupOperation.Restore),
                 "Setup: " + model.Id + " offers device testing after installation and update while offline preview remains inert");
             check(_numLockHint.IsVisible == (model.Id == "numpad"), "Setup: only the numpad completion explains enabling Num-Lock for digits");
-            _typingTest.Text = model.Id == "numpad" ? "123456789" : "INGLORIOU";
+            var expected = model.Id == "numpad" ? "1234567890" : "iNgLoRiOuS";
+            check(!this.GetLogicalDescendants().OfType<TextBox>().Any(), "Setup: completion uses direct keyboard input without an input field");
+            ReceiveCompletionText(expected[..^1], activeWindow: true);
             check(!TypingCompletes, "Setup: incomplete typing never finishes the wizard");
-            _typingTest.Text = model.Id == "numpad" ? "1234567890" : "iNgLoRiOuS";
+            ReceiveCompletionText(expected[^1..], activeWindow: true);
             check(TypingCompletes == (_operation != SetupOperation.Restore), "Setup: exact digits or case-independent name finishes only the INGLORIOUS test");
             _lightingRunning = true; Render(); var lightClosing = new System.ComponentModel.CancelEventArgs(); WindowClosing(this, lightClosing);
-            check(lightClosing.Cancel && !_close.IsEnabled && !TypingCompletes && !_typingTest.IsEnabled,
+            check(lightClosing.Cancel && !_close.IsEnabled && !TypingCompletes && _completionInput.Length == 0 && !ReceiveCompletionText(expected, activeWindow: true),
                 "Setup: lighting observation and cleanup finish before closing or accepting typed completion");
-            _lightingRunning = false;
+            _lightingRunning = false; Render();
+            check(!ReceiveCompletionText(expected, activeWindow: false) && _completionInput.Length == 0,
+                "Setup: inactive windows cannot collect or complete typing");
+            _busy = true;
+            check(!ReceiveCompletionText(expected, activeWindow: true) && _completionInput.Length == 0,
+                "Setup: firmware work cannot collect completion input");
+            _busy = false; IsEnabled = false;
+            check(!ReceiveCompletionText(expected, activeWindow: true), "Setup: modal-disabled windows ignore parent input");
+            IsEnabled = true;
+            if (_operation != SetupOperation.Restore)
+            {
+                ReceiveCompletionText(new string('x', 1000) + expected[..3], activeWindow: true);
+                check(_completionInput == expected[..3], "Setup: only the expected test prefix is retained, never unrelated input");
+                var back = new KeyEventArgs { Key = Key.Back }; ReceiveCompletionKey(back, activeWindow: true, released: false);
+                check(back.Handled && _completionInput == expected[..2], "Setup: backspace edits the bounded completion prefix");
+                foreach (var key in new[] { Key.Enter, Key.Space, Key.Tab, Key.Escape, Key.Left, Key.Right, Key.Up, Key.Down, Key.Home, Key.End, Key.PageUp, Key.PageDown, Key.Delete })
+                {
+                    var down = new KeyEventArgs { Key = key }; var up = new KeyEventArgs { Key = key };
+                    ReceiveCompletionKey(down, activeWindow: true, released: false); ReceiveCompletionKey(up, activeWindow: true, released: true);
+                    check(down.Handled && up.Handled && !_closed, "Setup: navigation keys cannot activate controls or close the completion screen: " + key);
+                }
+                check(_completionInput.Length == 0, "Setup: Escape and Delete clear the completion prefix");
+                var printable = new KeyEventArgs { Key = Key.I }; ReceiveCompletionKey(printable, activeWindow: true, released: false);
+                check(!printable.Handled && _completionInput.Length == 0, "Setup: printable key-down permits translated text input without counting twice");
+            }
 
             var board = BoardDescriptorRegistry.Get(model.Id);
             FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersionFor(model.Id), out var target);
@@ -245,6 +273,69 @@ public sealed partial class DeviceSetupWindow
         foreach (var key in new[] { "Plus (+) + Enter", "Leertaste + B" })
             check(L.Catalog[key].Count == L.SupportedLanguages.Count - 1 && L.Catalog[key].Values.All(value => value.Split(" + ").Length == 2),
                 "Setup: translated boot combinations remain two separate keycaps in every supported language");
+        if (_operation == SetupOperation.Install) RunCompactLayoutChecks(check);
         ShowOfflineStep("select");
+    }
+
+    private static void RunCompactLayoutChecks(Action<bool, string> check)
+    {
+        var language = L.CurrentLanguage;
+        try
+        {
+            foreach (var supported in L.SupportedLanguages)
+            {
+                L.SetLanguage(supported.Code);
+                foreach (var size in new[] { new Size(760, 590), new Size(1060, 520) })
+                foreach (var id in new[] { "numpad", "gmmk3-pro-100-iso", "gmmk3-75-iso" })
+                {
+                    var window = new DeviceSetupWindow(id, offlinePreview: true);
+                    try
+                    {
+                        var root = (Border)window.Content!;
+                        foreach (var step in new[] { "select", "connect", "backup", "reconnect", "complete", "blocked" })
+                        {
+                            window.ShowOfflineStep(step, id);
+                            if (step == "complete")
+                            {
+                                window._coreImportPreview = new(id, 0, 100, new() { [DeviceCatalog.Get(id).Keys[0].Id] = "#FF0000" }, new(), 0, 0);
+                                window._lightingStatus.Text = L.T("Prüfe, ob die Tasten und Seitenleisten aufgeleuchtet haben.");
+                                window.Render();
+                            }
+                            // Reserve space for a native title bar within a 760 x 620 desktop window.
+                            root.Measure(size); root.Arrange(new Rect(default, size));
+                            check(window._flowContent.Bounds.Bottom <= window._flowBody.Bounds.Height + 1,
+                                $"Setup: primary {step} instructions fit without scrolling at minimum size: {supported.Code}/{id}");
+                            check(step != "complete" || window._completion.Bounds.Bottom <= window._flowBody.Bounds.Height + 1,
+                                $"Setup: both test cards and completion actions fit at minimum size: {supported.Code}/{id}/{step}");
+                            var scrolls = root.GetLogicalDescendants().OfType<ScrollViewer>().ToArray();
+                            check(scrolls.Length == 1 && ReferenceEquals(scrolls[0], window._statusScroll),
+                                $"Setup: only long status output scrolls, never the wizard: {supported.Code}/{id}/{step}");
+                            if (step == "complete")
+                            {
+                                check(!window._statusScroll.IsVisible && window._testCards.Children.Count == 2 &&
+                                    !window.GetLogicalDescendants().OfType<TextBox>().Any() && window._deviceTestButton.IsVisible,
+                                    $"Setup: completion offers visual and direct typing tests without input fields or duplicate status: {supported.Code}/{id}");
+                                foreach (var control in new Control[] { window._lightingButton, window._lightingStatus, window._deviceTestButton,
+                                    window._typingHint, window._numLockHint, window._coreImportSection!, window._feedbackSection! })
+                                {
+                                    if (!control.IsVisible) continue;
+                                    var position = control.TranslatePoint(default, window._flowBody);
+                                    check(position is { } point && point.Y >= 0 && point.Y + control.Bounds.Height <= window._flowBody.Bounds.Height + 1 &&
+                                        point.X >= 0 && point.X + control.Bounds.Width <= window._flowBody.Bounds.Width + 1,
+                                        $"Setup: completion control stays fully inside the body: {supported.Code}/{id}/{control.Name ?? control.GetType().Name}");
+                                }
+                                var feedback = ((TextBlock)((Grid)window._feedbackSection!).Children[0]).Text;
+                                check(feedback == L.T(DeviceCatalog.Get(id).IsExperimentalFirmware
+                                    ? "Dein Modell wird experimentell unterstützt. Deine Rückmeldung zu Tasten und Beleuchtung hilft uns besonders."
+                                    : "Deine Rückmeldung hilft uns, INGLORIOUS Advanced zu verbessern."),
+                                    $"Setup: voluntary feedback wording matches the model support status: {supported.Code}/{id}");
+                            }
+                        }
+                    }
+                    finally { window.Close(); }
+                }
+            }
+        }
+        finally { L.SetLanguage(language); }
     }
 }

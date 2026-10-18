@@ -12,25 +12,27 @@ public sealed partial class DeviceSetupWindow
     private readonly Button _deviceTestButton = new() { Content = L.T("Gerät testen"), HorizontalAlignment = HorizontalAlignment.Left, MinHeight = 38 };
     private readonly Button _feedbackButton = new() { Content = L.T("Rückmeldung & Kontakt"), HorizontalAlignment = HorizontalAlignment.Left, MinHeight = 38 };
     private readonly Grid _coreImportSection = new(), _feedbackSection = new();
+    private readonly TextBlock _feedbackHint = Text(12);
     public CoreImportSelection? ImportedCoreSelection { get; private set; }
 
     private void InitializeCompletionOptions()
     {
         UiIcons.SetKind(_deviceTestButton, "keyboard"); UiIcons.SetKind(_coreImportButton, "import"); UiIcons.SetKind(_feedbackButton, "message");
-        var actions = new Grid { Margin = new(0, 18, 0, 0) };
+        var actions = new Grid { Margin = new(0, 12, 0, 0) };
         actions.ColumnDefinitions.Add(new()); actions.ColumnDefinitions.Add(new());
         Grid.SetIsSharedSizeScope(actions, true);
         void AddSection(Grid section, string description, Button button)
         {
             section.RowDefinitions.Add(new() { Height = GridLength.Auto, SharedSizeGroup = "CompletionOptionHint" });
             section.RowDefinitions.Add(new() { Height = GridLength.Auto });
-            var hint = Text(12, L.T(description)); hint.Foreground = (Brush)FindResource("Muted"); hint.Margin = new(0, 0, 0, 10); hint.LineHeight = 19;
+            var hint = ReferenceEquals(section, _feedbackSection) ? _feedbackHint : Text(12);
+            hint.Text = L.T(description); hint.Foreground = (Brush)FindResource("Muted"); hint.Margin = new(0, 0, 0, 6); hint.LineHeight = 17;
             section.Children.Add(hint); Grid.SetRow(button, 1); section.Children.Add(button); actions.Children.Add(section);
         }
         _coreImportSection.Margin = new(0, 0, 24, 0);
         AddSection(_coreImportSection, "Gespeicherte Farben und Belegungen aus Glorious CORE übernehmen.", _coreImportButton);
         AddSection(_feedbackSection, "Deine Rückmeldung hilft uns, INGLORIOUS Advanced zu verbessern.", _feedbackButton);
-        _completion.Children.Add(new Border { BorderBrush = (Brush)FindResource("Stroke"), BorderThickness = new(0, 1, 0, 0), Margin = new(0, 20, 0, 0), Child = actions });
+        _completion.Children.Add(new Border { BorderBrush = (Brush)FindResource("Stroke"), BorderThickness = new(0, 1, 0, 0), Margin = new(0, 12, 0, 0), Child = actions });
         _coreImportButton.Click += (_, _) =>
         {
             if (!LightingReady || _coreImportPreview is null || DeviceId is not { } id) return;
@@ -69,6 +71,8 @@ public sealed partial class DeviceSetupWindow
 
     private void RenderCompletionOptions()
     {
+        _feedbackHint.Text = DeviceCatalog.All.FirstOrDefault(model => model.Id == DeviceId) is { } model
+            ? DeviceFeedbackContext.Invitation(model) : L.T("Deine Rückmeldung hilft uns, INGLORIOUS Advanced zu verbessern.");
         _coreImportButton.Visibility = _coreImportPreview is null ? Visibility.Collapsed : Visibility.Visible;
         _coreImportSection.Visibility = _coreImportButton.Visibility;
         Grid.SetColumn(_feedbackSection, _coreImportPreview is null ? 0 : 1);

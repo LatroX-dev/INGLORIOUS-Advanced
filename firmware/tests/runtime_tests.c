@@ -12,6 +12,10 @@ static matrix_row_t pressed_rows[MATRIX_ROWS];
 static uint8_t registered[256];
 static uint32_t mock_now;
 static unsigned checks, replies, writes, fail_write, reloads;
+static unsigned knob_taps;
+static uint16_t knob_tapped_code;
+static uint8_t weak_mods, last_registered_mods, last_registered_code;
+static unsigned keyboard_reports;
 static bool fail_after_persist, fail_reload, erase_on_failure;
 static bool mock_borrowed;
 static uint32_t mock_stage_address;
@@ -79,7 +83,7 @@ wear_leveling_status_t ig_storage_stage_finish(bool commit_attempted) {
 }
 matrix_row_t matrix_get_row(uint8_t row) { return pressed_rows[row]; }
 void raw_hid_send(uint8_t *data, uint8_t length) { if (length != 32) abort(); memcpy(response, data, 32); replies++; }
-void register_code(uint8_t code) { registered[code] = 1; }
+void register_code(uint8_t code) { registered[code] = 1; last_registered_mods = weak_mods; last_registered_code = code; }
 void unregister_code(uint8_t code) { registered[code] = 0; }
 uint32_t timer_read32(void) { return mock_now; }
 void layer_clear(void) { layer_state = 0; }
@@ -91,6 +95,12 @@ uint32_t timer_elapsed32(uint32_t since) { return mock_now - since; }
 int16_t analogReadPin(int pin) { (void)pin; return analog_sample; }
 void midi_send_cc(int *device, uint8_t channel, uint8_t controller, uint8_t value) { (void)device; (void)channel; (void)controller; (void)value; midi_messages++; }
 void tap_code(uint8_t code) { (void)code; volume_taps++; }
+void tap_code16(uint16_t code) { knob_taps++; knob_tapped_code = code; }
+bool is_key_pressed(uint8_t code) { return registered[code] != 0; }
+uint8_t get_weak_mods(void) { return weak_mods; }
+void add_weak_mods(uint8_t mods) { weak_mods |= mods; }
+void set_weak_mods(uint8_t mods) { weak_mods = mods; }
+void send_keyboard_report(void) { keyboard_reports++; }
 void gpio_write_pin_high(int pin) { if (pin == B6) external_cs_high = true; }
 void gpio_set_pin_output(int pin) { if (pin == B6) { if (!external_cs_high) abort(); external_cs_output = true; } }
 void matrix_scan(void) { scans++; if (scans == release_at_scan) memset(pressed_rows, 0, sizeof(pressed_rows)); }
@@ -119,6 +129,8 @@ static void reset(void) {
     stage_open = macro_running = runtime_ready = false; stage_received = 0; active_slot = -1; active_generation = 0; mock_now = 0;
     memset(held_layer_keys, 0, sizeof(held_layer_keys));
     scans = release_at_scan = boot_jumps = waited_ms = volume_taps = midi_messages = 0;
+    knob_taps = knob_tapped_code = 0;
+    weak_mods = last_registered_mods = last_registered_code = 0; keyboard_reports = 0;
     external_cs_high = external_cs_output = false; analog_sample = 512;
     memset(&g_led_config, 0, sizeof(g_led_config)); memset(g_led_config.matrix_co, 255, sizeof(g_led_config.matrix_co));
     g_led_config.matrix_co[0][0] = 0;
@@ -331,6 +343,16 @@ static void prime_slider(int16_t value) { slider_reset(); sample_slider(value,3)
 #include "version_reporting_checks.h"
 #include "color_output_checks.h"
 #include "cache_staging_checks.h"
+#include "brightness_binding_checks.h"
+#define KNOB_TEST_NOW mock_now
+#define KNOB_TEST_PIXELS rendered
+#define KNOB_TEST_ROWS pressed_rows
+static void knob_test_install_length(const uint8_t *config, uint16_t length) { install_size(config,length); }
+static void knob_test_stage_length(const uint8_t *config, uint16_t length) { check(begin_size(config,length,active_generation)==0,"knob stage begins");stage_size_all(config,length); }
+static uint8_t knob_test_commit_length(const uint8_t *config, uint16_t length) {return commit_size(config,length,active_generation);}
+static void knob_test_install(const uint8_t *config) { knob_test_install_length(config,IG_MAX_SIZE); }
+static void knob_test_reboot(void) { keyboard_post_init_user(); }
+#include "knob_cycle_checks.h"
 int main(int argc, char **argv) {
     uint8_t first[IG_SIZE], second[IG_SIZE], bad[IG_SIZE];
     reset(); make_config(first, 0x15); make_config(second, 0x67);
@@ -432,7 +454,7 @@ int main(int argc, char **argv) {
     check(volume_taps == 0, "relative volume slider startup position sends nothing");
     sample_slider(1000,3); check(volume_taps == 1, "confirmed large slider movement sends one bounded volume step");
 #endif
-    check(argc == 3, "C# legacy and standby fixture directories explicitly supplied"); fixture(argv[1], "default"); fixture(argv[1], "configured");
+    check(argc >= 3 && argc <= 6, "C# legacy and standby fixture directories explicitly supplied"); fixture(argv[1], "default"); fixture(argv[1], "configured");
     fixture(argv[1],"effects"); fixture(argv[1],"timing"); fixture(argv[1],"v2-default"); fixture(argv[1],"sequences");
     effect_runtime_checks();
     reactive_history_expiry_checks();
@@ -447,6 +469,14 @@ int main(int argc, char **argv) {
     fallback_color_checks();
     color_output_checks();
     cache_staging_checks();
+    brightness_binding_checks();
+    reset(); uint8_t knob_config[IG_MAX_SIZE]; make_v4(knob_config); knob_cycle_checks(knob_config);
+    reset(); knob_order_checks(knob_config);
+    reset(); knob_status_checks(knob_config);
+    reset(); knob_press_checks(knob_config);
+    if (argc >= 4 && argv[3][0]) { reset(); knob_fixture_checks(argv[3],false); }
+    if (argc >= 5) { reset(); knob_fixture_checks(argv[4],true); }
+    if (argc == 6) { reset(); knob_press_fixture_checks(argv[5]); }
     printf("PASS: board%u, %u firmware runtime checks; separate mock cache/backing; zero hardware access.\n", IG_BOARD, checks);
     return 0;
 }

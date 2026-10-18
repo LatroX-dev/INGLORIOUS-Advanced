@@ -36,8 +36,19 @@ public sealed record OnboardExtensions(ushort Version, ushort Flags, ushort Ligh
     public bool SupportsLightingTest => Version == 1 && (Flags & 1) != 0;
     public bool SupportsScreensaver => Version == 1 && (Flags & 2) != 0;
     public bool SupportsDeviceTest => Version == 1 && (Flags & 4) != 0;
+    public bool SupportsKnobCycle => Version == 1 && (Flags & 8) != 0;
+    public bool SupportsKnobOrder => Version == 1 && (Flags & 16) != 0;
+    public bool SupportsKnobStatus => Version == 1 && (Flags & 32) != 0;
+    public bool SupportsKnobPress => Version == 1 && (Flags & 64) != 0;
 }
 public sealed record OnboardLightingTestStatus(bool Active, byte Pattern, ushort RemainingMs);
+public sealed record OnboardKnobStatus(string DeviceId, byte Layer, int ActivePresetBit, string? PresetId,
+    bool CycleEnabled, bool SignalActive, ushort CounterClockwiseCode, ushort ClockwiseCode,
+    uint ChangeCounter, uint Generation, uint ActiveCrc, byte CounterClockwiseLayer, byte ClockwiseLayer, byte Step)
+{
+    public string SourceLabel => KnobPresets.All.FirstOrDefault(preset => preset.Id == PresetId)?.SourceLabel ?? "Eigene Belegung";
+    public string Label => L.T(SourceLabel);
+}
 
 /// <summary>Configuration and acknowledged USB re-enumeration only. No flashing, memory addresses or bootloader commands.</summary>
 public sealed partial class OnboardClient(IOnboardTransport transport, string expectedDeviceId, bool allowEngineering = false) : IAsyncDisposable
@@ -46,6 +57,7 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
     private readonly SemaphoreSlim _exclusive = new(1, 1);
     private byte _sequence;
     private ushort? _lightingTestDurationMs;
+    private bool? _knobStatusSupported;
     private static bool ValidateEngineeringAccess(string deviceId, bool allowEngineering)
     {
         if (BoardDescriptorRegistry.Get(deviceId).IsEngineeringOnly && !EngineeringConfigurationPolicy.IsEnabled(deviceId, allowEngineering))
@@ -64,14 +76,15 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
     public async Task<OnboardFirmwareVersion?> GetFirmwareVersionAsync(CancellationToken cancellationToken = default)
     {
         await _exclusive.WaitAsync(cancellationToken);
-        try
-        {
-            byte[] data;
-            try { data = await Send(OnboardProtocol.GetFirmwareVersion, [], cancellationToken); }
-            catch (OnboardCommandException ex) when (ex.Status == 9) { return null; }
-            return ParseFirmwareVersion(data, expectedDeviceId);
-        }
+        try { return await FirmwareVersionCore(cancellationToken); }
         finally { _exclusive.Release(); }
+    }
+    private async Task<OnboardFirmwareVersion?> FirmwareVersionCore(CancellationToken cancellationToken)
+    {
+        byte[] data;
+        try { data = await Send(OnboardProtocol.GetFirmwareVersion, [], cancellationToken); }
+        catch (OnboardCommandException ex) when (ex.Status == 9) { return null; }
+        return ParseFirmwareVersion(data, expectedDeviceId);
     }
     internal static OnboardFirmwareVersion ParseFirmwareVersion(byte[] data, string expectedDeviceId)
     {
@@ -97,11 +110,48 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
         byte[] data;
         try { data = await Send(OnboardProtocol.GetExtensions, [], ct); }
         catch (OnboardCommandException ex) when (ex.Status == 9) { _lightingTestDurationMs = 0; return new(0, 0, 0); } // Old firmware: read-only unsupported-command response.
-        if (data.Length != 8 || Get16(data, 0) != 1 || (Get16(data, 2) & ~7) != 0 || Get16(data, 6) != 0 ||
+        if (data.Length != 8 || Get16(data, 0) != 1 || (Get16(data, 2) & ~127) != 0 || Get16(data, 6) != 0 ||
+            ((Get16(data, 2) & 120) != 0 && !DeviceCatalog.Get(expectedDeviceId).HasEncoder) ||
+            ((Get16(data, 2) & 16) != 0 && (Get16(data, 2) & 8) == 0) ||
+            ((Get16(data, 2) & 32) != 0 && (Get16(data, 2) & 24) != 24) ||
+            ((Get16(data, 2) & 64) != 0 && (Get16(data, 2) & 56) != 56) ||
             ((Get16(data, 2) & 1) != 0 ? Get16(data, 4) is < 1 or > OnboardExtensions.MaximumLightingTestDurationMs : Get16(data, 4) != 0))
             throw new InvalidDataException(L.T("Ungültige Antwort zu den Firmware-Erweiterungen."));
         _lightingTestDurationMs = Get16(data, 4);
         return new(Get16(data, 0), Get16(data, 2), Get16(data, 4));
+    }
+    public async Task<OnboardKnobStatus?> GetKnobStatusAsync(CancellationToken cancellationToken = default)
+    {
+        await _exclusive.WaitAsync(cancellationToken);
+        try
+        {
+            if (!DeviceCatalog.Get(expectedDeviceId).HasEncoder) return null;
+            if (_knobStatusSupported is null)
+            {
+                var version = await FirmwareVersionCore(cancellationToken);
+                _knobStatusSupported = version is not null && version.Version >= new FirmwareSemanticVersion(0, 11, 8) &&
+                    (await ExtensionsCore(cancellationToken)).SupportsKnobStatus;
+            }
+            if (_knobStatusSupported != true) return null;
+            return ParseKnobStatus(await Send(OnboardProtocol.ReadKnobStatus, [], cancellationToken), expectedDeviceId);
+        }
+        finally { _exclusive.Release(); }
+    }
+    internal static OnboardKnobStatus ParseKnobStatus(byte[] data, string deviceId)
+    {
+        if (!DeviceCatalog.Get(deviceId).HasEncoder || data.Length != 24 || data[0] != 1 || data[1] > 3 ||
+            (data[3] & ~3) != 0 || data[20] > data[1] || data[21] > data[1] || data[22] is < 1 or > 5 || data[23] != 0)
+            throw new InvalidDataException(L.T("Der Gerätestand konnte nicht gelesen werden. Bitte erneut versuchen."));
+        var left = Get16(data, 4); var right = Get16(data, 6);
+        var preset = KnobPresets.All.FirstOrDefault(candidate =>
+            OnboardSerializer.EncodeBinding(candidate.CounterClockwise, []) == left && OnboardSerializer.EncodeBinding(candidate.Clockwise, []) == right);
+        var bit = preset?.Id switch { "volume" => 1, "brightness" => 2, "tracks" => 4, "scroll" => 8,
+            "zoom" or "zoom-mac" => 16, "hscroll" => 32, "tabs" => 64, "undo" or "undo-mac" => 128, _ => 0 };
+        var scalable = bit is 1 or 2 or 8 or 16 or 32;
+        if (data[2] != bit || !scalable && data[22] != 1)
+            throw new InvalidDataException(L.T("Der Gerätestand konnte nicht gelesen werden. Bitte erneut versuchen."));
+        return new(deviceId, data[1], bit, preset?.Id, (data[3] & 1) != 0, (data[3] & 2) != 0,
+            left, right, Get32(data, 8), Get32(data, 12), Get32(data, 16), data[20], data[21], data[22]);
     }
     public Task<OnboardLightingTestStatus> GetLightingTestStatusAsync(CancellationToken cancellationToken = default) => LightingTestCore(0, cancellationToken);
     public Task<OnboardLightingTestStatus> StartLightingTestAsync(CancellationToken cancellationToken = default) => LightingTestCore(1, cancellationToken);
@@ -191,7 +241,7 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
             if (expectedGeneration.HasValue && info.Generation != expectedGeneration.Value) throw new IOException("Die Gerätekonfiguration hat sich seit deiner Sicherung geändert. Bitte erneut auslesen und sichern.");
             if (!info.Persistent) throw new IOException("Das Gerät meldet keinen verfügbaren dauerhaften Speicher.");
             if (imageSchema == 3 && !info.SupportsColorSequences) throw new InvalidDataException(L.T("Eigene Farbfolgen benötigen ein Firmware-Update. Es wird nichts übertragen."));
-            if (imageSchema == 4 && !info.SupportsStandby) throw new InvalidDataException(L.T(decoded.Standby.Mode == 2
+            if (imageSchema >= 4 && !info.SupportsStandby) throw new InvalidDataException(L.T(decoded.Standby.Mode == 2
                 ? "Der Screensaver benötigt ein Firmware-Update. Es wird nichts übertragen."
                 : "Standby benötigt ein Firmware-Update. Es wird nichts übertragen."));
             if (imageSchema >= 2 && !info.SupportsEffects && !info.SupportsTiming) throw new InvalidDataException("Die installierte Firmware unterstützt dieses Konfigurationsformat nicht. Ein Firmware-Update ist erforderlich.");
@@ -201,7 +251,7 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
             if (frozen.Length != OnboardSerializer.Shape(expectedDeviceId, imageSchema).Size) throw new InvalidDataException("Konfigurationsgröße passt nicht zur Firmware.");
             // Capture the previous configuration before touching staging; the UI additionally saves this as a recovery file.
             _ = await ReadCore(info, cancellationToken);
-            if (imageSchema == 4 && decoded.Standby.Mode == 2)
+            if (imageSchema >= 4 && decoded.Standby.Mode == 2)
             {
                 // Always query again, immediately before staging; a prior preview/capability
                 // read is not permission to send mode 2 to firmware that rejects that byte.
@@ -210,6 +260,27 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
                 catch (Exception ex) when (ex is IOException or InvalidDataException or NotSupportedException)
                 { throw new InvalidDataException(L.T("Der Screensaver benötigt ein Firmware-Update. Es wird nichts übertragen."), ex); }
                 if (!extensions.SupportsScreensaver) throw new InvalidDataException(L.T("Der Screensaver benötigt ein Firmware-Update. Es wird nichts übertragen."));
+            }
+            if (decoded.Layers.Any(layer => layer.Keys.Values.Any(key => key.Binding is "RM_VALU" or "RM_VALD")))
+            {
+                // Older firmware rejects these actions. Check the connected board afresh before staging.
+                var installed = await FirmwareVersionCore(cancellationToken);
+                if (installed is null || installed.Version < new FirmwareSemanticVersion(0, 11, 5))
+                    throw new InvalidDataException(L.T("Helligkeit per Taste oder Drehregler benötigt ein Firmware-Update. Es wird nichts übertragen."));
+            }
+            if (imageSchema >= 5)
+            {
+                // Reconfirm capabilities on this connection before any staging write.
+                var installed = await FirmwareVersionCore(cancellationToken);
+                var extensions = await ExtensionsCore(cancellationToken);
+                if (installed is null || installed.Version < new FirmwareSemanticVersion(0, 11, (ushort)(imageSchema >= 7 ? 8 : imageSchema == 6 ? 7 : 6)) || !extensions.SupportsKnobCycle || imageSchema >= 6 && !extensions.SupportsKnobOrder || imageSchema >= 7 && !extensions.SupportsKnobPress)
+                    throw new InvalidDataException(L.T("Diese Drehregler-Einstellungen benötigen ein Firmware-Update. Es wird nichts übertragen."));
+            }
+            else if (decoded.Layers.Any(layer => layer.Keys.Values.Any(key => KnobPresets.RequiresExtendedActions(key.Binding))))
+            {
+                var installed = await FirmwareVersionCore(cancellationToken);
+                if (installed is null || installed.Version < new FirmwareSemanticVersion(0, 11, 6))
+                    throw new InvalidDataException(L.T("Diese Drehregler-Einstellungen benötigen ein Firmware-Update. Es wird nichts übertragen."));
             }
             var begin = new byte[10]; Put16(begin, 0, frozen.Length); Put32(begin, 2, info.Generation); Put32(begin, 6, crc);
             var response = await Send(OnboardProtocol.Begin, begin, cancellationToken);
@@ -263,8 +334,8 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
         if (((data[7] & 2) != 0) != BoardDescriptorRegistry.Get(expectedDeviceId).HasSlider)
             throw new InvalidDataException("Geräte-Handshake passt nicht zur erwarteten INGLORIOUS-Firmware.");
         var supportsSchema2 = (data[7] & 24) != 0;
-        var uploadCapacity = OnboardSerializer.Shape(expectedDeviceId, supportsSchema2 ? 2 : 1).Size;
-        if (data[0] != s.Board || data[1] != s.Rows || data[2] != s.Cols || data[3] != 4 || data[4] != s.Leds || data[5] != 32 || data[6] != 128 || ((data[7] & 128) != 0 && (data[7] & 120) != 120) || ((data[7] & 32) != 0 && (data[7] & 8) == 0) || Get16(data, 8) != s.Size || Get16(data, 10) != OnboardSerializer.MacroCapacity(expectedDeviceId, schemaVersion) || Get16(data, 20) > uploadCapacity || (schemaVersion >= 2 && !supportsSchema2) || (schemaVersion >= 3 && (data[7] & 32) == 0) || (schemaVersion == 4 && (data[7] & 128) == 0))
+        var uploadCapacity = OnboardSerializer.Shape(expectedDeviceId, supportsSchema2 ? DeviceCatalog.Get(expectedDeviceId).HasEncoder ? 7 : 2 : 1).Size;
+        if (data[0] != s.Board || data[1] != s.Rows || data[2] != s.Cols || data[3] != 4 || data[4] != s.Leds || data[5] != 32 || data[6] != 128 || ((data[7] & 128) != 0 && (data[7] & 120) != 120) || ((data[7] & 32) != 0 && (data[7] & 8) == 0) || Get16(data, 8) != s.Size || Get16(data, 10) != OnboardSerializer.MacroCapacity(expectedDeviceId, schemaVersion) || Get16(data, 20) > uploadCapacity || (schemaVersion >= 2 && !supportsSchema2) || (schemaVersion >= 3 && (data[7] & 32) == 0) || (schemaVersion >= 4 && (data[7] & 128) == 0))
             throw new InvalidDataException("Geräte-Handshake passt nicht zur erwarteten INGLORIOUS-Firmware.");
         return new(expectedDeviceId, data[7], Get16(data, 8), Get32(data, 12), Get32(data, 16), Get16(data, 20), schemaVersion);
     }
@@ -301,3 +372,4 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
     private static void Put32(byte[] b, int i, uint v) => BinaryPrimitives.WriteUInt32LittleEndian(b.AsSpan(i), v);
     public ValueTask DisposeAsync() => transport.DisposeAsync();
 }
+

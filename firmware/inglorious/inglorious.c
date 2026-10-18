@@ -31,12 +31,31 @@ static void slider_reset(void);
 #define IG_SIZE (IG_EVENT_OFFSET + IG_EVENTS * 4)
 #define IG_OVERRIDE_OFFSET (IG_SIZE + IG_LAYERS * 8)
 #define IG_MAX_SIZE (IG_OVERRIDE_OFFSET + IG_LAYERS * RGB_MATRIX_LED_COUNT * 3)
+#define IG_ORDER_OFFSET IG_MAX_SIZE
+#define IG_ORDER_SIZE (IG_ORDER_OFFSET + IG_LAYERS * 2)
+#define IG_PRESS_OFFSET IG_ORDER_SIZE
+#define IG_PRESS_SIZE (IG_PRESS_OFFSET + IG_LAYERS * 16)
 #define IG_SEQUENCE_BYTES ((200 + IG_LAYERS * RGB_MATRIX_LED_COUNT / 2 + 3) & ~3)
 #define IG_SEQUENCE_OFFSET (IG_SIZE - IG_SEQUENCE_BYTES)
 #define IG_SEQUENCE_EVENTS (IG_EVENTS - IG_SEQUENCE_BYTES / 4)
 #define IG_SLOT_BYTES IG_STORAGE_SLOT_BYTES
 #define IG_SLOT_HEADER IG_STORAGE_HEADER_BYTES
 #define IG_VALID 0xA55A5AA5UL
+// QMK RM_VALU/RM_VALD identifiers; handled locally so our effects share one
+// volatile dimmer and a knob detent never schedules a QMK EEPROM write.
+#define IG_BRIGHTNESS_UP 0x7849U
+#define IG_BRIGHTNESS_DOWN 0x784AU
+#define IG_BRIGHTNESS_STEP 17U
+#define IG_ZOOM_IN 0x7E42U
+#define IG_ZOOM_OUT 0x7E43U
+#define IG_ZOOM_IN_MAC 0x7E44U
+#define IG_ZOOM_OUT_MAC 0x7E45U
+#define IG_TAB_PREVIOUS 0x7E46U
+#define IG_TAB_NEXT 0x7E47U
+#define IG_UNDO 0x7E48U
+#define IG_REDO 0x7E49U
+#define IG_UNDO_MAC 0x7E4AU
+#define IG_REDO_MAC 0x7E4BU
 // Engineering linking retains this exact RAW13 identity for offline inspection
 // even when GCC folds its response copy. Native tests also verify the handler.
 const uint8_t ig_fw_identity[16] __attribute__((used)) = {
@@ -47,7 +66,7 @@ const uint8_t ig_fw_identity[16] __attribute__((used)) = {
     (uint8_t)IG_FW_BUILD_ID, (uint8_t)(IG_FW_BUILD_ID >> 8),
     (uint8_t)(IG_FW_BUILD_ID >> 16), (uint8_t)(IG_FW_BUILD_ID >> 24)
 };
-_Static_assert(IG_MAX_SIZE <= IG_SLOT_BYTES - IG_SLOT_HEADER, "Config must fit one persistent slot");
+_Static_assert(IG_PRESS_SIZE <= IG_SLOT_BYTES - IG_SLOT_HEADER, "Config must fit one persistent slot");
 _Static_assert(RAW_EPSIZE == 32, "Protocol 1 requires 32-byte RAW HID");
 
 static uint8_t *staging;
@@ -72,6 +91,33 @@ static uint32_t lighting_last_activity;
 static uint8_t effect_frame_brightness;
 static bool lighting_suspended;
 static bool lighting_idle;
+#if IG_HAS_ENCODER
+#define IG_KNOB_HOLD_MS 700U
+#define IG_KNOB_SIGNAL_MS 600U
+// Mode zero uses the saved pair; the other eight are volatile presets.
+static uint8_t knob_modes[IG_LAYERS];
+static bool knob_pending, knob_consumed, knob_cancelled, knob_can_cycle;
+static uint8_t knob_layer, knob_short_layer;
+static uint16_t knob_short_code;
+static uint32_t knob_started;
+static uint32_t knob_change_counter, knob_signal_started;
+static uint8_t knob_signal_mode, knob_signal_layer;
+static bool knob_signal_active;
+static uint16_t knob_effective_direction(bool clockwise);
+static uint16_t knob_signal_remaining(uint32_t now);
+static void knob_status(uint8_t *out);
+static void knob_reset(void) {
+    memset(knob_modes, 0, sizeof(knob_modes));
+    knob_pending = knob_consumed = knob_cancelled = false;
+    knob_can_cycle = false;
+    knob_signal_active = false;
+}
+static bool knob_tap_safe(uint16_t code) {
+    return code < 0xE0 || code == IG_BRIGHTNESS_UP || code == IG_BRIGHTNESS_DOWN || (code >= 0x7700 && code <= 0x771F) || (code >= IG_ZOOM_IN && code <= IG_REDO_MAC);
+}
+#else
+static void knob_reset(void) {}
+#endif
 // One bounded volatile overlay; no RGB framebuffer or second configuration copy.
 #define IG_LIGHT_TEST_MS 21000
 static uint32_t light_test_started;
@@ -114,6 +160,8 @@ static uint32_t crc_eeprom(uint16_t base, uint16_t length) {
 }
 static bool key_allowed(uint16_t code, bool encoder) {
     if (code <= 0x00FF || (code >= 0x0100 && code <= 0x1FFF)) return true;
+    if (code == IG_BRIGHTNESS_UP || code == IG_BRIGHTNESS_DOWN) return true;
+    if (IG_HAS_ENCODER && code >= IG_ZOOM_IN && code <= IG_REDO_MAC) return true;
     if (code >= 0x5200 && code <= 0x5203) return true;
     if (!encoder && code >= 0x5220 && code <= 0x5223) return true;
     if (code >= 0x5260 && code <= 0x5263) return true;
@@ -239,14 +287,14 @@ static ig_rgb_t light_test_pixel(uint16_t elapsed, uint8_t led) {
 }
 static uint8_t lighting_scale(uint32_t now) {
     if (lighting_suspended) return 0;
-    if (active_u16(4) != 4 || !active_byte(26)) return brightness;
+    if (active_u16(4) < 4 || !active_byte(26)) return brightness;
     if (!lighting_idle && (uint32_t)(now - lighting_last_activity) < (uint32_t)active_u16(27) * 1000UL) return brightness;
     lighting_idle = true; // Remain asleep across later timer wraps until actual input/resume.
     if (active_byte(29) == 2) return brightness; // Screensaver is drawn separately, like the explicit test.
     return active_byte(29) == 0 ? 0 : (uint16_t)brightness * active_byte(30) / 100;
 }
-static uint8_t saved_interval(void) { return active_size == IG_MAX_SIZE ? active_byte(24) : 1; }
-static uint8_t saved_debounce(void) { return active_size == IG_MAX_SIZE ? active_byte(25) : 5; }
+static uint8_t saved_interval(void) { return active_size >= IG_MAX_SIZE ? active_byte(24) : 1; }
+static uint8_t saved_debounce(void) { return active_size >= IG_MAX_SIZE ? active_byte(25) : 5; }
 static bool macro_key_allowed(uint16_t code) { return (code >= 4 && code <= 0xA4) || (code >= 0xE0 && code <= 0xE7); }
 static bool sequence_ref_valid(const uint8_t *data, uint8_t id, uint8_t *seen) {
     if (!id) return true;
@@ -276,32 +324,53 @@ static bool validate_sequences(const uint8_t *data, bool allow_empty) {
     for (uint16_t i = IG_SEQUENCE_OFFSET + 200 + IG_LAYERS * RGB_MATRIX_LED_COUNT / 2; i < IG_SIZE; ++i) if (data[i]) return false;
     return (count || allow_empty) && seen == count;
 }
+static bool config_length_allowed(uint16_t length) {
+    return length == IG_SIZE || length == IG_MAX_SIZE || (IG_HAS_ENCODER && (length == IG_ORDER_SIZE || length == IG_PRESS_SIZE));
+}
 static bool validate_config(const uint8_t *data, uint16_t length) {
-    if (length != IG_SIZE && length != IG_MAX_SIZE) return false;
+    if (!config_length_allowed(length)) return false;
     uint16_t schema = u16(data + 4), capacity = schema >= 3 ? IG_SEQUENCE_EVENTS : IG_EVENTS;
-    if (memcmp(data, "IGCF", 4) || (length == IG_SIZE ? schema != 1 : (schema < 2 || schema > 4)) || data[6] != IG_BOARD || data[7] != 4 || data[8] != MATRIX_ROWS || data[9] != MATRIX_COLS || data[10] != RGB_MATRIX_LED_COUNT || data[11] != IG_MACROS || u16(data + 12) != capacity || u16(data + 14) > capacity) return false;
-    if (data[16] > 3 || data[17] || u16(data + 18) >= u16(data + 20) || u16(data + 20) > 1023 || data[22] > 15 || data[23] > 127) return false;
+    if (memcmp(data, "IGCF", 4) || (length == IG_SIZE ? schema != 1 : length == IG_MAX_SIZE ? (schema < 2 || schema > 5) : length == IG_ORDER_SIZE ? schema != 6 : schema != 7) || data[6] != IG_BOARD || data[7] != 4 || data[8] != MATRIX_ROWS || data[9] != MATRIX_COLS || data[10] != RGB_MATRIX_LED_COUNT || data[11] != IG_MACROS || u16(data + 12) != capacity || u16(data + 14) > capacity) return false;
+    if (data[16] > 3 || (schema < 5 ? data[17] != 0 : schema < 7 && (data[17] & ~15U) != 0) || (!IG_HAS_ENCODER && data[17]) || u16(data + 18) >= u16(data + 20) || u16(data + 20) > 1023 || data[22] > 15 || data[23] > 127) return false;
+    if (schema >= 5 && !IG_HAS_ENCODER) return false;
+    if (schema >= 6) {
+        bool custom_order = false;
+        for (uint8_t layer = 0; layer < IG_LAYERS; ++layer) {
+            uint16_t rank = u16(data + IG_ORDER_OFFSET + layer * 2);
+            if (rank >= 40320U) return false;
+            if (rank) custom_order = true;
+        }
+        if (schema == 6 && !custom_order) return false;
+    }
 #ifndef IG_HAS_SLIDER
     if (data[16] != 0) return false;
 #endif
-    if (length == IG_MAX_SIZE) {
+    if (length >= IG_MAX_SIZE) {
         if ((data[24] != 1 && data[24] != 2 && data[24] != 4 && data[24] != 8) || data[25] > 40) return false;
     } else if (data[24] || data[25]) return false;
-    if (schema == 4) {
-        if (data[26] > 1 || u16(data + 27) < 10 || u16(data + 27) > 3600 || data[29] > 2 || data[30] < 1 || data[30] > 100 || data[31]) return false;
+    if (schema >= 4) {
+        if (data[26] > 1 || u16(data + 27) < 10 || u16(data + 27) > 3600 || data[29] > 2 || data[30] < 1 || data[30] > 100 || (schema < 5 ? data[31] != 0 : (data[31] & ~(data[17] & 15U)) != 0)) return false;
     } else for (uint8_t i = 26; i < 32; ++i) if (data[i]) return false;
-    if (length == IG_MAX_SIZE) {
+    if (length >= IG_MAX_SIZE) {
+        bool knob_settings = data[17] != 0;
         for (uint8_t layer = 0; layer < IG_LAYERS; ++layer) {
             const uint8_t *effect = data + IG_SIZE + layer * 8;
-            if (effect[0] > 20 || !effect[3] || effect[3] > 3 || (effect[4] & ~3U) || (schema < 3 && effect[5]) || effect[6] || effect[7]) return false;
+            if (effect[0] > 20 || !effect[3] || effect[3] > 3 || (effect[4] & ~3U) || (schema < 3 && effect[5])) return false;
+            if (schema < 5) { if (effect[6] || effect[7]) return false; }
+            else {
+                if (!effect[6]) return false;
+                if (!(effect[7] & 7) || (effect[7] & 7) > 5 || (effect[7] & 0xE0) || ((effect[7] >> 3) & 3) > 2) return false;
+                if (effect[6] != 31 || effect[7] != 1) knob_settings = true;
+            }
         }
+        if (schema == 5 && !knob_settings) return false;
         for (uint16_t offset = IG_OVERRIDE_OFFSET; offset < IG_MAX_SIZE; offset += 3) {
             const uint8_t *effect = data + offset;
             if (effect[0] == 255) { if (effect[1] || effect[2]) return false; }
             else if ((effect[0] & 0x60) || (effect[0] & 0x1F) > 20) return false;
         }
     }
-    if (schema >= 3 && !validate_sequences(data, schema == 4)) return false;
+    if (schema >= 3 && !validate_sequences(data, schema >= 4)) return false;
     for (uint16_t i = IG_KEYS_OFFSET; i < IG_ENCODER_OFFSET; i += 2) {
         uint16_t code = u16(data + i);
         if (!key_allowed(code, false) || (!ig_physical[((i - IG_KEYS_OFFSET) / 2) % (MATRIX_ROWS * MATRIX_COLS)] && code)) return false;
@@ -309,6 +378,31 @@ static bool validate_config(const uint8_t *data, uint16_t length) {
     for (uint16_t i = IG_ENCODER_OFFSET; i < IG_RGB_OFFSET; i += 2) {
         if (!key_allowed(u16(data + i), true) || (!IG_HAS_ENCODER && u16(data + i))) return false;
     }
+#if IG_HAS_ENCODER
+    if (schema >= 7) {
+        bool custom_press = (data[17] & 0xF0) != 0;
+        for (uint16_t at = IG_PRESS_OFFSET; at < IG_PRESS_SIZE; at += 2) {
+            uint16_t code = u16(data + at);
+            if (!key_allowed(code, false) || !knob_tap_safe(code)) return false;
+            if (code != KC_TRNS) custom_press = true;
+            if (code >= 0x7700 && code <= 0x771F && !u16(data + IG_MACRO_OFFSET + (code - 0x7700) * 4 + 2)) return false;
+        }
+        if (!custom_press) return false;
+    }
+    for (uint8_t layer = 0; layer < IG_LAYERS; ++layer) if (data[17] & (1U << layer)) {
+        // A transparent press can resolve through any enabled lower layer.
+        // Validate every possible fallback, not just the default active stack.
+        uint16_t code = u16(data + IG_KEYS_OFFSET + 2 * (layer * MATRIX_ROWS * MATRIX_COLS + IG_ENCODER_KEY_ROW * MATRIX_COLS + IG_ENCODER_KEY_COL));
+        if (!knob_tap_safe(code)) return false;
+        if (code == KC_TRNS) {
+            if (u16(data + IG_KEYS_OFFSET + 2 * (IG_ENCODER_KEY_ROW * MATRIX_COLS + IG_ENCODER_KEY_COL)) == KC_TRNS) return false;
+            for (uint8_t lower = 0; lower < layer; ++lower) {
+                code = u16(data + IG_KEYS_OFFSET + 2 * (lower * MATRIX_ROWS * MATRIX_COLS + IG_ENCODER_KEY_ROW * MATRIX_COLS + IG_ENCODER_KEY_COL));
+                if (!knob_tap_safe(code)) return false;
+            }
+        }
+    }
+#endif
     uint16_t used = u16(data + 14);
     for (uint16_t i = 0; i < capacity; ++i) {
         const uint8_t *event = data + IG_EVENT_OFFSET + i * 4;
@@ -339,13 +433,14 @@ static bool read_slot(uint8_t slot, uint32_t *generation, uint32_t *crc, uint16_
     uint8_t header[IG_SLOT_HEADER];
     ee_read(slot_base(slot), header, sizeof(header));
     *length = u16(header + 6);
-    if (memcmp(header, "IGS1", 4) || header[4] != 1 || header[5] != IG_BOARD || (*length != IG_SIZE && *length != IG_MAX_SIZE) || u32(header + 28) != IG_VALID) return false;
+    if (memcmp(header, "IGS1", 4) || header[4] != 1 || header[5] != IG_BOARD || !config_length_allowed(*length) || u32(header + 28) != IG_VALID) return false;
     *generation = u32(header + 8); *crc = u32(header + 12);
     if (!*generation || crc_eeprom(slot_base(slot) + IG_SLOT_HEADER, *length) != *crc) return false;
     const uint8_t *data = ig_storage_view(slot_base(slot) + IG_SLOT_HEADER, *length);
     return data && validate_config(data, *length);
 }
 static void init_runtime(void) {
+    knob_reset();
     active_slot = -1; active_generation = 0; active_size = IG_SIZE;
     uint32_t generations[2] = {0}, crcs[2] = {0};
     uint16_t sizes[2] = {0};
@@ -444,7 +539,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
             if (count != 10) { status = 1; break; }
             if (light_test_remaining(timer_read32()) || diagnostic_remaining(timer_read32())) { status = 3; break; }
             if (!storage_ok) { status = 7; break; }
-            if (u16(p) != IG_SIZE && u16(p) != IG_MAX_SIZE) { status = 2; break; }
+            if (!config_length_allowed(u16(p))) { status = 2; break; }
             if (u32(p + 2) != active_generation) { status = 8; break; }
             if (!abort_staging()) { status = 7; break; }
             staging = ig_storage_stage_begin(slot_base(active_slot == 0 ? 1 : 0) + IG_SLOT_HEADER, u16(p));
@@ -482,7 +577,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
             brightness = p[0]; out[0] = brightness; size = 1; break;
         case 11: // Extension discovery leaves the original INFO layout and all config schemas intact.
             if (count) { status = 1; break; }
-            put16(out, 1); put16(out + 2, IG_BOARD==16 ? 7 : 3); put16(out + 4, IG_LIGHT_TEST_MS); size = 8; break;
+            put16(out, 1); put16(out + 2, (IG_BOARD==16 ? 7 : 3) | (IG_HAS_ENCODER ? 120 : 0)); put16(out + 4, IG_LIGHT_TEST_MS); size = 8; break;
         case 12: { // 0=status, 1=start once, 2=stop. Never persistent and never extends a running deadline.
             if (count != 1) { status = 1; break; }
             if (p[0] > 2) { status = 2; break; }
@@ -524,6 +619,11 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
             memcpy(out,p,5); put16(out+6,remaining); size=8; break;
         }
 #endif
+#if IG_HAS_ENCODER
+        case 16: // Read actual resolved encoder state; never advances or stores a mode.
+            if (count) { status = 1; break; }
+            knob_status(out); size = 24; break;
+#endif
         default: status = 9; break;
     }
     reply(command, seq, status, out, status ? 0 : size);
@@ -537,6 +637,18 @@ uint16_t keycode_at_keymap_location(uint8_t layer, uint8_t row, uint8_t col) {
 uint16_t keycode_at_encodermap_location(uint8_t layer, uint8_t index, bool clockwise) {
 #if IG_HAS_ENCODER
     if (layer >= 4 || index) return KC_NO;
+    if (active_u16(4) >= 5 && (active_byte(17) & (1U << layer))) {
+        switch (knob_modes[layer]) {
+            case 1: return clockwise ? KC_VOLU : KC_VOLD;
+            case 2: return clockwise ? IG_BRIGHTNESS_UP : IG_BRIGHTNESS_DOWN;
+            case 3: return clockwise ? KC_MNXT : KC_MPRV;
+            case 4: return clockwise ? 0xDA : 0xD9; // QMK mouse wheel down/up.
+            case 5: return active_byte(31) & (1U << layer) ? (clockwise ? IG_ZOOM_IN_MAC : IG_ZOOM_OUT_MAC) : (clockwise ? IG_ZOOM_IN : IG_ZOOM_OUT);
+            case 6: return clockwise ? 0xDC : 0xDB; // QMK horizontal wheel right/left.
+            case 7: return clockwise ? IG_TAB_NEXT : IG_TAB_PREVIOUS;
+            case 8: return active_byte(31) & (1U << layer) ? (clockwise ? IG_REDO_MAC : IG_UNDO_MAC) : (clockwise ? IG_REDO : IG_UNDO);
+        }
+    }
     return active_u16(IG_ENCODER_OFFSET + 2 * (layer * 2 + (clockwise ? 1 : 0)));
 #else
     (void)layer; (void)index; (void)clockwise; return KC_NO;
@@ -557,11 +669,216 @@ static void start_macro(uint8_t index, bool physical_trigger) {
     if (!count) return;
     macro_position = start; macro_end = start + count; macro_deadline = timer_read32(); macro_running = true;
 }
+#if IG_HAS_ENCODER
+static uint8_t knob_action_source(keyrecord_t *record) {
+    uint32_t layers = layer_state | default_layer_state;
+    for (int8_t layer = IG_LAYERS - 1; layer >= 0; --layer) if (layers & (1U << layer)) {
+        uint16_t code = IS_ENCODEREVENT(record->event) ? keycode_at_encodermap_location(layer,0,record->event.type == ENCODER_CW_EVENT) :
+                        keycode_at_keymap_location(layer,record->event.key.row,record->event.key.col);
+        if (code != KC_TRNS) return layer;
+    }
+    return 0;
+}
+static void knob_shortcut_tap(uint16_t code, uint8_t layer) {
+    // Keypad +/- avoids depending on the host's punctuation-key layout.
+    // Never release a +/- key already held by a real key or another source.
+    uint8_t key, mods;
+    if (code <= IG_ZOOM_OUT_MAC) {
+        key = code == IG_ZOOM_IN || code == IG_ZOOM_IN_MAC ? 0x57 : 0x56;
+        mods = code >= IG_ZOOM_IN_MAC ? 8 : 1;
+    } else if (code <= IG_TAB_NEXT) {
+        key = 0x2B; mods = code == IG_TAB_PREVIOUS ? 3 : 1; // Ctrl+Shift+Tab / Ctrl+Tab.
+    } else {
+        uint8_t layout = active_u16(4) >= 5 ? (active_byte(IG_SIZE + (layer < 4 ? layer : 0) * 8 + 7) >> 3) & 3 : 0;
+        key = layout == 1 ? 0x1C : layout == 2 ? 0x1A : 0x1D; // Z on QWERTY/QWERTZ/AZERTY hosts.
+        mods = (code >= IG_UNDO_MAC ? 8 : 1) | ((code & 1) ? 2 : 0); // Ctrl/GUI+Z, plus Shift for redo.
+    }
+    if (is_key_pressed(key)) return;
+    uint8_t saved = get_weak_mods();
+    add_weak_mods(mods);
+    register_code(key); unregister_code(key);
+    set_weak_mods(saved); send_keyboard_report();
+}
+static uint8_t knob_active_layer(void) {
+    uint8_t layer = get_highest_layer(layer_state | default_layer_state);
+    return layer < IG_LAYERS ? layer : 0;
+}
+static bool knob_other_keys_held(void) {
+    for (uint8_t row = 0; row < MATRIX_ROWS; ++row) {
+        matrix_row_t bits = physical_keys_down(row) & ~held_layer_keys[row];
+        if (row == IG_ENCODER_KEY_ROW) bits &= ~((matrix_row_t)1U << IG_ENCODER_KEY_COL);
+        if (bits) return true;
+    }
+    return false;
+}
+static bool knob_busy(void) {
+    return lighting_suspended || stage_open || ig_timing_reconnect_pending() || diagnostic_remaining(timer_read32());
+}
+static uint8_t knob_saved_preset(uint8_t layer) {
+    uint16_t left = active_u16(IG_ENCODER_OFFSET + layer * 4), right = active_u16(IG_ENCODER_OFFSET + layer * 4 + 2);
+    if (left == KC_VOLD && right == KC_VOLU) return 1;
+    if (left == IG_BRIGHTNESS_DOWN && right == IG_BRIGHTNESS_UP) return 2;
+    if (left == KC_MPRV && right == KC_MNXT) return 3;
+    if (left == 0xD9 && right == 0xDA) return 4;
+    if ((active_byte(31) & (1U << layer)) ? (left == IG_ZOOM_OUT_MAC && right == IG_ZOOM_IN_MAC) : (left == IG_ZOOM_OUT && right == IG_ZOOM_IN)) return 5;
+    if (left == 0xDB && right == 0xDC) return 6;
+    if (left == IG_TAB_PREVIOUS && right == IG_TAB_NEXT) return 7;
+    if ((active_byte(31) & (1U << layer)) ? (left == IG_UNDO_MAC && right == IG_REDO_MAC) : (left == IG_UNDO && right == IG_REDO)) return 8;
+    return 0;
+}
+static uint8_t knob_pair_mode(uint16_t left, uint16_t right) {
+    if (left == KC_VOLD && right == KC_VOLU) return 1;
+    if (left == IG_BRIGHTNESS_DOWN && right == IG_BRIGHTNESS_UP) return 2;
+    if (left == KC_MPRV && right == KC_MNXT) return 3;
+    if (left == 0xD9 && right == 0xDA) return 4;
+    if ((left == IG_ZOOM_OUT && right == IG_ZOOM_IN) || (left == IG_ZOOM_OUT_MAC && right == IG_ZOOM_IN_MAC)) return 5;
+    if (left == 0xDB && right == 0xDC) return 6;
+    if (left == IG_TAB_PREVIOUS && right == IG_TAB_NEXT) return 7;
+    if ((left == IG_UNDO && right == IG_REDO) || (left == IG_UNDO_MAC && right == IG_REDO_MAC)) return 8;
+    return 0;
+}
+static bool knob_decode_order(uint16_t rank, uint8_t order[8]) {
+    if (rank >= 40320U) return false;
+    static const uint16_t factorial[] = {5040,720,120,24,6,2,1,1};
+    uint8_t remaining[8] = {1,2,3,4,5,6,7,8};
+    for (uint8_t at = 0; at < 8; ++at) {
+        uint8_t index = rank / factorial[at];
+        rank %= factorial[at];
+        order[at] = remaining[index];
+        for (uint8_t next = index; next < 7 - at; ++next) remaining[next] = remaining[next + 1];
+    }
+    return true;
+}
+static uint8_t knob_next_mode(const uint8_t order[8], uint8_t mask, uint8_t saved, uint8_t current) {
+    if (!current) current = saved;
+    uint8_t position = 8; // The custom saved pair occupies the extra slot.
+    for (uint8_t at = 0; at < 8; ++at) if (order[at] == current) position = at;
+    for (uint8_t tries = 0; tries < 9; ++tries) {
+        position = position < 8 ? position + 1 : 0;
+        uint8_t candidate = position < 8 ? order[position] : 0;
+        if ((!candidate && !saved) || (candidate && (mask & (1U << (candidate - 1))))) return candidate == saved ? 0 : candidate;
+    }
+    return 0; // Configuration validation requires at least one selected preset.
+}
+static void knob_task(void) {
+    if (!knob_pending || !knob_can_cycle || knob_consumed || knob_cancelled) return;
+    if (knob_busy() || knob_layer != knob_active_layer() || knob_other_keys_held()) { knob_cancelled = true; return; }
+    if ((uint32_t)(timer_read32() - knob_started) < IG_KNOB_HOLD_MS) return;
+    uint8_t saved = knob_saved_preset(knob_layer), order[8];
+    if (!knob_decode_order(active_u16(4) >= 6 ? active_u16(IG_ORDER_OFFSET + knob_layer * 2) : 0, order)) { knob_cancelled = true; return; }
+    uint8_t mask = active_byte(IG_SIZE + knob_layer * 8 + 6);
+    uint16_t before_left = knob_effective_direction(false), before_right = knob_effective_direction(true);
+    knob_modes[knob_layer] = knob_next_mode(order, mask, saved, knob_modes[knob_layer]);
+    uint16_t after_left = knob_effective_direction(false), after_right = knob_effective_direction(true);
+    if (before_left != after_left || before_right != after_right) {
+        ++knob_change_counter;
+        knob_signal_mode = knob_pair_mode(after_left, after_right);
+        knob_signal_layer = knob_layer; knob_signal_started = timer_read32(); knob_signal_active = true;
+    }
+    knob_consumed = true; // One change for each hold; its release never taps.
+}
+static bool knob_process(uint16_t keycode, keyrecord_t *record) {
+    bool press_key = IS_KEYEVENT(record->event) && record->event.key.row == IG_ENCODER_KEY_ROW && record->event.key.col == IG_ENCODER_KEY_COL;
+    if (!press_key) {
+        if (knob_pending && record->event.pressed && IS_KEYEVENT(record->event)) knob_cancelled = true;
+        return true;
+    }
+    if (!record->event.pressed && knob_pending) {
+        knob_task();
+        bool tap = !knob_consumed && !knob_cancelled;
+        uint16_t code = knob_short_code;
+        knob_pending = knob_consumed = knob_cancelled = false;
+        if (tap) {
+            if (code >= 0x7700 && code <= 0x771F) start_macro(code - 0x7700, false);
+            else if (code == IG_BRIGHTNESS_UP) brightness = brightness > 255U - IG_BRIGHTNESS_STEP ? 255 : brightness + IG_BRIGHTNESS_STEP;
+            else if (code == IG_BRIGHTNESS_DOWN) brightness = brightness < IG_BRIGHTNESS_STEP ? 0 : brightness - IG_BRIGHTNESS_STEP;
+            else if (code >= IG_ZOOM_IN && code <= IG_REDO_MAC) knob_shortcut_tap(code,knob_short_layer);
+            else if (code > KC_TRNS && !(code <= 0xA4 && is_key_pressed((uint8_t)code))) tap_code16(code);
+        }
+        return false;
+    }
+    uint8_t layer = knob_active_layer();
+    if (!record->event.pressed) return true;
+    uint16_t press_override = KC_TRNS;
+    if (active_u16(4) >= 7 && (active_byte(17) & (1U << (layer + 4)))) {
+        uint8_t mode = knob_pair_mode(knob_effective_direction(false), knob_effective_direction(true));
+        if (mode) press_override = active_u16(IG_PRESS_OFFSET + layer * 16 + (mode - 1) * 2);
+    }
+    bool can_cycle = active_u16(4) >= 5 && (active_byte(17) & (1U << layer)) && knob_tap_safe(keycode) && !knob_busy() && !knob_other_keys_held();
+    if (!can_cycle && press_override == KC_TRNS) return true;
+    if (macro_running) cancel_macro();
+    knob_pending = true; knob_consumed = false; knob_cancelled = false;
+    knob_can_cycle = can_cycle;
+    knob_started = timer_read32(); knob_short_code = press_override == KC_TRNS ? keycode : press_override; knob_layer = layer;
+    knob_short_layer = press_override == KC_TRNS ? knob_action_source(record) : layer;
+    return false;
+}
+static uint16_t knob_resolved_direction(bool clockwise, uint8_t *source) {
+    uint32_t layers = layer_state | default_layer_state;
+    for (int8_t layer = IG_LAYERS - 1; layer >= 0; --layer) if (layers & (1U << layer)) {
+        uint16_t code = keycode_at_encodermap_location(layer,0,clockwise);
+        if (code != KC_TRNS) { *source = layer; return code; }
+    }
+    *source = 0;
+    return keycode_at_encodermap_location(0,0,clockwise); // QMK's layer-zero fallback.
+}
+static uint16_t knob_effective_direction(bool clockwise) {
+    uint8_t source;
+    return knob_resolved_direction(clockwise, &source);
+}
+static uint8_t knob_direction_steps(uint8_t layer, uint16_t left, uint16_t right) {
+    uint8_t mode = knob_pair_mode(left, right);
+    return active_u16(4) >= 5 && (mode == 1 || mode == 2 || mode == 4 || mode == 5 || mode == 6) ? active_byte(IG_SIZE + layer * 8 + 7) & 7 : 1;
+}
+static uint8_t knob_encoder_steps(keyrecord_t *record) {
+    if (!IS_ENCODEREVENT(record->event) || active_u16(4) < 5) return 1;
+    uint8_t layer = knob_active_layer();
+    uint16_t left = knob_effective_direction(false), right = knob_effective_direction(true);
+    return knob_direction_steps(layer, left, right);
+}
+static uint16_t knob_signal_remaining(uint32_t now) {
+    if (!knob_signal_active) return 0;
+    if ((int32_t)(now - knob_signal_started) < 0) return 0; // Older partial RGB frame; wait for a fresh frame timestamp.
+    uint32_t elapsed = now - knob_signal_started;
+    if (elapsed >= IG_KNOB_SIGNAL_MS || knob_busy() || light_test_active || lighting_idle || knob_signal_layer != knob_active_layer()) {
+        knob_signal_active = false; return 0;
+    }
+    return IG_KNOB_SIGNAL_MS - elapsed;
+}
+static ig_rgb_t knob_signal_color(void) {
+    switch (knob_signal_mode) {
+        case 1: return (ig_rgb_t){0,224,224};
+        case 2: return (ig_rgb_t){255,208,0};
+        case 3: return (ig_rgb_t){176,64,255};
+        case 4: return (ig_rgb_t){32,112,255};
+        case 5: return (ig_rgb_t){32,240,80};
+        case 6: return (ig_rgb_t){96,64,255};
+        case 7: return (ig_rgb_t){255,112,0};
+        case 8: return (ig_rgb_t){255,64,144};
+        default: return (ig_rgb_t){255,255,255};
+    }
+}
+static void knob_status(uint8_t *out) {
+    uint8_t layer = knob_active_layer(), left_layer, right_layer;
+    uint16_t left = knob_resolved_direction(false, &left_layer), right = knob_resolved_direction(true, &right_layer);
+    uint8_t mode = knob_pair_mode(left, right);
+    out[0] = 1; out[1] = layer; out[2] = mode ? 1U << (mode - 1) : 0;
+    out[3] = (active_u16(4) >= 5 && (active_byte(17) & (1U << layer)) ? 1 : 0) | (knob_signal_remaining(timer_read32()) ? 2 : 0);
+    put16(out + 4, left); put16(out + 6, right); put32(out + 8, knob_change_counter);
+    put32(out + 12, active_generation); put32(out + 16, active_crc);
+    out[20] = left_layer; out[21] = right_layer; out[22] = knob_direction_steps(layer, left, right);
+}
+#else
+static void knob_task(void) {}
+#endif
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (IS_KEYEVENT(record->event) &&
         (record->event.key.row >= MATRIX_ROWS || record->event.key.col >= MATRIX_COLS ||
          !ig_physical[record->event.key.row * MATRIX_COLS + record->event.key.col])) return true;
     if (IS_KEYEVENT(record->event) || IS_ENCODEREVENT(record->event)) lighting_activity();
+#if IG_HAS_ENCODER
+    if (!knob_process(keycode, record)) return false;
+#endif
     if (IS_KEYEVENT(record->event) && record->event.key.row < MATRIX_ROWS && record->event.key.col < MATRIX_COLS) {
         matrix_row_t bit = (matrix_row_t)1U << record->event.key.col;
         uint8_t row = record->event.key.row;
@@ -579,6 +896,25 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
     if (keycode >= 0x7700 && keycode <= 0x771F) { if (record->event.pressed) start_macro(keycode - 0x7700, IS_KEYEVENT(record->event)); return false; }
     if (record->event.pressed && macro_running) cancel_macro();
+    uint8_t steps = 1;
+#if IG_HAS_ENCODER
+    steps = knob_encoder_steps(record);
+    if (keycode >= IG_ZOOM_IN && keycode <= IG_REDO_MAC) {
+        if (record->event.pressed && (IS_KEYEVENT(record->event) || IS_ENCODEREVENT(record->event)))
+            for (uint8_t i = 0; i < steps; ++i) knob_shortcut_tap(keycode,knob_action_source(record));
+        return false;
+    }
+    if (record->event.pressed && IS_ENCODEREVENT(record->event) && (keycode == KC_VOLD || keycode == KC_VOLU || (keycode >= 0xD9 && keycode <= 0xDC)))
+        for (uint8_t i = 1; i < steps; ++i) tap_code16(keycode); // QMK processes the remaining original event.
+#endif
+    if (keycode == IG_BRIGHTNESS_UP || keycode == IG_BRIGHTNESS_DOWN) {
+        if (record->event.pressed && (IS_KEYEVENT(record->event) || IS_ENCODEREVENT(record->event))) {
+            uint8_t amount = IG_BRIGHTNESS_STEP * steps;
+            if (keycode == IG_BRIGHTNESS_UP) brightness = brightness > 255U - amount ? 255 : brightness + amount;
+            else brightness = brightness < amount ? 0 : brightness - amount;
+        }
+        return false; // Consume releases too: QMK's RGB handler may run on release.
+    }
     return true;
 }
 static void macro_task(void) {
@@ -605,13 +941,16 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         (void)diagnostic_remaining(effect_frame_time);
     }
     uint8_t effect[8] = {0,128,255,3,0,0,0,0};
-    if (active_size == IG_MAX_SIZE) for (uint8_t i = 0; i < 8; ++i) effect[i] = active_byte(IG_SIZE + layer * 8 + i);
+    if (active_size >= IG_MAX_SIZE) for (uint8_t i = 0; i < 8; ++i) effect[i] = active_byte(IG_SIZE + layer * 8 + i);
     // The automatic pattern has no manual-test state: uploads and dimmer writes
     // remain available, and ordinary activity/commit clears the existing idle latch.
-    bool screensaver = lighting_idle && active_u16(4) == 4 && active_byte(26) && active_byte(29) == 2;
+    bool screensaver = lighting_idle && active_u16(4) >= 4 && active_byte(26) && active_byte(29) == 2;
     uint32_t pattern_elapsed = 0;
     if (light_test_active) pattern_elapsed = effect_frame_time - light_test_started;
     else if (screensaver) pattern_elapsed = (effect_frame_time - lighting_last_activity - (uint32_t)active_u16(27) * 1000UL) % IG_LIGHT_TEST_MS;
+#if IG_HAS_ENCODER
+    uint16_t signal_remaining = knob_signal_remaining(effect_frame_time);
+#endif
     for (uint8_t led = led_min; led < led_max && led < RGB_MATRIX_LED_COUNT; ++led) {
 #if IG_BOARD == 16
         if(diagnostic_active && diagnostic_mode && !lighting_suspended) {
@@ -629,7 +968,7 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         uint16_t offset = IG_RGB_OFFSET + 3 * (layer * RGB_MATRIX_LED_COUNT + led);
         ig_rgb_t base = {active_byte(offset), active_byte(offset + 1), active_byte(offset + 2)};
         uint8_t selected[8]; memcpy(selected, effect, sizeof(selected));
-        if (active_size == IG_MAX_SIZE) {
+        if (active_size >= IG_MAX_SIZE) {
             uint16_t override = IG_OVERRIDE_OFFSET + 3 * (layer * RGB_MATRIX_LED_COUNT + led);
             uint8_t mode = active_byte(override);
             if (mode != 255) {
@@ -650,6 +989,16 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
             color.r = ig_effect_scale(color.r, selected[2]); color.g = ig_effect_scale(color.g, selected[2]); color.b = ig_effect_scale(color.b, selected[2]);
         }
         uint8_t scale = lighting_suspended ? 0 : effect_frame_brightness;
+#if IG_HAS_ENCODER
+        if (signal_remaining) {
+            uint16_t elapsed = IG_KNOB_SIGNAL_MS - signal_remaining;
+            uint8_t blend = elapsed < 100 ? elapsed * 255U / 100U : signal_remaining * 255U / 500U;
+            ig_rgb_t signal = knob_signal_color();
+            color.r = ((uint16_t)color.r * (255U - blend) + (uint16_t)signal.r * blend) / 255U;
+            color.g = ((uint16_t)color.g * (255U - blend) + (uint16_t)signal.g * blend) / 255U;
+            color.b = ((uint16_t)color.b * (255U - blend) + (uint16_t)signal.b * blend) / 255U;
+        }
+#endif
         lighting_output(led, ig_effect_scale(color.r, scale), ig_effect_scale(color.g, scale), ig_effect_scale(color.b, scale));
     }
     return false;
@@ -714,6 +1063,10 @@ void housekeeping_task_user(void) {
     // Newest first. Drop expired input history permanently so it cannot become
     // recent again after the 32-bit timer wraps during a long-running session.
     while (effect_hit_count && (uint32_t)(now - effect_hits[effect_hit_count - 1].time) >= IG_EFFECT_MAX_HIT_AGE_MS) --effect_hit_count;
+    knob_task();
+#if IG_HAS_ENCODER
+    (void)knob_signal_remaining(now);
+#endif
     if (lighting_suspended) return;
     if (any_keys_pressed()) lighting_activity(); // A held physical key is not inactivity.
     macro_task();
@@ -755,6 +1108,9 @@ static void recovery_startup(void) {
     bootloader_jump();
 }
 void keyboard_post_init_user(void) {
+#if IG_HAS_ENCODER
+    knob_change_counter = 0;
+#endif
 #if IG_BOARD == 16
     diagnostic_stop();
 #endif
@@ -768,5 +1124,10 @@ void keyboard_post_init_user(void) {
     rgb_matrix_enable_noeeprom();
     rgb_matrix_mode_noeeprom(RGB_MATRIX_SOLID_COLOR);
 }
-void suspend_power_down_user(void) { lighting_suspended = true; light_test_active = false; (void)diagnostic_remaining(timer_read32()); cancel_macro(); memset(held_layer_keys, 0, sizeof(held_layer_keys)); effect_hit_count = 0; }
+void suspend_power_down_user(void) { lighting_suspended = true; light_test_active = false; (void)diagnostic_remaining(timer_read32()); cancel_macro(); memset(held_layer_keys, 0, sizeof(held_layer_keys)); effect_hit_count = 0;
+#if IG_HAS_ENCODER
+    if (knob_pending) knob_cancelled = true;
+    knob_signal_active = false;
+#endif
+}
 void suspend_wakeup_init_user(void) { lighting_suspended = false; lighting_activity(); effect_hit_count = 0; }

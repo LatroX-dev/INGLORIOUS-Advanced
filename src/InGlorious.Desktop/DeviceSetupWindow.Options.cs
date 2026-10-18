@@ -18,11 +18,10 @@ public sealed partial class DeviceSetupWindow
 
     private void InitializeCompletionOptions()
     {
-        _completion.Children.Add(new Separator { Margin = new(0, 18, 0, 16) });
         _coreImportSection = CompletionOption("Gespeicherte Farben und Belegungen aus Glorious CORE übernehmen.", _coreImportButton);
         _feedbackSection = CompletionOption("Deine Rückmeldung hilft uns, INGLORIOUS Advanced zu verbessern.", _feedbackButton);
         _completionOptions.Children.Add(_coreImportSection); _completionOptions.Children.Add(_feedbackSection);
-        _completion.Children.Add(_completionOptions);
+        Grid.SetRow(_completionOptions, 1); _completion.Children.Add(_completionOptions);
         Avalonia.Automation.AutomationProperties.SetName(_coreImportButton, L.T("CORE-Einstellungen importieren"));
         Avalonia.Automation.AutomationProperties.SetName(_feedbackButton, L.T("Rückmeldung & Kontakt"));
         _coreImportButton.Click += async (_, _) =>
@@ -55,7 +54,7 @@ public sealed partial class DeviceSetupWindow
 
     private static Control CompletionOption(string description, Button button)
     {
-        var section = new Grid { RowDefinitions = new("*,Auto"), RowSpacing = 10 };
+        var section = new Grid { RowDefinitions = new("*,Auto"), RowSpacing = 8 };
         var introduction = Text(12, L.T(description)); introduction.Foreground = Palette("Muted");
         section.Children.Add(introduction);
         button.MinHeight = 38; button.HorizontalAlignment = HorizontalAlignment.Left;
@@ -80,6 +79,8 @@ public sealed partial class DeviceSetupWindow
         {
             Grid.SetColumn(_feedbackSection, hasCoreImport ? 1 : 0);
             Grid.SetColumnSpan(_feedbackSection, hasCoreImport ? 1 : 2);
+            ((TextBlock)((Grid)_feedbackSection).Children[0]).Text = DeviceCatalog.All.FirstOrDefault(device => device.Id == DeviceId) is { } model
+                ? DeviceFeedbackContext.Invitation(model) : L.T("Deine Rückmeldung hilft uns, INGLORIOUS Advanced zu verbessern.");
         }
         _deviceTestButton.IsVisible = DeviceId is { } id && DeviceCatalog.All.Any(device => device.Id == id && !device.IsOfflineOnly);
         _coreImportButton.IsEnabled = _deviceTestButton.IsEnabled = _feedbackButton.IsEnabled = !_offlinePreview && LightingReady;

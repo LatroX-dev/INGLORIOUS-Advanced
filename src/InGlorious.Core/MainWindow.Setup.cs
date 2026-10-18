@@ -12,6 +12,8 @@ public partial class MainWindow
         if (_readingDevice || _checkingFirmwareGuide || _startupLoading || _startupFinishing) return;
         _checkingFirmwareGuide = true;
         CoreImportSelection? importedCore = null;
+        string? installedDeviceId = null;
+        OnboardFirmwareVersion? installedVersion = null;
         try
         {
             await _sharedBrightness.StopAsync();
@@ -24,6 +26,7 @@ public partial class MainWindow
             }
             if (dialog.Completed) Status(L.T("Prüfe jetzt die Tasten und die Beleuchtung."));
             if (dialog.Completed) importedCore = dialog.ImportedCoreSelection;
+            if (dialog.Completed && operation == SetupOperation.Install) { installedDeviceId = dialog.DeviceId; installedVersion = dialog.ReportedVersion; }
         }
         catch (Exception ex) { Status(DeviceSetupService.ForUser(ex)); }
         finally
@@ -31,6 +34,7 @@ public partial class MainWindow
             _checkingFirmwareGuide = false;
             UpdateSetupDeviceButtons();
             if (importedCore is not null) AdoptSetupCoreImport(importedCore);
+            if (installedDeviceId is not null) OfferFeedbackAfterSetup(installedDeviceId, installedVersion, owner);
             if (!_startupClosed) { RequestConnectionRefresh(); StartSharedBrightnessIfReady(); }
         }
     }

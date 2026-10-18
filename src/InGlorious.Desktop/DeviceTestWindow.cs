@@ -5,6 +5,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Threading;
 using InGlorious.Core;
@@ -16,13 +17,14 @@ public sealed class DeviceTestWindow : Window
     private readonly DeviceDefinition _device;
     private readonly OnboardDevice? _connection;
     private readonly TextBlock _status = Label(""), _count = Label("");
-    private readonly StackPanel _physicalTest = new() { Name = "DevicePhysicalTest", Spacing = 12, IsVisible = false };
-    private readonly StackPanel _typingPanel = new() { Name = "DeviceTypingTest", Spacing = 10, IsVisible = false };
-    private readonly TextBox _typing = new() { Name = "DeviceTypingInput", MinHeight = 100, MaxLength = 2048, AcceptsReturn = true, AcceptsTab = true, TextWrapping = TextWrapping.Wrap };
+    private readonly StackPanel _physicalTest = new() { Name = "DevicePhysicalTest", Spacing = 6, IsVisible = false };
+    private readonly StackPanel _typingPanel = new() { Name = "DeviceTypingTest", Spacing = 6, IsVisible = false };
     private readonly TextBlock _lastKey = Label(L.T("Noch keine Taste gedrückt."));
-    private readonly Button _start = new() { Name = "StartDeviceTest", Content = L.T("Test starten") };
+    private readonly Button _start = new() { Name = "StartDeviceTest", Content = L.T("Test starten"), Focusable = false };
     private readonly List<Control> _lightControls = [];
     private readonly Dictionary<string, Action<IBrush>> _keyColors = [];
+    private readonly HashSet<string> _typingKeys = [];
+    private readonly Viewbox _keyboard = new() { Name = "DeviceTestKeyboardView", Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 12) };
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private readonly CancellationTokenSource _lifetime = new();
     private DeviceDiagnosticSession? _session;
@@ -37,11 +39,12 @@ public sealed class DeviceTestWindow : Window
         _connection = preview ? null : connection;
         _typingPanel.IsVisible = preview;
         Title = L.T("Gerät testen") + " · " + _device.Name;
-        Width = 1060; Height = 800; MinWidth = 760; MinHeight = 540;
+        Width = 1060; Height = 720; MinWidth = 760; MinHeight = 600;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Focusable = true;
         Background = ColorBrush("#171B1F"); Foreground = ColorBrush("#E4E7EB");
 
-        var body = new StackPanel { Margin = new Thickness(24), Spacing = 12 };
+        var body = new StackPanel { Margin = new Thickness(24, 20, 24, 0), Spacing = 8 };
         body.Children.Add(new TextBlock { Text = _device.Name, FontSize = 24, FontWeight = FontWeight.SemiBold });
         body.Children.Add(Label(L.T("Die Tasten behalten ihre normale Funktion. Deine Einstellungen werden nicht verändert."), muted: true));
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16 };
@@ -50,22 +53,14 @@ public sealed class DeviceTestWindow : Window
         _start.Click += async (_, _) => { _starting = StartAsync(); await _starting; };
         _count.Name = "DeviceTestCount"; _count.VerticalAlignment = VerticalAlignment.Center; _count.IsVisible = false;
         actions.Children.Add(_start); actions.Children.Add(_count); body.Children.Add(actions);
-        _typingPanel.Children.Add(new TextBlock { Text = L.T("Tipptest"), FontSize = 17, FontWeight = FontWeight.SemiBold });
-        _typingPanel.Children.Add(Label(L.T("Klicke in das Feld und drücke die Tasten, die du prüfen möchtest.")));
+        _typingPanel.Children.Add(Label(L.T("Drücke die Tasten, die du prüfen möchtest.")));
         if (_device.Id == "numpad") _typingPanel.Children.Add(Label(L.T("Für Ziffern Num-Lock einschalten. Standardbelegung: Fn + 0."), muted: true));
-        _typingPanel.Children.Add(_typing);
-        AutomationProperties.SetName(_typing, L.T("Hier Tasten testen"));
-        _typing.AddHandler(KeyDownEvent, RecordTypingKey, RoutingStrategies.Tunnel);
         _lastKey.Name = "DeviceTypingLastKey";
         _typingPanel.Children.Add(_lastKey);
+        _typingPanel.Children.Add(Label(L.T("Gelb zeigt die empfangene Eingabe. Bei eigenen Belegungen kann die Position abweichen."), muted: true));
         _typingPanel.Children.Add(Label(L.T("Die Eingabe kann auch von anderen angeschlossenen Tastaturen kommen."), muted: true));
-        body.Children.Add(_typingPanel);
         _physicalTest.Children.Add(Label(L.T("Drücke jede Taste einzeln und drehe den Knopf in beide Richtungen. Erkannte Tasten werden grün.")));
-        _physicalTest.Children.Add(new Viewbox
-        {
-            Child = CreateKeyboard(), Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly,
-            HorizontalAlignment = HorizontalAlignment.Left, MaxHeight = 310, Margin = new Thickness(0, 6)
-        });
+        _keyboard.Child = CreateKeyboard();
         _physicalTest.Children.Add(new TextBlock { Text = L.T("Beleuchtung prüfen"), FontSize = 17, FontWeight = FontWeight.SemiBold });
         _physicalTest.Children.Add(Label(L.T("Klicke eine Taste an, um nur ihre LED rot einzuschalten. Vergleiche die Position mit der Tastatur.")));
         var lights = new WrapPanel { Name = "DeviceTestLights" };
@@ -98,19 +93,37 @@ public sealed class DeviceTestWindow : Window
             extras.Children.Add(LightButton("Logo", () => LedAsync(led, 255, 0, 0)));
         if (extras.Children.Count > 0) _physicalTest.Children.Add(extras);
         _physicalTest.Children.Add(LightButton("Eigene Beleuchtung anzeigen", RestoreLightingAsync));
-        body.Children.Add(_physicalTest);
+        var lower = new StackPanel { Margin = new Thickness(24, 0, 24, 0) };
+        lower.Children.Add(_physicalTest); lower.Children.Add(_typingPanel);
         SetLightingEnabled(false);
         _status.Name = "DeviceTestStatus";
-        var close = new Button { Name = "CloseDeviceTest", Content = L.T("Fertig"), HorizontalAlignment = HorizontalAlignment.Right };
+        var close = new Button { Name = "CloseDeviceTest", Content = L.T("Fertig"), HorizontalAlignment = HorizontalAlignment.Right, Focusable = false };
         close.Click += (_, _) => Close();
         var footer = new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 16, Margin = new Thickness(24, 8, 24, 20) };
         footer.Children.Add(_status); Grid.SetColumn(close, 1); footer.Children.Add(close);
-        var layout = new Grid { RowDefinitions = new("*,Auto") };
-        layout.Children.Add(new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
-        Grid.SetRow(footer, 1); layout.Children.Add(footer); Content = layout;
+        var layout = new Grid { RowDefinitions = new("Auto,*,Auto,Auto"), Focusable = true, Background = Background };
+        layout.Children.Add(body); Grid.SetRow(_keyboard, 1); layout.Children.Add(_keyboard);
+        Grid.SetRow(lower, 2); layout.Children.Add(lower); Grid.SetRow(footer, 3); layout.Children.Add(footer); Content = layout;
         _timer.Tick += async (_, _) => await PollAsync();
-        AddHandler(KeyDownEvent, IgnoreTestKey, RoutingStrategies.Tunnel);
-        AddHandler(KeyUpEvent, IgnoreTestKey, RoutingStrategies.Tunnel);
+        AddHandler(KeyDownEvent, OnTestKeyDown, RoutingStrategies.Tunnel);
+        AddHandler(KeyUpEvent, OnTestKeyUp, RoutingStrategies.Tunnel);
+        AddHandler(TextInputEvent, (_, e) =>
+        {
+            if (_closing) return;
+            RecordTypingText(e.Text); e.Handled = true;
+        }, RoutingStrategies.Tunnel);
+        Opened += (_, _) =>
+        {
+            if (Screens.ScreenFromWindow(this) is { } screen)
+            {
+                var availableWidth = screen.WorkingArea.Width / screen.Scaling;
+                var availableHeight = screen.WorkingArea.Height / screen.Scaling;
+                MinWidth = Math.Min(MinWidth, availableWidth); MinHeight = Math.Min(MinHeight, availableHeight);
+                Width = Math.Min(Width, availableWidth); Height = Math.Min(Height, availableHeight);
+            }
+            layout.Focus();
+        };
+        if (preview) ShowTypingTest(capabilityKnown: true);
         Closing += OnClosing;
     }
 
@@ -120,7 +133,7 @@ public sealed class DeviceTestWindow : Window
         var canvas = new Canvas { Name = "DeviceTestKeyboard", Width = _device.PreviewWidth * unit, Height = _device.PreviewHeight * unit };
         foreach (var key in _device.Keys)
         {
-            var label = new TextBlock { Text = key.DisplayLabel, FontSize = key.DisplayLabel.Length > 5 ? 8 : 10, Foreground = ColorBrush("#F2F5F7"), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+            var label = new TextBlock { Text = key.DisplayLabel, FontSize = key.DisplayLabel.Length > 5 ? 8 : 10, Foreground = ColorBrush("#F2F5F7"), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center };
             var cap = new Grid(); cap.Children.Add(label);
             var button = new Button
             {
@@ -141,7 +154,7 @@ public sealed class DeviceTestWindow : Window
             }
             if (key.Label == "Knob") button.CornerRadius = new CornerRadius(99);
             if (key.LedIndex is { } led)
-            { button.Click += async (_, _) => await LedAsync(led, 255, 0, 0); _lightControls.Add(button); }
+            { button.Click += async (_, _) => await LedAsync(led, 255, 0, 0); }
             else button.IsHitTestVisible = false;
             ToolTip.SetTip(button, key.AccessibleLabel); AutomationProperties.SetName(button, key.AccessibleLabel);
             Canvas.SetLeft(button, (key.X - (key.IsIsoEnter ? .25 : 0)) * unit);
@@ -158,18 +171,37 @@ public sealed class DeviceTestWindow : Window
     }
     private static TextBlock Label(string text, bool muted = false) => new()
     { Text = text, TextWrapping = TextWrapping.Wrap, Foreground = ColorBrush(muted ? "#A7B0B8" : "#E4E7EB") };
-    private void SetLightingEnabled(bool enabled) { foreach (var control in _lightControls) control.IsEnabled = enabled; }
-    private void IgnoreTestKey(object? sender, KeyEventArgs e) { if (_session is not null) e.Handled = true; }
+    private void SetLightingEnabled(bool enabled)
+    { foreach (var control in _lightControls) control.IsEnabled = enabled; }
+    private static bool ActivatesControl(Key key) => DeviceTypingTest.IsTestNavigationKey(key.ToString());
+    private void OnTestKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (_closing) return;
+        RecordTypingKey(sender, e);
+        // Leave printable key-down events unhandled so the platform can deliver translated TextInput.
+        if (_session is not null || ActivatesControl(e.Key)) e.Handled = true;
+    }
+    private void OnTestKeyUp(object? sender, KeyEventArgs e)
+    { if (!_closing && (_session is not null || ActivatesControl(e.Key))) e.Handled = true; }
     private void RecordTypingKey(object? sender, KeyEventArgs e)
     {
-        if (_session is not null || !_typingPanel.IsVisible) return;
+        if (_closing || _session is not null || !_typingPanel.IsVisible) return;
         _lastKey.Text = L.Format("Zuletzt gedrückt: {0}", DeviceTypingTest.KeyLabel(e.Key.ToString()));
+        foreach (var id in DeviceTypingTest.MatchingDisplayKeys(_device, e.Key.ToString()))
+        { _typingKeys.Add(id); _keyColors[id](ColorBrush("#89661E")); }
     }
     private void ShowTypingTest(bool capabilityKnown)
     {
         _physicalTest.IsVisible = false; _count.IsVisible = false; SetLightingEnabled(false);
         _typingPanel.IsVisible = true; _start.IsVisible = !capabilityKnown;
         _status.Text = "";
+    }
+    private void RecordTypingText(string? text)
+    {
+        if (_closing || _session is not null || !_typingPanel.IsVisible || string.IsNullOrWhiteSpace(text) || text.Any(char.IsControl)) return;
+        _lastKey.Text = L.Format("Zuletzt gedrückt: {0}", text);
+        foreach (var id in DeviceTypingTest.MatchingTextDisplayKeys(_device, text))
+        { _typingKeys.Add(id); _keyColors[id](ColorBrush("#89661E")); }
     }
 
     private async Task StartAsync()
@@ -181,9 +213,10 @@ public sealed class DeviceTestWindow : Window
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token); timeout.CancelAfter(TimeSpan.FromSeconds(8));
             var session = await DeviceDiagnosticSession.TryStartAsync(_connection, timeout.Token);
             if (_closing) { if (session is not null) await session.DisposeAsync(); return; }
-            if (session is null) { ShowTypingTest(capabilityKnown: true); _typing.Focus(); return; }
+            if (session is null) { ShowTypingTest(capabilityKnown: true); ((Control)Content!).Focus(); return; }
             _session = session;
             _physicalTest.IsVisible = _count.IsVisible = true; _typingPanel.IsVisible = false;
+            _typingKeys.Clear();
             foreach (var color in _keyColors.Values) color(ColorBrush("#252A2F"));
             _count.Text = L.Format("{0} von {1} Eingaben erkannt", 0, _device.Keys.Count);
             _status.Text = L.T("Der Test läuft. Drücke die Tasten einzeln."); SetLightingEnabled(true); _timer.Start();
@@ -246,25 +279,68 @@ public sealed class DeviceTestWindow : Window
     private static string Failure(Exception error) => error is NotSupportedException ? error.Message : error is OnboardCommandException { Status: 3 }
         ? L.T("Lasse alle Tasten los und starte den Test erneut.") : L.T("Der Gerätetest wurde unterbrochen. Prüfe die USB-Verbindung und starte ihn erneut.");
 
-    internal void RunOfflineChecks(Action<bool, string> check)
+    internal async Task RunOfflineChecksAsync(Action<bool, string> check)
     {
         if (_connection is not null) throw new InvalidOperationException("Device test checks require an offline preview.");
-        check(_typingPanel.IsVisible && _typing.IsEnabled && !_physicalTest.IsVisible && !_count.IsVisible,
+        // A native template is required for child-to-window event routes; this fixture never activates or reads hardware.
+        ShowActivated = false; ShowInTaskbar = false; Opacity = 0; Show();
+        await Dispatcher.Yield(DispatcherPriority.Background);
+        try { RunOfflineInputAndLayoutChecks(check); }
+        finally { Close(); await Dispatcher.Yield(DispatcherPriority.Background); }
+    }
+
+    private void RunOfflineInputAndLayoutChecks(Action<bool, string> check)
+    {
+        check(_typingPanel.IsVisible && !_physicalTest.IsVisible && !_count.IsVisible && !this.GetLogicalDescendants().OfType<TextBox>().Any(),
             "Device test: typing is available before optional physical diagnostics without claiming a device key count");
+        check(_keyboard.IsVisible && _keyboard.Child is Canvas { } keyboard && keyboard.Children.Count == _device.Keys.Count && _keyboard.IsHitTestVisible && _session is null,
+            "Device test: every model retains its full diagram and tooltips without a hardware session: " + _device.Id);
         check(!_start.IsEnabled && _lightControls.All(control => !control.IsEnabled),
             "Device test: offline preview cannot start hardware diagnostics or change LEDs");
-        _typing.Text = "1234567890";
         var navigation = new KeyEventArgs { RoutedEvent = KeyDownEvent, Key = Key.Left };
-        RecordTypingKey(_typing, navigation);
-        check(_lastKey.Text == L.Format("Zuletzt gedrückt: {0}", DeviceTypingTest.KeyLabel("Left")) && !navigation.Handled && _typing.Text == "1234567890",
-            "Device test: navigation keys remain visible without suppressing or replacing the real text input");
+        RaiseEvent(navigation);
+        check(_lastKey.Text == L.Format("Zuletzt gedrückt: {0}", DeviceTypingTest.KeyLabel("Left")) && navigation.Handled,
+            "Device test: navigation keys are received directly by the window without an input field");
         var number = new KeyEventArgs { RoutedEvent = KeyDownEvent, Key = Key.NumPad7 };
-        RecordTypingKey(_typing, number);
+        RaiseEvent(number);
         check(_lastKey.Text == L.Format("Zuletzt gedrückt: {0}", "7") && !number.Handled,
             "Device test: numpad digits are shown without a platform enum name");
+        check(DeviceTypingTest.MatchingDisplayKeys(_device, "NumPad7").All(_typingKeys.Contains) && !_count.IsVisible && _session is null,
+            "Device test: OS hints mark standard legends without claiming physical results: " + _device.Id);
+        var symbol = new TextInputEventArgs { RoutedEvent = TextInputEvent, Text = "#" }; RaiseEvent(symbol);
+        check(_lastKey.Text == L.Format("Zuletzt gedrückt: {0}", "#") && symbol.Handled,
+            "Device test: actual symbol input supplies the readable label directly at window level: " + _device.Id);
+        var close = this.GetLogicalDescendants().OfType<Button>().Single(button => button.Name == "CloseDeviceTest");
+        foreach (var key in new[] { Key.Enter, Key.Space, Key.Tab, Key.Escape, Key.Home, Key.End, Key.PageUp, Key.PageDown, Key.Back, Key.Delete })
+        {
+            var down = new KeyEventArgs { RoutedEvent = KeyDownEvent, Key = key }; var up = new KeyEventArgs { RoutedEvent = KeyUpEvent, Key = key };
+            close.RaiseEvent(down); close.RaiseEvent(up);
+            check(down.Handled && up.Handled && !_closing && _lastKey.Text == L.Format("Zuletzt gedrückt: {0}", DeviceTypingTest.KeyLabel(key.ToString())),
+                "Device test: key down and release from Done route into testing without activating the button: " + key + " down=" + down.Handled + " up=" + up.Handled + " closing=" + _closing + " last=" + _lastKey.Text);
+        }
+        var composed = new TextInputEventArgs { RoutedEvent = TextInputEvent, Text = "é" }; close.RaiseEvent(composed);
+        check(composed.Handled && _lastKey.Text == L.Format("Zuletzt gedrückt: {0}", "é"),
+            "Device test: composed locale input follows the window route without a text field");
+        _closing = true;
+        RaiseEvent(new KeyEventArgs { RoutedEvent = KeyDownEvent, Key = Key.A });
+        RaiseEvent(new TextInputEventArgs { RoutedEvent = TextInputEvent, Text = "a" });
+        check(_lastKey.Text == L.Format("Zuletzt gedrückt: {0}", "é"), "Device test: input stops immediately when closing starts");
+        _closing = false;
+        check(this.GetLogicalDescendants().OfType<Button>().All(button => !button.Focusable),
+            "Device test: mouse actions remain available without keyboard focus reaching buttons");
         ShowTypingTest(capabilityKnown: true);
         check(_typingPanel.IsVisible && !_start.IsVisible && !_physicalTest.IsVisible && !_count.IsVisible && _lightControls.All(control => !control.IsEnabled),
             "Device test: unsupported diagnostics retain typing only and never expose inactive physical results or LEDs");
-        _lifetime.Dispose();
+        var root = (Grid)Content!;
+        foreach (var physical in new[] { false, true })
+        foreach (var size in new[] { new Size(1012, 640), new Size(744, 560), new Size(1000, 500) })
+        {
+            _physicalTest.IsVisible = physical; _typingPanel.IsVisible = !physical;
+            root.Measure(size); root.Arrange(new Rect(size));
+            var footer = root.Children.OfType<Grid>().Single(element => Grid.GetRow(element) == 3);
+            check(_keyboard.Bounds.Height > 80 && footer.Bounds.Bottom <= size.Height + 1 && !root.Children.OfType<ScrollViewer>().Any(),
+                "Device test: keyboard and controls fit a fixed footer layout: " + _device.Id + " " + size + " physical=" + physical + " diagram=" + _keyboard.Bounds.Height + " footer=" + footer.Bounds.Bottom);
+        }
+        ShowTypingTest(capabilityKnown: true);
     }
 }

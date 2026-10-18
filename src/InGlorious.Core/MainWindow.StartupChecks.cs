@@ -12,6 +12,9 @@ public partial class MainWindow
         var started = _startupStarted; var complete = _startupComplete;
         var resultsBefore = _startupResults.ToArray();
         var confirmedBefore = _confirmedDeviceSaves.ToArray();
+        var crcBefore = _deviceReadCrc.ToArray(); var requiredBefore = _deviceReadRequired.ToArray();
+        var refreshBefore = _configurationRefreshPending.ToArray();
+        var automaticBefore = _automaticFallbackProjects.ToArray();
         try
         {
             ResetWorkflowFixture("pro-iso");
@@ -84,6 +87,8 @@ public partial class MainWindow
                     "Startup: " + state + " uses a clean local fallback without claiming device confirmation");
                 check(SafetyBanner.Visibility == Visibility.Visible && ProjectSourceHint.Text == notice,
                     "Startup: " + state + " has a persistent, explicit offline explanation");
+                check(DeviceConfigurationNeedsRead && !TransferButton.IsEnabled,
+                    "Startup: " + state + " cannot transfer a fallback configuration before a successful read");
                 ProjectName.Text = "Edited fallback"; CommitNames();
                 SetProjectSource("Gespeichertes Profil · nicht mit dem Gerät abgeglichen"); UpdateDirtyState();
                 SwitchDevice("pro-iso"); SwitchDevice("numpad");
@@ -120,6 +125,60 @@ public partial class MainWindow
             check(Device.Id == finalizingDevice,
                 "Startup: finalization also blocks programmatic device navigation");
             _startupFinishing = false; EditorSurface.IsEnabled = true;
+            ApplyStartupResults(both, "pro-iso", Fallback);
+            CaptureSession();
+            var changedPro = ProjectService.Clone(pro); changedPro.Layers[0].Keys.First().Value.Color = "#B34512";
+            var changedRead = Loaded(changedPro) with { Info = Loaded(changedPro).Info! with { ActiveCrc = 456 } };
+            var refreshPending = new TaskCompletionSource<IReadOnlyList<StartupDeviceResult>>();
+            _configurationRefreshPending.Add("pro-iso");
+            var refreshing = RefreshDeviceConfigurationsAsync((ids, _) =>
+            {
+                check(ids.SequenceEqual(new[] { "pro-iso" }), "Refresh: only requested connected models are read");
+                return refreshPending.Task;
+            });
+            check(_startupLoading && !EditorSurface.IsEnabled, "Refresh: reopening locks edits until the current device state arrives");
+            refreshPending.SetResult([changedRead]); await refreshing;
+            check(_project.Layers[0].Keys.First().Value.Color == "#B34512" && !IsDirty && _projectPath is null && !DeviceConfigurationNeedsRead,
+                "Refresh: a clean session starts from the latest device configuration after reopening");
+            _project.Layers[0].Keys.First().Value.Color = "#EE9911"; CaptureSession();
+            var draft = _project; var draftFingerprint = Fingerprint(draft);
+            ApplyRefreshedDeviceConfigurations([changedRead], "pro-iso", false);
+            check(ReferenceEquals(_project, draft) && Fingerprint(_sessions["pro-iso"].Project) == draftFingerprint && !DeviceConfigurationNeedsRead,
+                "Refresh: an unchanged device preserves edits and allows their intentional transfer");
+            ApplyRefreshedDeviceConfigurations([changedRead with { Info = changedRead.Info! with { ActiveCrc = 789 } }], "pro-iso", false);
+            BuildDeviceButtons(); UpdateSourceHint();
+            check(ReferenceEquals(_project, draft) && DeviceConfigurationNeedsRead && !TransferButton.IsEnabled && ReadDeviceButton.IsEnabled && SafetyBanner.Visibility == Visibility.Visible,
+                "Refresh: a changed device preserves the draft and requires an explicit current read before transfer");
+            RecordDeviceRead(changedPro, changedRead.Info);
+            check(!DeviceConfigurationNeedsRead, "Refresh: an explicit verified read clears the stale-configuration gate");
+            ApplyRefreshedDeviceConfigurations([new("pro-iso", StartupDeviceState.ReadFailed)], "pro-iso", false);
+            check(ReferenceEquals(_project, draft) && DeviceConfigurationNeedsRead && !_confirmedDeviceSaves.ContainsKey("pro-iso"),
+                "Refresh: a failed read keeps the draft and removes old device confirmation");
+            _configurationRefreshPending.Add("pro-iso");
+            await RefreshDeviceConfigurationsAsync((_, _) => Task.FromResult<IReadOnlyList<StartupDeviceResult>>([]));
+            check(DeviceConfigurationNeedsRead && !TransferButton.IsEnabled && ReferenceEquals(_project, draft),
+                "Refresh: a missing requested result cannot enable a stale transfer or remove the draft");
+            var oldRevision = _connectionRevision;
+            _configurationRefreshPending.Add("pro-iso");
+            await RefreshDeviceConfigurationsAsync((_, _) =>
+            {
+                _connectionRevision++;
+                return Task.FromResult<IReadOnlyList<StartupDeviceResult>>([changedRead]);
+            });
+            check(DeviceConfigurationNeedsRead && _configurationRefreshPending.Contains("pro-iso") && ReferenceEquals(_project, draft),
+                "Refresh: USB changes while reading invalidate the result and schedule a new read");
+            _connectionRevision = oldRevision; _configurationRefreshPending.Clear();
+
+            ApplyStartupResults([new("pro-iso", StartupDeviceState.ReadFailed)], "pro-iso", Fallback);
+            CaptureSession();
+            check(ApplyRefreshedDeviceConfigurations([changedRead], "pro-iso", false) && !DeviceConfigurationNeedsRead && _sessions["pro-iso"].Path is null,
+                "Refresh: an untouched automatically opened fallback recovers to the actual device configuration");
+            ApplyStartupResults([new("pro-iso", StartupDeviceState.ReadFailed)], "pro-iso", Fallback);
+            _project.Name = "Saved deliberate changes"; _savedFingerprint = Fingerprint(_project); CaptureSession();
+            var savedDraft = _project;
+            check(!ApplyRefreshedDeviceConfigurations([changedRead], "pro-iso", false) && ReferenceEquals(_sessions["pro-iso"].Project, savedDraft) && DeviceConfigurationNeedsRead,
+                "Refresh: saving edits to a fallback does not make those deliberate changes safe to replace automatically");
+
             _startupStarted = false;
             var closingRead = new TaskCompletionSource<IReadOnlyList<StartupDeviceResult>>();
             var closing = LoadStartupDevicesAsync(_ => closingRead.Task, Fallback);
@@ -134,6 +193,10 @@ public partial class MainWindow
             _preferences = preferences; _startupStarted = started; _startupComplete = complete;
             _startupLoading = false; _startupClosed = false; _startupFinishing = false; EditorSurface.IsEnabled = true;
             _startupResults.Clear(); foreach (var pair in resultsBefore) _startupResults.Add(pair.Key, pair.Value);
+            _deviceReadCrc.Clear(); foreach (var pair in crcBefore) _deviceReadCrc.Add(pair.Key, pair.Value);
+            _deviceReadRequired.Clear(); foreach (var pair in requiredBefore) _deviceReadRequired.Add(pair.Key, pair.Value);
+            _configurationRefreshPending.Clear(); _configurationRefreshPending.UnionWith(refreshBefore);
+            _automaticFallbackProjects.Clear(); foreach (var pair in automaticBefore) _automaticFallbackProjects.Add(pair.Key, pair.Value);
             _confirmedDeviceSaves.Clear(); foreach (var pair in confirmedBefore) _confirmedDeviceSaves.Add(pair.Key, pair.Value);
             ResetWorkflowFixture("pro-iso");
         }

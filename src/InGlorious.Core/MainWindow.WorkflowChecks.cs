@@ -80,6 +80,8 @@ public partial class MainWindow
             }
             else check(BadgeLightButton.Visibility == Visibility.Collapsed, model.Id + ": layouts without badge expose no logo target");
             SetTab(4); UpdateLayout();
+            check(DeviceFeedbackHint.IsVisible && DeviceFeedbackHint.Text == DeviceFeedbackContext.Invitation(model) && DeviceFeedbackContact.IsVisible,
+                model.Id + ": experimental feedback invitation stays beside the optional contact button");
             check(ExperimentalDeviceLabel.IsVisible && ExperimentalDeviceNotice.IsVisible && ExperimentalDeviceNotice.Text == L.T("Experimentelle Unterstützung: noch nicht vollständig geprüft."), model.Id + ": device overview explains the experimental test status without an opt-in gate");
             check(DeviceHardwareOverview.Visibility == Visibility.Visible && OfflineDeviceOverview.Visibility == Visibility.Collapsed && DeviceRecoveryOverview.Visibility == Visibility.Visible && FirmwareInstallationNotice.Visibility == Visibility.Collapsed && ExperimentalSetupActions.Visibility == Visibility.Collapsed, model.Id + ": runtime status, generic update and restore share one device overview");
             check(ManageFirmwareButton.IsEnabled && RestoreOriginalFirmwareButton.IsEnabled, model.Id + ": connected models can open generic firmware checks with independent write protection");
@@ -91,6 +93,8 @@ public partial class MainWindow
             "The separately identified PRO exposes normal configuration and guarded setup actions");
         check(!ExperimentalDeviceLabel.IsVisible && !ExperimentalDeviceNotice.IsVisible && !OfflineDeviceOverview.IsVisible && DeviceHardwareOverview.IsVisible && DeviceRecoveryOverview.IsVisible,
             "The hardware-tested GMMK 3 PRO 100% ISO has no experimental badge and retains guarded firmware actions");
+        check(DeviceFeedbackHint.Text == L.T("Deine Rückmeldung hilft uns, INGLORIOUS Advanced zu verbessern."),
+            "The tested PRO keeps the general invitation after switching from an experimental model");
         var engineeringBefore = Fingerprint(_project); var engineeringKey = Device.Keys.First(key => key.LedIndex.HasValue);
         SetTab(0); _selection.Add(engineeringKey.Id); ApplyColor("#A01337");
         check(Layer.Keys[engineeringKey.Id].Color == "#A01337" && _project.DeviceId == "gmmk3-pro-100-iso", "Engineering profile stays separately editable");
@@ -103,6 +107,20 @@ public partial class MainWindow
     private void RunWorkflowChecks(Action<bool, string> check)
     {
         if (!_screenshotMode) throw new InvalidOperationException("Workflow checks require offline UI-smoke mode.");
+        var preferencesBeforeFeedback = JsonSerializer.Serialize(_preferences);
+        var modelForFeedback = DeviceCatalog.All.First(model => model.IsExperimentalFirmware).Id;
+        var settingsForFeedback = new AppSettingsWindow(_preferences, offlinePreview: true, connectedDevices: []);
+        OfferFeedbackAfterSetup(modelForFeedback, new(modelForFeedback, new(0, 11, 2), 1), settingsForFeedback);
+        check(_pendingSetupFeedback is { } queued && queued.DeviceId == modelForFeedback && queued.Version?.BuildId == 1 &&
+            !_feedbackInvitationOpen && JsonSerializer.Serialize(_preferences) == preferencesBeforeFeedback,
+            "setup feedback remains queued while settings owns an edit session, without changing preferences or opening a prompt");
+        settingsForFeedback.Close();
+        OfferPendingSetupFeedback();
+        check(_pendingSetupFeedback is null && !_feedbackInvitationOpen && JsonSerializer.Serialize(_preferences) == preferencesBeforeFeedback,
+            "draining setup feedback clears its queue and offline checks cannot persist markers or open a prompt");
+        OfferPendingSetupFeedback();
+        check(_pendingSetupFeedback is null && JsonSerializer.Serialize(_preferences) == preferencesBeforeFeedback,
+            "an empty setup feedback queue has no side effects");
         RunExperimentalModelChecks(check);
         foreach (var id in new[] { "pro-iso", "numpad" })
         {
@@ -170,12 +188,15 @@ public partial class MainWindow
             TransferWindow.RunOfflineStatusChecks(id, check);
         }
         RunBindingWorkflowChecks(check);
+        RunKnobBrightnessChecks(check);
+        RunKnobPresetChecks(check);
         RunLayerGuidanceChecks(check);
         ResetWorkflowFixture("pro-iso");
     }
 
     private void ResetWorkflowFixture(string deviceId)
     {
+        _deviceReadRequired.Clear(); _deviceReadCrc.Clear(); _automaticFallbackProjects.Clear();
         _sessions.Clear(); ApplyOpening(OpenDefaultProject(deviceId, allowDefault: false));
         _wholeSideSelection = false; _showLightingEffects = false; _effectForSelection = false; _macroAssigning = false;
         _lightingTarget = LightingTarget.Keys; _selectedSideLeds.Clear(); _selection.Clear(); _activeTab = 0;
@@ -278,7 +299,7 @@ public partial class MainWindow
         BindingSearch.Text = "not-a-binding"; RefreshBindingChoices();
         check(BindingChoice.Items.Count == 0 && BindingChoice.SelectedIndex == -1 && Fingerprint(_project) == before && _undo.Count == history, "Empty search has no stale binding selection or draft mutation");
         var encoder = Device.Keys.First(key => key.IsEncoder);
-        SelectKey(encoder.Id); UpdateLayout();
+        SelectKey(encoder.Id); SetKnobEditorMode(true); UpdateLayout();
         check(BindingSearch.Text == "" && BindingCategory.SelectedIndex == 0 &&
             (BindingChoice.SelectedItem as BindingOption)?.Code == Assignment(encoder.Id).Binding,
             "Selecting a preview key reveals its existing assignment even when the previous search hid it");
@@ -300,6 +321,55 @@ public partial class MainWindow
         check(!KeyboardWorkspace.IsVisible && DeviceOverview.IsVisible, "Device settings show the device overview without editable key targets or a hidden ancestor");
     }
 
+    private void RunKnobBrightnessChecks(Action<bool, string> check)
+    {
+        var decision = _pendingEditDecisionOverride;
+        try
+        {
+            foreach (var id in new[] { "pro-iso", "numpad", "gmmk3-pro-100-iso" })
+            {
+                ResetWorkflowFixture(id); _editingSlider = false; SetTab(1);
+                var press = Device.Keys.Single(key => key.Label == "Knob").Id;
+                SelectKey(press); SetKnobEditorMode(false);
+                check(KnobPresetPanel.Visibility == Visibility.Visible, id + ": knob press offers the same preset controls");
+                SelectKey("encoder:ccw");
+                check(KnobPresetPanel.Visibility == Visibility.Visible, id + ": selecting one rotation offers brightness for both directions");
+                _selection.Add(press); RefreshInspector();
+                var before = Fingerprint(_project); ApplyKnobPreset("brightness");
+                check(KnobPresetPanel.Visibility == Visibility.Collapsed && Fingerprint(_project) == before,
+                    id + ": a mixed key and rotation selection cannot change both knob directions");
+                _selection.Remove(press); _selection.Add("encoder:cw"); _layerIndex = 2; RefreshInspector();
+                var expected = ProjectService.Clone(_project);
+                expected.Layers[2].Keys["encoder:ccw"].Binding = "RM_VALD";
+                expected.Layers[2].Keys["encoder:cw"].Binding = "RM_VALU";
+                before = Fingerprint(_project); ApplyKnobPreset("brightness");
+                check(Fingerprint(_project) == Fingerprint(expected) && _undo.Count == 1 && IsDirty,
+                    id + ": shortcut changes only both rotation bindings on the edited layer, preserving colors, knob press and all other settings");
+                ApplyKnobPreset("brightness");
+                check(_undo.Count == 1, id + ": repeating the shortcut creates no redundant undo step");
+                Undo_Click(this, new RoutedEventArgs());
+                check(Fingerprint(_project) == before && _undo.Count == 0, id + ": one undo fully restores both directions");
+                SelectKey("encoder:cw"); BindingCategory.SelectedIndex = 5; BindingSearch.Text = "KC_VOL";
+                ApplyKnobPreset("brightness");
+                check(BindingSearch.Text.Length == 0 && BindingCategory.SelectedIndex == 0 &&
+                    (BindingChoice.SelectedItem as BindingOption)?.Code == "RM_VALU", id + ": shortcut reveals the new binding despite a previous media filter");
+                BindingCategory.SelectedIndex = 9; BindingSearch.Text = ""; RefreshBindingChoices();
+                check(BindingChoice.Items.Cast<BindingOption>().Select(option => option.Code).ToHashSet().SetEquals(["RM_VALU", "RM_VALD"]),
+                    id + ": lighting category contains only supported brightness functions");
+                BindingSearch.Text = L.T("Beleuchtung heller"); RefreshBindingChoices();
+                check(BindingChoice.Items.Count == 1 && ((BindingOption)BindingChoice.Items[0]).Code == "RM_VALU", id + ": translated brightness name is searchable");
+                BindingCategory.SelectedIndex = 0; BindingSearch.Text = "RM_"; RefreshBindingChoices();
+                check(BindingChoice.Items.Count == 2, id + ": unsupported RGB effect actions stay hidden");
+                Undo_Click(this, new RoutedEventArgs());
+                DebounceInput.Text = "13"; _pendingEditDecisionOverride = () => PendingEditChoice.Cancel;
+                before = Fingerprint(_project); ApplyKnobPreset("brightness");
+                check(HasPendingTiming && Fingerprint(_project) == before && _undo.Count == 0, id + ": canceling pending input prevents a knob change and preserves the draft");
+                DiscardPendingEdits(); _pendingEditDecisionOverride = null;
+            }
+        }
+        finally { _pendingEditDecisionOverride = decision; DiscardPendingEdits(); ResetWorkflowFixture("pro-iso"); }
+    }
+
     private void RunLayerGuidanceChecks(Action<bool, string> check)
     {
         if (!_screenshotMode) throw new InvalidOperationException("Layer guidance checks require offline mode.");
@@ -313,7 +383,7 @@ public partial class MainWindow
                 _selection.Add(key); RefreshInspector();
                 var baseline = ProjectService.Clone(_project);
                 var before = Fingerprint(_project);
-                OpenLayerSwitch_Click(this, new RoutedEventArgs()); UpdateLayout();
+                SetTab(3); UpdateLayout();
                 check(_activeTab == 3 && _selection.SetEquals([key]) && Fingerprint(_project) == before && _undo.Count == 0,
                     id + ": opening guided layer assignment preserves the selected key and complete draft");
                 check(LayerEditingHelp.IsVisible && LayerEditingHint.Text == LayerGuidance.EditingHint &&
@@ -385,11 +455,11 @@ public partial class MainWindow
                 }
                 ResetWorkflowFixture(id); SetTab(1); _selection.Add(key); RefreshInspector();
                 DebounceInput.Text = "13"; _pendingEditDecisionOverride = () => PendingEditChoice.Cancel;
-                before = Fingerprint(_project); OpenLayerSwitch_Click(this, new RoutedEventArgs());
+                before = Fingerprint(_project); SetTab(3);
                 check(_activeTab == 1 && HasPendingTiming && Fingerprint(_project) == before,
                     id + ": canceling pending-input resolution keeps the current binding editor");
                 _pendingEditDecisionOverride = () => PendingEditChoice.Discard;
-                OpenLayerSwitch_Click(this, new RoutedEventArgs());
+                SetTab(3);
                 DebounceInput.Text = "13"; _pendingEditDecisionOverride = () => PendingEditChoice.Cancel;
                 TargetLayer.SelectedIndex = 2; LayerSwitchMode.SelectedIndex = 2; AssignLayerSwitch_Click(this, new RoutedEventArgs());
                 check(Fingerprint(_project) == before && _undo.Count == 0 && HasPendingTiming,
@@ -440,3 +510,4 @@ public partial class MainWindow
         finally { _confirmedDeviceSaves.Remove(id); UpdateSourceHint(); }
     }
 }
+

@@ -42,6 +42,8 @@ $app = @(
     'FirmwareRelease.cs','FirmwareChangelog.cs','FirmwareMessages.cs','FirmwareLightingTestService.cs','MainWindow.Onboarding.cs','MainWindow.Standby.cs','UnsavedChangesWindow.cs','UiIcons.cs'
 )
 $app += @('RetainedLoaderLayout.cs','OnboardDiagnostics.cs','DeviceDiagnosticSession.cs','DeviceTestWindow.cs','MainWindow.DeviceTest.cs','DeviceSetupWindow.Options.cs')
+$app += @('MainWindow.KnobPresets.cs','MainWindow.KnobPresetChecks.cs','KnobOptionsWindow.cs')
+$app += @('OnboardTransportPool.cs')
 $allow = [Collections.Generic.List[string]]::new()
 $app += @('DeviceFeedback.cs','SupportContact.cs','DeviceFeedbackWindow.cs','MainWindow.Feedback.cs','CoreSettingsImport.cs','CoreImportWindow.cs','MainWindow.CoreImport.cs')
 foreach ($name in $app) { $allow.Add('src/InGlorious.Core/'+$name) }
@@ -95,6 +97,7 @@ foreach ($name in @('key-bindings.json','desktop.json','dialogs.json','favorites
 $desktop = @('App.axaml','App.axaml.cs','EditorState.cs','InGlorious.Desktop.csproj','MainWindow.Actions.cs','MainWindow.Checks.cs','MainWindow.cs','MainWindow.Editors.cs','MainWindow.Icons.cs','MainWindow.Macros.cs','MainWindow.KeyBindings.cs','MainWindow.KeyBindingsChecks.cs','MainWindow.Presets.cs','MainWindow.Settings.cs','MainWindow.SoftwareUpdate.cs','MainWindow.Startup.cs','MainWindow.StartupChecks.cs','MainWindow.Connections.cs','MainWindow.ConnectionsChecks.cs','MainWindow.Help.cs','MainWindow.HelpChecks.cs','MainWindow.Setup.cs','DeviceSetupWindow.cs','DeviceSetupWindow.Checks.cs','DeviceSetupWindow.Completion.cs','Program.cs','README.md','DesktopTrayIcon.cs','MainWindow.Background.cs','Shared/AssemblyInfo.cs','Shared/InGlorious.Shared.csproj','Shared/OnboardHidTransport.cs','Shared/PlatformDeviceService.cs')
 $desktop += @('DeviceFeedbackWindow.cs','MainWindow.Feedback.cs','CoreImportWindow.cs','MainWindow.CoreImport.cs')
 $desktop += @('DeviceTestWindow.cs','MainWindow.DeviceTest.cs','DeviceSetupWindow.Options.cs')
+$desktop += @('MainWindow.KnobPresets.cs','MainWindow.KnobStatus.cs')
 foreach ($name in $desktop) { $allow.Add('src/InGlorious.Desktop/'+$name) }
 foreach ($name in @('inglorious-mark.png','inglorious.ico')) { $allow.Add('src/InGlorious.Core/Assets/'+$name) }
 foreach ($name in @('INGLORIOUS-Oxanium-SemiBold.ttf','Oxanium-OFL.txt','Oxanium-source.json')) { $allow.Add('src/InGlorious.Core/Assets/Fonts/'+$name) }
@@ -103,7 +106,7 @@ foreach ($name in @('Build-Firmware.ps1','Resolve-Targets.ps1','Prepare-Overlay.
 foreach ($name in @('inglorious.c','ig_version.h','ig_effects.h','ig_color.h','ig_timing.c','ig_timing.h','ig_storage.h','ig_storage.inc','wb32_bulk.c')) { $allow.Add('firmware/inglorious/'+$name) }
 foreach ($name in @('ig_board.h','cache_staging_checks.h','Run-PortChecks.ps1','Run-EngineeringChecks.ps1','storage_tests.c','Run-StorageChecks.ps1')) { $allow.Add('firmware/tests/'+$name) }
 foreach ($name in @('port_checks.c','diagnostic_checks.h','port_mock.h','raw_hid.h','eeprom.h','wear_leveling.h','keymap_introspection.h','bootloader.h','wait.h')) { $allow.Add('firmware/tests/ports/'+$name) }
-foreach ($name in @('runtime_tests.c','version_reporting_checks.h','color_sequences_checks.h','color_output_checks.h','standby_checks.h','lighting_test_checks.h','effects_tests.c','bulk_tests.c','qmk_mock.h','analog.h','bootloader.h','eeprom.h','ig_physical.h','keymap_introspection.h','qmk_midi.h','raw_hid.h','wait.h','wear_leveling.h','Run-RuntimeChecks.ps1','Run-EffectsChecks.ps1','Run-BulkChecks.ps1','README.md')) { $allow.Add('firmware/tests/'+$name) }
+foreach ($name in @('runtime_tests.c','version_reporting_checks.h','brightness_binding_checks.h','color_sequences_checks.h','color_output_checks.h','standby_checks.h','lighting_test_checks.h','effects_tests.c','bulk_tests.c','qmk_mock.h','analog.h','bootloader.h','eeprom.h','ig_physical.h','keymap_introspection.h','qmk_midi.h','raw_hid.h','wait.h','wear_leveling.h','Run-RuntimeChecks.ps1','Run-EffectsChecks.ps1','Run-BulkChecks.ps1','README.md')) { $allow.Add('firmware/tests/'+$name) }
 foreach ($name in @('hal.h','wear_leveling_efl_config.h','wear_leveling_internal.h','wear_leveling.h')) { $allow.Add('firmware/tests/bulk_mocks/'+$name) }
 foreach ($name in @('debounce.h','action.h','qmk_mock.h','usb_main.h','timer.h','timing_tests.c','Run-TimingChecks.ps1','Test-DescriptorPatch.ps1')) { $allow.Add('tests/TimingChecks/'+$name) }
 foreach ($suite in @('InGlorious.Checks','InGlorious.OnboardChecks','InGlorious.StockChecks','InGlorious.RecordingChecks','InGlorious.LightingTestChecks','InGlorious.PendingChecks','InGlorious.PreferencesChecks','InGlorious.PreviewChecks','InGlorious.ColorSequenceChecks','InGlorious.MacroLibraryChecks','InGlorious.KeyBindingChecks','InGlorious.IntegrationChecks','InGlorious.LightingPresetChecks','InGlorious.BoardRegistryChecks','InGlorious.ModelChecks')) {
@@ -111,6 +114,10 @@ foreach ($suite in @('InGlorious.Checks','InGlorious.OnboardChecks','InGlorious.
 }
 $allow.Add('tests/InGlorious.Checks/ColorPaletteChecks.cs')
 $allow.Add('tests/InGlorious.OnboardChecks/FirmwareVersionChecks.cs')
+$allow.Add('tests/InGlorious.OnboardChecks/BrightnessBindingChecks.cs')
+foreach ($name in @('KnobPresetChecks.cs','KnobTransferChecks.cs','KnobFixtureExport.cs','KnobStatusChecks.cs','OnboardTransportPoolChecks.cs','KnobPressFixtureExport.cs','KnobPressChecks.cs')) { $allow.Add('tests/InGlorious.OnboardChecks/'+$name) }
+$allow.Add('tests/InGlorious.KeyBindingChecks/KnobBindingTransferChecks.cs')
+$allow.Add('firmware/tests/knob_cycle_checks.h')
 $allow.Add('tests/InGlorious.OnboardChecks/ExperimentalBoardChecks.cs')
 $allow.Add('tests/InGlorious.OnboardChecks/EngineeringConfigurationChecks.cs')
 $allow.Add('src/InGlorious.Core/Locales/lighting-zones.json')

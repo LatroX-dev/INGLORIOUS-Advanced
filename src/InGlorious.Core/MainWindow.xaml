@@ -37,7 +37,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="194" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="294" />
+                <ColumnDefinition Width="340" />
             </Grid.ColumnDefinitions>
             <Border Background="#1C1F22" BorderBrush="#353A40" BorderThickness="0,0,1,0">
                 <DockPanel Margin="12,22,12,14">
@@ -279,7 +279,7 @@
                                     <Button x:Name="DeviceTestAction" Grid.Row="1" local:UiIcons.Kind="keyboard" Content="{local:Tr Key='Gerät testen'}" Click="DeviceTest_Click" HorizontalAlignment="Left" MinHeight="38" Margin="0,0,24,0" />
                                     <TextBlock Grid.Column="1" Text="{local:Tr Key='Gespeicherte Farben und Belegungen aus Glorious CORE übernehmen.'}" Style="{StaticResource HelpText}" Margin="0,0,24,12" />
                                     <Button x:Name="ImportCoreSettings" Grid.Column="1" Grid.Row="1" local:UiIcons.Kind="import" Content="{local:Tr Key='CORE-Einstellungen importieren'}" Click="CoreImport_Click" HorizontalAlignment="Left" MinHeight="38" Margin="0,0,24,0" />
-                                    <TextBlock Grid.Column="2" Text="{local:Tr Key='Deine Rückmeldung hilft uns, INGLORIOUS Advanced zu verbessern.'}" Style="{StaticResource HelpText}" Margin="0,0,0,12" />
+                                    <TextBlock x:Name="DeviceFeedbackHint" Grid.Column="2" Style="{StaticResource HelpText}" Margin="0,0,0,12" />
                                     <Button x:Name="DeviceFeedbackContact" Grid.Column="2" Grid.Row="1" local:UiIcons.Kind="message" Content="{local:Tr Key='Rückmeldung &amp; Kontakt'}" Click="Feedback_Click" HorizontalAlignment="Left" MinHeight="38" />
                                 </Grid>
                             </StackPanel>
@@ -380,7 +380,7 @@
                 </ScrollViewer>
             </Grid>
             <Border Grid.Column="2" Background="#1C1F22" BorderBrush="#353A40" BorderThickness="1,0,0,0" x:Name="InspectorHost">
-                <Grid Margin="16,19,16,14">
+                <Grid Margin="20,16,20,14">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -392,15 +392,16 @@
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <StackPanel>
                                 <TextBlock x:Name="EditorSectionTitle" Text="{local:Tr Key='Beleuchtung'}" Style="{StaticResource Eyebrow}" Foreground="#A0A7B0" Visibility="Collapsed" />
-                                <TextBlock x:Name="InspectorTitle" Text="{local:Tr Key='Taste auswählen'}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,9,0,0" />
+                                <TextBlock x:Name="InspectorTitle" Text="{local:Tr Key='Taste auswählen'}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,0" />
                                 <TextBlock x:Name="InspectorSubtitle" Text="{local:Tr Key='Wähle eine Taste in der Vorschau.'}" Style="{StaticResource HelpText}" Margin="0,6,0,0" />
                             </StackPanel>
                             <Button x:Name="LightingPresetsButton" Grid.Column="1" local:UiIcons.Kind="palette" local:UiIcons.IconOnly="True" Content="{local:Tr Key='Beleuchtungsvorlagen'}" ToolTip="{local:Tr Key='Beleuchtungsvorlagen'}" AutomationProperties.Name="{local:Tr Key='Beleuchtungsvorlagen'}" Click="LightingPresets_Click" Width="36" Height="36" Padding="0" Margin="12,3,0,0" VerticalAlignment="Top" Style="{StaticResource QuietButton}" />
+                            <Button x:Name="OsActionShortcut" Grid.Column="1" local:UiIcons.Kind="action" local:UiIcons.IconOnly="True" Content="{local:Tr Key='Betriebssystem-Aktion …'}" ToolTip="{local:Tr Key='Betriebssystem-Aktion …'}" AutomationProperties.Name="{local:Tr Key='Betriebssystem-Aktion …'}" Click="AssignOsAction_Click" Width="36" Height="36" Padding="0" Margin="12,3,0,0" VerticalAlignment="Top" Style="{StaticResource QuietButton}" Visibility="Collapsed" />
                         </Grid>
                         <TextBlock x:Name="PendingEditsHint" Foreground="{StaticResource Accent}" TextWrapping="Wrap" Visibility="Collapsed" FontSize="11" Margin="0,9,0,0" />
                     </StackPanel>
                     <Border Grid.Row="1" Style="{StaticResource PanelDivider}" />
-                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <ScrollViewer x:Name="InspectorScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" SizeChanged="BindingViewport_SizeChanged">
                         <Grid>
                             <StackPanel x:Name="ColorPanel">
                                 <Border BorderBrush="{StaticResource Stroke}" BorderThickness="0,0,0,1">
@@ -529,8 +530,40 @@
                                     <Button x:Name="SliderBindingsButton" Content="{local:Tr Key='Schieberegler'}" Click="SliderBindings_Click" Margin="3,0,0,0"/>
                                 </UniformGrid>
                                 <StackPanel x:Name="KeyBindingPanel">
-                                <Button x:Name="OpenLayerSwitchButton" local:UiIcons.Kind="layers" Content="{local:Tr Key='Fn / Ebenenwechsel …'}" Click="OpenLayerSwitch_Click" Margin="0,0,0,8"/>
-                                <Button local:UiIcons.Kind="action" Content="{local:Tr Key='Betriebssystem-Aktion …'}" Click="AssignOsAction_Click" Margin="0,0,0,12"/>
+                                    <UniformGrid x:Name="KnobModeTabs" Columns="2" Margin="0,0,0,18" Height="38" Visibility="Collapsed">
+                                        <Button x:Name="KnobPresetModeButton" Content="{local:Tr Key='Vorlagen'}" Click="KnobPresetMode_Click" Style="{StaticResource EditorSectionButton}"/>
+                                        <Button x:Name="KnobManualModeButton" Content="{local:Tr Key='Manuell'}" Click="KnobManualMode_Click" Style="{StaticResource EditorSectionButton}"/>
+                                    </UniformGrid>
+                                    <UniformGrid x:Name="KnobManualTargets" Columns="3" Margin="0,0,0,16" Visibility="Collapsed">
+                                        <Button x:Name="KnobLeftTarget" local:UiIcons.Kind="rotate-left" Content="{local:Tr Key='Links'}" ToolTip="{local:Tr Key='Nach links drehen'}" AutomationProperties.Name="{local:Tr Key='Nach links drehen'}" Tag="encoder:ccw" Click="KnobManualTarget_Click" Margin="0,0,4,0" Padding="5,8"/>
+                                        <Button x:Name="KnobRightTarget" local:UiIcons.Kind="rotate-right" Content="{local:Tr Key='Rechts'}" ToolTip="{local:Tr Key='Nach rechts drehen'}" AutomationProperties.Name="{local:Tr Key='Nach rechts drehen'}" Tag="encoder:cw" Click="KnobManualTarget_Click" Margin="0,0,4,0" Padding="5,8"/>
+                                        <Button x:Name="KnobPressTarget" Content="{local:Tr Key='Drücken'}" Tag="press" Click="KnobManualTarget_Click"/>
+                                    </UniformGrid>
+                                <StackPanel x:Name="KnobPresetPanel" Margin="0,0,0,14" Visibility="Collapsed">
+                                    <TextBlock Text="{local:Tr Key='Drehen'}" Style="{StaticResource HelpText}" Margin="0,0,0,7" />
+                                    <ComboBox x:Name="KnobPresetChoice" DisplayMemberPath="Label" SelectionChanged="KnobPreset_SelectionChanged" Margin="0,0,0,8" />
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="65"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="{local:Tr Key='Schritte pro Rastung'}" VerticalAlignment="Center"/>
+                                        <ComboBox x:Name="KnobStepChoice" Grid.Column="1" SelectionChanged="KnobStep_SelectionChanged"/>
+                                    </Grid>
+                                    <TextBlock Text="{local:Tr Key='Gilt für Lautstärke, Helligkeit, Scrollen und Zoom.'}" Style="{StaticResource HelpText}" Margin="0,0,0,10"/>
+                                    <StackPanel x:Name="KnobUndoLayoutPanel" Margin="0,0,0,10" Visibility="Collapsed">
+                                        <TextBlock Text="{local:Tr Key='Tastaturlayout für Rückgängig'}" Style="{StaticResource HelpText}" Margin="0,0,0,5"/>
+                                        <ComboBox x:Name="KnobUndoLayoutChoice" SelectionChanged="KnobUndoLayout_SelectionChanged"/>
+                                    </StackPanel>
+                                    <CheckBox x:Name="KnobCycleCheck" Content="{local:Tr Key='Lange drücken: Funktion wechseln'}" Click="KnobCycle_Click" />
+                                    <Button x:Name="KnobCycleOptionsButton" Content="{local:Tr Key='Reihenfolge …'}" Click="KnobCycleOptions_Click" Margin="0,8,0,0" Visibility="Collapsed"/>
+                                    <TextBlock x:Name="KnobCycleHint" Style="{StaticResource HelpText}" Margin="0,7,0,0" />
+                                </StackPanel>
+                                    <StackPanel x:Name="KnobShortPressPanel" Margin="0,4,0,0" Visibility="Collapsed">
+                                        <Border Style="{StaticResource PanelDivider}"/>
+                                        <TextBlock Text="{local:Tr Key='Kurzes Drücken'}" Style="{StaticResource SectionTitle}"/>
+                                        <ComboBox x:Name="KnobPressModeChoice" Margin="0,8,0,0" AutomationProperties.Name="{local:Tr Key='Kurzes Drücken'}" SelectionChanged="KnobPressMode_SelectionChanged"/>
+                                        <ComboBox x:Name="KnobPressFunctionChoice" Margin="0,8,0,0" DisplayMemberPath="Label" SelectedValuePath="Bit" AutomationProperties.Name="{local:Tr Key='Funktion'}" SelectionChanged="KnobPressFunction_SelectionChanged"/>
+                                        <ComboBox x:Name="KnobPressChoice" Margin="0,8,0,0" DisplayMemberPath="Label" SelectedValuePath="Code" IsTextSearchEnabled="True" TextSearch.TextPath="Label" MaxDropDownHeight="320" AutomationProperties.Name="{local:Tr Key='Kurzes Drücken'}" SelectionChanged="KnobPress_SelectionChanged"/>
+                                    </StackPanel>
+                                    <StackPanel x:Name="ManualBindingEditor">
                                 <TextBlock x:Name="CurrentBindingText" Style="{StaticResource HelpText}" Margin="0,0,0,13" />
                                 <TextBlock x:Name="NumpadNumLockHint" Text="{local:Tr Key='Für Ziffern Num-Lock einschalten. Standardbelegung: Fn + 0.'}" Style="{StaticResource HelpText}" Margin="0,0,0,13" Visibility="Collapsed" />
                                 <ComboBox x:Name="BindingCategory" SelectionChanged="BindingCategory_SelectionChanged" SelectedIndex="0" Margin="0,0,0,10">
@@ -543,8 +576,9 @@
                                     <ComboBoxItem Content="{local:Tr Key='Strg, Shift, Alt …'}" />
                                     <ComboBoxItem Content="{local:Tr Key='Ebenen'}" />
                                     <ComboBoxItem Content="{local:Tr Key='Makros'}" />
+                                    <ComboBoxItem Content="{local:Tr Key='Beleuchtung'}" />
                                 </ComboBox>
-                                <TextBlock Text="{local:Tr Key='Taste oder Funktion suchen'}" Style="{StaticResource HelpText}" Margin="0,0,0,7" />
+                                <TextBlock x:Name="BindingSearchLabel" Text="{local:Tr Key='Taste oder Funktion suchen'}" Style="{StaticResource HelpText}" Margin="0,0,0,7" />
                                 <Grid Margin="0,0,0,8">
                                     <TextBox x:Name="BindingSearch" TextChanged="BindingSearch_TextChanged" ToolTip="{local:Tr Key='Tasten und Funktionen suchen'}" />
                                     <TextBlock Text="{local:Tr Key='z. B. Enter, Lautstärke …'}" Foreground="#919BA6" FontSize="11" Margin="11,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False">
@@ -562,11 +596,7 @@
                                 </Grid>
                                 <ListBox x:Name="BindingChoice" ItemTemplate="{StaticResource OptionLabelTemplate}" SelectedValuePath="Code" Height="220" SelectionChanged="BindingChoice_SelectionChanged" />
                                 <TextBlock x:Name="BindingFunctionHint" Style="{StaticResource HelpText}" Margin="0,9,0,0" Visibility="Collapsed" />
-                                <Button local:UiIcons.Kind="check" x:Name="AssignBindingButton" Content="{local:Tr Key='Belegung zuweisen'}" Click="AssignBinding_Click" Style="{StaticResource PrimaryButton}" Margin="0,11,0,0" />
-                                <UniformGrid Columns="2" Margin="0,8,0,0">
-                                    <Button x:Name="ResetBindingButton" Content="{local:Tr Key='Standard'}" Click="ResetBinding_Click" FontSize="11" Margin="0,0,3,0" />
-                                    <Button x:Name="DisableBindingButton" Content="{local:Tr Key='Deaktivieren'}" Click="DisableBinding_Click" FontSize="11" Margin="3,0,0,0" />
-                                </UniformGrid>
+                                    </StackPanel>
                                 </StackPanel>
                                 <StackPanel x:Name="SliderPanel" Visibility="Collapsed">
                                     <TextBlock Text="{local:Tr Key='Funktion'}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />
@@ -682,10 +712,19 @@
                         </Grid>
                     </ScrollViewer>
                     <Border Grid.Row="3" Visibility="{Binding Visibility, ElementName=BindingPanel}" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,12,0,0">
+                        <StackPanel>
+                            <StackPanel x:Name="ManualBindingActions" Margin="0,0,0,14">
+                                <Button local:UiIcons.Kind="check" x:Name="AssignBindingButton" Content="{local:Tr Key='Belegung zuweisen'}" Click="AssignBinding_Click" Style="{StaticResource PrimaryButton}" Margin="0,11,0,0" />
+                                <UniformGrid Columns="2" Margin="0,8,0,0">
+                                    <Button x:Name="ResetBindingButton" Content="{local:Tr Key='Standard'}" Click="ResetBinding_Click" FontSize="11" Margin="0,0,3,0" />
+                                    <Button x:Name="DisableBindingButton" Content="{local:Tr Key='Deaktivieren'}" Click="DisableBinding_Click" FontSize="11" Margin="3,0,0,0" />
+                                </UniformGrid>
+                            </StackPanel>
                         <UniformGrid Columns="2">
                             <Button x:Name="ImportKeyBindingsButton" local:UiIcons.Kind="import" Content="{local:Tr Key='Importieren …'}" Click="ImportKeyBindings_Click" FontSize="11" Padding="7,9" Margin="0,0,3,0" />
                             <Button x:Name="ExportKeyBindingsButton" local:UiIcons.Kind="export" Content="{local:Tr Key='Exportieren …'}" Click="ExportKeyBindings_Click" FontSize="11" Padding="7,9" Margin="3,0,0,0" />
                         </UniformGrid>
+                        </StackPanel>
                     </Border>
                     <Border x:Name="ApplyEffectHost" Grid.Row="3" Visibility="Collapsed" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,12,0,0">
                         <Button local:UiIcons.Kind="check" x:Name="ApplyEffectButton" Content="{local:Tr Key='Effekt übernehmen'}" Click="ApplyEffect_Click" Style="{StaticResource PrimaryButton}" />

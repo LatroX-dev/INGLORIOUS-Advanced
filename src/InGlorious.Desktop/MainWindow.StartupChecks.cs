@@ -6,7 +6,7 @@ namespace InGlorious.Desktop;
 
 public sealed partial class MainWindow
 {
-    private void RunStartupSessionChecks(Action<bool, string> check)
+    private async Task RunStartupSessionChecksAsync(Action<bool, string> check)
     {
         if (!Program.Offline) throw new InvalidOperationException("Startup checks require offline mode.");
         var savedSessions = _sessions.ToArray();
@@ -15,6 +15,8 @@ public sealed partial class MainWindow
         var savedFingerprints = _startupReadFingerprints.ToArray();
         var savedFallbacks = _startupFallbackNotices.ToArray();
         var savedPlaceholders = _startupPlaceholders.ToArray();
+        var savedCrc = _deviceReadCrc.ToArray(); var savedRequired = _deviceReadRequired.ToArray(); var savedRefresh = _configurationRefreshPending.ToArray();
+        var savedAutomatic = _automaticFallbackSessions.ToArray();
         var savedState = _state;
         var savedPreferences = _preferences;
         var savedStatus = _status;
@@ -23,6 +25,7 @@ public sealed partial class MainWindow
         var savedStarted = _startupStarted;
         var savedClosed = _startupWindowClosed;
         var savedAllowClose = _allowClose;
+        var savedPending = _pendingApply;
         try
         {
             _sessions.Clear(); _confirmed.Clear(); _startupNotices.Clear(); _startupReadFingerprints.Clear(); _startupFallbackNotices.Clear(); _startupPlaceholders.Clear();
@@ -92,11 +95,68 @@ public sealed partial class MainWindow
                 _startupFallbackNotices["pro-iso"] == new StartupDeviceResult("pro-iso", StartupDeviceState.ReadFailed).Message,
                 "incomplete loaded results become explicit failures without false confirmation");
 
+            var current = Loaded("pro-iso");
+            ApplyStartupResults([current, Loaded("numpad")]);
+            _state = _sessions["pro-iso"];
+            var refreshedProject = ProjectService.Clone(current.Project!);
+            refreshedProject.Layers[0].Keys.First().Value.Color = "#AB2309";
+            var refreshed = current with { Project = refreshedProject, Info = current.Info! with { ActiveCrc = current.Info.ActiveCrc + 1 } };
+            ApplyRefreshedDeviceConfigurations([refreshed], "pro-iso", false);
+            check(_state.Project.Layers[0].Keys.First().Value.Color == "#AB2309" && !_state.Dirty && _state.Path is null && !DeviceConfigurationNeedsRead,
+                "reopening a clean session adopts the latest actual device configuration");
+            _state.Change(project => project.Name = "Retain my draft");
+            var draft = _state; var draftFingerprint = EditorState.Fingerprint(draft.Project);
+            ApplyRefreshedDeviceConfigurations([refreshed], "pro-iso", false);
+            check(ReferenceEquals(_state, draft) && _state.Dirty && _state.CanUndo && !DeviceConfigurationNeedsRead,
+                "an unchanged device keeps the edited draft and its undo history");
+            ApplyRefreshedDeviceConfigurations([refreshed with { Info = refreshed.Info! with { ActiveCrc = refreshed.Info.ActiveCrc + 1 } }], "pro-iso", false);
+            check(ReferenceEquals(_state, draft) && EditorState.Fingerprint(_state.Project) == draftFingerprint && DeviceConfigurationNeedsRead && !_confirmed.ContainsKey("pro-iso"),
+                "a changed device keeps the draft but prevents a stale transfer until an explicit read");
+            MarkDeviceConfigurationRead(refreshed.Project!, refreshed.Info);
+            check(!DeviceConfigurationNeedsRead, "an explicit verified read clears the stale-state transfer gate");
+            ApplyRefreshedDeviceConfigurations([new("pro-iso", StartupDeviceState.ReadFailed)], "pro-iso", false);
+            check(ReferenceEquals(_state, draft) && DeviceConfigurationNeedsRead,
+                "failed refresh retains edits and requires reading before transfer");
+            ApplyStartupResults([current, Loaded("numpad")]);
+            var pendingSession = _state;
+            ApplyRefreshedDeviceConfigurations([refreshed], "pro-iso", true);
+            check(ReferenceEquals(_state, pendingSession) && DeviceConfigurationNeedsRead,
+                "uncommitted fields preserve the exact editor even when the project itself is still clean");
+
+            _pendingApply = null; _busy = _startupLoading = false;
+            var refreshSource = new TaskCompletionSource<IReadOnlyList<StartupDeviceResult>>();
+            _configurationRefreshPending.Add("pro-iso");
+            var refreshing = RefreshDeviceConfigurationsAsync((ids, _) =>
+            {
+                check(ids.SequenceEqual(new[] { "pro-iso" }), "reopening only reads requested models");
+                return refreshSource.Task;
+            });
+            check(_startupLoading && _busy && !_root.IsEnabled, "reopening disables editing before awaiting device data");
+            refreshSource.SetResult([]); await refreshing;
+            check(!_startupLoading && !_busy && _root.IsEnabled && DeviceConfigurationNeedsRead,
+                "an incomplete refresh response unlocks local editing but cannot enable transfer");
+            _configurationRefreshPending.Add("pro-iso");
+            await RefreshDeviceConfigurationsAsync((_, _) => Task.FromResult<IReadOnlyList<StartupDeviceResult>>([current]));
+            check(!DeviceConfigurationNeedsRead && !_state.Dirty && _state.Path is null,
+                "a subsequent successful current read recovers the unchanged clean session");
+
+            _sessions["pro-iso"] = proLocal; _state = proLocal;
+            ApplyStartupResults([new("pro-iso", StartupDeviceState.ReadFailed)]);
+            ApplyRefreshedDeviceConfigurations([current], "pro-iso", false);
+            check(!ReferenceEquals(_state, proLocal) && _state.Path is null && !DeviceConfigurationNeedsRead,
+                "an untouched automatically opened local fallback recovers to the real device configuration");
+            _sessions["pro-iso"] = proLocal; _state = proLocal;
+            ApplyStartupResults([new("pro-iso", StartupDeviceState.ReadFailed)]);
+            proLocal.Change(project => project.Name = "Saved deliberate changes"); proLocal.MarkSaved("saved-pro.inglorious.json");
+            ApplyRefreshedDeviceConfigurations([current], "pro-iso", false);
+            check(ReferenceEquals(_state, proLocal) && !proLocal.Dirty && DeviceConfigurationNeedsRead,
+                "saving edited fallback data preserves that intentional profile during subsequent refresh");
+
             _busy = _startupLoading = true; Build();
             check(!_root.IsEnabled && !GuardNavigation().GetAwaiter().GetResult(), "startup read locks editing and navigation before device results arrive");
             _busy = _startupLoading = false; _startupStarted = false; Build();
             var beforeOffline = EditorState.Fingerprint(_state.Project);
-            LoadStartupDevicesAsync().GetAwaiter().GetResult();
+            await LoadStartupDevicesAsync();
             check(!_startupStarted && !_busy && _root.IsEnabled && EditorState.Fingerprint(_state.Project) == beforeOffline,
                 "offline startup bypass neither discovers hardware nor changes sessions or editability");
             var beforeClose = _state;
@@ -115,9 +175,14 @@ public sealed partial class MainWindow
             _startupReadFingerprints.Clear(); foreach (var item in savedFingerprints) _startupReadFingerprints.Add(item.Key, item.Value);
             _startupFallbackNotices.Clear(); foreach (var item in savedFallbacks) _startupFallbackNotices.Add(item.Key, item.Value);
             _startupPlaceholders.Clear(); _startupPlaceholders.UnionWith(savedPlaceholders);
+            _deviceReadCrc.Clear(); foreach (var item in savedCrc) _deviceReadCrc.Add(item.Key, item.Value);
+            _deviceReadRequired.Clear(); foreach (var item in savedRequired) _deviceReadRequired.Add(item.Key, item.Value);
+            _configurationRefreshPending.Clear(); _configurationRefreshPending.UnionWith(savedRefresh);
+            _automaticFallbackSessions.Clear(); foreach (var item in savedAutomatic) _automaticFallbackSessions.Add(item.Key, item.Value);
             _state = savedState; _preferences = savedPreferences; _status = savedStatus;
             _busy = savedBusy; _startupLoading = savedLoading; _startupStarted = savedStarted;
             _startupWindowClosed = savedClosed; _allowClose = savedAllowClose;
+            _pendingApply = savedPending;
             Build();
         }
     }

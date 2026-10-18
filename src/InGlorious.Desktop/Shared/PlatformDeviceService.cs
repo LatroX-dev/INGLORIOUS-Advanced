@@ -23,6 +23,12 @@ public static class PlatformDeviceService
             .Where(id => id is not null).Cast<string>().Distinct(StringComparer.Ordinal).ToArray());
 
     public static Task<IReadOnlyList<OnboardDevice>> FindAsync() => Task.Run(OnboardClient.FindDevices);
+    public static async Task<OnboardKnobStatus?> GetKnobStatusAsync(OnboardDevice device, CancellationToken cancellationToken = default)
+    {
+        _ = BoardDescriptorRegistry.Get(device.DeviceId);
+        await using var client = OnboardClient.Open(device);
+        return await client.GetKnobStatusAsync(cancellationToken);
+    }
     public static async Task<OnboardInfo> GetInfoAsync(OnboardDevice device)
     {
         _ = BoardDescriptorRegistry.Get(device.DeviceId);
@@ -45,6 +51,7 @@ public static class PlatformDeviceService
         if (!BoardDescriptorRegistry.TryGet(info.DeviceId, out var board) || !BoardDescriptorRegistry.TryGet(image.DeviceId, out _)) return "Unbekanntes Gerätemodell.";
         if (board.IsEngineeringOnly) return "Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar.";
         if (info.DeviceId != image.DeviceId) return "Das Profil passt nicht zum ausgewählten Gerät.";
+        if (image.RequiresKnobCycle && extensions?.SupportsKnobCycle != true || image.RequiresKnobOrder && extensions?.SupportsKnobOrder != true || image.RequiresKnobPress && extensions?.SupportsKnobPress != true) return "Diese Drehregler-Einstellungen benötigen ein Firmware-Update. Es wird nichts übertragen.";
         if (image.RequiresScreensaver && extensions?.SupportsScreensaver != true) return "Der Screensaver benötigt ein Firmware-Update. Es wird nichts übertragen.";
         if (image.RequiresStandby && !info.SupportsStandby) return "Standby benötigt passende INGLORIOUS-Firmware.";
         if (image.RequiresColorSequences && !info.SupportsColorSequences) return "Eigene Farbfolgen benötigen ein Firmware-Update. Es wird nichts übertragen.";
@@ -77,7 +84,7 @@ public static class PlatformDeviceService
         if (device.DeviceId != image.DeviceId) throw new InvalidDataException(L.T("Das Profil passt nicht zum ausgewählten Gerät."));
         await using var client = OnboardClient.Open(device);
         var backup = await ReadWithClient(client, device.DeviceId);
-        var extensions = image.RequiresScreensaver ? await ReadExtensionsAsync(client) : null;
+        var extensions = image.RequiresScreensaver || image.RequiresKnobCycle ? await ReadExtensionsAsync(client) : null;
         if (UnsupportedReason(backup.Info, image, extensions) is { } unsupported) throw new FirmwareUpdateRequiredException(L.T(unsupported));
         if (!backup.Info.Persistent) throw new IOException("Persistent device storage is unavailable.");
         var folder = Path.Combine(Paths.DataRoot, "device-backups"); Directory.CreateDirectory(folder);

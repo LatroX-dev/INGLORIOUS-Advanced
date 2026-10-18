@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -41,7 +41,11 @@ public sealed partial class MainWindow
     {
         if (Program.Offline || _connectionsStarted || _connectionsClosed || _startupWindowClosed || _allowClose) return;
         _connectionsStarted = true;
-        _connectionTimer.Tick += async (_, _) => await RefreshConnectionsAsync();
+        _connectionTimer.Tick += async (_, _) =>
+        {
+            await RefreshConnectionsAsync();
+            if (_configurationRefreshPending.Count > 0 && CanRefreshConnections) await RefreshDeviceConfigurationsAsync();
+        };
         _connectionTimer.Start();
         await Task.CompletedTask;
     }
@@ -125,16 +129,24 @@ public sealed partial class MainWindow
 
     private void ApplyConnectionSnapshot(IEnumerable<string> ids, bool failed = false, IEnumerable<SetupDevice>? setupDevices = null)
     {
+        var previousIds = _connectedDeviceIds.ToHashSet(StringComparer.Ordinal);
         if (!failed)
         {
             _connectedDeviceIds = NormalizeConnectedModels(ids);
             _connectedSetupDevices = EligibleSetupDevices(setupDevices ?? []);
         }
         _connectionsFailed = failed;
+        var changed = failed ? [] : previousIds.Except(_connectedDeviceIds).Concat(_connectedDeviceIds.Except(previousIds)).ToArray();
+        if (failed || changed.Contains(_state.Device.Id, StringComparer.Ordinal)) ResetKnobStatus();
+        if (!_initialConnectionsPending)
+            foreach (var id in changed) RequireDeviceConfigurationRead(id);
         // A previous readback cannot confirm a later connection, or an unknown connection state.
         foreach (var id in _confirmed.Keys.Where(id => failed || !_connectedDeviceIds.Contains(id, StringComparer.Ordinal)).ToArray()) _confirmed.Remove(id);
         UpdateConnectionSelector();
         UpdateFooter();
+        if (!failed) RequestDeviceConfigurationRefresh(_initialConnectionsPending
+            ? _connectedDeviceIds.Where(id => _deviceReadRequired.ContainsKey(id))
+            : changed.Where(id => _connectedDeviceIds.Contains(id, StringComparer.Ordinal)));
     }
 
     private void UpdateConnectionSelector()
@@ -236,7 +248,11 @@ public sealed partial class MainWindow
     {
         var available = CurrentModelConnected && !_state.Device.IsOfflineOnly && !_busy && !_startupLoading && !_initialConnectionsPending;
         if (_readDeviceButton is not null) _readDeviceButton.IsEnabled = available;
-        if (_transferButton is not null) _transferButton.IsEnabled = available;
+        if (_transferButton is not null)
+        {
+            _transferButton.IsEnabled = available && !DeviceConfigurationNeedsRead;
+            ToolTip.SetTip(_transferButton, DeviceConfigurationNeedsRead ? DeviceConfigurationReadNotice : null);
+        }
         foreach (var button in _deviceButtons.Values) button.IsEnabled = !_connectionsFailed && !_busy && !_startupLoading && !_initialConnectionsPending;
         foreach (var button in _setupDeviceButtons.Values) button.IsEnabled = !_connectionsFailed && !_busy && !_startupLoading && !_initialConnectionsPending;
     }

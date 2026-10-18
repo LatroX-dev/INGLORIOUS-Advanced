@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.64
+
+- Adjust keyboard brightness with the knob or assigned keys, even with the app closed.
+- Choose knob presets, adjust their sensitivity and hold the knob to switch between selected functions.
+- Drag to reorder knob functions and set short-press actions for each function directly in presets.
+- Check the active knob function in its tooltip and get a brief light signal when switching.
+- Fixed flickering knob controls and repeated status messages.
+- Reload the keyboard configuration when opening the app or reconnecting a device, while keeping unsaved edits.
+- Clearer editing panels with fewer controls shown at once.
+- Test keys directly in the keyboard view on every model, including the Numpad.
+- More compact firmware setup and update steps.
+- Optional feedback reminders for experimental keyboards, with more useful problem reports.
+
 ## 0.6.57
 
 - Fixed key labels and favorite-color help staying in German when using another app language.

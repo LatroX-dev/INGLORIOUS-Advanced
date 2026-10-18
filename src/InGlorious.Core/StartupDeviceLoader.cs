@@ -25,20 +25,25 @@ public static class StartupDeviceLoader
     public static Task<IReadOnlyList<StartupDeviceResult>> LoadAsync(CancellationToken cancellationToken = default) =>
         LoadAsync(ct => Task.Run(OnboardClient.FindDevices, ct), OnboardClient.Open, cancellationToken);
 
+    public static Task<IReadOnlyList<StartupDeviceResult>> LoadDevicesAsync(IReadOnlyCollection<string> deviceIds, CancellationToken cancellationToken = default) =>
+        LoadAsync(ct => Task.Run(OnboardClient.FindDevices, ct), OnboardClient.Open, cancellationToken, deviceIds);
+
     internal static async Task<IReadOnlyList<StartupDeviceResult>> LoadAsync(
         Func<CancellationToken, Task<IReadOnlyList<OnboardDevice>>> discover,
-        Func<OnboardDevice, OnboardClient> open, CancellationToken cancellationToken = default)
+        Func<OnboardDevice, OnboardClient> open, CancellationToken cancellationToken = default, IReadOnlyCollection<string>? deviceIds = null)
     {
+        var definitions = DeviceCatalog.All.Where(device => deviceIds is null || deviceIds.Contains(device.Id)).ToArray();
+        if (definitions.Length == 0) return [];
         IReadOnlyList<OnboardDevice> devices;
         try { devices = await discover(cancellationToken).ConfigureAwait(false); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
             Trace.TraceWarning("Startup device discovery failed: {0}", ex);
-            return DeviceCatalog.All.Select(d => new StartupDeviceResult(d.Id, d.IsOfflineOnly ? StartupDeviceState.OfflineOnly : StartupDeviceState.ReadFailed)).ToArray();
+            return definitions.Select(d => new StartupDeviceResult(d.Id, d.IsOfflineOnly ? StartupDeviceState.OfflineOnly : StartupDeviceState.ReadFailed)).ToArray();
         }
         var results = new List<StartupDeviceResult>();
-        foreach (var definition in DeviceCatalog.All)
+        foreach (var definition in definitions)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (definition.IsOfflineOnly) { results.Add(new(definition.Id, StartupDeviceState.OfflineOnly)); continue; }
@@ -72,6 +77,31 @@ public static class StartupDeviceLoader
             {
                 Trace.TraceWarning("Startup read failed for {0}: {1}", definition.Id, ex);
                 results.Add(new(definition.Id, StartupDeviceState.ReadFailed));
+            }
+        }
+        if (results.Any(result => result.Loaded))
+        {
+            try
+            {
+                // A device can disconnect after its final INFO but before another model
+                // finishes reading. Never adopt that old read for a later USB connection.
+                var current = await discover(cancellationToken).ConfigureAwait(false);
+                for (var index = 0; index < results.Count; index++)
+                {
+                    var result = results[index];
+                    if (!result.Loaded) continue;
+                    var before = devices.Where(device => device.DeviceId == result.DeviceId).ToArray();
+                    var after = current.Where(device => device.DeviceId == result.DeviceId).ToArray();
+                    if (before.Length != 1 || after.Length != 1 || !string.Equals(before[0].Path, after[0].Path, StringComparison.Ordinal))
+                        results[index] = new(result.DeviceId, StartupDeviceState.ReadFailed);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception ex)
+            {
+                Trace.TraceWarning("Connection verification after configuration read failed: {0}", ex);
+                for (var index = 0; index < results.Count; index++)
+                    if (results[index].Loaded) results[index] = new(results[index].DeviceId, StartupDeviceState.ReadFailed);
             }
         }
         return results;

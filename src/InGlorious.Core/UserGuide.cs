@@ -1,4 +1,4 @@
-﻿namespace InGlorious.Core;
+namespace InGlorious.Core;
 
 public sealed record GuideSection(string Heading, string Body);
 public sealed record GuideTopic(string Id, string Title, IReadOnlyList<GuideSection> Sections);
@@ -23,6 +23,8 @@ public static class UserGuide
         {
             new("GMMK Numpad", "Für Ziffern Num-Lock einschalten. Standardbelegung: Fn + 0."),
             new("Tasten und Drehgeber", "Wähle eine Taste in der Vorschau, suche eine Funktion und übernimm sie. Mehrere ausgewählte Tasten erhalten dieselbe Belegung. Die beiden Drehrichtungen des Drehgebers lassen sich getrennt belegen. Belegungen gelten für die oben ausgewählte Ebene."),
+            new("Drehregler-Vorlagen", "Wähle den Drehregler. „Vorlagen“ belegt beide Drehrichtungen; „Manuell“ zeigt links drehen, rechts drehen und Drücken einzeln. Der Ansichtswechsel ändert nichts. Unter „Kurzes Drücken“ bearbeitest du die Druckfunktion. Mit langem Druck (700 ms) kannst du Funktionen wechseln. „Reihenfolge“ legt Auswahl und Reihenfolge fest. Nutze die Pfeile zum Sortieren. „Schritte pro Rastung“ (1–5) passt die Stärke an. Übertrage deine Änderungen auf die Tastatur. Nach dem Neuverbinden startet die gespeicherte Vorlage."),
+            new("Kurzer Druck und Funktionswechsel", "Mit „Je Funktion“ legst du für jede Drehfunktion eine eigene Druckaktion fest. Ohne eigene Zuordnung gilt der allgemeine kurze Druck. Ziehe Funktionen unter „Reihenfolge“ an die gewünschte Stelle. Beim Wechsel signalisiert die Tastatur die neue Funktion kurz mit einer Farbe. Die App zeigt die tatsächlich aktive Funktion. Übertrage deine Änderungen, damit sie auch ohne App gelten."),
             new("Fn und Zusatztasten", "Strg, Shift oder Alt hältst du zusammen mit einer anderen Taste gedrückt, etwa Strg+C. Fn öffnet stattdessen eine zusätzliche Belegung auf diesem Gerät."),
             new("Import und Export", "Beim Import und Export wählst du die Ebenen aus. Nur die gewählten Ebenen werden mit ihren Namen, Belegungen und zugewiesenen Makros übernommen; ihre Nummern bleiben gleich. Farben und Effekte bleiben erhalten. Den Schieberegler kannst du separat einbeziehen. Importiere auf demselben Gerätemodell und speichere danach mit „Auf Tastatur übertragen“."),
             new("Betriebssystemaktionen", "Unter „Betriebssystem-Aktion …“ wählst du Betriebssystem und Tastaturlayout. Die Aktion verwendet passende Tastenfolgen; ihre Wirkung hängt vom System und der geöffneten Anwendung ab. Prüfe die Auswahl, bevor du sie einer Taste zuweist.")
@@ -36,7 +38,7 @@ public static class UserGuide
         new("layers", "Ebenen", Array.AsReadOnly(new GuideSection[]
         {
             new("Vier Belegungen", "Ebene 0 ist deine normale Belegung. Ebenen 1 bis 3 bieten zusätzliche Funktionen und Beleuchtungen. „Ebene bearbeiten“ ändert nur die Ansicht in der App. Auf der Tastatur brauchst du eine Taste, die die gewünschte Ebene einschaltet."),
-            new("Fn-Taste einrichten", "Bearbeite Ebene 0 und wähle eine Taste in der Vorschau. Öffne „Fn / Ebenenwechsel …“, wähle Ebene 1 und „Beim Halten (Fn)“. Klicke auf „Dieser Taste zuweisen“. Bearbeite danach Ebene 1 und belege dort die gewünschten Tasten. Speichere mit „Auf Tastatur übertragen“. Nun hältst du deine Fn-Taste, um diese Funktionen zu nutzen."),
+            new("Fn-Taste einrichten", "Bearbeite Ebene 0 und wähle eine Taste in der Vorschau. Öffne „Ebenen“, wähle Ebene 1 und „Beim Halten (Fn)“. Klicke auf „Dieser Taste zuweisen“. Bearbeite danach Ebene 1 und belege dort die gewünschten Tasten. Speichere mit „Auf Tastatur übertragen“. Nun hältst du deine Fn-Taste, um diese Funktionen zu nutzen."),
             new("Ein-/ausschalten", "Ein Druck schaltet die Zielebene ein oder aus. Die Taste zum Ebenenwechsel muss auch auf dieser Ebene erreichbar bleiben."),
             new("Direkt wechseln", "Wechselt zur Zielebene und schaltet andere Zusatzebenen aus. Lege dort auch eine Taste zum Zurückwechseln an."),
             new("Belegung darunter verwenden", "Verwendet die Belegung der nächstniedrigeren eingeschalteten Ebene, sonst die Basis.")

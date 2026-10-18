@@ -20,6 +20,14 @@ public sealed class KeyBindingLayer
     [JsonRequired] public int Index { get; set; }
     [JsonRequired] public string Name { get; set; } = "";
     [JsonRequired] public Dictionary<string, string> Bindings { get; set; } = [];
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool KnobCycleEnabled { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool KnobCycleMacZoom { get; set; }
+    public int KnobCycleMask { get; set; } = 31;
+    public List<int> KnobCycleOrder { get; set; } = [1, 2, 4, 8, 16, 32, 64, 128];
+    public int KnobStep { get; set; } = 1;
+    public int KnobUndoLayout { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool KnobPressByFunction { get; set; }
+    public Dictionary<int, string> KnobPressBindings { get; set; } = [];
 }
 
 public sealed record KeyBindingSelection(IReadOnlyList<int> Layers, bool IncludeSlider);
@@ -38,13 +46,22 @@ public static class KeyBindingTransfer
         ArgumentNullException.ThrowIfNull(project);
         OnboardSerializer.ValidateEditorProject(project);
         var selected = SelectLayers(layers, new HashSet<int> { 0, 1, 2, 3 });
-        var referenced = References(selected.SelectMany(index => project.Layers[index].Keys.Values.Select(key => key.Binding)));
+        var referenced = References(selected.SelectMany(index => project.Layers[index].Keys.Values.Select(key => key.Binding)
+            .Concat(project.Layers[index].KnobPressBindings.Values)));
         var result = new KeyBindingDocument
         {
             DeviceId = project.DeviceId,
             Layers = selected.Order().Select(index => new KeyBindingLayer
             {
                 Index = index, Name = project.Layers[index].Name,
+                KnobCycleEnabled = project.Layers[index].KnobCycleEnabled,
+                KnobCycleMacZoom = project.Layers[index].KnobCycleMacZoom,
+                KnobCycleMask = project.Layers[index].KnobCycleMask,
+                KnobCycleOrder = [.. project.Layers[index].KnobCycleOrder],
+                KnobStep = project.Layers[index].KnobStep,
+                KnobUndoLayout = project.Layers[index].KnobUndoLayout,
+                KnobPressByFunction = project.Layers[index].KnobPressByFunction,
+                KnobPressBindings = new(project.Layers[index].KnobPressBindings),
                 Bindings = project.Layers[index].Keys.ToDictionary(key => key.Key, key => key.Value.Binding, StringComparer.Ordinal)
             }).ToList(),
             Macros = project.Macros.Where(macro => referenced.Contains(macro.Id)).Select(CopyMacro).ToList(),
@@ -82,7 +99,7 @@ public static class KeyBindingTransfer
         if (project.DeviceId != document.DeviceId)
             throw new InvalidDataException(L.T("Diese Tastenbelegungen gehören zu einem anderen Gerätemodell oder Layout."));
         var selected = SelectLayers(layers, document.Layers.Select(layer => layer.Index).ToHashSet());
-        var referenced = References(document.Layers.Where(layer => selected.Contains(layer.Index)).SelectMany(layer => layer.Bindings.Values));
+        var referenced = References(document.Layers.Where(layer => selected.Contains(layer.Index)).SelectMany(layer => layer.Bindings.Values.Concat(layer.KnobPressBindings.Values)));
         OnboardSerializer.ValidateEditorProject(project);
         var result = ProjectService.Clone(project);
         var ids = result.Macros.Select(macro => macro.Id).ToHashSet(StringComparer.Ordinal);
@@ -159,6 +176,8 @@ public static class KeyBindingTransfer
             if (layer is null || layer.Index is < 0 or > 3 || !indices.Add(layer.Index) || !ValidName(layer.Name) || layer.Bindings is null || layer.Bindings.Count != device.Keys.Count ||
                 !layer.Bindings.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(device.Keys.Select(key => key.Id)) ||
                 layer.Bindings.Any(pair => pair.Value is null || pair.Value.Length > 70 || pair.Value.Any(char.IsControl))) throw Invalid();
+            if (layer.KnobPressBindings is null || layer.KnobPressBindings.Count > 8 || layer.KnobPressBindings.Any(pair =>
+                !KnobPresets.CycleOptions.Any(option => option.Bit == pair.Key) || pair.Value is null || pair.Value.Length > 70 || pair.Value.Any(char.IsControl))) throw Invalid();
         }
         var ids = new HashSet<string>(StringComparer.Ordinal);
         long steps = 0;
@@ -172,7 +191,7 @@ public static class KeyBindingTransfer
                 if (step is null || step.Kind is not ("down" or "up" or "delay") || step.Key is null || step.Key.Length > 64 ||
                     step.Key.Any(char.IsControl) || step.DelayMs is < 0 or > 10000) throw Invalid();
         }
-        var referenced = References(document.Layers.SelectMany(layer => layer.Bindings.Values));
+        var referenced = References(document.Layers.SelectMany(layer => layer.Bindings.Values.Concat(layer.KnobPressBindings.Values)));
         if (steps > 768 || !ids.SetEquals(referenced)) throw Invalid();
         var neutral = ProjectService.Create(device.Id);
         neutral.Macros = document.Macros.Select(CopyMacro).ToList();
@@ -185,6 +204,16 @@ public static class KeyBindingTransfer
         foreach (var layer in document.Layers.Where(layer => selected.Contains(layer.Index)))
         {
             target.Layers[layer.Index].Name = layer.Name;
+            target.Layers[layer.Index].KnobCycleEnabled = layer.KnobCycleEnabled;
+            target.Layers[layer.Index].KnobCycleMacZoom = layer.KnobCycleMacZoom;
+            target.Layers[layer.Index].KnobCycleMask = layer.KnobCycleMask;
+            if (!KnobPresets.IsValidOrder(layer.KnobCycleOrder)) throw Invalid();
+            target.Layers[layer.Index].KnobCycleOrder = [.. layer.KnobCycleOrder];
+            target.Layers[layer.Index].KnobStep = layer.KnobStep;
+            target.Layers[layer.Index].KnobUndoLayout = layer.KnobUndoLayout;
+            target.Layers[layer.Index].KnobPressByFunction = layer.KnobPressByFunction;
+            target.Layers[layer.Index].KnobPressBindings = layer.KnobPressBindings.ToDictionary(pair => pair.Key,
+                pair => pair.Value.StartsWith("MACRO:", StringComparison.Ordinal) ? "MACRO:" + remapped[pair.Value[6..]] : pair.Value);
             foreach (var (key, binding) in layer.Bindings)
                 target.Layers[layer.Index].Keys[key].Binding = binding.StartsWith("MACRO:", StringComparison.Ordinal) ? "MACRO:" + remapped[binding[6..]] : binding;
         }
@@ -219,7 +248,35 @@ public static class KeyBindingTransfer
         if (root.GetProperty("layers").ValueKind != JsonValueKind.Array || root.GetProperty("macros").ValueKind != JsonValueKind.Array) throw Invalid();
         foreach (var layer in root.GetProperty("layers").EnumerateArray())
         {
-            RequireProperties(layer, "index", "name", "bindings");
+            var properties = new List<string> { "index", "name", "bindings" };
+            foreach (var name in new[] { "knobCycleEnabled", "knobCycleMacZoom", "knobPressByFunction" })
+                if (layer.TryGetProperty(name, out var flag))
+                {
+                    if (flag.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw Invalid();
+                    properties.Add(name);
+                }
+            foreach (var name in new[] { "knobCycleMask", "knobStep", "knobUndoLayout" })
+                if (layer.TryGetProperty(name, out var number))
+                {
+                    if (number.ValueKind != JsonValueKind.Number || !number.TryGetInt32(out _)) throw Invalid();
+                    properties.Add(name);
+                }
+            if (layer.TryGetProperty("knobCycleOrder", out var order))
+            {
+                if (order.ValueKind != JsonValueKind.Array || order.GetArrayLength() != 8 ||
+                    order.EnumerateArray().Any(item => item.ValueKind != JsonValueKind.Number || !item.TryGetInt32(out _))) throw Invalid();
+                properties.Add("knobCycleOrder");
+            }
+            if (layer.TryGetProperty("knobPressBindings", out var pressBindings))
+            {
+                if (pressBindings.ValueKind != JsonValueKind.Object) throw Invalid();
+                var bits = new HashSet<int>();
+                foreach (var binding in pressBindings.EnumerateObject())
+                    if (!int.TryParse(binding.Name, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var bit) ||
+                        binding.Name != bit.ToString(System.Globalization.CultureInfo.InvariantCulture) || !bits.Add(bit) || binding.Value.ValueKind != JsonValueKind.String) throw Invalid();
+                properties.Add("knobPressBindings");
+            }
+            RequireProperties(layer, properties.ToArray());
             var bindings = layer.GetProperty("bindings");
             if (bindings.ValueKind != JsonValueKind.Object) throw Invalid();
             var seen = new HashSet<string>(StringComparer.Ordinal);

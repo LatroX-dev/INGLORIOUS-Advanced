@@ -97,7 +97,8 @@ try
     Check(closingSession.Preferences == closedB, "fresh edit session contains the values read with its fingerprint");
     Reject(() => AppPreferencesStore.SaveWindowState("unknown", 1400, 900, path), "window state rejects unknown device identifiers");
 
-    foreach (var bad in new[] { "{broken", "null", "{\"SchemaVersion\":2}", "{\"StartDevice\":\"unknown\"}", "{\"LastDeviceId\":null}", "{\"WindowWidth\":4}", "{\"WindowHeight\":9000}", "{\"Language\":null}", "{\"Language\":\"de-AT\"}", "{\"Language\":\"unknown\"}" })
+    foreach (var bad in new[] { "{broken", "null", "{\"SchemaVersion\":2}", "{\"StartDevice\":\"unknown\"}", "{\"LastDeviceId\":null}", "{\"WindowWidth\":4}", "{\"WindowHeight\":9000}", "{\"Language\":null}", "{\"Language\":\"de-AT\"}", "{\"Language\":\"unknown\"}",
+        "{\"FeedbackRequestedModels\":null}", "{\"FeedbackRequestedModels\":[\"unknown\"]}", "{\"FeedbackRequestedModels\":[\"numpad\",\"numpad\"]}" })
     {
         var bytes = Encoding.UTF8.GetBytes(bad); File.WriteAllBytes(path, bytes);
         var fallback = AppPreferencesStore.Load(path);
@@ -118,7 +119,16 @@ try
     Check(AppPreferencesStore.CaptureWindow(saved, 1400, 850) == saved, "disabled size memory preserves stored size");
     var defaults = new AppPreferences();
     Check(AppPreferencesStore.CaptureWindow(defaults, double.NaN, 850) == defaults && AppPreferencesStore.CaptureWindow(defaults, 1400, double.PositiveInfinity) == defaults, "nonfinite window dimensions are ignored");
-    foreach (var invalid in new[] { defaults with { SchemaVersion = 3 }, defaults with { StartDevice = "other" }, defaults with { LastDeviceId = "other" }, defaults with { WindowWidth = double.NaN }, defaults with { WindowHeight = 0 }, defaults with { Language = "unknown" }, defaults with { Language = "de-AT" }, defaults with { Language = null! } })
+    var marked = defaults with { FeedbackRequestedModels = ["numpad", "pro-iso"] };
+    AppPreferencesStore.Save(marked, path);
+    var reloaded = AppPreferencesStore.Load(path).Preferences;
+    Check(reloaded == marked && reloaded.GetHashCode() == marked.GetHashCode(), "per-model markers preserve preference value equality and hashing after reload");
+    var markedCopy = marked.ClonePreferences();
+    Check(markedCopy == marked && !ReferenceEquals(markedCopy.FeedbackRequestedModels, marked.FeedbackRequestedModels), "cloning owns its marker list while retaining value equality");
+    markedCopy.FeedbackRequestedModels[0] = "pro-iso";
+    Check(marked.FeedbackRequestedModels[0] == "numpad" && markedCopy != marked, "editing the clone cannot mutate the source marker list");
+    foreach (var invalid in new[] { defaults with { SchemaVersion = 3 }, defaults with { StartDevice = "other" }, defaults with { LastDeviceId = "other" }, defaults with { WindowWidth = double.NaN }, defaults with { WindowHeight = 0 }, defaults with { Language = "unknown" }, defaults with { Language = "de-AT" }, defaults with { Language = null! },
+        defaults with { FeedbackRequestedModels = null! }, defaults with { FeedbackRequestedModels = ["unknown"] }, defaults with { FeedbackRequestedModels = ["numpad", "numpad"] } })
         Reject(() => AppPreferencesStore.Save(invalid, path), "invalid application preferences cannot be written");
     var large = new byte[65537]; File.WriteAllBytes(path, large);
     Check(AppPreferencesStore.Load(path).Warning is not null, "oversized file reports a warning");

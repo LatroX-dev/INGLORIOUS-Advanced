@@ -1,12 +1,18 @@
 # INGLORIOUS onboard firmware
 
-All sixteen targets use firmware **0.11.4**, build `0x000B0401`, including the separate GMMK 3 PRO 100% ISO wired, non-HE target. Build success does not establish full physical acceptance. Model support and physical acceptance are listed in [the model overview](../docs/model-support.md).
+All sixteen targets use firmware **0.11.8**, build `0x000B0801`, including the separate GMMK 3 PRO 100% ISO wired, non-HE target. Build success does not establish full physical acceptance. Model support and physical acceptance are listed in [the model overview](../docs/model-support.md).
 
 ## Behavior
 
 The QMK-based firmware runs key assignments, four layers, macros, lighting and standby on the keyboard. The app may be closed after a successful configuration transfer. The Numpad is USB-only. Its slider supports disabled, lighting brightness, relative volume and MIDI control; linking brightness across devices requires the desktop app.
 
 There are 21 lighting modes with per-LED overrides, custom color sequences and global settings. The optional lighting test lasts 21 seconds and the screensaver repeats the sequence after inactivity. Settings and the test sequence run locally, without a background service.
+
+The knob can cycle through selected functions in a saved order. A brief color pulse confirms a function change, and the app can read the function actually active on the keyboard. Short presses can use one shared action or separate actions for each knob function. Cycling, press actions and the pulse work with the app closed; reading the live state does not change the saved profile.
+
+Keys and rotary-knob directions can raise or lower keyboard brightness. The dimmer applies to all keys and side lighting, including individual effects, without the app running. Its current level is temporary; reconnecting power or transferring a profile restores the normal level. The assigned key or knob functions remain saved. On the Numpad, moving a slider assigned to brightness takes over the dimmer again.
+
+Rotary-knob presets cover volume, brightness, tracks, vertical/horizontal scrolling, zoom, tabs and undo/redo. A per-layer option cycles selected presets in your chosen order after holding the knob for 700 ms; a short press retains its assigned action. Reconnecting or transferring a profile restores the saved preset. Volume, brightness, scrolling and zoom have an optional step multiplier from 1 to 5. Zoom and undo offer Ctrl or Command shortcuts; undo also supports QWERTY, QWERTZ and AZERTY host layouts. Application support for these shortcuts varies.
 
 Each device has two configuration slots inside a 32-KiB internal flash reserve. Board IDs 1–9 use 7,168-byte slots; IDs 10–16 use 7,680-byte slots. Four layers, up to 32 macro slots and shared event/color pools fit within that fixed space. Oversized configurations are rejected rather than silently truncated. An upload stages data in the inactive part of the EEPROM RAM cache and commits only after full validation.
 

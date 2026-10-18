@@ -42,10 +42,12 @@ public sealed partial class MainWindow
     internal void OpenFromTray()
     {
         if (_startupWindowClosed) return;
+        var reopening = !IsVisible;
         Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
         foreach (var dialog in OwnedWindows) if (dialog.IsVisible) dialog.Activate();
+        if (reopening) RequestDeviceConfigurationRefresh();
     }
 
     private void RunBackgroundWindowChecks(Action<bool, string> check)

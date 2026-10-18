@@ -15,11 +15,35 @@ public sealed record AppPreferences
     public bool CheckForSoftwareUpdates { get; init; } = true;
     public bool SharedBrightness { get; init; }
     public bool SharedBrightnessNoticeDismissed { get; init; }
+    public string[] FeedbackRequestedModels { get; init; } = [];
     public double WindowWidth { get; init; } = 1536;
     public double WindowHeight { get; init; } = 960;
 
     public string ResolveStartDevice() => StartDevice == "last" ? LastDeviceId : StartDevice;
-    public AppPreferences ClonePreferences() => this with { };
+    public AppPreferences ClonePreferences() => this with { FeedbackRequestedModels = [.. FeedbackRequestedModels] };
+
+    // Settings remain value objects after adding the persisted per-model list.
+    public bool Equals(AppPreferences? other) => other is not null &&
+        SchemaVersion == other.SchemaVersion && StartDevice == other.StartDevice && LastDeviceId == other.LastDeviceId &&
+        Language == other.Language && RememberWindowSize == other.RememberWindowSize && ShowHelp == other.ShowHelp &&
+        CheckForSoftwareUpdates == other.CheckForSoftwareUpdates && SharedBrightness == other.SharedBrightness &&
+        SharedBrightnessNoticeDismissed == other.SharedBrightnessNoticeDismissed &&
+        ((FeedbackRequestedModels is null && other.FeedbackRequestedModels is null) ||
+         (FeedbackRequestedModels is not null && other.FeedbackRequestedModels is not null &&
+          FeedbackRequestedModels.SequenceEqual(other.FeedbackRequestedModels, StringComparer.Ordinal))) &&
+        WindowWidth.Equals(other.WindowWidth) && WindowHeight.Equals(other.WindowHeight);
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(SchemaVersion); hash.Add(StartDevice); hash.Add(LastDeviceId); hash.Add(Language);
+        hash.Add(RememberWindowSize); hash.Add(ShowHelp); hash.Add(CheckForSoftwareUpdates);
+        hash.Add(SharedBrightness); hash.Add(SharedBrightnessNoticeDismissed);
+        if (FeedbackRequestedModels is not null)
+            foreach (var model in FeedbackRequestedModels) hash.Add(model, StringComparer.Ordinal);
+        hash.Add(WindowWidth); hash.Add(WindowHeight);
+        return hash.ToHashCode();
+    }
 }
 
 public sealed record AppPreferencesLoadResult(AppPreferences Preferences, string? Warning);
@@ -100,6 +124,9 @@ public static class AppPreferencesStore
         ArgumentNullException.ThrowIfNull(preferences);
         if (preferences.SchemaVersion != 1 || (preferences.StartDevice != "last" && !DeviceCatalog.All.Any(device => device.Id == preferences.StartDevice)) ||
             !DeviceCatalog.All.Any(device => device.Id == preferences.LastDeviceId) || !L.IsLanguagePreference(preferences.Language) ||
+            preferences.FeedbackRequestedModels is null || preferences.FeedbackRequestedModels.Length > DeviceCatalog.All.Count ||
+            preferences.FeedbackRequestedModels.Distinct(StringComparer.Ordinal).Count() != preferences.FeedbackRequestedModels.Length ||
+            preferences.FeedbackRequestedModels.Any(id => !DeviceCatalog.All.Any(device => device.Id == id)) ||
             !double.IsFinite(preferences.WindowWidth) || preferences.WindowWidth is < 1150 or > 7680 ||
             !double.IsFinite(preferences.WindowHeight) || preferences.WindowHeight is < 760 or > 4320)
             throw new InvalidDataException(L.T("Die App-Einstellungen enthalten ungültige Werte oder eine unbekannte Version."));

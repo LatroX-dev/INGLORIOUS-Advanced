@@ -9,7 +9,9 @@ public sealed record OnboardDevice(string DeviceId, string Name, string Path);
 /// <summary>Portable transport for the private InGlorious collection only. No stock or bootloader commands.</summary>
 public sealed class OnboardHidTransport : IOnboardTransport
 {
-    private readonly HidStream _stream;
+    private readonly HidStream? _stream;
+    private readonly IOnboardTransport? _shared;
+    private OnboardHidTransport(IOnboardTransport shared) => _shared = shared;
     private int _closed;
     private OnboardHidTransport(HidStream stream) { _stream = stream; _stream.ReadTimeout = 130_000; _stream.WriteTimeout = 4_000; }
     public static IReadOnlyList<OnboardDevice> FindDevices()
@@ -42,11 +44,21 @@ public sealed class OnboardHidTransport : IOnboardTransport
     }
     public static OnboardHidTransport Open(OnboardDevice expected)
     {
+        _ = FindExpectedDevice(expected);
+        return new(OnboardTransportPool.Acquire(expected.Path, expected.DeviceId + "\n" + expected.Name, () => OpenNative(expected)));
+    }
+    private static HidDevice FindExpectedDevice(OnboardDevice expected)
+    {
         var board = BoardDescriptorRegistry.Get(expected.DeviceId);
         if (board.IsEngineeringOnly) throw new InvalidDataException(L.T("Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar."));
         var device = DeviceList.Local.GetHidDevices(BoardDescriptorRegistry.RuntimeVendorId).SingleOrDefault(d => d.DevicePath == expected.Path && d.ProductID == board.RuntimeProductId)
             ?? throw new IOException(L.T("Keine passende eigene INGLORIOUS-Firmware erkannt. Ein Gerät mit Original-Firmware kann hier noch nicht ausgelesen werden."));
         if (Identify(device) != expected) throw new IOException(L.T("Die gelesene Konfiguration passt nicht zum gewählten Gerät."));
+        return device;
+    }
+    private static OnboardHidTransport OpenNative(OnboardDevice expected)
+    {
+        var device = FindExpectedDevice(expected);
         var stream = device.Open();
         try
         {
@@ -57,6 +69,7 @@ public sealed class OnboardHidTransport : IOnboardTransport
     }
     public async Task<byte[]> ExchangeAsync(byte[] packet, CancellationToken cancellationToken)
     {
+        if (_shared is not null) return await _shared.ExchangeAsync(packet, cancellationToken).ConfigureAwait(false);
         ValidateOutbound(packet);
         ObjectDisposedException.ThrowIf(_closed != 0, this);
         cancellationToken.ThrowIfCancellationRequested();
@@ -64,7 +77,7 @@ public sealed class OnboardHidTransport : IOnboardTransport
         // A cancelled connection is never reused, and a timed-out COMMIT is never retried here.
         using var registration = cancellationToken.Register(Close);
         var output = new byte[33]; packet.CopyTo(output, 1);
-        await _stream.WriteAsync(output, 0, output.Length, cancellationToken).ConfigureAwait(false);
+        await _stream!.WriteAsync(output, 0, output.Length, cancellationToken).ConfigureAwait(false);
         var input = new byte[33];
         var count = await _stream.ReadAsync(input, 0, input.Length, cancellationToken).ConfigureAwait(false);
         if (count != 33 || input[0] != 0) throw new IOException("Incomplete INGLORIOUS HID report.");
@@ -75,6 +88,6 @@ public sealed class OnboardHidTransport : IOnboardTransport
     {
         OnboardProtocol.ValidateRequest(packet);
     }
-    private void Close() { if (Interlocked.Exchange(ref _closed, 1) == 0) _stream.Dispose(); }
-    public ValueTask DisposeAsync() { Close(); return ValueTask.CompletedTask; }
+    private void Close() { if (Interlocked.Exchange(ref _closed, 1) == 0) _stream!.Dispose(); }
+    public ValueTask DisposeAsync() { if (_shared is not null) return _shared.DisposeAsync(); Close(); return ValueTask.CompletedTask; }
 }

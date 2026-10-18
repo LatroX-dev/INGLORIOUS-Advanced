@@ -26,6 +26,7 @@ var root = Path.Combine(Path.GetTempPath(), "INGLORIOUS-KeyBindingChecks-" + Gui
 Directory.CreateDirectory(root);
 try
 {
+    KnobBindingTransferChecks.Run(root, Check, Reject);
     foreach (var device in DeviceCatalog.All)
     {
         var source = ProjectService.Create(device.Id);
@@ -95,6 +96,58 @@ try
         Check(Json(target) == targetBefore && Json(source) == before, device.Id + ": selection operations preserve inputs");
         captured.Macros[0].Steps[0].Key = "KC_Y";
         Check(Json(source) == before, device.Id + ": capture macro steps detached");
+    }
+
+    foreach (var deviceId in new[] { "pro-iso", "numpad", "gmmk3-pro-100-iso", "gmmk2-65-ansi" })
+    {
+        var model = DeviceCatalog.Get(deviceId);
+        var physical = model.Keys.First(key => !key.IsEncoder).Id;
+        var brightnessSource = ProjectService.Create(deviceId);
+        brightnessSource.Layers[1].Keys[physical].Binding = "RM_VALD";
+        brightnessSource.Layers[3].Keys[physical].Binding = "RM_VALU";
+        if (model.HasEncoder)
+        {
+            brightnessSource.Layers[1].Keys["encoder:ccw"].Binding = "RM_VALD";
+            brightnessSource.Layers[1].Keys["encoder:cw"].Binding = "RM_VALU";
+            brightnessSource.Layers[3].Keys["encoder:ccw"].Binding = "RM_VALU";
+            brightnessSource.Layers[3].Keys["encoder:cw"].Binding = "RM_VALD";
+        }
+        var sourceBefore = Json(brightnessSource);
+        var selectedBrightness = KeyBindingTransfer.Capture(brightnessSource, [3, 1], includeSlider: false);
+        var brightnessFile = Path.Combine(root, deviceId + ".brightness.bindings.json");
+        KeyBindingTransfer.Export(brightnessFile, selectedBrightness);
+        var loadedBrightness = KeyBindingTransfer.Load(brightnessFile);
+        Check(Json(loadedBrightness) == Json(selectedBrightness) && loadedBrightness.Layers.Select(layer => layer.Index).SequenceEqual([1, 3]),
+            deviceId + ": brightness bindings export and import with their real selected layer indices");
+        Check(loadedBrightness.Layers[0].Bindings[physical] == "RM_VALD" && loadedBrightness.Layers[1].Bindings[physical] == "RM_VALU",
+            deviceId + ": both physical brightness actions survive the selected-layer file roundtrip");
+        if (model.HasEncoder)
+            Check(loadedBrightness.Layers[0].Bindings["encoder:ccw"] == "RM_VALD" && loadedBrightness.Layers[0].Bindings["encoder:cw"] == "RM_VALU" &&
+                loadedBrightness.Layers[1].Bindings["encoder:ccw"] == "RM_VALU" && loadedBrightness.Layers[1].Bindings["encoder:cw"] == "RM_VALD",
+                deviceId + ": each imported layer retains its independent encoder directions");
+        var brightnessTarget = ProjectService.Create(deviceId);
+        brightnessTarget.Macros.Add(Tap("keep", "KC_C", "Keep this macro"));
+        brightnessTarget.Layers[0].Keys[physical].Binding = "MACRO:keep";
+        brightnessTarget.Layers[1].Keys[physical].Color = "#1234AB";
+        brightnessTarget.Layers[3].LightingEffect = new() { Mode = 2, Brightness = 170, Colors = ["#00ABFF", "#FFCC00"] };
+        if (model.HasSlider) brightnessTarget.Slider.Mode = 3;
+        var targetBefore = Json(brightnessTarget);
+        foreach (var selected in new int[][] { [1], [3], [3, 1] })
+        {
+            var appliedBrightness = KeyBindingTransfer.Apply(brightnessTarget, loadedBrightness, selected, includeSlider: false);
+            Check(selected.All(index => Json(KeyBindingTransfer.Capture(appliedBrightness, [index], includeSlider: false)) ==
+                Json(KeyBindingTransfer.Capture(brightnessSource, [index], includeSlider: false))),
+                deviceId + ": selected brightness layers apply without remapping other actions or knob press");
+            Check(Enumerable.Range(0, 4).Except(selected).All(index => Json(appliedBrightness.Layers[index]) == Json(brightnessTarget.Layers[index])) &&
+                NonBindings(appliedBrightness) == NonBindings(brightnessTarget) && Json(appliedBrightness.Macros) == Json(brightnessTarget.Macros) &&
+                Json(appliedBrightness.Slider) == Json(brightnessTarget.Slider),
+                deviceId + ": brightness import preserves unselected layers, colors, effects, macros and slider");
+            var wire = OnboardSerializer.Prepare(appliedBrightness);
+            Check(OnboardSerializer.Prepare(OnboardSerializer.Decode(wire.Payload)).Payload.SequenceEqual(wire.Payload),
+                deviceId + ": imported brightness bindings remain valid for a byte-exact device configuration");
+        }
+        Check(Json(brightnessSource) == sourceBefore && Json(brightnessTarget) == targetBefore && Json(loadedBrightness) == Json(selectedBrightness),
+            deviceId + ": brightness export and partial imports never mutate either profile or the loaded document");
     }
 
     var project = ProjectService.Create("numpad"); project.Macros.Add(Tap("used"));

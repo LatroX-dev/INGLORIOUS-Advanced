@@ -45,6 +45,8 @@ public partial class MainWindow
         if (_screenshotMode || _startupLoading || _startupClosed || _checkingFirmwareGuide || _readingDevice || _scanning || (!force && _automaticFirmwareGuideChecked)) return;
         _checkingFirmwareGuide = true; _automaticFirmwareGuideChecked = true;
         CoreImportSelection? importedCore = null;
+        string? installedDeviceId = null;
+        OnboardFirmwareVersion? installedVersion = null;
         try
         {
             _firmwareAssessments.Clear(); RefreshFirmwareVersionLabel();
@@ -63,6 +65,7 @@ public partial class MainWindow
                 var setup = new DeviceSetupWindow(deviceId) { Owner = this };
                 setup.ShowDialog();
                 if (setup.Completed) importedCore = setup.ImportedCoreSelection;
+                if (setup.Completed) { installedDeviceId = setup.DeviceId; installedVersion = setup.ReportedVersion; }
                 RequestConnectionRefresh();
                 return;
             }
@@ -126,6 +129,7 @@ public partial class MainWindow
             _checkingFirmwareGuide = false;
             UpdateSetupDeviceButtons();
             if (importedCore is not null) AdoptSetupCoreImport(importedCore);
+            if (installedDeviceId is not null) MaybeOfferExperimentalFeedback(installedDeviceId, DeviceFeedbackTrigger.Installation, installedVersion);
             StartSharedBrightnessIfReady();
         }
     }

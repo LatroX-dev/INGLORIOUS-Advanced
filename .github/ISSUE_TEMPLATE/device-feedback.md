@@ -12,11 +12,24 @@ Do not include serial numbers, device identifiers, firmware backups, profiles, m
 ## Device feedback
 
 - Device and exact layout:
-- App version:
-- Firmware version (if known):
-- OS version:
+- App version and architecture:
+- App language:
+- Firmware version and build (if known):
+- OS version and architecture:
 - Result: Working well / Problem
+
+## Steps to reproduce (for problems)
+
+What did you do before the problem appeared? Include the step of setup or updating, if relevant.
+
+## Expected behavior
+
+What should have happened?
+
+## Actual behavior
+
+What happened instead? Include the app's error message, if any.
 
 ## Comment
 
-What worked, or what happened and what you expected? This is optional.
+For a working setup, mention which functions you tested. Remove any sections that do not apply.

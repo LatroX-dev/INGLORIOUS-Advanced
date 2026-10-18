@@ -105,8 +105,12 @@ internal static class FirmwareVersionChecks
                 "Numpad patch note is exact; a PRO patch update invents no device-specific fix");
             var redDefaults = new FirmwareSemanticVersion(0, 11, 3);
             var lightingFix = new FirmwareSemanticVersion(0, 11, 4);
-            check(FirmwareChangelog.Between(deviceId, v07, new(65535, 65535, 65535)).All(n => n.Version <= lightingFix)
-                && FirmwareChangelog.Between(deviceId, v07, new(65535, 65535, 65535)).Select(n => n.Version).SequenceEqual(new[] { lightingFix, redDefaults }.Concat(expectedVersions)), "A future target cannot expose notes beyond the current documented firmware");
+            var brightnessBindings = new FirmwareSemanticVersion(0, 11, 5);
+            var knobCycle = new FirmwareSemanticVersion(0, 11, 6);
+            var knobOrder = new FirmwareSemanticVersion(0, 11, 7);
+            var knobFeedback = new FirmwareSemanticVersion(0, 11, 8);
+            check(FirmwareChangelog.Between(deviceId, v07, new(65535, 65535, 65535)).All(n => n.Version <= knobFeedback)
+                && FirmwareChangelog.Between(deviceId, v07, new(65535, 65535, 65535)).Select(n => n.Version).SequenceEqual(new[] { knobFeedback, knobOrder, knobCycle, brightnessBindings, lightingFix, redDefaults }.Concat(expectedVersions)), "A future target cannot expose notes beyond the current documented firmware");
             check(FirmwareChangelog.Between(deviceId, current, redDefaults).Single().Changes.SequenceEqual(new[] { "Red default lighting when no saved colors are available." }), "New default-color note does not invent per-key diagnostics for other boards");
             foreach (var installed in new FirmwareSemanticVersion?[] { null, default(FirmwareSemanticVersion), current, new(0, 11, 2), new(1, 0, 0) })
                 check(FirmwareChangelog.Between(deviceId, installed, current).Count == 0, "Missing/default/current/newer firmware has no proposed update changelog");
@@ -132,10 +136,40 @@ internal static class FirmwareVersionChecks
             foreach (var installed in new FirmwareSemanticVersion?[] { null, default(FirmwareSemanticVersion), latestRelease, new(0, 11, 5) })
                 check(FirmwareChangelog.Between(board.DeviceId, installed, latestRelease).Count == 0,
                     board.DeviceId + ": missing, current or newer firmware has no pending lighting-test fix");
-            check(FirmwareChangelog.Between(board.DeviceId, previousRelease, new(99, 0, 0)).Select(note => note.Version).SequenceEqual(new[] { latestRelease }),
-                board.DeviceId + ": future target cannot invent changes after the documented lighting-test fix");
-            check(FirmwareChangelog.Between(board.DeviceId, latestRelease, new(99, 0, 0)).Count == 0,
-                board.DeviceId + ": undocumented future updates have no guessed notes");
+            var brightnessRelease = new FirmwareSemanticVersion(0, 11, 5);
+            var knobCycleRelease = new FirmwareSemanticVersion(0, 11, 6);
+            var knobOrderRelease = new FirmwareSemanticVersion(0, 11, 7);
+            var knobFeedbackRelease = new FirmwareSemanticVersion(0, 11, 8);
+            var expectedFuture = board.HasEncoder ? new[] { knobFeedbackRelease, knobOrderRelease, knobCycleRelease, brightnessRelease, latestRelease } : new[] { brightnessRelease, latestRelease };
+            check(FirmwareChangelog.Between(board.DeviceId, previousRelease, new(99, 0, 0)).Select(note => note.Version).SequenceEqual(expectedFuture),
+                board.DeviceId + ": future target cannot invent changes after the documented knob feature");
+            check(FirmwareChangelog.Between(board.DeviceId, latestRelease, brightnessRelease).Single().Changes.SequenceEqual(new[] { "Adjust keyboard brightness with the knob or assigned keys." }),
+                board.DeviceId + ": brightness-capable targets show the short feature note");
+            var cycleNotes = FirmwareChangelog.Between(board.DeviceId, brightnessRelease, knobCycleRelease);
+            check(board.HasEncoder
+                ? cycleNotes.Count == 1 && cycleNotes[0].Version == knobCycleRelease && cycleNotes[0].Changes.SequenceEqual(new[] { "New knob actions for scrolling, zoom, tabs and undo/redo.", "Adjust knob sensitivity and hold to switch between selected functions." })
+                : cycleNotes.Count == 0,
+                board.DeviceId + ": only a board with an encoder receives the long-press feature note");
+            check(FirmwareChangelog.Between(board.DeviceId, brightnessRelease, brightnessRelease).Count == 0 &&
+                FirmwareChangelog.Between(board.DeviceId, knobFeedbackRelease, new(99, 0, 0)).Count == 0,
+                board.DeviceId + ": current or undocumented future updates have no guessed notes");
+            var orderNotes = FirmwareChangelog.Between(board.DeviceId, knobCycleRelease, knobOrderRelease);
+            check(board.HasEncoder ? orderNotes.Count == 1 && orderNotes[0].Version == knobOrderRelease &&
+                orderNotes[0].Changes.SequenceEqual(new[] { "Choose the order of knob functions." }) : orderNotes.Count == 0,
+                board.DeviceId + ": only encoder devices receive the short function-order note");
+            var feedbackNotes = FirmwareChangelog.Between(board.DeviceId, knobOrderRelease, knobFeedbackRelease);
+            check(board.HasEncoder ? feedbackNotes.Count == 1 && feedbackNotes[0].Version == knobFeedbackRelease &&
+                feedbackNotes[0].Changes.SequenceEqual(new[] { "Set a different short-press action for each knob function.", "See the active knob function and get a brief light signal when switching." }) : feedbackNotes.Count == 0,
+                board.DeviceId + ": only encoder devices receive press actions and switching feedback notes");
+            foreach (var installed in new FirmwareSemanticVersion?[] { null, default(FirmwareSemanticVersion), knobFeedbackRelease, new(1, 0, 0) })
+                check(FirmwareChangelog.Between(board.DeviceId, installed, knobFeedbackRelease).Count == 0,
+                    board.DeviceId + ": missing, current or newer versions never show a knob feedback update");
+            foreach (var installed in new FirmwareSemanticVersion?[] { null, default(FirmwareSemanticVersion), knobCycleRelease, new(1, 0, 0) })
+                check(FirmwareChangelog.Between(board.DeviceId, installed, knobCycleRelease).Count == 0,
+                    board.DeviceId + ": missing, current or newer versions never show the knob update");
+            foreach (var installed in new FirmwareSemanticVersion?[] { null, default(FirmwareSemanticVersion), knobOrderRelease, new(1, 0, 0) })
+                check(FirmwareChangelog.Between(board.DeviceId, installed, knobOrderRelease).Count == 0,
+                    board.DeviceId + ": missing, current or newer versions never show an ordering update");
         }
         foreach (var unknownDevice in new string?[] { null, "", "PRO-ISO", "pro", "GMMK PRO", "other", "numpad " })
             check(FirmwareChangelog.Between(unknownDevice!, new(0, 7, 0), latestRelease).Count == 0, "Unknown model cannot receive another device's changelog");

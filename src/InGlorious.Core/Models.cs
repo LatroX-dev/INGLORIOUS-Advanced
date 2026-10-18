@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -15,7 +15,7 @@ public record KeyDefinition(string Id, string Label, double X, double Y, double 
     {
         "encoder:ccw" => L.T("Nach links drehen"),
         "encoder:cw" => L.T("Nach rechts drehen"),
-        _ => Label == "Knob" ? L.T("Drehregler drücken") : L.T(Label)
+        _ => Label == "Knob" ? L.T("Drehregler drücken") : DefaultBinding == "KC_PAUS" ? BindingCatalog.FunctionLabel(DefaultBinding) : L.T(Label)
     };
 }
 // Preview geometry in key units, independent of QMK's normalized effect coordinates.
@@ -51,7 +51,7 @@ public record DeviceDefinition(string Id, string Name, string SourceSubtitle, st
 public record BindingOption(string Code, string SourceLabel)
 {
     public bool ShowCode { get; init; }
-    public string Label => L.T(SourceLabel) + (ShowCode ? $"  ·  {Code}" : "");
+    public string Label => (Code == "KC_PAUS" ? BindingCatalog.FunctionLabel(Code) : L.T(SourceLabel)) + (ShowCode ? $"  ·  {Code}" : "");
 }
 public record LightingEffectOption(int Id, string SourceLabel, string SourceDescription, bool HasDirection)
 {
@@ -124,6 +124,14 @@ public sealed class LayerProfile
 {
     public string Name { get; set; } = "Layer";
     public Dictionary<string, KeyAssignment> Keys { get; set; } = [];
+    public bool KnobCycleEnabled { get; set; }
+    public bool KnobCycleMacZoom { get; set; }
+    public int KnobCycleMask { get; set; } = 31;
+    public List<int> KnobCycleOrder { get; set; } = [1, 2, 4, 8, 16, 32, 64, 128];
+    public bool KnobPressByFunction { get; set; }
+    public Dictionary<int, string> KnobPressBindings { get; set; } = [];
+    public int KnobStep { get; set; } = 1;
+    public int KnobUndoLayout { get; set; }
     // Preserve the fallback for older JSON files; new profiles set their color explicitly.
     public string SideLedColor { get; set; } = "#8374F8";
     public Dictionary<int, string> ExtraLedColors { get; set; } = [];
@@ -175,6 +183,134 @@ public sealed class KeyAssignment
 {
     public string Color { get; set; } = "#7367F0";
     public string Binding { get; set; } = "KC_NO";
+}
+public sealed record KnobPreset(string Id, string SourceLabel, string CounterClockwise, string Clockwise)
+{
+    public string Label => L.T(SourceLabel);
+}
+public sealed record KnobCycleOption(int Bit, string SourceLabel)
+{
+    public string Label => L.T(SourceLabel);
+}
+public static class KnobPresets
+{
+    public static int BitForPreset(string? presetId) => presetId switch
+    { "volume" => 1, "brightness" => 2, "tracks" => 4, "scroll" => 8, "zoom" or "zoom-mac" => 16,
+      "hscroll" => 32, "tabs" => 64, "undo" or "undo-mac" => 128, _ => 0 };
+    public static bool IsPressOverrideAssignable(string binding) => binding == "KC_TRNS" || IsTapSafe(binding);
+    public static string GetPressBinding(LayerProfile layer, int bit) => layer.KnobPressBindings.GetValueOrDefault(bit, "KC_TRNS");
+    public static void SetPressBinding(LayerProfile layer, int bit, string binding)
+    {
+        if (!CycleOptions.Any(option => option.Bit == bit) || !IsPressOverrideAssignable(binding))
+            throw new InvalidDataException(L.T("Ungültige Drehregler-Einstellungen."));
+        if (binding == "KC_TRNS") layer.KnobPressBindings.Remove(bit);
+        else layer.KnobPressBindings[bit] = binding;
+    }
+    public static bool IsValidOrder(IReadOnlyList<int>? order) => order is { Count: 8 } &&
+        order.Distinct().Count() == 8 && order.All(bit => bit is 1 or 2 or 4 or 8 or 16 or 32 or 64 or 128);
+    public static bool IsDefaultOrder(IReadOnlyList<int>? order) => IsValidOrder(order) &&
+        order!.Select((bit, index) => bit == 1 << index).All(value => value);
+    public static int EncodeOrder(IReadOnlyList<int> order)
+    {
+        if (!IsValidOrder(order)) throw new InvalidDataException(L.T("Ungültige Drehregler-Einstellungen."));
+        var remaining = new List<int> { 1, 2, 4, 8, 16, 32, 64, 128 };
+        var rank = 0;
+        foreach (var bit in order) { var index = remaining.IndexOf(bit); rank = rank * remaining.Count + index; remaining.RemoveAt(index); }
+        return rank;
+    }
+    public static List<int> DecodeOrder(int rank)
+    {
+        if (rank is < 0 or >= 40320) throw new InvalidDataException(L.T("Ungültige Drehregler-Einstellungen."));
+        int[] digits = new int[8];
+        for (var index = 7; index >= 0; index--) { var divisor = 8 - index; digits[index] = rank % divisor; rank /= divisor; }
+        var remaining = new List<int> { 1, 2, 4, 8, 16, 32, 64, 128 }; var order = new List<int>();
+        foreach (var digit in digits) { order.Add(remaining[digit]); remaining.RemoveAt(digit); }
+        return order;
+    }
+    public static IReadOnlyList<KnobCycleOption> OrderedCycleOptions(LayerProfile layer) =>
+        layer.KnobCycleOrder.Select(bit => CycleOptions.Single(option => option.Bit == bit)).ToArray();
+    public static IReadOnlyList<KnobCycleOption> CycleOptions { get; } = Array.AsReadOnly(new[]
+    {
+        new KnobCycleOption(1, "Lautstärke"), new KnobCycleOption(2, "Helligkeit"),
+        new KnobCycleOption(4, "Musiktitel"), new KnobCycleOption(8, "Scrollen"),
+        new KnobCycleOption(16, "Zoom"), new KnobCycleOption(32, "Horizontal scrollen"),
+        new KnobCycleOption(64, "Tabs wechseln"), new KnobCycleOption(128, "Rückgängig / Wiederholen")
+    });
+    public static string CycleSummary(LayerProfile layer)
+    {
+        var preset = Find(layer);
+        var separateOsVariant = preset?.Id is "zoom" or "zoom-mac" or "undo" or "undo-mac" &&
+            preset.Id.EndsWith("-mac", StringComparison.Ordinal) != layer.KnobCycleMacZoom;
+        var start = preset is null ? new[] { L.T("Eigene Belegung") } : separateOsVariant ? new[] { preset.Label } : Array.Empty<string>();
+        return string.Join(" → ", start.Concat(OrderedCycleOptions(layer).Where(option => (layer.KnobCycleMask & option.Bit) != 0).Select(option => option.Label)));
+    }
+    public static IReadOnlyList<KnobPreset> All { get; } = Array.AsReadOnly(new[]
+    {
+        new KnobPreset("volume", "Lautstärke", "KC_VOLD", "KC_VOLU"),
+        new KnobPreset("brightness", "Helligkeit", "RM_VALD", "RM_VALU"),
+        new KnobPreset("tracks", "Musiktitel", "KC_MPRV", "KC_MNXT"),
+        new KnobPreset("scroll", "Scrollen", "MS_WHLU", "MS_WHLD"),
+        new KnobPreset("zoom", "Zoom (Windows / Linux)", "IG_ZOOM_OUT", "IG_ZOOM_IN"),
+        new KnobPreset("zoom-mac", "Zoom (macOS)", "IG_ZOOM_OUT_MAC", "IG_ZOOM_IN_MAC"),
+        new KnobPreset("hscroll", "Horizontal scrollen", "MS_WHLL", "MS_WHLR"),
+        new KnobPreset("tabs", "Tabs wechseln", "IG_TAB_PREV", "IG_TAB_NEXT"),
+        new KnobPreset("undo", "Rückgängig / Wiederholen (Windows / Linux)", "IG_UNDO", "IG_REDO"),
+        new KnobPreset("undo-mac", "Rückgängig / Wiederholen (macOS)", "IG_UNDO_MAC", "IG_REDO_MAC")
+    });
+    public static KnobPreset? Find(LayerProfile layer) => All.FirstOrDefault(p =>
+        layer.Keys.GetValueOrDefault("encoder:ccw")?.Binding == p.CounterClockwise &&
+        layer.Keys.GetValueOrDefault("encoder:cw")?.Binding == p.Clockwise);
+    public static void Apply(LayerProfile layer, string presetId)
+    {
+        var preset = All.Single(p => p.Id == presetId);
+        if (!layer.Keys.ContainsKey("encoder:ccw") || !layer.Keys.ContainsKey("encoder:cw"))
+            throw new InvalidDataException(L.T("Ungültige Drehregler-Einstellungen."));
+        layer.Keys["encoder:ccw"].Binding = preset.CounterClockwise;
+        layer.Keys["encoder:cw"].Binding = preset.Clockwise;
+        if (layer.KnobCycleEnabled && preset.Id is "zoom" or "zoom-mac" or "undo" or "undo-mac")
+            layer.KnobCycleMacZoom = preset.Id.EndsWith("-mac", StringComparison.Ordinal);
+    }
+    public static bool IsSelection(DeviceDefinition device, IEnumerable<string> selection)
+    {
+        var ids = selection.ToArray();
+        return device.HasEncoder && ids.Length > 0 &&
+            (ids.All(id => id is "encoder:ccw" or "encoder:cw") ||
+             ids.Length == 1 && device.Keys.Any(key => key.Id == ids[0] && key.Label == "Knob"));
+    }
+    public static bool CanCycle(AppProject project, int layer)
+    {
+        var device = DeviceCatalog.All.FirstOrDefault(d => d.Id == project.DeviceId);
+        var press = device?.Keys.SingleOrDefault(key => key.Label == "Knob");
+        if (device?.HasEncoder != true || press is null || layer is < 0 or > 3 || project.Layers?.Count != 4) return false;
+        // Any lower layer may be active beneath a transparent press binding.
+        if (project.Layers[layer]?.Keys?.GetValueOrDefault(press.Id)?.Binding is not { } assigned) return false;
+        if (assigned != "KC_TRNS") return IsTapSafe(assigned);
+        for (var current = layer - 1; current >= 0; current--)
+        {
+            var binding = project.Layers[current]?.Keys?.GetValueOrDefault(press.Id)?.Binding;
+            if (binding is null) return false;
+            if (binding == "KC_TRNS") continue;
+            if (!IsTapSafe(binding)) return false;
+        }
+        return project.Layers[0]?.Keys?.GetValueOrDefault(press.Id)?.Binding is { } basis && basis != "KC_TRNS";
+    }
+    public static bool HasInvalidCycle(AppProject project) => project.Layers is not null &&
+        project.Layers.Select((layer, index) => (layer, index)).Any(item =>
+            item.layer?.KnobCycleEnabled == true && !CanCycle(project, item.index) ||
+            item.layer is { KnobCycleEnabled: false, KnobCycleMacZoom: true } ||
+            item.layer is { KnobCycleMask: < 1 or > 255 } or { KnobStep: < 1 or > 5 } or { KnobUndoLayout: < 0 or > 2 } ||
+            item.layer is { } layer && (!IsValidOrder(layer.KnobCycleOrder) ||
+                layer.KnobPressBindings is null || layer.KnobPressBindings.Any(entry => !CycleOptions.Any(option => option.Bit == entry.Key) || entry.Value is null || entry.Value == "KC_TRNS" || !IsPressOverrideAssignable(entry.Value)) ||
+                !DeviceCatalog.Get(project.DeviceId).HasEncoder && (layer.KnobPressByFunction || layer.KnobPressBindings.Count != 0 || layer.KnobCycleMask != 31 || layer.KnobStep != 1 || layer.KnobUndoLayout != 0 || !IsDefaultOrder(layer.KnobCycleOrder))));
+    public static bool RequiresExtendedActions(string binding) => binding is "MS_WHLU" or "MS_WHLD" or "MS_WHLL" or "MS_WHLR" or
+        "IG_ZOOM_IN" or "IG_ZOOM_OUT" or "IG_ZOOM_IN_MAC" or "IG_ZOOM_OUT_MAC" or
+        "IG_TAB_PREV" or "IG_TAB_NEXT" or "IG_UNDO" or "IG_REDO" or "IG_UNDO_MAC" or "IG_REDO_MAC";
+    private static bool IsTapSafe(string binding) =>
+        !binding.StartsWith("MO(", StringComparison.Ordinal) && !binding.StartsWith("TG(", StringComparison.Ordinal) &&
+        !binding.StartsWith("TO(", StringComparison.Ordinal) &&
+        binding is not ("KC_LCTL" or "KC_RCTL" or "KC_LSFT" or "KC_RSFT" or "KC_LALT" or "KC_RALT" or "KC_LGUI" or "KC_RGUI") &&
+        (binding == "KC_NO" || binding.StartsWith("MACRO:", StringComparison.Ordinal) ||
+         BindingCatalog.IsLightingBrightness(binding) || RequiresExtendedActions(binding) || BindingCatalog.All.Any(option => option.Code == binding && binding.StartsWith("KC_", StringComparison.Ordinal)));
 }
 public sealed class MacroDefinition
 {
@@ -389,10 +525,19 @@ public static class BindingCatalog
 {
     private static readonly Dictionary<string, string> Labels = new()
     {
+        ["MS_WHLU"]="Nach oben scrollen", ["MS_WHLD"]="Nach unten scrollen",
+        ["MS_WHLL"]="Nach links scrollen", ["MS_WHLR"]="Nach rechts scrollen",
+        ["IG_ZOOM_IN"]="Vergrößern (Windows / Linux)", ["IG_ZOOM_OUT"]="Verkleinern (Windows / Linux)",
+        ["IG_ZOOM_IN_MAC"]="Vergrößern (macOS)", ["IG_ZOOM_OUT_MAC"]="Verkleinern (macOS)",
+        ["IG_TAB_PREV"]="Vorheriger Tab", ["IG_TAB_NEXT"]="Nächster Tab",
+        ["IG_UNDO"]="Rückgängig (Windows / Linux)", ["IG_REDO"]="Wiederholen (Windows / Linux)",
+        ["IG_UNDO_MAC"]="Rückgängig (macOS)", ["IG_REDO_MAC"]="Wiederholen (macOS)",
         ["KC_BSLS"]="\\", ["KC_SCRL"]="Scroll Lock", ["KC_PAUS"]="Pause", ["KC_APP"]="Menu",
-        ["KC_ESC"]="Esc", ["KC_PSCR"]="Druck", ["KC_MUTE"]="Stumm", ["KC_GRV"]="^", ["KC_MINS"]="ß", ["KC_EQL"]="´", ["KC_BSPC"]="⌫", ["KC_DEL"]="Entf", ["KC_TAB"]="Tab", ["KC_LBRC"]="Ü", ["KC_RBRC"]="+", ["KC_CAPS"]="Caps", ["KC_SCLN"]="Ö", ["KC_QUOT"]="Ä", ["KC_NUHS"]="#", ["KC_ENT"]="Enter", ["KC_LSFT"]="Shift", ["KC_RSFT"]="Shift", ["KC_NUBS"]="<", ["KC_COMM"]=",", ["KC_DOT"]=".", ["KC_SLSH"]="-", ["KC_Y"]="Z", ["KC_Z"]="Y", ["KC_LCTL"]="Strg", ["KC_RCTL"]="Strg", ["KC_LGUI"]="Win", ["KC_RGUI"]="Win R", ["KC_LALT"]="Alt", ["KC_RALT"]="Alt Gr", ["KC_SPC"]="Space", ["MO(1)"]="Fn", ["KC_LEFT"]="←", ["KC_RGHT"]="→", ["KC_UP"]="↑", ["KC_DOWN"]="↓", ["KC_PGUP"]="Bild ↑", ["KC_PGDN"]="Bild ↓", ["KC_HOME"]="Pos1", ["KC_END"]="Ende", ["KC_INS"]="Einfg", ["KC_TRNS"]="Durchreichen", ["KC_NO"]="Deaktiviert", ["KC_VOLU"]="Lauter", ["KC_VOLD"]="Leiser", ["KC_MPLY"]="Play/Pause", ["KC_MNXT"]="Nächster Titel", ["KC_MPRV"]="Vorheriger Titel", ["KC_MSTP"]="Stopp", ["KC_CALC"]="Rechner", ["KC_MAIL"]="E-Mail öffnen", ["KC_MYCM"]="Dateimanager öffnen", ["KC_NUM"]="Num Lock", ["KC_PSLS"]="/", ["KC_PAST"]="*", ["KC_PMNS"]="−", ["KC_PPLS"]="+", ["KC_PENT"]="Enter", ["KC_PDOT"]=",", ["RM_TOGG"]="RGB an/aus", ["RM_VALU"]="RGB heller", ["RM_VALD"]="RGB dunkler", ["RM_NEXT"]="RGB Effekt weiter"
+        ["KC_ESC"]="Esc", ["KC_PSCR"]="Druck", ["KC_MUTE"]="Stumm", ["KC_GRV"]="^", ["KC_MINS"]="ß", ["KC_EQL"]="´", ["KC_BSPC"]="⌫", ["KC_DEL"]="Entf", ["KC_TAB"]="Tab", ["KC_LBRC"]="Ü", ["KC_RBRC"]="+", ["KC_CAPS"]="Caps", ["KC_SCLN"]="Ö", ["KC_QUOT"]="Ä", ["KC_NUHS"]="#", ["KC_ENT"]="Enter", ["KC_LSFT"]="Shift", ["KC_RSFT"]="Shift", ["KC_NUBS"]="<", ["KC_COMM"]=",", ["KC_DOT"]=".", ["KC_SLSH"]="-", ["KC_Y"]="Z", ["KC_Z"]="Y", ["KC_LCTL"]="Strg", ["KC_RCTL"]="Strg", ["KC_LGUI"]="Win", ["KC_RGUI"]="Win R", ["KC_LALT"]="Alt", ["KC_RALT"]="Alt Gr", ["KC_SPC"]="Space", ["MO(1)"]="Fn", ["KC_LEFT"]="←", ["KC_RGHT"]="→", ["KC_UP"]="↑", ["KC_DOWN"]="↓", ["KC_PGUP"]="Bild ↑", ["KC_PGDN"]="Bild ↓", ["KC_HOME"]="Pos1", ["KC_END"]="Ende", ["KC_INS"]="Einfg", ["KC_TRNS"]="Durchreichen", ["KC_NO"]="Deaktiviert", ["KC_VOLU"]="Lauter", ["KC_VOLD"]="Leiser", ["KC_MPLY"]="Play/Pause", ["KC_MNXT"]="Nächster Titel", ["KC_MPRV"]="Vorheriger Titel", ["KC_MSTP"]="Stopp", ["KC_CALC"]="Rechner", ["KC_MAIL"]="E-Mail öffnen", ["KC_MYCM"]="Dateimanager öffnen", ["KC_NUM"]="Num Lock", ["KC_PSLS"]="/", ["KC_PAST"]="*", ["KC_PMNS"]="−", ["KC_PPLS"]="+", ["KC_PENT"]="Enter", ["KC_PDOT"]=",", ["RM_TOGG"]="RGB an/aus", ["RM_VALU"]="Beleuchtung heller", ["RM_VALD"]="Beleuchtung dunkler", ["RM_NEXT"]="RGB Effekt weiter"
     };
     public static IReadOnlyList<BindingOption> All { get; } = Create();
+    public static bool IsLightingBrightness(string code) => code is "RM_VALU" or "RM_VALD";
+    public static bool IsAssignable(string code) => !code.StartsWith("RM_", StringComparison.Ordinal) || IsLightingBrightness(code);
     // Only character legends depend on the physical layout. Functional labels are
     // translated at display time, without changing the stored labels or bindings.
     public static string AnsiKeyLabel(string code) => code switch
@@ -403,7 +548,8 @@ public static class BindingCatalog
         "KC_RALT" => "Alt", _ => KeyLabel(code)
     };
     // Keep narrow keycaps readable; tooltips and accessibility retain the full names.
-    internal static string CompactLegend(string label) => L.CurrentLanguage == "en" ? label switch
+    private static string PauseKeyLabel => L.CurrentLanguage == "de" ? "Pause" : L.T("Pause-Taste");
+    internal static string CompactLegend(string label) => label == "Pause" ? PauseKeyLabel : L.CurrentLanguage == "en" ? label switch
     {
         "Druck" => "PrtSc", "Entf" => "Del", "Einfg" => "Ins",
         "Bild ↑" => "PgUp", "Bild ↓" => "PgDn", _ => L.T(label)
@@ -411,6 +557,9 @@ public static class BindingCatalog
     public static string KeyLabel(string code) => Labels.TryGetValue(code, out var name) ? name : code.StartsWith("KC_P") && code.Length == 5 && char.IsDigit(code[4]) ? code[4].ToString() : code.StartsWith("KC_") ? code[3..] : code;
     public static string FunctionLabel(string code)
     {
+        if (code == "RM_VALU") return L.T("Beleuchtung heller");
+        if (code == "RM_VALD") return L.T("Beleuchtung dunkler");
+        if (code == "KC_PAUS") return PauseKeyLabel;
         if (LayerGuidance.BindingLabel(code) is { } action) return action;
         if (code is "KC_LCTL" or "KC_RCTL" or "KC_LSFT" or "KC_RSFT" or "KC_LALT" or "KC_RALT" or "KC_LGUI" or "KC_RGUI")
         {
@@ -501,15 +650,20 @@ public static class ProjectService
             if (layer.SideLedColor == null || !Regex.IsMatch(layer.SideLedColor, "\\A#[0-9A-Fa-f]{6}\\z") || layer.ExtraLedColors == null || layer.ExtraLedColors.Any(kv => !device.NonKeyLedIndices.Contains(kv.Key) || kv.Value == null || !Regex.IsMatch(kv.Value, "\\A#[0-9A-Fa-f]{6}\\z")))
                 errors.Add(L.T("Ungültige Seitenbeleuchtung."));
             if (layer.Keys.Count != device.Keys.Count || device.Keys.Any(k => !layer.Keys.ContainsKey(k.Id))) errors.Add(L.F($"Layer {layer.Name}: Tasten passen nicht zum Gerät."));
+            if (layer.KnobPressBindings?.Values.Any(binding => binding is not null && binding.StartsWith("MACRO:", StringComparison.Ordinal) && !macroIds.Contains(binding[6..])) == true)
+                errors.Add(L.T("Ungültige Drehregler-Einstellungen."));
             foreach (var key in layer.Keys.Values)
             {
                 if (key == null) { errors.Add(L.T("Leere Tastenbelegung.")); continue; }
                 if (key.Color == null || !Regex.IsMatch(key.Color, "\\A#[0-9A-Fa-f]{6}\\z")) errors.Add(L.T("RGB-Farben benötigen das Format #RRGGBB."));
                 var binding = key.Binding ?? "";
+                if (!device.HasEncoder && KnobPresets.RequiresExtendedActions(binding) && binding.StartsWith("IG_", StringComparison.Ordinal))
+                    errors.Add(L.T("Diese Drehregler-Funktion ist für dieses Gerät nicht verfügbar."));
                 if (!BindingCatalog.All.Any(b => b.Code == binding) && !Regex.IsMatch(binding, "\\A(MO|TG|TO)\\([0-3]\\)\\z") && !(binding.StartsWith("MACRO:", StringComparison.Ordinal) && macroIds.Contains(binding[6..]))) errors.Add(L.F($"Unbekannte Belegung: {binding}"));
             }
         }
         if (project.Layers[0]?.Keys?.Values.Any(k => k?.Binding == "KC_TRNS") == true) errors.Add(L.T("Der Basis-Layer darf keine durchgereichten Tasten enthalten."));
+        if (KnobPresets.HasInvalidCycle(project)) errors.Add(L.T("Ungültige Drehregler-Einstellungen."));
         var sequences = project.Layers.Where(l => l is not null).SelectMany(l => new[] { l.LightingEffect?.Colors }.Concat(l.LedEffects?.Values.Select(e => e?.Colors) ?? []))
             .Where(c => c is { Count: > 0 } && ColorSequenceRules.IsValid(c)).Select(c => ColorSequenceRules.Identity(c!)).Distinct(StringComparer.Ordinal);
         if (sequences.Count() > ColorSequenceRules.MaximumSequences) errors.Add(L.T("Der Gerätespeicher fasst höchstens acht unterschiedliche Farbfolgen. Gleiche Folgen teilen sich einen Speicherplatz."));

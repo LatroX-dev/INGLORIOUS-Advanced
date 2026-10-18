@@ -1,4 +1,81 @@
 {
+  "Kopieren nicht möglich. Markiere und kopiere den Text in der Vorschau.": {
+    "en": "Could not copy. Select and copy the text in the preview.",
+    "es": "No se pudo copiar. Selecciona y copia el texto de la vista previa.",
+    "fr": "Impossible de copier. Sélectionnez et copiez le texte dans l’aperçu.",
+    "it": "Impossibile copiare. Seleziona e copia il testo nell’anteprima.",
+    "pt-BR": "Não foi possível copiar. Selecione e copie o texto na prévia.",
+    "pl": "Nie udało się skopiować. Zaznacz i skopiuj tekst w podglądzie.",
+    "tr": "Kopyalanamadı. Önizlemedeki metni seçip kopyalayın.",
+    "ru": "Не удалось скопировать. Выделите и скопируйте текст в предпросмотре.",
+    "ja": "コピーできませんでした。プレビューのテキストを選択してコピーしてください。",
+    "ko": "복사할 수 없습니다. 미리보기에서 텍스트를 선택하여 복사하세요.",
+    "zh-Hans": "无法复制。请在预览中选择并复制文本。"
+  },
+  "Schritte zum Problem": {
+    "en": "Steps to reproduce", "es": "Pasos para reproducir el problema", "fr": "Étapes pour reproduire le problème", "it": "Passaggi per riprodurre il problema", "pt-BR": "Passos para reproduzir o problema", "pl": "Kroki odtworzenia problemu", "tr": "Sorunu yeniden oluşturma adımları", "ru": "Шаги для воспроизведения", "ja": "問題の再現手順", "ko": "문제 재현 단계", "zh-Hans": "复现步骤"
+  },
+  "Erwartetes Verhalten": {
+    "en": "Expected behavior", "es": "Comportamiento esperado", "fr": "Comportement attendu", "it": "Comportamento previsto", "pt-BR": "Comportamento esperado", "pl": "Oczekiwane działanie", "tr": "Beklenen davranış", "ru": "Ожидаемое поведение", "ja": "期待する動作", "ko": "예상 동작", "zh-Hans": "预期行为"
+  },
+  "Tatsächliches Verhalten": {
+    "en": "Actual behavior", "es": "Comportamiento real", "fr": "Comportement observé", "it": "Comportamento effettivo", "pt-BR": "Comportamento real", "pl": "Rzeczywiste działanie", "tr": "Gerçekleşen davranış", "ru": "Фактическое поведение", "ja": "実際の動作", "ko": "실제 동작", "zh-Hans": "实际行为"
+  },
+  "Modell, Versionen und System werden ergänzt. Persönliche Dateien und Gerätekennungen bleiben ausgeschlossen.": {
+    "en": "Model, versions and system details are added. Personal files and device identifiers are excluded.",
+    "es": "Se añaden el modelo, las versiones y el sistema. No se incluyen archivos personales ni identificadores del dispositivo.",
+    "fr": "Le modèle, les versions et le système sont ajoutés. Les fichiers personnels et identifiants d’appareil sont exclus.",
+    "it": "Vengono aggiunti modello, versioni e sistema. File personali e identificativi del dispositivo sono esclusi.",
+    "pt-BR": "O modelo, as versões e o sistema são adicionados. Arquivos pessoais e identificadores do dispositivo ficam de fora.",
+    "pl": "Dodawane są model, wersje i system. Pliki osobiste i identyfikatory urządzenia są pomijane.",
+    "tr": "Model, sürümler ve sistem bilgileri eklenir. Kişisel dosyalar ve aygıt kimlikleri dahil edilmez.",
+    "ru": "Добавляются модель, версии и данные системы. Личные файлы и идентификаторы устройства не включаются.",
+    "ja": "モデル、バージョン、システム情報が追加されます。個人ファイルやデバイス識別情報は含まれません。",
+    "ko": "모델, 버전 및 시스템 정보가 추가됩니다. 개인 파일과 기기 식별 정보는 포함되지 않습니다.",
+    "zh-Hans": "将添加型号、版本和系统信息，不包含个人文件或设备标识。"
+  },
+  "Bericht kopieren": {
+    "en": "Copy report", "es": "Copiar informe", "fr": "Copier le rapport", "it": "Copia rapporto", "pt-BR": "Copiar relatório", "pl": "Kopiuj raport", "tr": "Raporu kopyala", "ru": "Копировать отчёт", "ja": "レポートをコピー", "ko": "보고서 복사", "zh-Hans": "复制报告"
+  },
+  "Der Bericht ist zu lang für einen Link. Kopiere ihn und füge ihn in GitHub oder deine E-Mail ein.": {
+    "en": "The report is too long for a link. Copy it and paste it into GitHub or your email.",
+    "es": "El informe es demasiado largo para un enlace. Cópialo y pégalo en GitHub o en tu correo.",
+    "fr": "Le rapport est trop long pour un lien. Copiez-le et collez-le dans GitHub ou votre e-mail.",
+    "it": "Il rapporto è troppo lungo per un link. Copialo e incollalo su GitHub o nella tua e-mail.",
+    "pt-BR": "O relatório é longo demais para um link. Copie e cole no GitHub ou no seu e-mail.",
+    "pl": "Raport jest za długi, aby umieścić go w linku. Skopiuj go i wklej w GitHub lub do e-maila.",
+    "tr": "Rapor bir bağlantı için çok uzun. Kopyalayıp GitHub’a veya e-postanıza yapıştırın.",
+    "ru": "Отчёт слишком длинный для ссылки. Скопируйте его и вставьте в GitHub или письмо.",
+    "ja": "レポートが長すぎるためリンクに含められません。コピーしてGitHubまたはメールに貼り付けてください。",
+    "ko": "보고서가 너무 길어 링크에 포함할 수 없습니다. 복사하여 GitHub 또는 이메일에 붙여넣으세요.",
+    "zh-Hans": "报告太长，无法放入链接。请复制后粘贴到 GitHub 或电子邮件中。"
+  },
+  "Rückmeldung geben": {
+    "en": "Give feedback",
+    "es": "Enviar comentarios",
+    "fr": "Donner un avis",
+    "it": "Lascia un feedback",
+    "pt-BR": "Enviar feedback",
+    "pl": "Przekaż opinię",
+    "tr": "Geri bildirim ver",
+    "ru": "Оставить отзыв",
+    "ja": "フィードバックする",
+    "ko": "피드백 보내기",
+    "zh-Hans": "提供反馈"
+  },
+  "Dein Modell wird experimentell unterstützt. Deine Rückmeldung zu Tasten und Beleuchtung hilft uns besonders.": {
+    "en": "Support for your model is experimental. Feedback on its keys and lighting is especially helpful.",
+    "es": "La compatibilidad con tu modelo es experimental. Tus comentarios sobre las teclas y la iluminación nos ayudan especialmente.",
+    "fr": "La prise en charge de votre modèle est expérimentale. Vos retours sur les touches et l’éclairage nous sont particulièrement utiles.",
+    "it": "Il supporto per il tuo modello è sperimentale. Il tuo feedback su tasti e illuminazione è particolarmente utile.",
+    "pt-BR": "O suporte ao seu modelo é experimental. Seu feedback sobre as teclas e a iluminação é especialmente útil.",
+    "pl": "Obsługa Twojego modelu jest eksperymentalna. Opinie o klawiszach i podświetleniu są dla nas szczególnie pomocne.",
+    "tr": "Modeliniz için destek deneysel aşamadadır. Tuşlar ve aydınlatma hakkındaki geri bildiriminiz bize özellikle yardımcı olur.",
+    "ru": "Поддержка вашей модели экспериментальная. Отзывы о клавишах и подсветке особенно полезны для нас.",
+    "ja": "このモデルのサポートは実験段階です。キーや照明についてのフィードバックが特に役立ちます。",
+    "ko": "이 모델은 실험적으로 지원됩니다. 키와 조명에 대한 피드백이 특히 도움이 됩니다.",
+    "zh-Hans": "你的型号目前处于实验性支持阶段。关于按键和灯光的反馈对我们尤其有帮助。"
+  },
   "Deine Rückmeldung hilft uns, INGLORIOUS Advanced zu verbessern.": {
     "en": "Your feedback helps us improve INGLORIOUS Advanced.",
     "es": "Tus comentarios nos ayudan a mejorar INGLORIOUS Advanced.",

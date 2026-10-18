@@ -10,6 +10,10 @@ public sealed partial class MainWindow
 {
     private string _lastSide = "left";
     private bool _editingSlider;
+    private EditorState? _knobModeState;
+    private int _knobModeLayer = -1;
+    private bool? _knobManual;
+    private Button? _bindingPrimaryAction;
     private async Task ShowLightingSectionAsync(string section)
     {
         if (!await GuardNavigation()) return;
@@ -197,7 +201,10 @@ public sealed partial class MainWindow
         var colors = Input(string.Join(", ", effect.Colors), "#FF0000, #00FF00, #0000FF"); colors.AcceptsReturn = true; colors.MinHeight = 64; colors.Name = "EffectColors";
         var sequencePanel = Column(Heading("Farbfolge"), colors, Text(L.T("Bis zu 8 Farben. Leer verwendet den normalen Farbwechsel."), true, 11));
         var description = Text("", true, 11);
-        var settings = Column(mode, description, Heading("Geschwindigkeit"), speed, Heading("Helligkeit"), brightness, reverse, target, sequencePanel); settings.Name = "EffectSettings";
+        var motion = new Grid { ColumnDefinitions = new("*,*"), ColumnSpacing = 12 };
+        motion.Children.Add(Column(Text(L.T("Geschwindigkeit"), true, 12), speed));
+        var level = Column(Text(L.T("Helligkeit"), true, 12), brightness); Grid.SetColumn(level, 1); motion.Children.Add(level);
+        var settings = Column(mode, description, motion, reverse, target, sequencePanel); settings.Spacing = 12; settings.Name = "EffectSettings";
         void UpdateEffectControls()
         {
             if (mode.SelectedIndex < 0) return;
@@ -253,7 +260,7 @@ public sealed partial class MainWindow
     }
     private void BuildBindingEditor()
     {
-        if (_state.Device.Id == "numpad")
+        if (_state.Device.Id == "numpad" && !IsKnobSelection())
         {
             var keys = AsyncButton("Tasten", () => ShowBindingEditorAsync(false)); keys.Name = "BindingKeysTab";
             var slider = AsyncButton("Schieberegler", () => ShowBindingEditorAsync(true)); slider.Name = "BindingSliderTab";
@@ -261,58 +268,216 @@ public sealed partial class MainWindow
             _editor.Children.Add(Row(keys, slider));
             if (_editingSlider) { BuildSliderEditor(); return; }
         }
+        if (IsKnobSelection())
+        {
+            if (!ReferenceEquals(_knobModeState, _state) || _knobModeLayer != _state.LayerIndex)
+            { _knobModeState = _state; _knobModeLayer = _state.LayerIndex; _knobManual = null; }
+            var manual = _knobManual ?? KnobPresets.Find(_state.Layer) is null;
+            BuildKnobModeSelector(manual);
+            if (!manual) { BuildKnobPresetEditor(); BuildKnobShortPress(); return; }
+            BuildKnobTargetSelector();
+        }
+        else { _knobModeState = null; _knobModeLayer = -1; _knobManual = null; }
         var selectedBinding = Text(L.F($"Auf Ebene {_state.LayerIndex}: {SelectedBindingSummary()}"), true); selectedBinding.Name = "CurrentKeyBindingSummary"; _editor.Children.Add(selectedBinding);
         if (_state.Device.Id == "numpad")
         {
             var numLockHint = Text(L.T("Für Ziffern Num-Lock einschalten. Standardbelegung: Fn + 0."), true, 11);
             numLockHint.Name = "NumpadNumLockHint"; _editor.Children.Add(numLockHint);
         }
-        var layerEntry = AsyncButton("Fn / Ebenenwechsel …", OpenLayerBindingEditorAsync); layerEntry.Name = "OpenLayerBindingEditor"; _editor.Children.Add(layerEntry);
         var search = Input("", L.T("Belegung suchen")); search.Name = "BindingSearch";
-        var list = new ListBox { Name = "BindingChoices", Height = 230 };
+        var list = new ListBox { Name = "BindingChoices", Height = Math.Clamp(Height - 640, 160, 220) };
         list.Loaded += (_, _) =>
         {
             if (list.SelectedItem is not BindingRow selected) return;
             // Use the control lifecycle so queued callbacks do not retain old editors.
-            list.BringIntoView(); list.ScrollIntoView(selected);
+            list.ScrollIntoView(selected);
         };
         var hint = Text("", true, 11); hint.Name = "BindingFunctionHint";
-        var modifiersOnly = false;
+        var category = Choice(new[] { "Alle Funktionen", "Strg, Shift, Alt …", "Beleuchtung", "Ebenen" }.Select(L.T)); category.Name = "BindingCategory";
         void UpdateHint()
         {
             var code = (list.SelectedItem as BindingRow)?.Code ?? (_state.SelectedKeys.Count == 1 ? _state.Layer.Keys[_state.SelectedKeys.Single()].Binding : "");
-            hint.Text = modifiersOnly ? LayerGuidance.ModifierHint : LayerGuidance.BindingDescription(code);
+            hint.Text = category.SelectedIndex == 1 ? LayerGuidance.ModifierHint : LayerGuidance.BindingDescription(code);
             hint.IsVisible = !string.IsNullOrEmpty(hint.Text);
         }
         void Filter()
         {
             var selected = (list.SelectedItem as BindingRow)?.Code ?? (_state.SelectedKeys.Count == 1 ? _state.Layer.Keys[_state.SelectedKeys.Single()].Binding : null);
-            var rows = BindingCatalog.All.Select(binding => binding.Code)
+            var rows = BindingCatalog.All.Select(binding => binding.Code).Where(BindingCatalog.IsAssignable)
                 .Concat(Enumerable.Range(0, 4).SelectMany(layer => new[] { "MO", "TG", "TO" }.Select(action => $"{action}({layer})")))
                 .Concat(_state.Project.Macros.Select(macro => "MACRO:" + macro.Id)).Distinct()
-                .Where(code => (!modifiersOnly || IsModifierBinding(code)) &&
+                .Where(code => (category.SelectedIndex switch { 1 => IsModifierBinding(code), 2 => BindingCatalog.IsLightingBrightness(code), 3 => LayerGuidance.TryLayerAction(code, out _, out _), _ => true }) &&
                     (DisplayBinding(code).Contains(search.Text ?? "", StringComparison.CurrentCultureIgnoreCase) || code.Contains(search.Text ?? "", StringComparison.OrdinalIgnoreCase)))
                 .Select(code => new BindingRow(code, DisplayBinding(code))).ToArray();
             list.ItemsSource = rows; list.SelectedItem = rows.FirstOrDefault(row => row.Code == selected); UpdateHint();
         }
-        Button modifiers = null!;
-        modifiers = Button("Strg, Shift, Alt …", () => { modifiersOnly = !modifiersOnly; modifiers.BorderBrush = Brush(modifiersOnly ? "#EF646B" : "#424950"); Filter(); }); modifiers.Name = "ModifierBindings";
+        category.SelectionChanged += (_, _) => Filter();
         search.TextChanged += (_, _) => Filter(); list.SelectionChanged += (_, _) => UpdateHint(); Filter();
-        _editor.Children.Add(modifiers); _editor.Children.Add(search); _editor.Children.Add(list); _editor.Children.Add(hint);
-        var applyBinding = Button("Zuweisen", () => { if (list.SelectedItem is not BindingRow binding) return; _state.SetBinding(binding.Code); Changed(); Build(); }, true);
-        applyBinding.Name = "AssignKeyBinding"; applyBinding.IsEnabled = _state.Surface == "keys" && _state.SelectedKeys.Count > 0; _editor.Children.Add(applyBinding);
-        _editor.Children.Add(Heading("Systemaktionen"));
-        var system = Choice(new[] { "Windows", "macOS", "Linux" }, Array.IndexOf(new[] { "windows", "macos", "linux" }, OsActionCatalog.CurrentSystem));
-        var layout = Choice(new[] { "QWERTZ · DE", "QWERTY · EN", "AZERTY · FR" });
-        var actionChoice = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
-        OsAction[] actions = [];
-        void Reload() { actions = OsActionCatalog.For(new[] { "windows", "macos", "linux" }[system.SelectedIndex], new[] { "de", "en", "fr" }[layout.SelectedIndex]).ToArray(); actionChoice.ItemsSource = actions.Select(a => a.Label).ToArray(); actionChoice.SelectedIndex = 0; }
-        system.SelectionChanged += (_, _) => Reload(); layout.SelectionChanged += (_, _) => Reload(); Reload();
-        _editor.Children.Add(system); _editor.Children.Add(layout); _editor.Children.Add(actionChoice);
-        _editor.Children.Add(Button("Zuweisen", () => { _state.AssignOsAction(actions[actionChoice.SelectedIndex]); Changed(); }));
+        _editor.Children.Add(category); _editor.Children.Add(search); _editor.Children.Add(list); _editor.Children.Add(hint);
+        var applyBinding = Button("Belegung zuweisen", () => { if (list.SelectedItem is not BindingRow binding) return; _state.SetBinding(binding.Code); Changed(); Build(); }, true);
+        applyBinding.Name = "AssignKeyBinding"; applyBinding.IsEnabled = _state.Surface == "keys" && _state.SelectedKeys.Count > 0; _bindingPrimaryAction = applyBinding;
         var inherit = Button("Belegung darunter verwenden", () => { _state.SetBinding("KC_TRNS"); Changed(); Build(); });
         inherit.Name = "UseUnderlyingBinding"; inherit.IsEnabled = _state.LayerIndex > 0 && _state.Surface == "keys" && _state.SelectedKeys.Count > 0; ToolTip.SetTip(inherit, LayerGuidance.BindingDescription("KC_TRNS"));
+        _editor.Children.Add(new Separator { Margin = new Thickness(0, 10) });
         _editor.Children.Add(inherit); _editor.Children.Add(Button("Deaktivieren", () => { _state.SetBinding("KC_NO"); Changed(); Build(); }));
+    }
+
+    private bool ShowsManualBindings => _page == "Tastenbelegung" && !(_state.Device.Id == "numpad" && _editingSlider) &&
+        (!IsKnobSelection() || (_knobManual ?? KnobPresets.Find(_state.Layer) is null));
+
+    private async Task ShowOsActionAsync()
+    {
+        if (Program.Offline || !ShowsManualBindings || !await GuardNavigation()) return;
+        _navigating = true;
+        try { await AssignOsActionCoreAsync(() => CreateOsActionWindow().ShowDialog<OsAction?>(this)); }
+        finally { _navigating = false; }
+    }
+
+    private async Task<bool> AssignOsActionCoreAsync(Func<Task<OsAction?>> choose)
+    {
+        var state = _state; var layer = state.LayerIndex; var keys = state.SelectedKeys.ToArray();
+        var fingerprint = EditorState.Fingerprint(state.Project); var path = state.Path;
+        bool Current() => IsKeyBindingContextCurrent(state, fingerprint, path) && state.LayerIndex == layer &&
+            ShowsManualBindings && state.Surface == "keys" && keys.Length > 0 && state.SelectedKeys.SetEquals(keys);
+        if (!Current()) return false;
+        var action = await choose(); if (action is null || !Current()) return false;
+        state.AssignOsAction(action); Changed(); Build(); return true;
+    }
+
+    private Window CreateOsActionWindow()
+    {
+        var dialog = new Window { Title = L.T("Systemaktionen"), Width = 540, MaxHeight = 600, SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, CanResize = false, Background = Brush("#141618") };
+        var title = Text(L.T("Systemaktionen"), size: 21); title.FontWeight = FontWeight.SemiBold;
+        var system = Choice(new[] { "Windows", "macOS", "Linux" }, Array.IndexOf(new[] { "windows", "macos", "linux" }, OsActionCatalog.CurrentSystem)); system.Name = "OsActionSystem";
+        var keyboardLayout = Choice(new[] { "QWERTZ · DE", "QWERTY · EN", "AZERTY · FR" }); keyboardLayout.Name = "OsActionKeyboardLayout";
+        var actionChoice = new ComboBox { Name = "OsActionChoice", HorizontalAlignment = HorizontalAlignment.Stretch };
+        OsAction[] actions = [];
+        void Reload()
+        {
+            actions = OsActionCatalog.For(new[] { "windows", "macos", "linux" }[system.SelectedIndex], new[] { "de", "en", "fr" }[keyboardLayout.SelectedIndex]).ToArray();
+            actionChoice.ItemsSource = actions.Select(action => action.Label).ToArray(); actionChoice.SelectedIndex = 0;
+        }
+        system.SelectionChanged += (_, _) => Reload(); keyboardLayout.SelectionChanged += (_, _) => Reload(); Reload();
+        var fields = new Grid { ColumnDefinitions = new("*,*"), ColumnSpacing = 10 };
+        fields.Children.Add(system); Grid.SetColumn(keyboardLayout, 1); fields.Children.Add(keyboardLayout);
+        var cancel = new Button { Content = ButtonContent("Abbrechen"), IsCancel = true, IsDefault = true }; cancel.Click += (_, _) => dialog.Close();
+        var assign = new Button { Name = "ConfirmOsAction", Content = ButtonContent("Belegung zuweisen") }; assign.Classes.Add("primary");
+        assign.Click += (_, _) => { if (actionChoice.SelectedIndex >= 0) dialog.Close(actions[actionChoice.SelectedIndex]); };
+        var footer = Row(cancel, assign); footer.HorizontalAlignment = HorizontalAlignment.Right; footer.Margin = new Thickness(0, 16, 0, 0);
+        var body = Column(title, fields, actionChoice); body.Spacing = 16;
+        var content = new Grid { RowDefinitions = new("*,Auto"), Margin = new Thickness(24) };
+        content.Children.Add(new ScrollViewer { Content = body }); Grid.SetRow(footer, 1); content.Children.Add(footer); dialog.Content = content;
+        dialog.Opened += (_, _) => { if (dialog.Screens.ScreenFromWindow(dialog) is { } screen) ConstrainKnobDialog(dialog, screen.WorkingArea.Width / screen.Scaling, screen.WorkingArea.Height / screen.Scaling); };
+        return dialog;
+    }
+    private bool IsKnobSelection() => !(_state.Device.Id == "numpad" && _editingSlider) && _state.Surface == "keys" &&
+        KnobPresets.IsSelection(_state.Device, _state.SelectedKeys);
+    private void BuildKnobPresetEditor()
+    {
+        _editor.Children.Add(Text(L.T("Drehregler"), true, 12));
+        var current = KnobPresets.Find(_state.Layer);
+        var customOffset = current is null ? 1 : 0;
+        var choices = (current is null ? new[] { L.T("Eigene Belegung") } : Array.Empty<string>())
+            .Concat(KnobPresets.All.Select(preset => preset.Label)).ToArray();
+        int CurrentIndex() => KnobPresets.Find(_state.Layer) is { } selected
+            ? KnobPresets.All.ToList().FindIndex(preset => preset.Id == selected.Id) + customOffset : 0;
+        var presetChoice = Choice(choices, CurrentIndex()); presetChoice.Name = "KnobPresetChoice";
+        Avalonia.Automation.AutomationProperties.SetName(presetChoice, L.T("Drehregler"));
+        var restoringSelection = false;
+        presetChoice.SelectionChanged += async (_, _) =>
+        {
+            if (_building || restoringSelection) return;
+            try
+            {
+                if (presetChoice.SelectedIndex >= customOffset &&
+                    await AssignKnobPresetAsync(KnobPresets.All[presetChoice.SelectedIndex - customOffset].Id)) return;
+            }
+            catch (Exception ex) { Status(ex.Message); }
+            restoringSelection = true; presetChoice.SelectedIndex = CurrentIndex(); restoringSelection = false;
+        };
+        _editor.Children.Add(presetChoice);
+        if (current?.Id is "undo" or "undo-mac")
+        {
+            _editor.Children.Add(Text(L.T("Tastaturlayout für Rückgängig"), true, 11));
+            var undoLayout = Choice(new[] { "QWERTY", "QWERTZ", "AZERTY" }, _state.Layer.KnobUndoLayout); undoLayout.Name = "KnobUndoLayout";
+            Avalonia.Automation.AutomationProperties.SetName(undoLayout, L.T("Tastaturlayout für Rückgängig"));
+            var restoringLayout = false;
+            undoLayout.SelectionChanged += async (_, _) =>
+            {
+                if (_building || restoringLayout) return;
+                try { if (await SetKnobUndoLayoutAsync(undoLayout.SelectedIndex)) return; }
+                catch (Exception ex) { Status(ex.Message); }
+                restoringLayout = true; undoLayout.SelectedIndex = _state.Layer.KnobUndoLayout; restoringLayout = false;
+            };
+            _editor.Children.Add(undoLayout);
+        }
+        var step = Choice(Enumerable.Range(1, 5).Select(value => value.ToString()), _state.Layer.KnobStep - 1);
+        step.Name = "KnobStep"; step.MinWidth = 62; step.Width = 62;
+        Avalonia.Automation.AutomationProperties.SetName(step, L.T("Schritte pro Rastung"));
+        var restoringStep = false;
+        step.SelectionChanged += async (_, _) =>
+        {
+            if (_building || restoringStep) return;
+            try { if (await SetKnobStepAsync(step.SelectedIndex + 1)) return; }
+            catch (Exception ex) { Status(ex.Message); }
+            restoringStep = true; step.SelectedIndex = _state.Layer.KnobStep - 1; restoringStep = false;
+        };
+        var stepRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 8 };
+        var stepLabel = Text(L.T("Schritte pro Rastung")); stepLabel.VerticalAlignment = VerticalAlignment.Center;
+        stepRow.Children.Add(stepLabel); Grid.SetColumn(step, 1); stepRow.Children.Add(step); _editor.Children.Add(stepRow);
+        ToolTip.SetTip(stepRow, L.T("Gilt für Lautstärke, Helligkeit, Scrollen und Zoom."));
+        var canCycle = KnobPresets.CanCycle(_state.Project, _state.LayerIndex);
+        var cycle = new CheckBox
+        {
+            Name = "KnobCycleEnabled", Content = Text(L.T("Lange drücken: Funktion wechseln")),
+            IsChecked = _state.Layer.KnobCycleEnabled, IsEnabled = canCycle || _state.Layer.KnobCycleEnabled
+        };
+        cycle.Click += async (_, _) =>
+        {
+            try { if (await SetKnobCycleAsync(cycle.IsChecked == true)) return; }
+            catch (Exception ex) { Status(ex.Message); }
+            cycle.IsChecked = _state.Layer.KnobCycleEnabled;
+        };
+        _editor.Children.Add(cycle);
+        var hint = !canCycle ? "Zum Wechseln darf der kurze Druck keine Fn-Taste, Ebene oder Tastenkombination sein."
+            : "700 ms halten. Kurzes Drücken behält seine Belegung.";
+        var cycleHint = Text(L.T(hint), true, 11); cycleHint.Name = "KnobCycleHint";
+        cycleHint.IsVisible = !canCycle || _state.Layer.KnobCycleEnabled; _editor.Children.Add(cycleHint);
+        if (_state.Layer.KnobCycleEnabled)
+        {
+            var summary = Text(KnobPresets.CycleSummary(_state.Layer), true, 11); summary.Name = "KnobCycleSummary"; _editor.Children.Add(summary);
+            var functions = AsyncButton("Reihenfolge …", ShowKnobCycleOptionsAsync); functions.Name = "KnobCycleOptions"; _editor.Children.Add(functions);
+        }
+        var applicationHint = Text(L.T("Zoom, Tabs und Rückgängig hängen von der geöffneten Anwendung ab."), true, 11);
+        applicationHint.Name = "KnobApplicationHint";
+        applicationHint.IsVisible = current?.Id is "zoom" or "zoom-mac" or "tabs" or "undo" or "undo-mac";
+        _editor.Children.Add(applicationHint);
+    }
+    private async Task<bool> AssignKnobPresetAsync(string presetId)
+    {
+        if (_busy || _startupLoading || !IsKnobSelection()) return false;
+        var state = _state; var layer = state.LayerIndex;
+        if (!await GuardNavigation() || !ReferenceEquals(state, _state) || layer != state.LayerIndex || !IsKnobSelection()) return false;
+        if (KnobPresets.Find(state.Layer)?.Id == presetId) return true;
+        CommitCandidate(project => KnobPresets.Apply(project.Layers[layer], presetId));
+        Changed(); Build(); Status(L.T("Drehregler-Vorlage zugewiesen.")); return true;
+    }
+    private async Task<bool> SetKnobCycleAsync(bool enabled)
+    {
+        if (_busy || _startupLoading || !IsKnobSelection()) return false;
+        var state = _state; var layer = state.LayerIndex;
+        if (!await GuardNavigation() || !ReferenceEquals(state, _state) || layer != state.LayerIndex || !IsKnobSelection()) return false;
+        if (enabled && !KnobPresets.CanCycle(state.Project, layer)) return false;
+        if (state.Layer.KnobCycleEnabled == enabled) return true;
+        CommitCandidate(project =>
+        {
+            var target = project.Layers[layer]; var preset = KnobPresets.Find(target);
+            target.KnobCycleEnabled = enabled;
+            target.KnobCycleMacZoom = enabled && (preset?.Id is "zoom-mac" or "undo-mac" ||
+                preset?.Id is not ("zoom" or "undo") && OsActionCatalog.CurrentSystem == "macos");
+        });
+        Changed(); Build(); Status(L.T(enabled ? "Wechsel per langem Druck aktiviert." : "Wechsel per langem Druck deaktiviert.")); return true;
     }
     private static bool IsModifierBinding(string code) => code is "KC_LCTL" or "KC_RCTL" or "KC_LSFT" or "KC_RSFT" or "KC_LALT" or "KC_RALT" or "KC_LGUI" or "KC_RGUI";
     private string DisplayBinding(string binding)
@@ -326,12 +491,8 @@ public sealed partial class MainWindow
         var keys = _state.Device.Keys.Where(key => _state.Surface == "keys" && _state.SelectedKeys.Contains(key.Id)).ToArray();
         if (keys.Length == 0) return L.T("Wähle zuerst mindestens eine Taste in der Geräteansicht.");
         if (keys.Length == 1) return keys[0].AccessibleLabel + " · " + DisplayBinding(_state.Layer.Keys[keys[0].Id].Binding);
+        if (keys.All(key => key.IsEncoder)) return L.T("Drehen") + " · " + string.Join(", ", keys.Select(key => DisplayBinding(_state.Layer.Keys[key.Id].Binding)).Distinct());
         return L.F($"{keys.Length} Tasten ausgewählt") + " · " + string.Join(", ", keys.Select(key => DisplayBinding(_state.Layer.Keys[key.Id].Binding)).Distinct().Take(3));
-    }
-    private async Task OpenLayerBindingEditorAsync()
-    {
-        if (!await GuardNavigation()) return;
-        _page = "Ebenen"; _editingSlider = false; Build();
     }
     private sealed record BindingRow(string Code, string Label) { public override string ToString() => Label; }
     private void BuildLayerEditor()
@@ -357,8 +518,8 @@ public sealed partial class MainWindow
             assign.IsEnabled = _state.Surface == "keys" && _state.SelectedKeys.Count > 0 && !cannotHold;
         }
         behavior.SelectionChanged += (_, _) => UpdateBehavior(); target.SelectionChanged += (_, _) => UpdateBehavior(); UpdateBehavior();
-        _editor.Children.Add(Heading("Zielebene")); _editor.Children.Add(target);
-        _editor.Children.Add(Heading("Verhalten")); _editor.Children.Add(behavior); _editor.Children.Add(description); _editor.Children.Add(assign);
+        _editor.Children.Add(Text(L.T("Zielebene"), true, 12)); _editor.Children.Add(target);
+        _editor.Children.Add(Text(L.T("Verhalten"), true, 12)); _editor.Children.Add(behavior); _editor.Children.Add(description); _editor.Children.Add(assign);
         if (_preferences.ShowHelp) _editor.Children.Add(Text(LayerGuidance.FnExample, true, 11));
         _editor.Children.Add(new Separator { Margin = new Thickness(0, 10) });
         var name = Input(_state.Layer.Name);

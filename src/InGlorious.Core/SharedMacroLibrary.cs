@@ -32,6 +32,22 @@ public sealed record MacroProfileImport(AppProject Project, IReadOnlyList<string
 
 public static class SharedMacroLibrary
 {
+    public static AppProject RemoveFromProfile(AppProject source, string macroId)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var project = ProjectService.Clone(source);
+        project.Macros.RemoveAll(macro => macro.Id == macroId);
+        var binding = "MACRO:" + macroId;
+        foreach (var layer in project.Layers)
+        {
+            foreach (var assignment in layer.Keys.Values)
+                if (assignment.Binding == binding) assignment.Binding = "KC_NO";
+            foreach (var bit in layer.KnobPressBindings.Where(pair => pair.Value == binding).Select(pair => pair.Key).ToArray())
+                layer.KnobPressBindings[bit] = "KC_NO";
+        }
+        return project;
+    }
+
     public const int MaximumMacros = 256, MaximumFileBytes = 8 * 1024 * 1024;
     public static string DefaultPath => System.IO.Path.Combine(Paths.DataRoot, "macro-library.macros.json");
     private static readonly JsonSerializerOptions Options = new()

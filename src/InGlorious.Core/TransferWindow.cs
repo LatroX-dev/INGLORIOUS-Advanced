@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -36,7 +36,7 @@ public sealed partial class TransferWindow : Window
     private VerifiedTarget? SelectedTarget => _targetChoice.SelectedItem as VerifiedTarget;
     private async Task<OnboardExtensions?> ReadRequiredExtensionsAsync(OnboardClient client)
     {
-        if (!_image.RequiresScreensaver) return null;
+        if (!_image.RequiresScreensaver && !_image.RequiresKnobCycle) return null;
         try { return await client.GetExtensionsAsync(); }
         catch (Exception ex) when (ex is IOException or NotSupportedException)
         {
@@ -358,6 +358,7 @@ public sealed partial class TransferWindow : Window
     }
 
     private string? UnsupportedFeature(OnboardInfo info) =>
+        (_image.RequiresKnobCycle && _currentExtensions?.SupportsKnobCycle != true || _image.RequiresKnobOrder && _currentExtensions?.SupportsKnobOrder != true) ? L.T("Diese Drehregler-Einstellungen benötigen ein Firmware-Update. Es wird nichts übertragen.") :
         _image.RequiresScreensaver && _currentExtensions?.SupportsScreensaver != true ? L.T("Der Screensaver benötigt ein Firmware-Update. Es wird nichts übertragen.") :
         _image.RequiresStandby && !info.SupportsStandby ? L.T("Standby benötigt ein Firmware-Update. Es wird nichts übertragen.") :
         _image.RequiresColorSequences && !info.SupportsColorSequences ? L.T("Eigene Farbfolgen benötigen ein Firmware-Update. Es wird nichts übertragen.") :

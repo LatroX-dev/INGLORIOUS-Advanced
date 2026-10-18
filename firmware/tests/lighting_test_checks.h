@@ -28,7 +28,7 @@ static void lighting_test_checks(void) {
     uint8_t config[IG_MAX_SIZE], backing_before[sizeof(mock_backing)];
     uint8_t action = 0, set_brightness = 11;
     reset();
-    check(command(11,NULL,0)==0 && response[6]==8 && u16(response+8)==1 && u16(response+10)==3 && u16(response+12)==21000 && u16(response+14)==0,"extension discovery reports version, both capabilities, bounded duration, reserved zeros");
+    check(command(11,NULL,0)==0 && response[6]==8 && u16(response+8)==1 && u16(response+10)==123 && u16(response+12)==21000 && u16(response+14)==0,"extension discovery reports version, lighting and ordered knob capabilities, bounded duration, reserved zeros");
     check(command(11,&action,1)==1,"extension discovery rejects nonempty request");
     check(command(12,NULL,0)==1,"light test requires exactly one action byte");
     uint8_t excess[2]={1,0}; check(command(12,excess,2)==1,"light test rejects extra payload");

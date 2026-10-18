@@ -19,6 +19,8 @@ The **?** button in the app opens the guide in your selected language. **Device 
 
 Include the exact keyboard model and layout, operating system, app and firmware versions, what you expected and what happened. A short error message or screenshot usually helps. Check [existing issues](https://github.com/LatroX-dev/INGLORIOUS-Advanced/issues) before opening a new one.
 
+The in-app report fills in the model, layout, support status, app version and language, firmware version and build when known, bundled firmware version, and system architecture. Choose **Report a problem** to add the steps, expected behavior and actual behavior. Review the complete draft before opening GitHub or email; nothing is sent automatically. Use **Copy report** when a long report cannot fit in a link.
+
 For a failed firmware operation, include the message shown by the app and whether the keyboard is still in update mode. Follow the displayed recovery instructions; do not force another model's firmware onto the device.
 
 GitHub issues are public. Do not upload original-firmware backups, personal profiles, serial numbers or unredacted logs. Keep your backups locally for recovery.

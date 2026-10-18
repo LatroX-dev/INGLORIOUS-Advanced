@@ -96,6 +96,26 @@ try
         if (media.Contains(key)) Reject(() => SharedMacroLibrary.Validate([Tap(key: key)]), "Media macro rejected " + key);
         else { SharedMacroLibrary.Validate([Tap(key: key)]); checks++; }
     }
+    foreach (var device in DeviceCatalog.All.Where(device => device.HasEncoder))
+    {
+        var profile = ProjectService.Create(device.Id);
+        profile.Macros = [new() { Id = "remove", Name = "Remove", Steps = Tap().Steps }, new() { Id = "keep", Name = "Keep", Steps = Tap(key: "KC_B").Steps }];
+        foreach (var layer in profile.Layers)
+        {
+            layer.Keys[device.Keys.First(key => !key.IsEncoder).Id].Binding = "MACRO:remove";
+            layer.KnobPressBindings = new() { [1] = "MACRO:remove", [2] = "MACRO:keep", [128] = "MACRO:remove" };
+        }
+        profile.Layers[2].KnobPressByFunction = true;
+        var before = Serialize(profile);
+        var removed = SharedMacroLibrary.RemoveFromProfile(profile, "remove");
+        Check(Serialize(profile) == before && removed.Macros.Select(macro => macro.Id).SequenceEqual(["keep"]), device.Id + ": macro removal creates a detached undoable candidate");
+        Check(removed.Layers.All(layer => !layer.Keys.Values.Any(key => key.Binding == "MACRO:remove") && layer.KnobPressBindings[1] == "KC_NO" &&
+            layer.KnobPressBindings[128] == "KC_NO" && layer.KnobPressBindings[2] == "MACRO:keep"), device.Id + ": removal clears every physical and function-specific reference, including disabled assignments");
+        Check(removed.Layers[2].KnobPressByFunction && !removed.Layers[1].KnobPressByFunction, device.Id + ": removing a macro does not toggle short-press mode");
+        OnboardSerializer.ValidateEditorProject(removed); checks++;
+        var imported = SharedMacroLibrary.CopyIntoProfile(profile, [Tap("Another macro")]);
+        Check(Serialize(imported.Project.Layers) == Serialize(profile.Layers), device.Id + ": copying another macro retains every per-function press reference and mode");
+    }
     foreach (var key in new[] { "KC_MAIL", "KC_MYCM" })
     {
         Reject(() => SharedMacroLibrary.Parse(Document(Serialize(new[] { Tap(key: key) }))), "Consumer key import rejected " + key);

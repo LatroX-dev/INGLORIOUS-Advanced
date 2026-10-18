@@ -15,6 +15,7 @@ public partial class MainWindow
         var setupDevicesBefore = _setupDevices;
         var preferencesBefore = _preferences;
         var confirmationsBefore = _confirmedDeviceSaves.ToArray();
+        var requiredBefore = _deviceReadRequired.ToArray();
         var scanFailedBefore = _connectionScanFailed; var pendingBefore = _connectionRefreshPending;
         var revisionBefore = _connectionRevision; var nextScanBefore = _nextConnectionScan;
         var scanningBefore = _scanning; var readingBefore = _readingDevice; var guideBefore = _checkingFirmwareGuide;
@@ -42,12 +43,15 @@ public partial class MainWindow
             IsEnabled = true; _connectionScanFailed = false;
             _pendingEditDecisionOverride = () => PendingEditChoice.Discard;
             ResetWorkflowFixture("pro-iso");
+            _devices = [];
             var pro = DevicePresence("pro-iso"); var pad = DevicePresence("numpad");
             await ScanDevicesAsync(scan: () => Snapshot(pro, pad));
             check(VisibleModels().SequenceEqual(new[] { "pro-iso", "numpad" }) && IsActiveDeviceConnected,
                 "Connections: only the two present normal-mode models appear, not seven offline editor layouts");
-            check(ReadDeviceButton.IsEnabled && TransferButton.IsEnabled,
-                "Connections: a present supported model offers read and transfer, which retain their separate protocol checks");
+            check(ReadDeviceButton.IsEnabled && !TransferButton.IsEnabled && DeviceConfigurationNeedsRead,
+                "Connections: a newly connected model must be read before its stale local session can be transferred");
+            MarkDeviceConfigurationRead(_project); BuildDeviceButtons();
+            check(ReadDeviceButton.IsEnabled && TransferButton.IsEnabled, "Connections: verified configuration read enables transfer");
             ClickDevice("numpad");
             check(Device.Id == "numpad" && HighlightedModels().SequenceEqual(new[] { "numpad" }),
                 "Connections: clicking the Numpad button opens its session and highlights only that device");
@@ -217,6 +221,7 @@ public partial class MainWindow
             _confirmedDeviceSaves.Clear(); foreach (var entry in confirmationsBefore) _confirmedDeviceSaves.Add(entry.Key, entry.Value);
             _scanning = scanningBefore; _readingDevice = readingBefore; _checkingFirmwareGuide = guideBefore;
             _startupLoading = loadingBefore; _startupFinishing = finishingBefore; _startupClosed = closedBefore;
+            _deviceReadRequired.Clear(); foreach (var pair in requiredBefore) _deviceReadRequired.Add(pair.Key, pair.Value);
             IsEnabled = enabledBefore; _pendingEditDecisionOverride = decisionBefore;
             BuildDeviceButtons(); UpdateSourceHint();
         }

@@ -32,19 +32,27 @@ public sealed partial class DeviceSetupWindow : Window
     private readonly List<Window> _owners = [];
     private readonly ComboBox _devices = new() { Name = "SetupDevices", MinHeight = 36, Margin = new(0, 10, 0, 12) };
     private readonly TextBlock _flowTitle = Text(24), _deviceName = Text(13), _version = Text(13), _step = Text(13), _heading = Text(22), _description = Text(13), _status = Text(13), _experimental = Text(12), _backup = Text(13);
-    private readonly ProgressBar _stepProgress = new() { Name = "SetupStepProgress", Maximum = 5, Height = 3, MinHeight = 0, Margin = new(0, 18, 0, 0), IsHitTestVisible = false };
-    private readonly Border _summary = new() { CornerRadius = new(6), Padding = new(16), Margin = new(0, 0, 0, 16) };
-    private readonly Border _keyPanel = new() { Name = "SetupKeyCombination", CornerRadius = new(6), Padding = new(20), Margin = new(0, 0, 0, 16), BorderThickness = new(1) };
+    private readonly ProgressBar _stepProgress = new() { Name = "SetupStepProgress", Maximum = 5, Height = 3, MinHeight = 0, Margin = new(0, 12, 0, 0), IsHitTestVisible = false };
+    private readonly Border _summary = new() { CornerRadius = new(6), Padding = new(12), Margin = new(0, 0, 0, 12) };
+    private readonly Border _keyPanel = new() { Name = "SetupKeyCombination", CornerRadius = new(6), Padding = new(16), Margin = new(0, 0, 0, 12), BorderThickness = new(1) };
     private readonly StackPanel _keyCaps = new() { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
-    private readonly CheckBox _modelConfirmation = new() { Name = "SetupModelConfirmed", Margin = new(0, 18, 0, 0) };
+    private readonly CheckBox _modelConfirmation = new() { Name = "SetupModelConfirmed", Margin = new(0, 8, 0, 0) };
     private readonly Button _search = new() { Name = "SetupSearch", HorizontalAlignment = HorizontalAlignment.Left };
     private readonly Button _action = new() { Name = "SetupAction", MinWidth = 155, Margin = new(12, 0, 0, 0) };
     private readonly Button _close = new() { Name = "SetupClose", MinWidth = 100 };
     private readonly ProgressBar _activity = new() { Height = 4, MinHeight = 0, IsIndeterminate = true, Margin = new(0, 12, 0, 0), IsVisible = false };
     private readonly TextBlock _keepOpen = Text(12);
     private readonly StackPanel _driverHelp = new() { Margin = new(0, 14, 0, 0), IsVisible = false };
+    private readonly Grid _flowBody = new() { Name = "SetupFlowBody", RowDefinitions = new("Auto,*,Auto") };
+    private readonly StackPanel _flowContent = new() { Name = "SetupStepContent" };
+    private readonly ScrollViewer _statusScroll = new()
+    {
+        Name = "SetupStatusScroll", MaxHeight = 90,
+        VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+    };
     public string? DeviceId => _session?.DeviceId;
     public bool Completed => _progress?.Stage == SetupStage.Complete && _writeAttempted;
+    public OnboardFirmwareVersion? ReportedVersion => Completed && _operation != SetupOperation.Restore ? _runtimeVersion : null;
     public bool DeviceStateMayHaveChanged => _writeAttempted || _outcomeUncertain;
 
     private static IBrush Palette(string key) => new SolidColorBrush(Color.Parse(key switch
@@ -57,31 +65,32 @@ public sealed partial class DeviceSetupWindow : Window
         _preferredDeviceId = preferredDeviceId; _preferredInstanceId = preferredInstanceId; _operation = operation; _offlinePreview = offlinePreview || Program.Offline;
         _service = _offlinePreview ? null : new DeviceSetupService();
         Title = OperationTitle + " · INGLORIOUS Advanced";
-        Width = 760; Height = 710; MinWidth = 680; MinHeight = 620;
+        Width = 880; Height = 710; MinWidth = 760; MinHeight = 620;
         WindowStartupLocation = WindowStartupLocation.CenterOwner; ShowInTaskbar = false;
         Background = Palette("WindowBackground"); Foreground = Palette("Text"); FontSize = 13; UseLayoutRounding = true;
         using (var icon = AssetLoader.Open(new Uri("avares://INGLORIOUS Advanced/Assets/inglorious.ico"))) Icon = new WindowIcon(icon);
-        var root = new Grid { Background = Background, Margin = new(24), RowDefinitions = new("Auto,*,Auto") };
-        var header = new StackPanel { Margin = new(0, 0, 0, 20) };
+        var root = new Grid { Background = Background, Margin = new(20), RowDefinitions = new("Auto,*,Auto") };
+        var header = new StackPanel { Margin = new(0, 0, 0, 16) };
         _flowTitle.Text = OperationTitle; _flowTitle.FontWeight = FontWeight.SemiBold;
         _deviceName.Foreground = Palette("Muted"); _deviceName.Margin = new(0, 5, 0, 0);
         _stepProgress.Foreground = _activity.Foreground = Palette("Accent"); _stepProgress.Background = _activity.Background = Palette("Stroke");
         header.Children.Add(_flowTitle); header.Children.Add(_deviceName); header.Children.Add(_experimental); header.Children.Add(_stepProgress); root.Children.Add(header);
-        var body = new StackPanel();
-        _step.Foreground = Palette("Accent"); _step.FontWeight = FontWeight.SemiBold; _step.Margin = new(0, 0, 0, 8);
+        _step.Foreground = Palette("Accent"); _step.FontWeight = FontWeight.SemiBold; _step.Margin = new(0, 0, 0, 6);
         _heading.FontWeight = FontWeight.SemiBold;
-        _description.Foreground = Palette("Muted"); _description.LineHeight = 21; _description.Margin = new(0, 10, 0, 14);
+        _description.Foreground = Palette("Muted"); _description.LineHeight = 20; _description.Margin = new(0, 8, 0, 10);
         var summaryContent = new StackPanel(); summaryContent.Children.Add(_version); summaryContent.Children.Add(_backup);
         _summary.Background = Palette("Surface"); _summary.Child = summaryContent;
         _keyPanel.Background = Palette("SurfaceRaised"); _keyPanel.BorderBrush = Palette("Stroke"); _keyPanel.Child = _keyCaps;
         InitializeCompletionControls();
-        foreach (var element in new Control[] { _step, _heading, _description, _devices, _keyPanel, _summary, _modelConfirmation, _activity, _status, _completion, _driverHelp }) body.Children.Add(element);
-        var scroll = new ScrollViewer { Content = body, Padding = new(0, 0, 10, 0), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
-        Grid.SetRow(scroll, 1); root.Children.Add(scroll);
+        foreach (var element in new Control[] { _step, _heading, _description, _devices, _keyPanel, _summary, _modelConfirmation, _activity, _driverHelp }) _flowContent.Children.Add(element);
+        _flowBody.Children.Add(_flowContent);
+        Grid.SetRow(_completion, 1); _flowBody.Children.Add(_completion);
+        _statusScroll.Content = _status; Grid.SetRow(_statusScroll, 2); _flowBody.Children.Add(_statusScroll);
+        Grid.SetRow(_flowBody, 1); root.Children.Add(_flowBody);
         _version.FontWeight = FontWeight.SemiBold;
         _experimental.Foreground = Palette("Experimental"); _experimental.Margin = new(0, 10, 0, 0);
-        _backup.LineHeight = 21; _backup.Margin = new(0, 8, 0, 0);
-        _status.Foreground = Palette("Muted"); _status.Margin = new(0, 14, 0, 14); _status.LineHeight = 21;
+        _backup.LineHeight = 20; _backup.Margin = new(0, 8, 0, 0);
+        _status.Foreground = Palette("Muted"); _status.LineHeight = 20;
         _keepOpen.Text = L.T("INGLORIOUS Advanced nicht schließen."); _keepOpen.Foreground = Palette("Accent"); _keepOpen.FontWeight = FontWeight.SemiBold; _keepOpen.Margin = new(0, 0, 0, 14);
         _driverHelp.Children.Add(Text(13, L.T("Wähle in Zadig nur das Gerät im Update-Modus und installiere dafür WinUSB.")));
         var driverLink = new Button { Content = L.T("USB-Treiber einrichten (Zadig)"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new(0, 8, 0, 0), IsEnabled = !_offlinePreview };
@@ -90,7 +99,7 @@ public sealed partial class DeviceSetupWindow : Window
         _modelConfirmation.Content = Text(13, L.T("Das erkannte Modell stimmt mit meinem Gerät überein."));
         _modelConfirmation.Foreground = Palette("Text");
         _search.Content = L.T("Erneut prüfen"); _close.Content = L.T("Schließen"); _action.Classes.Add("primary");
-        var footer = new Grid { Margin = new(0, 20, 0, 0), RowDefinitions = new("Auto,Auto"), ColumnDefinitions = new("*,Auto,Auto") };
+        var footer = new Grid { Name = "SetupFooter", Margin = new(0, 16, 0, 0), RowDefinitions = new("Auto,Auto"), ColumnDefinitions = new("*,Auto,Auto") };
         Grid.SetColumnSpan(_keepOpen, 3); footer.Children.Add(_keepOpen);
         _search.MinHeight = _close.MinHeight = _action.MinHeight = 38;
         Grid.SetRow(_search, 1); footer.Children.Add(_search); Grid.SetRow(_close, 1); Grid.SetColumn(_close, 1); footer.Children.Add(_close);
@@ -106,11 +115,27 @@ public sealed partial class DeviceSetupWindow : Window
         _timer.Tick += async (_, _) => await ObserveAsync();
         Opened += async (_, _) =>
         {
+            FitAvailableWorkArea();
             if (_started) return; _started = true;
             for (var owner = Owner as Window; owner is not null; owner = owner.Owner as Window) { owner.Closing += WindowClosing; _owners.Add(owner); }
             if (!_offlinePreview) { await DiscoverAsync(); if (!_closed) _timer.Start(); }
         };
         Render();
+    }
+
+    private void FitAvailableWorkArea()
+    {
+        var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+        if (screen is null) return;
+        var availableWidth = Math.Max(1, Math.Floor(screen.WorkingArea.Width / screen.Scaling) - 32);
+        var availableHeight = Math.Max(1, Math.Floor(screen.WorkingArea.Height / screen.Scaling) - 40);
+        var constrained = availableHeight < MinHeight || Width > availableWidth || Height > availableHeight;
+        MinWidth = Math.Min(760, availableWidth); MinHeight = Math.Min(620, availableHeight);
+        Width = Math.Min(availableWidth, availableHeight < 620 ? 1060 : Width);
+        Height = Math.Min(Height, availableHeight);
+        if (constrained)
+            Position = new PixelPoint(screen.WorkingArea.X + Math.Max(0, (int)((screen.WorkingArea.Width - Width * screen.Scaling) / 2)),
+                screen.WorkingArea.Y + Math.Max(0, (int)((screen.WorkingArea.Height - (Height + 32) * screen.Scaling) / 2)));
     }
 
     private string OperationTitle => L.T(_operation switch { SetupOperation.Install => "Gerät einrichten", SetupOperation.Update => "Firmware aktualisieren", _ => "Original-Firmware wiederherstellen" });
@@ -299,8 +324,11 @@ public sealed partial class DeviceSetupWindow : Window
     private bool IsFirmwareOperationRunning => _busy && _firmwareSequence.Started &&
         _progress?.Stage is SetupStage.ReadyToBackup or SetupStage.ReadyToInstall;
 
-    private void UpdateStatusVisibility() => _status.IsVisible = !IsFirmwareOperationRunning || _error ||
-        (_status.Text != _description.Text && _status.Text != _heading.Text && _status.Text != _keepOpen.Text);
+    private void UpdateStatusVisibility()
+    {
+        _status.IsVisible = _statusScroll.IsVisible = _error || (_progress?.Stage != SetupStage.Complete &&
+            !string.IsNullOrWhiteSpace(_status.Text) && _status.Text != _description.Text && _status.Text != _heading.Text && _status.Text != _keepOpen.Text);
+    }
 
     private void ApplyProgress(SetupProgress progress)
     {
@@ -409,7 +437,8 @@ public sealed partial class DeviceSetupWindow : Window
         _close.IsEnabled = !_busy && !_lightingRunning; _close.Content = L.T(stage == SetupStage.Complete ? "Fertig" : "Schließen");
         _activity.IsVisible = _busy || _readingVersion || stage == SetupStage.Reconnect;
         _activity.Margin = stage == SetupStage.Reconnect ? new(0, 0, 0, 18) : new(0, 12, 0, 0);
-        _status.Margin = stage == SetupStage.Reconnect ? new(0, 0, 0, 14) : new(0, 14, 0, 14);
+        _status.Margin = new(0);
+        _statusScroll.Margin = new(0, 10, 0, 0);
         if (IsFirmwareOperationRunning)
         {
             _heading.Text = stage == SetupStage.ReadyToBackup ? BackupActivity : WriteActivity;
