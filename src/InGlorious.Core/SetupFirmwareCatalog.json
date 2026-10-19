@@ -16,8 +16,8 @@
       "deviceId": "numpad",
       "boardId": 2,
       "file": "numpad.bin",
-      "bytes": 52316,
-      "sha256": "1B8A713FB6E9BDED989582E03246441ADA522E50ACCE6386583F11FDC6D9E71D",
+      "bytes": 52260,
+      "sha256": "AB641156B875B33328B0A4D678C9EEC66C69D550C8D672342AF946DC9DC23D6E",
       "transport": "wb32-dfu",
       "flashBytes": 131072,
       "sramBytes": 28672

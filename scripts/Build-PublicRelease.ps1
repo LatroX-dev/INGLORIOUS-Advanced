@@ -48,7 +48,7 @@ $dependencies=& (Join-Path $PSScriptRoot 'Initialize-BuildDependencies.ps1') -Sc
 if(-not$FirmwareDirectory){
     & (Join-Path $PSScriptRoot 'Initialize-BuildDependencies.ps1') -Scope Firmware -Offline:$Offline|Out-Host
     $FirmwareDirectory=Join-Path $output 'firmware'
-    & (Join-Path $root 'firmware/Build-Firmware.ps1') -OutputDirectory $FirmwareDirectory
+    & (Join-Path $root 'firmware/Build-Firmware.ps1') -Clean -OutputDirectory $FirmwareDirectory
     # Generate neutral C# defaults for the independent comparison with linked ARM keymaps.
     foreach($family in @('port','gmmk3')){
         $fixtureDirectory=Join-Path $root ('artifacts/'+$(if($family-eq'port'){'port-fixtures'}else{'gmmk3-port-fixtures'}))

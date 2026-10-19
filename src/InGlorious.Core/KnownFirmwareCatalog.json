@@ -59,6 +59,16 @@
           "sramBytes": 28672
         },
         {
+          "deviceId": "numpad",
+          "boardId": 2,
+          "file": "numpad.bin",
+          "bytes": 52260,
+          "sha256": "AB641156B875B33328B0A4D678C9EEC66C69D550C8D672342AF946DC9DC23D6E",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
           "deviceId": "pro-ansi",
           "boardId": 3,
           "file": "pro-ansi.bin",

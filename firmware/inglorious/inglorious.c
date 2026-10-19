@@ -1142,13 +1142,15 @@ static bool recovery_chord_held(void) {
         matrix_row_t expected = 0;
         if (row == IG_RECOVERY_KEY1_ROW) expected |= (matrix_row_t)1U << IG_RECOVERY_KEY1_COL;
         if (row == IG_RECOVERY_KEY2_ROW) expected |= (matrix_row_t)1U << IG_RECOVERY_KEY2_COL;
-        matrix_row_t actual = matrix_get_row(row);
 #if IG_BOARD == 16
+        matrix_row_t actual = matrix_get_row(row);
         // Confirmed rear profile contacts are not held keys. Other unused cells
         // remain checked here; no unverified matrix position is ignored.
         if (row >= 11 && row <= 13) actual &= ~((matrix_row_t)1U << 7);
-#endif
         if (actual != expected) return false;
+#else
+        if (matrix_get_row(row) != expected) return false;
+#endif
     }
     return true;
 }
