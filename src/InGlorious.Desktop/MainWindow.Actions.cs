@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -389,6 +390,7 @@ public sealed partial class MainWindow
             // Opened can run before the application lifetime has entered its main loop.
             // Let startup finish before a failed check can close the main window.
             await Dispatcher.Yield(DispatcherPriority.Background);
+            var offlineExitCode = 0;
             try
             {
                 var smoke = Array.IndexOf(Program.Arguments, "--smoke");
@@ -429,7 +431,7 @@ public sealed partial class MainWindow
                                 { knobScroll.Offset = new Vector(0, knobScroll.Extent.Height); prompt.UpdateLayout(); }
                                 using var captured = new RenderTargetBitmap(new PixelSize((int)prompt.ClientSize.Width, (int)prompt.ClientSize.Height), new Vector(96, 96)); captured.Render(prompt); captured.Save(Program.Arguments[shot + 1], PngBitmapEncoderOptions.Default);
                             }
-                            catch (Exception ex) { Console.Error.WriteLine(ex); Environment.ExitCode = 1; }
+                            catch (Exception ex) { Console.Error.WriteLine(ex); offlineExitCode = 1; }
                             finally { prompt.Close(); }
                         };
                         await prompt.ShowDialog(this); return;
@@ -470,13 +472,25 @@ public sealed partial class MainWindow
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine(ex); Environment.ExitCode = 1;
+                Console.Error.WriteLine(ex); offlineExitCode = 1;
                 var failedSmoke = Array.IndexOf(Program.Arguments, "--smoke");
                 if (failedSmoke >= 0 && failedSmoke + 1 < Program.Arguments.Length)
                     try { await File.WriteAllTextAsync(Program.Arguments[failedSmoke + 1], "FAILED\n" + ex); }
                     catch (Exception reportError) { Console.Error.WriteLine(reportError); }
             }
-            finally { Close(); }
+            finally
+            {
+                _allowClose = true;
+                // Closing the last window uses the lifetime's default success code.
+                // Pass the check result explicitly so failures remain failures in CI.
+                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                    desktop.Shutdown(offlineExitCode);
+                else
+                {
+                    Close();
+                    Environment.ExitCode = offlineExitCode;
+                }
+            }
             return;
         }
         await LoadStartupDevicesAsync();

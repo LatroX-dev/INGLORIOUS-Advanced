@@ -297,11 +297,12 @@ public sealed partial class MainWindow
     }
     private void RunSetupRoutingChecks(Action<bool, string> check)
     {
-        FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersion, out var target);
         var savedState = _state;
         foreach (var board in BoardDescriptorRegistry.All)
         {
             var id = board.DeviceId;
+            check(FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersionFor(id), out var target),
+                "Setup routing: valid target version " + id);
             var info = new OnboardInfo(id, 249, 128, 1, 0, 0, 3);
             var report = new OnboardFirmwareVersion(id, target, 1);
             check(ClassifySetupFirmware(id, info, report) == SetupRuntimeState.Current, "Setup routing: validated current target " + id);

@@ -56,7 +56,13 @@ Invoke-Checked 'chmod' @('755',(Join-Path $publish 'INGLORIOUS Advanced'),(Join-
 if($IsMacOS){
  Invoke-Checked 'codesign' @('--force','--sign','-','--timestamp=none','--entitlements',(Join-Path $PSScriptRoot 'macos-entitlements.plist'),(Join-Path $publish 'INGLORIOUS Advanced'))
 }
-if($IsLinux){Invoke-Checked 'xvfb-run' @('-a',(Join-Path $publish 'INGLORIOUS Advanced'),'--smoke')}else{Invoke-Checked (Join-Path $publish 'INGLORIOUS Advanced') @('--smoke')}
+# A successful process exit alone cannot confirm that every offline check ran.
+# Require a new, complete report before screenshots or packaging may proceed.
+$smoke=Join-Path $output 'native-smoke.txt'
+if(Test-Path -LiteralPath $smoke){throw 'The native smoke report must be created by this run.'}
+$smokeArguments=@('--smoke',$smoke,'--language','en')
+if($IsLinux){Invoke-Checked 'xvfb-run' (@('-a',(Join-Path $publish 'INGLORIOUS Advanced'))+$smokeArguments)}else{Invoke-Checked (Join-Path $publish 'INGLORIOUS Advanced') $smokeArguments}
+if(-not(Test-Path -LiteralPath $smoke -PathType Leaf)-or[IO.File]::ReadAllText($smoke)-cnotmatch'\APASS [1-9]\d* offline desktop checks; no device discovery, HID, process, or user-data writes\.\r?\n?\z'){throw 'Native application smoke did not produce a complete PASS report.'}
 [xml]$project=Get-Content -LiteralPath (Join-Path $root 'src/InGlorious.Desktop/InGlorious.Desktop.csproj')
 $version=[string]$project.Project.PropertyGroup.Version
 # Capture the app on this native host. Screenshot mode uses only synthetic

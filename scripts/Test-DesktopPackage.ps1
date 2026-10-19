@@ -55,12 +55,14 @@ if($Runtime.StartsWith('osx-')){
   & codesign --verify --strict (Join-Path $appRoot $entry)
   if($LASTEXITCODE-ne0){throw ('Extracted native signature verification failed: '+$entry)};$checked++
  }
- # The relocated, extracted bundle must forward every offline argument. This
- # also exercises payload lookup and resources without opening any HID device.
- $smoke=Join-Path $testRoot 'extracted-bundle-smoke.txt'
- & $launcher --smoke $smoke --language en
- if($LASTEXITCODE-ne0-or-not(Test-Path -LiteralPath $smoke)-or(Get-Content -LiteralPath $smoke -Raw)-notmatch'^PASS \d+ offline desktop checks;'){throw 'Extracted application bundle smoke failed.'};$checked++
 }
+# The relocated, extracted application must pass on every native host. On macOS
+# use the bundle launcher to verify argument forwarding and payload lookup too.
+$smoke=Join-Path $testRoot 'extracted-application-smoke.txt'
+if(Test-Path -LiteralPath $smoke){throw 'The extracted application smoke report must be created by this run.'}
+if($Runtime.StartsWith('osx-')){& $launcher --smoke $smoke --language en}
+else{& xvfb-run -a (Join-Path $appRoot 'INGLORIOUS Advanced') --smoke $smoke --language en}
+if($LASTEXITCODE-ne0-or-not(Test-Path -LiteralPath $smoke -PathType Leaf)-or[IO.File]::ReadAllText($smoke)-cnotmatch'\APASS [1-9]\d* offline desktop checks; no device discovery, HID, process, or user-data writes\.\r?\n?\z'){throw 'Extracted application smoke failed.'};$checked++
 # Rules must grant access only to the reviewed stock/runtime pairs and two update interfaces.
 $rules=Get-Content -LiteralPath (Join-Path $PSScriptRoot '70-inglorious.rules')
 $expectedPairs=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
