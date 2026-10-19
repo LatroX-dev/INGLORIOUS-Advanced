@@ -31,10 +31,16 @@ App 0.7.0 includes firmware with these controls:
 
 | Feature | Models | Firmware |
 | --- | --- | --- |
-| Windows/macOS modifier switch | Listed GMMK 3 wired, non-HE models and GMMK 3 PRO 100% ISO | 0.11.9 or newer |
+| Windows/macOS modifier switch | GMMK 3 65%, 75% and 100% in ANSI and ISO, plus GMMK 3 PRO 100% ISO; all wired, non-HE | 0.11.9 or newer |
 | Three independent onboard profiles | GMMK 3 PRO 100% ISO wired, non-HE only | 0.11.11 or newer |
 
-Both functions run on the keyboard with the app closed. The GMMK 3 PRO 100% ISO has physical Windows-side evidence for these switches; the other GMMK 3 variants remain experimental. A profile is a complete configuration with its own four layers. The ordinary GMMK 3 profile selector is not yet supported. See [using the switches](getting-started.md#use-the-keyboards-switches) and [hardware test scope](hardware-controls.md).
+Both functions run on the keyboard with the app closed. The GMMK 3 PRO 100% ISO has physical Windows-side evidence for these switches; the other GMMK 3 variants remain experimental. A profile is a complete configuration with its own four layers.
+
+The profile switch on the regular GMMK 3 65%, 75% and 100% (ANSI and ISO) is **not implemented yet**. This is a model-specific limitation, not an ISO requirement: the available manufacturer sources do not identify the profile-switch contacts, and these targets need a different storage layout from the PRO. Their Experimental status does not enable the profile switch.
+
+Own one of these models and willing to help? [Contact us](mailto:inglorious@latrox.dev) or [open a hardware feedback issue](https://github.com/LatroX-dev/INGLORIOUS-Advanced/issues/new?template=device-feedback.md) with the exact model, size, layout and hardware revision if known. We can arrange a guided test; no firmware change is needed just to volunteer. Please do not upload firmware backups or serial numbers.
+
+See [using the supported switches](getting-started.md#use-the-keyboards-switches), [what is needed for the other models](hardware-controls.md#extending-profile-switch-support) and [hardware test scope](hardware-controls.md).
 
 ## Not supported
 

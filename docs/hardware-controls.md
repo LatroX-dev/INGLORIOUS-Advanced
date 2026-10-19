@@ -30,6 +30,18 @@ On 2026-10-18, a tester confirmed the following on Windows with the GMMK 3 PRO 1
 
 These are explicit model identities, not a rule based on the product name. Other GMMK 3 PRO sizes/layouts and HE or wireless variants do not inherit this support. See [model support](model-support.md).
 
+## Extending profile-switch support
+
+The regular GMMK 3 65%, 75% and 100% models have a physical profile selector, in both ANSI and ISO layouts. Its INGLORIOUS implementation is still missing; this is not simply an untested feature that can be enabled by selecting Experimental support.
+
+The pinned manufacturer sources identify the Windows/macOS input and its behavior for each variant, but do not identify the profile selector's contacts or the mapping of positions 1, 2 and 3. Unassigned matrix cells matching the tested PRO layout are candidates for investigation, not evidence of the same wiring.
+
+The six existing targets use a conservative 128 KiB flash layout, while the tested PRO target uses 256 KiB. Its 48 KiB profile bank cannot be reused at the same addresses. Moving that bank below the existing settings would leave too little room for the profile-enabled firmware. A separate storage layout must retain complete profiles, preserve existing settings during updates and handle interrupted saves. The WB32 driver's family-wide flash descriptor is not proof that a particular board has additional usable memory.
+
+Adding support requires confirmed selector mappings for the exact variants, a validated storage and update path, and firmware built for each model. Hardware tests must then cover all three positions, saving and switching with the app closed, reconnecting, and recovery. Other PRO layouts and HE or wireless models remain outside the current supported-model list.
+
+Owners willing to help can [contact the project](mailto:inglorious@latrox.dev) or [open a hardware feedback issue](https://github.com/LatroX-dev/INGLORIOUS-Advanced/issues/new?template=device-feedback.md) with their exact model and layout. Coordinate the test before changing firmware; do not install the PRO 100% ISO build on another model or share original-firmware backups publicly.
+
 ## Implementation and evidence
 
 The reviewed Glorious GMMK 3 sources define the OS input as A13 for 65%, 75% and 100% boards. The input interpretation follows each variant's original callback, including the different polarity in the 75% ANSI source. The PRO 100% ISO target uses the separately identified derivative of the 100% ISO port; its OS-switch input and left-side modifier behavior have the physical evidence recorded above.

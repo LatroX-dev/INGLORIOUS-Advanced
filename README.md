@@ -79,8 +79,8 @@ These screenshots show the Windows editor with offline demo data. They do not de
 - Key and encoder assignments, four layers and a shared macro library with import/export.
 - Import and export key bindings for selected layers, including assigned macros, without changing lighting. The Numpad slider can be included separately.
 - Local profiles for each device, with configuration readback after transfer.
-- Three independent onboard profiles selected by the physical switch on the GMMK 3 PRO 100% ISO.
-- Windows/macOS modifier switching via the physical switch on supported GMMK 3 wired models, without using an extra layer.
+- Three independent onboard profiles selected by the physical switch on the GMMK 3 PRO 100% ISO. [Status for other models](docs/model-support.md#physical-switches).
+- Windows/macOS modifier switching via the physical switch on supported GMMK 3 wired models (ANSI and ISO), without using an extra layer.
 - Adjustable USB polling rate and debounce time.
 - Standby lighting and an optional INGLORIOUS screensaver, under Device.
 - Numpad slider: disabled, lighting brightness, relative volume or MIDI control.
