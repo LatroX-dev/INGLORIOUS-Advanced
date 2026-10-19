@@ -15,16 +15,6 @@ I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the m
 
 **App 0.7.0 · Firmware 0.11.11 for GMMK 3 PRO 100% ISO; 0.11.9 for other supported models**
 
-### New in 0.7.0: use your keyboard's switches
-
-- **Three onboard profiles:** on the **GMMK 3 PRO 100% ISO**, use the physical profile switch to change between three saved configurations. Each has its own lighting, bindings and four layers. Switching works with the app closed.
-- **Windows/macOS switch:** on supported **GMMK 3 wired keyboards**, adapt standard modifier keys to the selected OS while keeping your layers and custom bindings.
-- The Windows app shows both switch positions beside the layer selection and follows the selected hardware profile automatically.
-
-These features require the included firmware update. Profile switching is limited to the wired, non-HE GMMK 3 PRO 100% ISO. Other GMMK 3 models remain experimental; wireless and HE variants are not supported. [How the switches work](docs/getting-started.md#use-the-keyboards-switches).
-
-**[Download 0.7.0](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases/tag/v0.7.0) · [What's changed](CHANGELOG.md#070)**
-
 Get installers and packages from the [Releases page](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases). macOS and Linux builds are Early Alpha; physical-device testing is still limited.
 
 See the [Changelog](CHANGELOG.md) for new features, improvements and bug fixes.
@@ -90,7 +80,7 @@ These screenshots show the Windows editor with offline demo data. They do not de
 - Import and export key bindings for selected layers, including assigned macros, without changing lighting. The Numpad slider can be included separately.
 - Local profiles for each device, with configuration readback after transfer.
 - Three independent onboard profiles selected by the physical switch on the GMMK 3 PRO 100% ISO.
-- Windows/macOS modifier switching on supported GMMK 3 wired models, without using an extra layer.
+- Windows/macOS modifier switching via the physical switch on supported GMMK 3 wired models, without using an extra layer.
 - Adjustable USB polling rate and debounce time.
 - Standby lighting and an optional INGLORIOUS screensaver, under Device.
 - Numpad slider: disabled, lighting brightness, relative volume or MIDI control.
