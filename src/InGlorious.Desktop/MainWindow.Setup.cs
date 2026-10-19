@@ -30,8 +30,10 @@ public sealed partial class MainWindow
         CoreImportSelection? importedCore = null;
         string? feedbackDeviceId = null;
         OnboardFirmwareVersion? feedbackVersion = null;
+        IDisposable? knobStatusPause = null;
         try
         {
+            knobStatusPause = await PauseKnobStatusAsync();
             await _sharedBrightness.StopAsync();
             var dialog = new DeviceSetupWindow(preferredDeviceId, operation, preferredInstanceId: preferredInstanceId);
             await dialog.ShowDialog(owner ?? this);
@@ -44,12 +46,16 @@ public sealed partial class MainWindow
         catch (Exception ex) { Trace.TraceError("Firmware setup failed: {0}", ex); Status(DeviceSetupService.ForUser(ex)); }
         finally
         {
-            _firmwareFlow = _busy = false;
-            if (importedCore is not null) { _root.IsEnabled = true; await AdoptSetupCoreImportAsync(importedCore); }
-            if (feedbackDeviceId is not null) await MaybeOfferExperimentalFeedbackAsync(feedbackDeviceId, DeviceFeedbackTrigger.Installation, feedbackVersion, owner);
-            _busy = priorBusy;
-            if (!_startupWindowClosed && !_allowClose)
-            { _root.IsEnabled = !_busy; UpdateFooter(); await UpdateBrightnessService(); await RefreshConnectionsAsync(); }
+            try
+            {
+                _firmwareFlow = _busy = false;
+                if (importedCore is not null) { _root.IsEnabled = true; await AdoptSetupCoreImportAsync(importedCore); }
+                if (feedbackDeviceId is not null) await MaybeOfferExperimentalFeedbackAsync(feedbackDeviceId, DeviceFeedbackTrigger.Installation, feedbackVersion, owner);
+                _busy = priorBusy;
+                if (!_startupWindowClosed && !_allowClose)
+                { _root.IsEnabled = !_busy; UpdateFooter(); await UpdateBrightnessService(); await RefreshConnectionsAsync(); }
+            }
+            finally { knobStatusPause?.Dispose(); }
         }
     }
 
@@ -69,8 +75,10 @@ public sealed partial class MainWindow
         CoreImportSelection? importedCore = null;
         string? feedbackDeviceId = null;
         OnboardFirmwareVersion? feedbackVersion = null;
+        IDisposable? knobStatusPause = null;
         try
         {
+            knobStatusPause = await PauseKnobStatusAsync();
             await _sharedBrightness.StopAsync();
             if (DeviceSetupService.IsGloriousCoreRunning() is not false)
             { if (force) Status(L.T("Schließe Glorious CORE, bevor du fortfährst.")); return; }
@@ -108,10 +116,14 @@ public sealed partial class MainWindow
         catch (Exception ex) { Trace.TraceError("Firmware discovery failed: {0}", ex); Status(DeviceSetupService.ForUser(ex)); }
         finally
         {
-            _firmwareFlow = _busy = false;
-            if (importedCore is not null) { _root.IsEnabled = true; await AdoptSetupCoreImportAsync(importedCore); }
-            if (!_startupWindowClosed && !_allowClose) { Build(); await UpdateBrightnessService(); await RefreshConnectionsAsync(); }
-            if (feedbackDeviceId is not null) await MaybeOfferExperimentalFeedbackAsync(feedbackDeviceId, DeviceFeedbackTrigger.Installation, feedbackVersion, owner);
+            try
+            {
+                _firmwareFlow = _busy = false;
+                if (importedCore is not null) { _root.IsEnabled = true; await AdoptSetupCoreImportAsync(importedCore); }
+                if (!_startupWindowClosed && !_allowClose) { Build(); await UpdateBrightnessService(); await RefreshConnectionsAsync(); }
+                if (feedbackDeviceId is not null) await MaybeOfferExperimentalFeedbackAsync(feedbackDeviceId, DeviceFeedbackTrigger.Installation, feedbackVersion, owner);
+            }
+            finally { knobStatusPause?.Dispose(); }
         }
     }
 

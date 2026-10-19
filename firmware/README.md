@@ -1,6 +1,6 @@
 # INGLORIOUS onboard firmware
 
-All sixteen targets use firmware **0.11.8**, build `0x000B0801`, including the separate GMMK 3 PRO 100% ISO wired, non-HE target. Build success does not establish full physical acceptance. Model support and physical acceptance are listed in [the model overview](../docs/model-support.md).
+App **0.7.0** bundles firmware **0.11.11**, build `0x000B0B01`, for the GMMK 3 PRO 100% ISO wired, non-HE target and **0.11.9**, build `0x000B0901`, for the other fifteen targets. Each release catalog records the exact version and image layout per model. Build success does not establish full physical acceptance. Model support and physical acceptance are listed in [the model overview](../docs/model-support.md).
 
 ## Behavior
 
@@ -14,7 +14,7 @@ Keys and rotary-knob directions can raise or lower keyboard brightness. The dimm
 
 Rotary-knob presets cover volume, brightness, tracks, vertical/horizontal scrolling, zoom, tabs and undo/redo. A per-layer option cycles selected presets in your chosen order after holding the knob for 700 ms; a short press retains its assigned action. Reconnecting or transferring a profile restores the saved preset. Volume, brightness, scrolling and zoom have an optional step multiplier from 1 to 5. Zoom and undo offer Ctrl or Command shortcuts; undo also supports QWERTY, QWERTZ and AZERTY host layouts. Application support for these shortcuts varies.
 
-Each device has two configuration slots inside a 32-KiB internal flash reserve. Board IDs 1–9 use 7,168-byte slots; IDs 10–16 use 7,680-byte slots. Four layers, up to 32 macro slots and shared event/color pools fit within that fixed space. Oversized configurations are rejected rather than silently truncated. An upload stages data in the inactive part of the EEPROM RAM cache and commits only after full validation.
+Boards 1–15 use two configuration slots inside a 32-KiB internal flash reserve. Board IDs 1–9 use 7,168-byte slots; IDs 10–15 use 7,680-byte slots. Board 16 keeps its previous settings as a read-only fallback and adds a separate 48-KiB bank with an A/B record pair for each of three hardware profiles. Each profile holds four layers, up to 32 macro slots and shared event/color pools. Oversized configurations are rejected rather than silently truncated. Uploads stage data in RAM and commit only after full validation. See the [hardware-profile storage format](protocol.md#private-board-16-hardware-profiles-profile-pairs-v1) for the model-specific guarantees.
 
 This storage implementation does not promise atomic recovery from power loss during QMK flash consolidation. External stock SPI memory is disabled. The firmware does not store profiles in the wireless controller or preserve all original external settings.
 
@@ -38,7 +38,7 @@ python firmware/Verify-CandidateBuild.py firmware/build
 
 QMK base: `7a1bbf37c5c07da4ea0a162bb139083a46ef40a1`. ChibiOS: `6170ddf92d55be54c89b708d1882eea229edeb2c`. ChibiOS-Contrib: `5a9ad82b6ba4f649cdb800e8c2bbc9be2d3ce767`. The remaining submodule and compiler pins are in `scripts/build-dependencies.json`. Firmware uses QMK-MSYS 1.12.0 and ARM GCC 15.2.0; LTO is disabled. `Prepare-Overlay.ps1` generates board keymaps and physical mappings. The timing and storage patch scripts only accept their expected upstream input hashes.
 
-The GMMK 3 wired non-HE ports are normalized from pinned manufacturer sources. Their original sources, provenance and documented corrections are retained under `reference/glorious-gmmk3` and `ports/gmmk3`. The physical OS switch remains disabled pending hardware validation.
+The GMMK 3 wired non-HE ports are normalized from pinned manufacturer sources. Their original sources, provenance and documented corrections are retained under `reference/glorious-gmmk3` and `ports/gmmk3`. Windows/macOS modifier switching is supported on these targets and the supported GMMK 3 PRO variant, while preserving all four user layers and custom bindings. Three-position hardware profiles are supported only on the GMMK 3 PRO 100% ISO. Both switches have Windows-side physical evidence on that exact PRO variant; the other models remain untested. See [hardware controls](../docs/hardware-controls.md) for the scope and remaining acceptance.
 
 The build records binary sizes, source hashes, compiler version, linker maps and stack reports. Firmware catalog hashes must match before those files can be packaged. A successful build proves neither hardware compatibility nor maximum stack usage under every input sequence.
 

@@ -8,12 +8,14 @@ namespace InGlorious.Core;
 /// version responses and the recoverable installation marker alone are not firmware provenance.</summary>
 public static class KnownFirmwareImages
 {
-    private sealed record Image(string DeviceId, byte BoardId, int Bytes, string Sha256, int FlashBytes, int ApplicationOffset = 0);
+    private sealed record Image(string DeviceId, byte BoardId, int Bytes, string Sha256, int FlashBytes, int ApplicationOffset = 0, string? StorageLayout = null);
     private sealed record Release(string ReleaseId, Image[] Targets);
     private sealed record Catalog(int Schema, Release[] Releases);
     private static readonly Lazy<Catalog> Approved = new(ReadCatalog);
 
-    public static string Validate(ReadOnlySpan<byte> fullImage, string deviceId, byte boardId)
+    public static string Validate(ReadOnlySpan<byte> fullImage, string deviceId, byte boardId) => Identify(fullImage, deviceId, boardId).ReleaseId;
+    public static string? GetStorageLayout(ReadOnlySpan<byte> fullImage, string deviceId, byte boardId) => Identify(fullImage, deviceId, boardId).Image.StorageLayout;
+    private static (string ReleaseId, Image Image) Identify(ReadOnlySpan<byte> fullImage, string deviceId, byte boardId)
     {
         var identity = InstallationIdentity.Read(fullImage);
         if (identity is null || identity.BoardId != boardId) throw new InvalidDataException("KNOWN_FIRMWARE_IDENTITY_REQUIRED");
@@ -30,11 +32,11 @@ public static class KnownFirmwareImages
         {
             if (image.DeviceId != deviceId || image.BoardId != boardId || image.FlashBytes != fullImage.Length) continue;
             int end = image.ApplicationOffset + image.Bytes;
-            if (fullImage.Slice(end, marker - end).ContainsAnyExcept((byte)0xFF)) continue;
             if (CryptographicOperations.FixedTimeEquals(SHA256.HashData(fullImage.Slice(image.ApplicationOffset, image.Bytes)), Convert.FromHexString(image.Sha256)))
             {
+                if (!ProfileBankLayout.GapIsValid(fullImage, end, image.StorageLayout)) continue;
                 if (boardId == RetainedLoaderLayout.BoardId) RetainedLoaderLayout.ValidateApplicationVectors(fullImage.Slice(image.ApplicationOffset, image.Bytes));
-                return release.ReleaseId;
+                return (release.ReleaseId, image);
             }
         }
         throw new InvalidDataException("UNKNOWN_INSTALLED_FIRMWARE");
@@ -55,6 +57,7 @@ public static class KnownFirmwareImages
             foreach (var target in release.Targets)
             {
                 RetainedLoaderLayout.ValidateLayout(target.DeviceId, target.BoardId, target.FlashBytes, target.ApplicationOffset);
+                ProfileBankLayout.ValidateGeometry(target.DeviceId, target.BoardId, target.FlashBytes, target.ApplicationOffset, target.Bytes, target.StorageLayout);
                 if (string.IsNullOrWhiteSpace(target.DeviceId) || target.BoardId is < 1 or > 16 || target.Bytes < 8 ||
                     target.Bytes > InstallationIdentity.Offset(target.FlashBytes) - target.ApplicationOffset || target.Sha256.Length != 64 || target.Sha256.Any(c => !char.IsAsciiHexDigit(c)))
                     throw new InvalidDataException("KNOWN_FIRMWARE_CATALOG_INVALID");

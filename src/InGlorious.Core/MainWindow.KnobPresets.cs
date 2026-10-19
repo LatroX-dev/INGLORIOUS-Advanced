@@ -10,6 +10,8 @@ public partial class MainWindow
     private DispatcherTimer? _knobStatusTimer;
     private CancellationTokenSource? _knobStatusCancellation;
     private bool _knobStatusReading;
+    private int _knobStatusPauseDepth;
+    private Task _knobStatusCompletion = Task.CompletedTask;
     private string? _knobStatusDevice, _knobStatusPath;
     private OnboardKnobStatus? _knobStatus;
     private DateTime _knobStatusNextRead;
@@ -17,7 +19,7 @@ public partial class MainWindow
     private long _knobStatusConnectionRevision, _knobNoticeRevision;
     private string? _knobNoticeRestore;
     private Func<string, CancellationToken, Task<(OnboardKnobStatus? Status, string Path)>> _readKnobRuntime = ReadKnobRuntimeAsync;
-    private bool CanReadKnobStatus => IsVisible && WindowState != WindowState.Minimized &&
+    private bool CanReadKnobStatus => _knobStatusPauseDepth == 0 && IsVisible && WindowState != WindowState.Minimized &&
         !_startupClosed && !_startupLoading && !_startupFinishing && !_readingDevice && !_checkingFirmwareGuide && !_scanning &&
         IsEnabled && EditorSurface.IsEnabled && _activeTab == 1 && (IsKnobPresetSelection() || IsKnobHovered) && IsActiveDeviceConnected &&
         !OwnedWindows.Cast<Window>().Any(window => window.IsVisible);
@@ -27,7 +29,8 @@ public partial class MainWindow
     {
         if (_activeTab != 1 || _knobStatusDevice != Device.Id || !IsActiveDeviceConnected)
         {
-            _knobStatusCancellation?.Cancel(); _knobStatus = null; _knobStatusPath = null;
+            if (!_hardwareSwitchReadingActive) _knobStatusCancellation?.Cancel();
+            _knobStatus = null; _knobStatusPath = null;
             _knobStatusDevice = Device.Id; _knobStatusNextRead = DateTime.MinValue;
         }
         if (_knobStatusTimer is null && !_startupClosed && !_screenshotMode)
@@ -66,7 +69,11 @@ public partial class MainWindow
         if (DateTime.UtcNow < _knobNoticeUntil) return;
         var restore = _knobNoticeRestore; _knobNoticeRestore = null; Status(restore);
     }
-    private async void KnobStatusTick(object? sender, EventArgs e) => await RefreshKnobStatusAsync();
+    private async void KnobStatusTick(object? sender, EventArgs e)
+    {
+        await RefreshHardwareSwitchesAsync();
+        await RefreshKnobStatusAsync();
+    }
     private static Task<(OnboardKnobStatus? Status, string Path)> ReadKnobRuntimeAsync(string deviceId, CancellationToken token) =>
         Task.Run(async () =>
         {
@@ -80,21 +87,28 @@ public partial class MainWindow
     {
         if (_screenshotMode && !allowOfflineFixture) return;
         ExpireKnobChangeNotice();
+        // A foreground operation waits for this poll to release its pooled HID lease.
+        // Do not cancel it merely because the owner is disabled or a dialog is opening.
+        if (_knobStatusPauseDepth != 0) return;
         if (!CanReadKnobStatus)
         {
-            _knobStatusCancellation?.Cancel();
+            if (!_hardwareSwitchReadingActive) _knobStatusCancellation?.Cancel();
             _knobStatus = null; _knobStatusPath = null;
             return;
         }
         if (_knobStatusReading || DateTime.UtcNow < _knobStatusNextRead) return;
         var deviceId = Device.Id; var revision = _connectionRevision;
         _knobStatusReading = true;
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _knobStatusCompletion = completion.Task;
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         var token = cancellation.Token;
         _knobStatusCancellation = cancellation;
         try
         {
-            var result = await _readKnobRuntime(deviceId, token).WaitAsync(token);
+            // The read includes asynchronous transport disposal. An outer WaitAsync
+            // could finish on cancellation while that native handle is still closing.
+            var result = await _readKnobRuntime(deviceId, token);
             if (!CanReadKnobStatus || Device.Id != deviceId || revision != _connectionRevision || cancellation.IsCancellationRequested) return;
             if (result.Status is not null && result.Status.DeviceId != deviceId) throw new System.IO.InvalidDataException("Unexpected knob status device.");
             var previous = _knobStatus;
@@ -121,7 +135,33 @@ public partial class MainWindow
             _knobStatus = null; _knobStatusPath = null;
             _knobStatusNextRead = DateTime.UtcNow.AddSeconds(3);
         }
-        finally { _knobStatusCancellation = null; _knobStatusReading = false; }
+        finally
+        {
+            _knobStatusCancellation = null; _knobStatusReading = false;
+            completion.TrySetResult();
+        }
+    }
+    private async Task<IDisposable> PauseKnobStatusAsync()
+    {
+        _knobStatusPauseDepth++;
+        _knobStatus = null; _knobStatusPath = null;
+        try
+        {
+            await _knobStatusCompletion;
+            return new KnobStatusPause(this);
+        }
+        catch { _knobStatusPauseDepth--; throw; }
+    }
+    private sealed class KnobStatusPause(MainWindow owner) : IDisposable
+    {
+        private MainWindow? _owner = owner;
+        public void Dispose()
+        {
+            if (_owner is not { } current) return;
+            _owner = null; current._knobStatusPauseDepth--;
+            if (current._knobStatusPauseDepth == 0)
+            { current._knobStatusNextRead = default; current._hardwareSwitchNextRead = default; }
+        }
     }
     private void StopKnobStatusMonitor()
     {

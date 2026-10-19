@@ -8,6 +8,7 @@ internal static class FirmwareVersionChecks
     public static async Task Run(Action<bool, string> check)
     {
         RunChangelogChecks(check);
+        RunHardwareSwitchChangelogChecks(check);
         async Task Reject(Func<Task> action, string label)
         {
             try { await action(); }
@@ -141,8 +142,12 @@ internal static class FirmwareVersionChecks
             var knobOrderRelease = new FirmwareSemanticVersion(0, 11, 7);
             var knobFeedbackRelease = new FirmwareSemanticVersion(0, 11, 8);
             var expectedFuture = board.HasEncoder ? new[] { knobFeedbackRelease, knobOrderRelease, knobCycleRelease, brightnessRelease, latestRelease } : new[] { brightnessRelease, latestRelease };
+            if (HardwareControlCatalog.HasOsSwitch(board.DeviceId))
+                expectedFuture = new[] { new FirmwareSemanticVersion(0, 11, 9) }.Concat(expectedFuture).ToArray();
+            if (board.DeviceId == "gmmk3-pro-100-iso")
+                expectedFuture = new[] { new FirmwareSemanticVersion(0, 11, 11) }.Concat(expectedFuture).ToArray();
             check(FirmwareChangelog.Between(board.DeviceId, previousRelease, new(99, 0, 0)).Select(note => note.Version).SequenceEqual(expectedFuture),
-                board.DeviceId + ": future target cannot invent changes after the documented knob feature");
+                board.DeviceId + ": future target cannot invent changes after the documented device features");
             check(FirmwareChangelog.Between(board.DeviceId, latestRelease, brightnessRelease).Single().Changes.SequenceEqual(new[] { "Adjust keyboard brightness with the knob or assigned keys." }),
                 board.DeviceId + ": brightness-capable targets show the short feature note");
             var cycleNotes = FirmwareChangelog.Between(board.DeviceId, brightnessRelease, knobCycleRelease);
@@ -151,7 +156,7 @@ internal static class FirmwareVersionChecks
                 : cycleNotes.Count == 0,
                 board.DeviceId + ": only a board with an encoder receives the long-press feature note");
             check(FirmwareChangelog.Between(board.DeviceId, brightnessRelease, brightnessRelease).Count == 0 &&
-                FirmwareChangelog.Between(board.DeviceId, knobFeedbackRelease, new(99, 0, 0)).Count == 0,
+                FirmwareChangelog.Between(board.DeviceId, new(0, 11, 11), new(99, 0, 0)).Count == 0,
                 board.DeviceId + ": current or undocumented future updates have no guessed notes");
             var orderNotes = FirmwareChangelog.Between(board.DeviceId, knobCycleRelease, knobOrderRelease);
             check(board.HasEncoder ? orderNotes.Count == 1 && orderNotes[0].Version == knobOrderRelease &&
@@ -173,6 +178,54 @@ internal static class FirmwareVersionChecks
         }
         foreach (var unknownDevice in new string?[] { null, "", "PRO-ISO", "pro", "GMMK PRO", "other", "numpad " })
             check(FirmwareChangelog.Between(unknownDevice!, new(0, 7, 0), latestRelease).Count == 0, "Unknown model cannot receive another device's changelog");
+    }
+
+    private static void RunHardwareSwitchChangelogChecks(Action<bool, string> check)
+    {
+        var beforeSwitches = new FirmwareSemanticVersion(0, 11, 8);
+        var osSwitch = new FirmwareSemanticVersion(0, 11, 9);
+        var diagnosticOnly = new FirmwareSemanticVersion(0, 11, 10);
+        var profiles = new FirmwareSemanticVersion(0, 11, 11);
+        var future = new FirmwareSemanticVersion(99, 0, 0);
+        // The exact supported variants are intentional: retail-name prefixes must not
+        // grant a firmware feature to an unmapped board or a different PCB.
+        var osDevices = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "gmmk3-65-ansi", "gmmk3-65-iso", "gmmk3-75-ansi", "gmmk3-75-iso",
+            "gmmk3-100-ansi", "gmmk3-100-iso", "gmmk3-pro-100-iso"
+        };
+        const string osText = "Use the Windows/Mac switch to change modifier-key positions, even with the app closed.";
+        const string profileText = "Use the profile switch to select three saved keyboard configurations, even with the app closed.";
+        foreach (var board in BoardDescriptorRegistry.ProtocolBoards)
+        {
+            bool hasOs = osDevices.Contains(board.DeviceId), hasProfiles = board.DeviceId == "gmmk3-pro-100-iso";
+            var notes = FirmwareChangelog.Between(board.DeviceId, beforeSwitches, osSwitch);
+            check(hasOs ? notes.Count == 1 && notes[0].Version == osSwitch && notes[0].Changes.SequenceEqual([osText]) : notes.Count == 0,
+                board.DeviceId + ": Windows/Mac notes apply only to the seven explicitly mapped switch variants");
+            check(FirmwareChangelog.Between(board.DeviceId, osSwitch, diagnosticOnly).Count == 0,
+                board.DeviceId + ": diagnostic firmware is not presented as a customer-facing feature");
+            notes = FirmwareChangelog.Between(board.DeviceId, diagnosticOnly, profiles);
+            check(hasProfiles ? notes.Count == 1 && notes[0].Version == profiles && notes[0].Changes.SequenceEqual([profileText]) : notes.Count == 0,
+                board.DeviceId + ": three profile-switch configurations are offered only for GMMK3 PRO100 ISO");
+            var expected = hasProfiles ? new[] { profiles, osSwitch } : hasOs ? new[] { osSwitch } : Array.Empty<FirmwareSemanticVersion>();
+            notes = FirmwareChangelog.Between(board.DeviceId, beforeSwitches, future);
+            check(notes.Select(note => note.Version).SequenceEqual(expected),
+                board.DeviceId + ": skipped switch releases remain descending and future versions invent no changes");
+            foreach (var installed in new FirmwareSemanticVersion?[] { null, default(FirmwareSemanticVersion), profiles, future })
+                check(FirmwareChangelog.Between(board.DeviceId, installed, profiles).Count == 0,
+                    board.DeviceId + ": absent, current and newer versions never get pending profile-switch notes");
+            check(FirmwareChangelog.Between(board.DeviceId, beforeSwitches, beforeSwitches).Count == 0 &&
+                FirmwareChangelog.Between(board.DeviceId, osSwitch, beforeSwitches).Count == 0,
+                board.DeviceId + ": equal and older targets never offer new switch features");
+            L.SetLanguage("ja");
+            check(FirmwareChangelog.Between(board.DeviceId, beforeSwitches, future).SelectMany(note => note.Changes)
+                    .SequenceEqual(notes.SelectMany(note => note.Changes)),
+                board.DeviceId + ": switch release notes remain English in a translated app");
+            L.SetLanguage("de");
+        }
+        foreach (var unsupported in new string?[] { null, "", "gmmk3-pro-75-ansi", "gmmk3-pro-100-ansi", "gmmk3-pro-he-100-iso", "gmmk3-pro-100-iso " })
+            check(FirmwareChangelog.Between(unsupported!, beforeSwitches, future).Count == 0,
+                "Unknown, HE and unsupported PRO variants never inherit profile or OS switch notes");
     }
     private sealed class VersionTransport(string id) : IOnboardTransport
     {

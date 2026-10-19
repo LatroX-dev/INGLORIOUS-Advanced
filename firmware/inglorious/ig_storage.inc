@@ -26,6 +26,10 @@ uint8_t *ig_storage_stage_begin(uint32_t address, size_t length) {
 }
 
 wear_leveling_status_t ig_storage_stage_write(uint32_t address, const void *value, size_t length) {
+#if IG_PROFILE_BANK_ENABLE
+    (void)address; (void)value; (void)length;
+    return WEAR_LEVELING_FAILED; // Legacy backing remains immutable with hardware profiles.
+#else
     if (!ig_storage_borrowed || ig_storage_fault || !value || ig_storage_phase > 3) return WEAR_LEVELING_FAILED;
     const uint8_t *bytes = value;
     uint32_t payload = ig_storage_payload_address;
@@ -54,10 +58,14 @@ wear_leveling_status_t ig_storage_stage_write(uint32_t address, const void *valu
     if (status == WEAR_LEVELING_FAILED) ig_storage_phase = 255;
     else ++ig_storage_phase;
     return status;
+#endif
 }
 
 wear_leveling_status_t ig_storage_stage_finish(bool commit_attempted) {
     if (!ig_storage_borrowed) return WEAR_LEVELING_FAILED;
+#if IG_PROFILE_BANK_ENABLE
+    if (commit_attempted) return WEAR_LEVELING_FAILED;
+#endif
     bool failed = ig_storage_phase == 255 || (commit_attempted && ig_storage_phase == 0) || (!commit_attempted && ig_storage_phase != 0);
     // An abort may never become a flash recovery operation. In particular a
     // corrupt/full log must fail closed rather than consolidate staged RAM.

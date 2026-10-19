@@ -40,7 +40,8 @@ bool ig_timing_update(uint8_t interval_ms, uint8_t debounce_ms) {
     if (!ig_timing_valid(interval_ms, debounce_ms)) return false;
     saved_interval = interval_ms;
     if (debounce_delay != debounce_ms) { debounce_delay = debounce_ms; debounce_restart = true; }
-    // A newly verified configuration requires its own readback and RAW8 acknowledgment.
+    // Invalidate the prior request. The caller binds and schedules a new action
+    // after readback/RAW8 or a safe physical profile activation.
     reconnect_pending = false;
     return true;
 }
@@ -49,6 +50,8 @@ uint8_t ig_timing_active_interval(void) { return active_interval; }
 uint8_t ig_timing_saved_interval(void) { return saved_interval; }
 uint8_t ig_timing_debounce_ms(void) { return debounce_delay; }
 bool ig_timing_reconnect_pending(void) { return reconnect_pending; }
+bool ig_timing_usb_active(void) { return USB_DRIVER.state == USB_ACTIVE; }
+void ig_timing_cancel_reconnect(void) { reconnect_pending = false; }
 
 bool ig_timing_schedule_reconnect(void) {
     if (active_interval == saved_interval) return false;

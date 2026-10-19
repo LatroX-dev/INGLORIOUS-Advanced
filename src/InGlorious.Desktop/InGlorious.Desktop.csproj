@@ -3,7 +3,7 @@
     <OutputType>WinExe</OutputType><TargetFramework>net9.0</TargetFramework>
     <RuntimeIdentifiers>win-x64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
-    <AssemblyName>INGLORIOUS Advanced</AssemblyName><Version>0.6.65</Version><Product>INGLORIOUS Advanced</Product><Title>INGLORIOUS Advanced</Title>
+    <AssemblyName>INGLORIOUS Advanced</AssemblyName><Version>0.7.0</Version><Product>INGLORIOUS Advanced</Product><Title>INGLORIOUS Advanced</Title>
     <ApplicationIcon>../InGlorious.Core/Assets/inglorious.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <SetupAssetsDirectory Condition="'$(SetupAssetsDirectory)' == ''">$(MSBuildThisFileDirectory)../../artifacts/portable-setup-assets</SetupAssetsDirectory>

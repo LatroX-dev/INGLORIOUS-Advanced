@@ -1,6 +1,6 @@
 // Exercises the actual RAW13 handler. No device, OS or flash APIs.
 static void version_reporting_checks(void) {
-    static const uint8_t expected[16] = {1,0,IG_BOARD,0,0,0,11,0,8,0,0,0,1,8,11,0};
+    static const uint8_t expected[16] = {1,0,IG_BOARD,0,0,0,11,0,9,0,0,0,1,9,11,0};
     uint8_t config[IG_SIZE], cache_before[sizeof(mock_cache)], backing_before[sizeof(mock_backing)];
     uint8_t scratch[IG_MAX_SIZE], staging_before[IG_MAX_SIZE], info_before[32], extensions_before[32];
     reset(); make_config(config,0x71); install(config);

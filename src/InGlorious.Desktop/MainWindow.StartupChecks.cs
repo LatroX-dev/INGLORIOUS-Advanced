@@ -17,7 +17,9 @@ public sealed partial class MainWindow
         var savedPlaceholders = _startupPlaceholders.ToArray();
         var savedCrc = _deviceReadCrc.ToArray(); var savedRequired = _deviceReadRequired.ToArray(); var savedRefresh = _configurationRefreshPending.ToArray();
         var savedAutomatic = _automaticFallbackSessions.ToArray();
+        var savedHardwareBindings = _hardwareProfileBindings.ToArray();
         var savedState = _state;
+        var savedPage = _page;
         var savedPreferences = _preferences;
         var savedStatus = _status;
         var savedBusy = _busy;
@@ -152,6 +154,40 @@ public sealed partial class MainWindow
             check(ReferenceEquals(_state, proLocal) && !proLocal.Dirty && DeviceConfigurationNeedsRead,
                 "saving edited fallback data preserves that intentional profile during subsequent refresh");
 
+            var bankProject = Loaded("gmmk3-pro-100-iso");
+            var bankImage = OnboardSerializer.Prepare(bankProject.Project!);
+            var installation = new Guid("81c8f301-c975-4dde-93d9-6df367bf9372");
+            StartupDeviceResult Bank(byte slot, ulong generation, Guid? identity = null) => bankProject with
+            {
+                ProfileSnapshot = new(identity ?? installation,
+                    new("gmmk3-pro-100-iso", slot, slot, 1, slot, generation, bankImage.Crc32, bankImage.UsedBytes, bankImage.SchemaVersion), bankImage.Payload)
+            };
+            var firstBank = Bank(1, 0x100000001UL);
+            ApplyStartupResults([firstBank]);
+            check(_state.Device.Id == bankProject.DeviceId && _hardwareProfileBindings[bankProject.DeviceId] == firstBank.ProfileSnapshot!.Binding,
+                "bank startup preserves installation, exact slot and full uint64 generation");
+            _state.Change(project => project.Name = "Keep slot one draft");
+            var bankDraft = _state; var bankFingerprint = EditorState.Fingerprint(bankDraft.Project);
+            ApplyRefreshedDeviceConfigurations([Bank(2, 0x100000001UL)], bankProject.DeviceId, false);
+            check(ReferenceEquals(_state, bankDraft) && EditorState.Fingerprint(_state.Project) == bankFingerprint && DeviceConfigurationNeedsRead &&
+                _hardwareProfileBindings[bankProject.DeviceId].Slot == 1,
+                "identical payload in a different hardware slot never retargets a dirty portable draft");
+            ApplyRefreshedDeviceConfigurations([Bank(1, 0x100000002UL)], bankProject.DeviceId, false);
+            check(ReferenceEquals(_state, bankDraft) && DeviceConfigurationNeedsRead && _hardwareProfileBindings[bankProject.DeviceId].Generation == 0x100000001UL,
+                "generation-only changes keep the previous explicit write precondition");
+            ApplyRefreshedDeviceConfigurations([Bank(1, 0x100000001UL, new Guid("e5479781-2694-4827-9a74-58e722e0bac8"))], bankProject.DeviceId, false);
+            check(ReferenceEquals(_state, bankDraft) && DeviceConfigurationNeedsRead && _hardwareProfileBindings[bankProject.DeviceId].InstallationId == installation,
+                "another installation cannot adopt an existing draft even with equal slot, generation and colors");
+            ApplyStartupResults([firstBank]);
+            ApplyRefreshedDeviceConfigurations([Bank(2, 0x100000001UL)], bankProject.DeviceId, false);
+            check(!DeviceConfigurationNeedsRead && !_state.Dirty && _hardwareProfileBindings[bankProject.DeviceId].Slot == 2,
+                "a clean portable editor adopts a verified physical profile on refresh");
+            _page = "Beleuchtung"; Build();
+            check(_root.GetLogicalDescendants().OfType<TextBlock>().Single(text => text.Name == "HardwareProfileBinding").Text == L.Format("In Bearbeitung: Profil {0}", 2),
+                "portable editor visibly identifies its bound hardware profile");
+            MarkDeviceConfigurationRead(bankProject.Project!, bankProject.Info);
+            check(!_hardwareProfileBindings.ContainsKey(bankProject.DeviceId), "verified legacy reads remove obsolete bank binding");
+
             _busy = _startupLoading = true; Build();
             check(!_root.IsEnabled && !GuardNavigation().GetAwaiter().GetResult(), "startup read locks editing and navigation before device results arrive");
             _busy = _startupLoading = false; _startupStarted = false; Build();
@@ -179,7 +215,8 @@ public sealed partial class MainWindow
             _deviceReadRequired.Clear(); foreach (var item in savedRequired) _deviceReadRequired.Add(item.Key, item.Value);
             _configurationRefreshPending.Clear(); _configurationRefreshPending.UnionWith(savedRefresh);
             _automaticFallbackSessions.Clear(); foreach (var item in savedAutomatic) _automaticFallbackSessions.Add(item.Key, item.Value);
-            _state = savedState; _preferences = savedPreferences; _status = savedStatus;
+            _hardwareProfileBindings.Clear(); foreach (var item in savedHardwareBindings) _hardwareProfileBindings.Add(item.Key, item.Value);
+            _state = savedState; _page = savedPage; _preferences = savedPreferences; _status = savedStatus;
             _busy = savedBusy; _startupLoading = savedLoading; _startupStarted = savedStarted;
             _startupWindowClosed = savedClosed; _allowClose = savedAllowClose;
             _pendingApply = savedPending;

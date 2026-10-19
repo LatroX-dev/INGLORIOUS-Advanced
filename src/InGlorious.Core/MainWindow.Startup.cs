@@ -17,7 +17,7 @@ public partial class MainWindow
         ?? L.T("Die aktuelle Konfiguration wurde noch nicht gelesen. Wähle „Von Tastatur laden“, bevor du Änderungen überträgst.");
 
     private string? StartupNotice => _deviceReadRequired.TryGetValue(Device.Id, out var required) ? required : _startupResults.TryGetValue(Device.Id, out var result)
-        && result.State != StartupDeviceState.OfflineOnly && (!result.Loaded || result.Info?.Persistent != true) ? result.Message : null;
+        && result.State != StartupDeviceState.OfflineOnly && (!result.Loaded || !result.StorageHealthy) ? result.Message : null;
 
     private void InitializeStartup()
     {
@@ -70,6 +70,7 @@ public partial class MainWindow
         Func<string, ProjectOpening>? openFallback = null)
     {
         _sessions.Clear(); _startupResults.Clear(); _confirmedDeviceSaves.Clear(); _deviceReadCrc.Clear(); _deviceReadRequired.Clear(); _automaticFallbackProjects.Clear();
+        _hardwareProfileBindings.Clear(); _hardwareProfileDrafts.Clear(); _hardwareRefreshObserved.Clear(); _hardwareRefreshRetried.Clear();
         _macroAssigning = false; _selectedSideLeds.Clear();
         _lightingTarget = LightingTarget.Keys;
         foreach (var device in DeviceCatalog.All)
@@ -82,10 +83,12 @@ public partial class MainWindow
             ProjectOpening opening;
             if (result.Loaded)
             {
+                if (result.ProfileSnapshot is { } snapshot) RememberHardwareProfileSnapshot(snapshot);
                 _deviceReadCrc[device.Id] = result.Info!.ActiveCrc;
                 opening = new(ProjectService.Clone(result.Project!), null,
+                    result.ProfileSnapshot is { } loadedProfile ? L.Format("Profil {0} von Tastatur gelesen", loadedProfile.Status.Slot) :
                     "Vom Gerät gelesen · Stand " + result.Info!.Generation, null);
-                if (result.Info.Persistent)
+                if (result.StorageHealthy)
                     _confirmedDeviceSaves[device.Id] = (Fingerprint(opening.Project), DateTime.Now);
             }
             else
@@ -140,6 +143,7 @@ public partial class MainWindow
         Status(L.T("Konfigurationen werden von den Geräten gelesen …"));
         try
         {
+            using var pausedKnob = await PauseKnobStatusAsync();
             await _sharedBrightness.StopAsync();
             IReadOnlyList<StartupDeviceResult> results;
             try { results = await (read ?? StartupDeviceLoader.LoadDevicesAsync)(ids, _startupCancellation.Token); }
@@ -184,10 +188,18 @@ public partial class MainWindow
             if (!result.Loaded || result.Project!.DeviceId != id || result.Info!.DeviceId != id)
             {
                 if (result.State == StartupDeviceState.Loaded) result = new(id, StartupDeviceState.ReadFailed);
-                _startupResults[id] = result; RequireDeviceConfigurationRead(id, result.Message); continue;
+                _startupResults[id] = result; RequireDeviceConfigurationRead(id, result.Message);
+                RetryHardwareProfileRead(id); continue;
             }
             var automatic = _sessions.TryGetValue(id, out var fallbackSession) && _automaticFallbackProjects.TryGetValue(id, out var fallback) &&
                 ReferenceEquals(fallback.Project, fallbackSession.Project) && fallback.Fingerprint == Fingerprint(fallbackSession.Project) && fallback.Path == fallbackSession.Path;
+            if (result.ProfileSnapshot is not null)
+            {
+                _startupResults[id] = result;
+                replacedActive |= ApplyHardwareProfileRefresh(result, activeId, preserveActive, automatic);
+                continue;
+            }
+            _hardwareProfileBindings.Remove(id);
             var preserve = _sessions.TryGetValue(id, out var session) &&
                 (Fingerprint(session.Project) != session.SavedFingerprint ||
                  session.Path is not null && !automatic || id == activeId && preserveActive);

@@ -6,6 +6,8 @@ if (args.Length == 7 && args[0] == "--self-test-engineering" && args[1] == "--en
     return SelfTests.RunEngineering(args[2], args[4], args[6]);
 if (args.Length == 7 && args[0] == "--self-test-retained-loader" && args[1] == "--candidate" && args[3] == "--original" && args[5] == "--repeat")
     return SelfTests.RunRetainedLoader(args[2], args[4], args[6]);
+if (args.Length == 9 && args[0] == "--self-test-retained-loader" && args[1] == "--candidate" && args[3] == "--original" && args[5] == "--repeat" && args[7] == "--profile-bank-fixtures")
+    return SelfTests.RunRetainedLoader(args[2], args[4], args[6], args[8]);
 if (args.SequenceEqual(new[] { "--discover" }))
 {
     try

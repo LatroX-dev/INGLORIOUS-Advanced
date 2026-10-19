@@ -20,15 +20,18 @@ public sealed class DeviceTestWindow : Window
     private readonly StackPanel _physicalTest = new() { Name = "DevicePhysicalTest", Spacing = 6, IsVisible = false };
     private readonly StackPanel _typingPanel = new() { Name = "DeviceTypingTest", Spacing = 6, IsVisible = false };
     private readonly TextBlock _lastKey = Label(L.T("Noch keine Taste gedrückt."));
+    private readonly StackPanel _hardwareControls = new() { Name = "DeviceHardwareControls", MaxWidth = 340, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _osSwitch = Label("");
     private readonly Button _start = new() { Name = "StartDeviceTest", Content = L.T("Test starten"), Focusable = false };
     private readonly List<Control> _lightControls = [];
     private readonly Dictionary<string, Action<IBrush>> _keyColors = [];
     private readonly HashSet<string> _typingKeys = [];
     private readonly Viewbox _keyboard = new() { Name = "DeviceTestKeyboardView", Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 12) };
-    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(180) };
+    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(350) };
     private readonly CancellationTokenSource _lifetime = new();
     private DeviceDiagnosticSession? _session;
-    private Task _starting = Task.CompletedTask;
+    private HardwareControlTestSession? _hardwareSession;
+    private Task _starting = Task.CompletedTask, _pollTask = Task.CompletedTask;
     private bool _polling, _closing, _closed;
     private static IBrush ColorBrush(string color) => new SolidColorBrush(Color.Parse(color));
 
@@ -45,7 +48,9 @@ public sealed class DeviceTestWindow : Window
         Background = ColorBrush("#171B1F"); Foreground = ColorBrush("#E4E7EB");
 
         var body = new StackPanel { Margin = new Thickness(24, 20, 24, 0), Spacing = 8 };
-        body.Children.Add(new TextBlock { Text = _device.Name, FontSize = 24, FontWeight = FontWeight.SemiBold });
+        var heading = new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 16 };
+        heading.Children.Add(new TextBlock { Text = _device.Name, FontSize = 24, FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
+        Grid.SetColumn(_hardwareControls, 1); heading.Children.Add(_hardwareControls); body.Children.Add(heading);
         body.Children.Add(Label(L.T("Die Tasten behalten ihre normale Funktion. Deine Einstellungen werden nicht verändert."), muted: true));
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16 };
         _start.IsEnabled = _connection is not null;
@@ -53,6 +58,12 @@ public sealed class DeviceTestWindow : Window
         _start.Click += async (_, _) => { _starting = StartAsync(); await _starting; };
         _count.Name = "DeviceTestCount"; _count.VerticalAlignment = VerticalAlignment.Center; _count.IsVisible = false;
         actions.Children.Add(_start); actions.Children.Add(_count); body.Children.Add(actions);
+        _hardwareControls.IsVisible = HardwareControlCatalog.HasOsSwitch(deviceId);
+        _osSwitch.Name = "DeviceOsSwitch"; _osSwitch.IsVisible = HardwareControlCatalog.HasOsSwitch(deviceId);
+        _osSwitch.FontSize = 12; _osSwitch.TextAlignment = TextAlignment.Right;
+        _osSwitch.Text = HardwareControlCatalog.OsSwitchText(deviceId, null, false); _hardwareControls.Children.Add(_osSwitch);
+        var unsupported = HardwareControlCatalog.UnsupportedText(deviceId);
+        if (unsupported.Length > 0) { ToolTip.SetTip(_start, unsupported); ToolTip.SetTip(_hardwareControls, unsupported); ToolTip.SetTip(body, unsupported); }
         _typingPanel.Children.Add(Label(L.T("Drücke die Tasten, die du prüfen möchtest.")));
         if (_device.Id == "numpad") _typingPanel.Children.Add(Label(L.T("Für Ziffern Num-Lock einschalten. Standardbelegung: Fn + 0."), muted: true));
         _lastKey.Name = "DeviceTypingLastKey";
@@ -104,7 +115,7 @@ public sealed class DeviceTestWindow : Window
         var layout = new Grid { RowDefinitions = new("Auto,*,Auto,Auto"), Focusable = true, Background = Background };
         layout.Children.Add(body); Grid.SetRow(_keyboard, 1); layout.Children.Add(_keyboard);
         Grid.SetRow(lower, 2); layout.Children.Add(lower); Grid.SetRow(footer, 3); layout.Children.Add(footer); Content = layout;
-        _timer.Tick += async (_, _) => await PollAsync();
+        _timer.Tick += async (_, _) => { if (_polling) return; _pollTask = PollAsync(); await _pollTask; };
         AddHandler(KeyDownEvent, OnTestKeyDown, RoutingStrategies.Tunnel);
         AddHandler(KeyUpEvent, OnTestKeyUp, RoutingStrategies.Tunnel);
         AddHandler(TextInputEvent, (_, e) =>
@@ -206,44 +217,57 @@ public sealed class DeviceTestWindow : Window
 
     private async Task StartAsync()
     {
-        if (_connection is null || _session is not null || _closing) return;
+        if (_connection is null || _session is not null || _hardwareSession is not null || _closing || !_start.IsEnabled) return;
         _start.IsEnabled = false;
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token); timeout.CancelAfter(TimeSpan.FromSeconds(8));
             var session = await DeviceDiagnosticSession.TryStartAsync(_connection, timeout.Token);
             if (_closing) { if (session is not null) await session.DisposeAsync(); return; }
-            if (session is null) { ShowTypingTest(capabilityKnown: true); ((Control)Content!).Focus(); return; }
             _session = session;
+            _hardwareSession = await HardwareControlTestSession.TryStartAsync(_connection, timeout.Token);
+            if (_closing) { await StopAsync(); return; }
+            _osSwitch.Text = HardwareControlCatalog.OsSwitchText(_device.Id, _hardwareSession?.Status, true);
+            if (_session is null)
+            {
+                ShowTypingTest(capabilityKnown: true); ((Control)Content!).Focus();
+                if (_hardwareSession is not null) _timer.Start();
+                return;
+            }
             _physicalTest.IsVisible = _count.IsVisible = true; _typingPanel.IsVisible = false;
             _typingKeys.Clear();
             foreach (var color in _keyColors.Values) color(ColorBrush("#252A2F"));
             _count.Text = L.Format("{0} von {1} Eingaben erkannt", 0, _device.Keys.Count);
             _status.Text = L.T("Der Test läuft. Drücke die Tasten einzeln."); SetLightingEnabled(true); _timer.Start();
         }
-        catch (Exception error) { if (!_closing) { _status.Text = Failure(error); _start.IsEnabled = true; } }
+        catch (Exception error) { await StopAsync(); if (!_closing) { _status.Text = Failure(error); _start.IsEnabled = true; _start.IsVisible = true; } }
     }
     private async Task PollAsync()
     {
-        if (_polling || _session is null || _closing) return;
+        if (_polling || (_session is null && _hardwareSession is null) || _closing) return;
         _polling = true;
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token); timeout.CancelAfter(TimeSpan.FromSeconds(3));
-            var state = await _session.PollAsync(timeout.Token);
-            var seen = 0;
-            foreach (var key in _device.Keys)
+            if (_session is { } session)
             {
-                var done = key.Id == "encoder:cw" ? state.Clockwise != 0 : key.Id == "encoder:ccw" ? state.Counterclockwise != 0 : state.WasPressed(key.Id);
-                if (done) seen++;
-                _keyColors[key.Id](ColorBrush(done ? "#23704A" : "#252A2F"));
+                var state = await session.PollAsync(timeout.Token);
+                var seen = 0;
+                foreach (var key in _device.Keys)
+                {
+                    var done = key.Id == "encoder:cw" ? state.Clockwise != 0 : key.Id == "encoder:ccw" ? state.Counterclockwise != 0 : state.WasPressed(key.Id);
+                    if (done) seen++;
+                    _keyColors[key.Id](ColorBrush(done ? "#23704A" : "#252A2F"));
+                }
+                _count.Text = L.Format("{0} von {1} Eingaben erkannt", seen, _device.Keys.Count);
             }
-            _count.Text = L.Format("{0} von {1} Eingaben erkannt", seen, _device.Keys.Count);
+            if (!_closing && _hardwareSession is { } hardware)
+                _osSwitch.Text = HardwareControlCatalog.OsSwitchText(_device.Id, await hardware.PollAsync(timeout.Token), true);
         }
         catch (Exception error)
         {
             _timer.Stop(); await StopAsync();
-            if (!_closing) { _status.Text = Failure(error); _start.IsEnabled = true; }
+            if (!_closing) { _status.Text = Failure(error); _start.IsEnabled = true; _start.IsVisible = true; }
         }
         finally { _polling = false; }
     }
@@ -262,19 +286,43 @@ public sealed class DeviceTestWindow : Window
     private async Task StopAsync()
     {
         var session = _session; _session = null; SetLightingEnabled(false);
-        if (session is not null)
+        var hardware = _hardwareSession; _hardwareSession = null;
+        if (!_closing) _osSwitch.Text = HardwareControlCatalog.OsSwitchText(_device.Id, null, false);
+        try
         {
-            try { await session.DisposeAsync(); }
-            catch (Exception error) { System.Diagnostics.Trace.TraceError("Device test cleanup failed: {0}", error); if (!_closing) _status.Text = Failure(error); }
+            if (session is not null) await session.DisposeAsync();
+        }
+        catch (Exception error) { System.Diagnostics.Trace.TraceError("Device test cleanup failed: {0}", error); if (!_closing) _status.Text = Failure(error); }
+        finally
+        {
+            if (hardware is not null)
+            {
+                try { await hardware.DisposeAsync(); }
+                catch (Exception error) { System.Diagnostics.Trace.TraceError("Hardware-control test cleanup failed: {0}", error); if (!_closing) _status.Text = Failure(error); }
+            }
         }
     }
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
         if (_closed) return;
         e.Cancel = true; if (_closing) return;
-        _closing = true; _timer.Stop(); _lifetime.Cancel();
-        try { await _starting; await StopAsync(); }
+        _closing = true; _timer.Stop();
+        try { await DrainAndStopAsync(); }
         finally { _closed = true; _lifetime.Dispose(); Dispatcher.UIThread.Post(Close); }
+    }
+    private async Task DrainAndStopAsync(Func<Task>? offlineStop = null)
+    {
+        // Normal close drains the real operations before diagnostic STOP can release the shared channel.
+        try { await _starting; }
+        finally
+        {
+            try { await _pollTask; }
+            finally
+            {
+                try { await (offlineStop is null ? StopAsync() : offlineStop()); }
+                finally { _lifetime.Cancel(); }
+            }
+        }
     }
     private static string Failure(Exception error) => error is NotSupportedException ? error.Message : error is OnboardCommandException { Status: 3 }
         ? L.T("Lasse alle Tasten los und starte den Test erneut.") : L.T("Der Gerätetest wurde unterbrochen. Prüfe die USB-Verbindung und starte ihn erneut.");
@@ -285,12 +333,20 @@ public sealed class DeviceTestWindow : Window
         // A native template is required for child-to-window event routes; this fixture never activates or reads hardware.
         ShowActivated = false; ShowInTaskbar = false; Opacity = 0; Show();
         await Dispatcher.Yield(DispatcherPriority.Background);
-        try { RunOfflineInputAndLayoutChecks(check); }
+        try { RunOfflineInputAndLayoutChecks(check); await RunOfflineCloseChecksAsync(check); }
         finally { Close(); await Dispatcher.Yield(DispatcherPriority.Background); }
     }
 
     private void RunOfflineInputAndLayoutChecks(Action<bool, string> check)
     {
+        HardwareControlCatalog.RunOfflineChecks(check);
+        check(_hardwareControls.IsVisible == HardwareControlCatalog.HasOsSwitch(_device.Id) &&
+            _osSwitch.IsVisible == HardwareControlCatalog.HasOsSwitch(_device.Id) && _hardwareSession is null,
+            "Device test: hardware controls appear only for explicitly inventoried devices: " + _device.Id);
+        check((ToolTip.GetTip(_start) as string ?? "") == HardwareControlCatalog.UnsupportedText(_device.Id),
+            "Device test: unsupported hardware information is available without another layout row: " + _device.Id);
+        check(_osSwitch.Text == HardwareControlCatalog.OsSwitchText(_device.Id, null, false) && !_timer.IsEnabled,
+            "Device test: opening a test never invents a switch state or starts USB polling: " + _device.Id);
         check(_typingPanel.IsVisible && !_physicalTest.IsVisible && !_count.IsVisible && !this.GetLogicalDescendants().OfType<TextBox>().Any(),
             "Device test: typing is available before optional physical diagnostics without claiming a device key count");
         check(_keyboard.IsVisible && _keyboard.Child is Canvas { } keyboard && keyboard.Children.Count == _device.Keys.Count && _keyboard.IsHitTestVisible && _session is null,
@@ -332,15 +388,71 @@ public sealed class DeviceTestWindow : Window
         check(_typingPanel.IsVisible && !_start.IsVisible && !_physicalTest.IsVisible && !_count.IsVisible && _lightControls.All(control => !control.IsEnabled),
             "Device test: unsupported diagnostics retain typing only and never expose inactive physical results or LEDs");
         var root = (Grid)Content!;
+        var switchStates = HardwareControlCatalog.HasOsSwitch(_device.Id)
+            ? new[] { HardwareControlCatalog.OsSwitchText(_device.Id, null, false), HardwareControlCatalog.OsSwitchText(_device.Id, null, true),
+                HardwareControlCatalog.OsSwitchText(_device.Id, new(_device.Id, false, false, false), true),
+                HardwareControlCatalog.OsSwitchText(_device.Id, new(_device.Id, true, false, true), true) }
+            : new[] { "" };
         foreach (var physical in new[] { false, true })
         foreach (var size in new[] { new Size(1012, 640), new Size(744, 560), new Size(1000, 500) })
+        foreach (var switchState in switchStates)
         {
+            _osSwitch.Text = switchState;
             _physicalTest.IsVisible = physical; _typingPanel.IsVisible = !physical;
             root.Measure(size); root.Arrange(new Rect(size));
             var footer = root.Children.OfType<Grid>().Single(element => Grid.GetRow(element) == 3);
             check(_keyboard.Bounds.Height > 80 && footer.Bounds.Bottom <= size.Height + 1 && !root.Children.OfType<ScrollViewer>().Any(),
                 "Device test: keyboard and controls fit a fixed footer layout: " + _device.Id + " " + size + " physical=" + physical + " diagram=" + _keyboard.Bounds.Height + " footer=" + footer.Bounds.Bottom);
         }
+        _osSwitch.Text = HardwareControlCatalog.OsSwitchText(_device.Id, null, false);
         ShowTypingTest(capabilityKnown: true);
+    }
+    private async Task RunOfflineCloseChecksAsync(Action<bool, string> check)
+    {
+        var fixture = new DeviceTestWindow(_device.Id, null, preview: true);
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var poll = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stop = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stopStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture._starting = start.Task; fixture._pollTask = poll.Task; fixture._closing = true;
+        bool stopEntered = false, stopFinished = false;
+        var closing = fixture.DrainAndStopAsync(async () =>
+        {
+            stopEntered = true;
+            stopStarted.SetResult();
+            check(!fixture._lifetime.IsCancellationRequested, "Device test: diagnostic STOP starts before lifetime cancellation");
+            await stop.Task; stopFinished = true;
+        });
+        try
+        {
+            check(!closing.IsCompleted && !stopEntered && !fixture._lifetime.IsCancellationRequested,
+                "Device test: closing waits for actual startup without cancelling the transport");
+            start.SetResult(); await Dispatcher.Yield(DispatcherPriority.Background);
+            check(!closing.IsCompleted && !stopEntered && !fixture._lifetime.IsCancellationRequested,
+                "Device test: closing also waits for an outstanding physical or switch poll");
+            poll.SetResult(); await stopStarted.Task;
+            check(stopEntered && !stopFinished && !closing.IsCompleted && !fixture._lifetime.IsCancellationRequested,
+                "Device test: window cannot close while diagnostic STOP or transport disposal is pending");
+            stop.SetResult(); await closing;
+            check(stopFinished && fixture._lifetime.IsCancellationRequested,
+                "Device test: normal close cancels the lifetime only after STOP and disposal complete");
+        }
+        finally
+        {
+            start.TrySetResult(); poll.TrySetResult(); stop.TrySetResult();
+            try { await closing; } finally { fixture._lifetime.Dispose(); fixture._closed = true; fixture.Close(); }
+        }
+        var failed = new DeviceTestWindow(_device.Id, null, preview: true) { _closing = true };
+        failed._starting = Task.FromException(new IOException("offline startup failure"));
+        bool cleaned = false, rejected = false;
+        try { await failed.DrainAndStopAsync(() => { cleaned = !failed._lifetime.IsCancellationRequested; return Task.CompletedTask; }); }
+        catch (IOException) { rejected = true; }
+        check(rejected && cleaned && failed._lifetime.IsCancellationRequested,
+            "Device test: failed startup still runs STOP/disposal before lifetime cancellation");
+        failed._lifetime.Dispose(); failed._closed = true; failed.Close();
+        _osSwitch.Text = "stale offline switch state";
+        await StopAsync();
+        check(_osSwitch.Text == HardwareControlCatalog.OsSwitchText(_device.Id, null, false),
+            "Device test: stopping clears the last live switch state");
     }
 }

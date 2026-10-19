@@ -1,6 +1,15 @@
 using System.Buffers.Binary;
 using InGlorious.Core;
 
+if (args is ["--hardware-profile-fixtures", var profileFixtureDirectory])
+{
+    Directory.CreateDirectory(profileFixtureDirectory);
+    var project = ProjectService.Create("gmmk3-pro-100-iso");
+    project.Layers[0].KnobPressByFunction = true;
+    File.WriteAllBytes(Path.Combine(profileFixtureDirectory, "payload.bin"), OnboardSerializer.Prepare(project).Payload);
+    return;
+}
+
 if (args is ["--knob-fixtures", var fixtureDirectory])
 {
     KnobFixtureExport.Write(fixtureDirectory);
@@ -28,8 +37,13 @@ await BrightnessBindingChecks.Run(Check);
 KnobPresetChecks.Run(Check);
 await KnobTransferChecks.Run(Check);
 await KnobStatusChecks.Run(Check);
+await HardwareControlChecks.Run(Check);
+await HardwareProfileChecks.Run(Check);
+ProfileBankLayoutChecks.Run(Check, args is ["--profile-bank-fixtures", var bankFixtures] ? bankFixtures : null);
 await KnobPressChecks.Run(Check);
 await OnboardTransportPoolChecks.Run(Check);
+await DiscoveryChecks.Run(Check);
+await MetadataChecks.Run(Check);
 await ExperimentalBoardChecks.Run(Check, args);
 await EngineeringConfigurationChecks.Run(Check);
 await DiagnosticChecks.Run(Check);

@@ -56,6 +56,9 @@ public partial class App : Application
                 L.SetLanguage(AppPreferencesStore.Load().Preferences.Language); ShowStartupNotice(ApplicationStartupState.GuardUnavailable); Shutdown(); return;
             }
         }
+        if (!offline)
+            OnboardMetadata.DiagnosticSink = entry => OnboardDiscoveryDiagnostics.AppendMetadata(
+                System.IO.Path.Combine(Paths.DataRoot, "diagnostics"), entry);
         SystemParameters.StaticPropertyChanged += SystemParametersChanged;
         ShutdownMode = ShutdownMode.OnMainWindowClose;
         var window = new MainWindow();
@@ -115,6 +118,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        OnboardMetadata.DiagnosticSink = null;
         SystemParameters.StaticPropertyChanged -= SystemParametersChanged;
         _backgroundSession?.Dispose(); _backgroundSession = null;
         _instance?.Dispose(); _instance = null;

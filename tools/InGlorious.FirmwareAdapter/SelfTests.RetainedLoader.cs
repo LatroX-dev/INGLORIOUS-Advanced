@@ -48,13 +48,13 @@ internal static partial class SelfTests
         Reject(() => RetainedLoaderWriteGrant.ValidateBackupDevice(fake.Fingerprint, fake.Fingerprint with { FlashBytes = 131072 }), "backup geometry cannot change");
     }
 
-    internal static int RunRetainedLoader(string candidatePath, string originalPath, string repeatPath)
+    internal static int RunRetainedLoader(string candidatePath, string originalPath, string repeatPath, string? profileFixtures = null)
     {
         string root = CheckDirectory(); Directory.CreateDirectory(root);
         try
         {
             RetainedLoaderChecks(root);
-            RetainedLoaderFixtureChecks(root, candidatePath, originalPath, repeatPath);
+            RetainedLoaderFixtureChecks(root, candidatePath, originalPath, repeatPath, profileFixtures);
             Console.WriteLine(System.Text.Encoding.UTF8.GetString(Json.Bytes(new { passed = checks, retainedLoaderEndToEnd = true,
                 hardwareAccess = false, nativeLibraryLoaded = false, toolProcessesStarted = false })));
             return 0;
@@ -63,7 +63,7 @@ internal static partial class SelfTests
         finally { CleanCheckDirectory(root); }
     }
 
-    private static void RetainedLoaderFixtureChecks(string root, string candidatePath, string originalPath, string repeatPath)
+    private static void RetainedLoaderFixtureChecks(string root, string candidatePath, string originalPath, string repeatPath, string? profileFixtures = null)
     {
         var model = Model.Get(RetainedLoaderLayout.DeviceId);
         Check(!string.Equals(Path.GetFullPath(originalPath), Path.GetFullPath(repeatPath), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal), "original pair paths are distinct");
@@ -79,6 +79,9 @@ internal static partial class SelfTests
         var identity = new InstallationIdentity(16, Guid.NewGuid(), Files.Hash(original));
         byte[] image = InstallationIdentity.CreateImage(application, model.FlashBytes, identity, original);
         string version = KnownFirmwareImages.Validate(image, model.DeviceId, 16);
+        string? storageLayout = KnownFirmwareImages.GetStorageLayout(image, model.DeviceId, 16);
+        if (profileFixtures is not null && storageLayout != ProfileBankLayout.Name)
+            throw new InvalidDataException("Profile fixture checks require a reviewed profile-pairs-v1 firmware candidate.");
         Check(image.AsSpan(0, 0x7000).SequenceEqual(original.AsSpan(0, 0x7000)) && image.AsSpan(0x7000, application.Length).SequenceEqual(application), "prepared image combines own loader and offset-linked reviewed code");
         var device = new FakeDevice(model) { Image = original.ToArray() };
         var selection = new Selection(0x342D, 0xDFA0, 1, "6.7", "", model.Transport);
@@ -143,5 +146,35 @@ internal static partial class SelfTests
         var restored = engine.Run(restore);
         Check(restored is { Status: "verified", WriteAttempted: true } && device.Image.AsSpan().SequenceEqual(original), "normal restore returns exact own original despite damaged application vectors");
         Check(device.Writes == 3, "only install update and restore wrote through bounded fake packets");
+        if (profileFixtures is not null)
+        {
+            foreach (string name in new[] { "valid", "torn-inactive", "first-save-torn" })
+            {
+                byte[] bank = Files.ReadBounded(Path.Combine(profileFixtures, name + ".bin"), ProfileBankLayout.Length);
+                Check(bank.Length == ProfileBankLayout.Length, "full native bank fixture " + name);
+                _ = ProfileBankLayout.Inspect(bank);
+                device.Image = image.ToArray(); bank.CopyTo(device.Image, ProfileBankLayout.Start);
+                for (int i = model.FlashBytes - InstallationIdentity.StorageBytes; i < model.FlashBytes; i++) device.Image[i] = (byte)(i * 31 + 17);
+                byte[] bankCurrent = device.Image.ToArray();
+                var bankCapture = engine.Run(new(1, "capture", Folder("bank-capture-" + name), model.DeviceId, selection));
+                Check(bankCapture.Status == "ok" && bankCapture.Artifacts.Any(a => a.Path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)),
+                    "bank source has full readback evidence " + name);
+                byte[] bankUpdate = image.ToArray();
+                ProfileBankLayout.Preserve(bankCurrent, bankUpdate, storageLayout, storageLayout);
+                var bankRequest = update with { SessionDirectory = Folder("bank-update-" + name), BundlePath = BundleFor(bankUpdate), ExpectedCurrentSha256 = Files.Hash(bankCurrent) };
+                byte[] lostBankByte = bankUpdate.ToArray(); lostBankByte[ProfileBankLayout.Start + 41] ^= 1;
+                Block(bankRequest with { BundlePath = BundleFor(lostBankByte) }, "changed bank byte " + name);
+                var bankUpdated = engine.Run(bankRequest);
+                Check(bankUpdated is { Status: "verified", WriteAttempted: true } && device.Image.AsSpan().SequenceEqual(bankUpdate) &&
+                    device.Image.AsSpan(ProfileBankLayout.Start, ProfileBankLayout.Length).SequenceEqual(bank), "bank update retains exact committed and torn bytes " + name);
+                byte[] bankBeforeRestore = device.Image.ToArray();
+                var bankRestore = engine.Run(restore with { SessionDirectory = Folder("bank-restore-" + name) });
+                Check(bankRestore is { Status: "verified", WriteAttempted: true } && device.Image.AsSpan().SequenceEqual(original),
+                    "original restore remains exact with bank configuration " + name);
+                var restoreReads = bankRestore.Artifacts.Where(a => a.Kind == "pre-write-read").ToArray();
+                Check(restoreReads.Length == 2 && restoreReads.All(a => Files.ReadBounded(Path.Combine(bankRestore.EvidenceDirectory, a.Path), model.FlashBytes).AsSpan().SequenceEqual(bankBeforeRestore)),
+                    "restore evidence preserves both complete current bank images " + name);
+            }
+        }
     }
 }

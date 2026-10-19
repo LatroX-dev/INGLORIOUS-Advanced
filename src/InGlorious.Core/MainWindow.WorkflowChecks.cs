@@ -196,6 +196,8 @@ public partial class MainWindow
 
     private void ResetWorkflowFixture(string deviceId)
     {
+        _hardwareProfileBindings.Clear(); _hardwareProfileDrafts.Clear(); _hardwareRefreshObserved.Clear(); _hardwareRefreshRetried.Clear();
+        _hardwareSwitchReading = null; _hardwareSwitchDevice = null; _hardwareSwitchNextRead = default;
         _deviceReadRequired.Clear(); _deviceReadCrc.Clear(); _automaticFallbackProjects.Clear();
         _sessions.Clear(); ApplyOpening(OpenDefaultProject(deviceId, allowDefault: false));
         _wholeSideSelection = false; _showLightingEffects = false; _effectForSelection = false; _macroAssigning = false;

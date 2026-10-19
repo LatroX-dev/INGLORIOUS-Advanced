@@ -5,12 +5,14 @@ namespace InGlorious.Core;
 
 public enum StartupDeviceState { Loaded, NotConnected, Ambiguous, ReadFailed, OfflineOnly }
 
-public sealed record StartupDeviceResult(string DeviceId, StartupDeviceState State, AppProject? Project = null, OnboardInfo? Info = null)
+public sealed record StartupDeviceResult(string DeviceId, StartupDeviceState State, AppProject? Project = null, OnboardInfo? Info = null,
+    OnboardHardwareProfileSnapshot? ProfileSnapshot = null)
 {
     public bool Loaded => State == StartupDeviceState.Loaded && Project is not null && Info is not null;
+    public bool StorageHealthy => ProfileSnapshot?.Status.StorageHealthy ?? Info?.Persistent == true;
     public string Message => L.T(State switch
     {
-        StartupDeviceState.Loaded when Info?.Persistent == false => "Konfiguration geladen. Der Gerätespeicher ist nicht verfügbar.",
+        StartupDeviceState.Loaded when !StorageHealthy => "Konfiguration geladen. Der Gerätespeicher ist nicht verfügbar.",
         StartupDeviceState.Loaded => "Konfiguration von Tastatur geladen",
         StartupDeviceState.OfflineOnly => "Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar.",
         StartupDeviceState.NotConnected => "Kein Gerät mit INGLORIOUS verbunden. Lokales Profil geöffnet.",
@@ -62,13 +64,34 @@ public static class StartupDeviceLoader
                 {
                     var before = await client.GetInfoAsync(deadline.Token).ConfigureAwait(false);
                     if ((before.Flags & 4) != 0 || before.StagingBytes != 0) throw new IOException("Another configuration transfer is active.");
-                    var bytes = await client.ReadAsync(deadline.Token).ConfigureAwait(false);
+                    var profile = await client.GetHardwareProfileStatusAsync(cancellationToken: deadline.Token).ConfigureAwait(false);
+                    OnboardHardwareProfileSnapshot? snapshot = null;
+                    byte[] bytes;
+                    if (profile is not null)
+                    {
+                        if (profile.ActiveSlot == 0 || profile.SwitchPending || profile.UploadOpen) throw new IOException("Hardware profile is changing.");
+                        snapshot = await client.ReadHardwareProfileAsync(profile.ActiveSlot, deadline.Token).ConfigureAwait(false);
+                        var current = await client.GetHardwareProfileStatusAsync(cancellationToken: deadline.Token).ConfigureAwait(false);
+                        if (current is null || current.ActiveSlot != profile.ActiveSlot || current.SwitchPending || current.UploadOpen ||
+                            current.Generation != snapshot.Status.Generation || current.Crc32 != snapshot.Status.Crc32 ||
+                            snapshot.InstallationId != await client.GetInstallationIdAsync(deadline.Token).ConfigureAwait(false))
+                            throw new InvalidDataException("Hardware profile changed during startup read.");
+                        bytes = snapshot.Payload;
+                    }
+                    else bytes = await client.ReadAsync(deadline.Token).ConfigureAwait(false);
                     var after = await client.GetInfoAsync(deadline.Token).ConfigureAwait(false);
-                    if (before != after || after.DeviceId != definition.Id || OnboardProtocol.Crc32(bytes) != after.ActiveCrc)
+                    if ((snapshot is null && before != after) || after.DeviceId != definition.Id || OnboardProtocol.Crc32(bytes) != after.ActiveCrc)
                         throw new InvalidDataException("Device configuration changed during startup read.");
+                    if (snapshot is not null)
+                    {
+                        var final = await client.GetHardwareProfileStatusAsync(cancellationToken: deadline.Token).ConfigureAwait(false);
+                        if (final is null || final.ActiveSlot != snapshot.Binding.Slot || final.SwitchPending || final.UploadOpen ||
+                            final.Generation != snapshot.Binding.Generation || final.Crc32 != snapshot.Binding.Crc32)
+                            throw new InvalidDataException("Hardware selector changed after startup verification.");
+                    }
                     var project = OnboardSerializer.Decode(bytes);
                     if (project.DeviceId != definition.Id) throw new InvalidDataException("Device configuration belongs to another model.");
-                    loaded = new(definition.Id, StartupDeviceState.Loaded, project, after);
+                    loaded = new(definition.Id, StartupDeviceState.Loaded, project, after, snapshot);
                 }
                 results.Add(loaded);
             }

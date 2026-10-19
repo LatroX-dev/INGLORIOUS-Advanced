@@ -19,6 +19,7 @@
 #define B12 12
 #define B14 14
 #define C4 20
+#define A13 113
 typedef uint16_t matrix_row_t;
 typedef struct { uint8_t x, y; } point_t;
 typedef struct { uint8_t matrix_co[MATRIX_ROWS][MATRIX_COLS]; point_t point[RGB_MATRIX_LED_COUNT]; uint8_t flags[RGB_MATRIX_LED_COUNT]; } led_config_t;
@@ -48,6 +49,8 @@ void rgb_matrix_mode_noeeprom(uint8_t mode);
 uint32_t timer_elapsed32(uint32_t since);
 void gpio_write_pin_high(int pin);
 void gpio_set_pin_output(int pin);
+void gpio_set_pin_input_high(int pin);
+bool gpio_read_pin(int pin);
 void matrix_scan(void);
 void wait_ms(uint16_t milliseconds);
 void bootloader_jump(void);

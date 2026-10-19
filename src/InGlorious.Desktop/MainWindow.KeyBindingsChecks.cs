@@ -609,6 +609,83 @@ public sealed partial class MainWindow
             var busyReads = reads; await RefreshKnobStatusAsync(true);
             check(reads == busyReads, "busy operations prevent background knob status polls");
             _busy = false;
+
+            fixtureState.Change(project => project.Name = "Unsaved knob transfer fixture");
+            var dirtyFingerprint = EditorState.Fingerprint(fixtureState.Project);
+            var pollEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releasePoll = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            CancellationToken pollToken = default;
+            _readKnobStatus = async (_, token) =>
+            {
+                reads++; pollToken = token; pollEntered.SetResult(); await releasePoll.Task; return snapshot;
+            };
+            pendingRead = RefreshKnobStatusAsync(true); await pollEntered.Task;
+            Task<IDisposable>? pauseTask = null, nestedPauseTask = null;
+            try
+            {
+                _busy = true;
+                pauseTask = PauseKnobStatusAsync(); nestedPauseTask = PauseKnobStatusAsync();
+                readBefore = reads;
+                for (var tick = 0; tick < 3; tick++) await RefreshKnobStatusAsync(true);
+                check(!pauseTask.IsCompleted && !nestedPauseTask.IsCompleted && !pollToken.IsCancellationRequested && reads == readBefore && _knobStatusReading,
+                    "foreground operations drain a pending knob read while paused ticks neither cancel it nor start another read");
+                releasePoll.SetResult(); await pendingRead;
+                var pause = await pauseTask; var nestedPause = await nestedPauseTask;
+                check(!_knobStatusReading && _knobStatusCompletion is null && _knobStatusPauseDepth == 2 && QuietStatus(),
+                    "both nested foreground scopes continue only after the poll finishes and its stale runtime result is discarded");
+                _busy = false; pause.Dispose(); pause.Dispose();
+                await RefreshKnobStatusAsync(true);
+                check(_knobStatusPauseDepth == 1 && reads == readBefore,
+                    "disposing one foreground scope twice cannot resume polling while another scope remains active");
+                nestedPause.Dispose();
+                _readKnobStatus = (_, _) => { reads++; return Task.FromResult<OnboardKnobStatus?>(snapshot); };
+                await RefreshKnobStatusAsync(true);
+                check(_knobStatusPauseDepth == 0 && reads == readBefore + 1 && _knobStatus == snapshot &&
+                    EditorState.Fingerprint(fixtureState.Project) == dirtyFingerprint && fixtureState.Dirty && fixtureState.CanUndo,
+                    "leaving the final foreground scope resumes fresh status reads without changing unsaved profile edits or undo history");
+            }
+            finally
+            {
+                releasePoll.TrySetResult(); await pendingRead;
+                if (pauseTask is not null) (await pauseTask).Dispose();
+                if (nestedPauseTask is not null) (await nestedPauseTask).Dispose();
+                _busy = false;
+            }
+            fixtureState.Undo();
+            check(EditorState.Fingerprint(fixtureState.Project) == initial && !fixtureState.Dirty && !fixtureState.CanUndo,
+                "the original profile still restores with exactly one undo after a paused status read");
+
+            var cancelPollEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var cleanupEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseCleanup = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var disposed = false;
+            _readKnobStatus = async (_, token) =>
+            {
+                reads++; cancelPollEntered.SetResult();
+                try { await Task.Delay(Timeout.InfiniteTimeSpan, token); return snapshot; }
+                finally { cleanupEntered.SetResult(); await releaseCleanup.Task; disposed = true; }
+            };
+            pendingRead = RefreshKnobStatusAsync(true); await cancelPollEntered.Task;
+            pauseTask = null;
+            try
+            {
+                _busy = true; pauseTask = PauseKnobStatusAsync();
+                _knobStatusCancellation!.Cancel(); await cleanupEntered.Task;
+                await RefreshKnobStatusAsync(true);
+                check(!pendingRead.IsCompleted && !pauseTask.IsCompleted && _knobStatusReading && !disposed,
+                    "a canceled knob read remains in flight while its RAW lease cleanup is delayed, blocking foreground continuation");
+                releaseCleanup.SetResult(); await pendingRead;
+                using var pause = await pauseTask;
+                check(disposed && !_knobStatusReading && _knobStatusCompletion is null && QuietStatus() &&
+                    EditorState.Fingerprint(fixtureState.Project) == initial && !fixtureState.Dirty,
+                    "foreground continuation after cancellation waits for underlying cleanup and preserves the profile and quiet cache");
+            }
+            finally
+            {
+                releaseCleanup.TrySetResult(); await pendingRead;
+                if (pauseTask is not null) (await pauseTask).Dispose();
+                _busy = false;
+            }
             _findKnobDevices = () => new TaskCompletionSource<IReadOnlyList<OnboardDevice>>().Task;
             await RefreshKnobStatusAsync(true);
             check(!_knobStatusReading && QuietStatus() && _knobStatusNextRead > DateTime.UtcNow && _status == "after change",

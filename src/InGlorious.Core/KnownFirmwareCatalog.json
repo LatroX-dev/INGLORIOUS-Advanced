@@ -1,6 +1,208 @@
 {
   "releases": [
     {
+      "releaseId": "0.11.11",
+      "targets": [
+        {
+          "deviceId": "gmmk3-pro-100-iso",
+          "boardId": 16,
+          "file": "gmmk3-pro-100-iso.bin",
+          "bytes": 60132,
+          "sha256": "86D6D45C867ABA4819AE6F443275C26608E781F5A7606495424082BC4E098985",
+          "transport": "wb32-dfu",
+          "flashBytes": 262144,
+          "sramBytes": 36864,
+          "releaseId": "0.11.11",
+          "applicationOffset": 28672,
+          "storageLayout": "profile-pairs-v1"
+        }
+      ]
+    },
+    {
+      "releaseId": "0.11.10",
+      "targets": [
+        {
+          "deviceId": "gmmk3-pro-100-iso",
+          "boardId": 16,
+          "file": "gmmk3-pro-100-iso.bin",
+          "bytes": 49652,
+          "sha256": "5C43C4EFDAAEC8C34B6741682C25FB5C625749B0CDD1EE1F7FA33E5BBAA10D5A",
+          "transport": "wb32-dfu",
+          "flashBytes": 262144,
+          "sramBytes": 36864,
+          "releaseId": "0.11.10",
+          "applicationOffset": 28672
+        }
+      ]
+    },
+    {
+      "releaseId": "0.11.9",
+      "targets": [
+        {
+          "deviceId": "pro-iso",
+          "boardId": 1,
+          "file": "pro.bin",
+          "bytes": 50076,
+          "sha256": "3B080DDF4FD87B7C4E12E1C40E7FCB1D7970CBE4894E4461947B4E159E4A9C91",
+          "transport": "stm32-dfuse",
+          "flashBytes": 262144,
+          "sramBytes": 40960
+        },
+        {
+          "deviceId": "numpad",
+          "boardId": 2,
+          "file": "numpad.bin",
+          "bytes": 52316,
+          "sha256": "1B8A713FB6E9BDED989582E03246441ADA522E50ACCE6386583F11FDC6D9E71D",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
+          "deviceId": "pro-ansi",
+          "boardId": 3,
+          "file": "pro-ansi.bin",
+          "bytes": 49988,
+          "sha256": "1096091A850B3A091B6EC7DEFE15A080F3A360376069AFE55FC63CF27D8CC386",
+          "transport": "stm32-dfuse",
+          "flashBytes": 262144,
+          "sramBytes": 40960
+        },
+        {
+          "deviceId": "pro-rev2-ansi",
+          "boardId": 4,
+          "file": "pro-rev2-ansi.bin",
+          "bytes": 47856,
+          "sha256": "E43DDE1B0C4FF99BE9E12FA0C13915B4A4DC3BB9775C690AA4FE4B76D60392B5",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
+          "deviceId": "pro-rev2-iso",
+          "boardId": 5,
+          "file": "pro-rev2-iso.bin",
+          "bytes": 47924,
+          "sha256": "3BBB28A47E206B717EE4A0B78F4D2820559CE111C7FF55183EDB70EB1B280D8D",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
+          "deviceId": "gmmk2-65-ansi",
+          "boardId": 6,
+          "file": "gmmk2-65-ansi.bin",
+          "bytes": 42980,
+          "sha256": "3BAFC4538DD2C76F5AC158C96B392AE81F8DEF501197773161D8F96226D229CA",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
+          "deviceId": "gmmk2-65-iso",
+          "boardId": 7,
+          "file": "gmmk2-65-iso.bin",
+          "bytes": 42940,
+          "sha256": "A6C6808C26F099562211267F0F40143692136A46BB787280C6F4B48A1375E71B",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
+          "deviceId": "gmmk2-96-ansi",
+          "boardId": 8,
+          "file": "gmmk2-96-ansi.bin",
+          "bytes": 43800,
+          "sha256": "AD255AE9ED4540EED8CB24E6113F875197E95A7278DA53AD90B045EBA064E0C0",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
+          "deviceId": "gmmk2-96-iso",
+          "boardId": 9,
+          "file": "gmmk2-96-iso.bin",
+          "bytes": 43752,
+          "sha256": "3226E0C58479BB5379D8D05741D559D97646B3005E7A527D6B83815EE0D99AE3",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
+          "deviceId": "gmmk3-65-ansi",
+          "boardId": 10,
+          "file": "gmmk3-65-ansi.bin",
+          "bytes": 48540,
+          "sha256": "25400CB92452D5B6304FEDB4110316D3844D67B73270999CB4B8585E8823062A",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
+          "deviceId": "gmmk3-65-iso",
+          "boardId": 11,
+          "file": "gmmk3-65-iso.bin",
+          "bytes": 48464,
+          "sha256": "15288202638A864F646326932E31826EAB45D8BA2BFB142A18C0BBCC5AF97EA2",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
+          "deviceId": "gmmk3-75-ansi",
+          "boardId": 12,
+          "file": "gmmk3-75-ansi.bin",
+          "bytes": 48076,
+          "sha256": "095F05F085D23B8D8678BE8D81F5A61BA44DB36C5C8378736DF3F366C3F21E1D",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
+          "deviceId": "gmmk3-75-iso",
+          "boardId": 13,
+          "file": "gmmk3-75-iso.bin",
+          "bytes": 48016,
+          "sha256": "F112065A14D3B7289EA7AAB718EFAFD13FEFF22363ED5652A73A36324438DB60",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
+          "deviceId": "gmmk3-100-ansi",
+          "boardId": 14,
+          "file": "gmmk3-100-ansi.bin",
+          "bytes": 48836,
+          "sha256": "BB0EF3B96A5D5755A25BA5E45F2F6CFEDE5D40E9F21A5E145DE545532B2EB7FF",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
+          "deviceId": "gmmk3-100-iso",
+          "boardId": 15,
+          "file": "gmmk3-100-iso.bin",
+          "bytes": 48780,
+          "sha256": "6DDACA1893319B834304E06FB4B1B38CB8691B4F590EAB9D057509B23BE360D4",
+          "transport": "wb32-dfu",
+          "flashBytes": 131072,
+          "sramBytes": 28672
+        },
+        {
+          "deviceId": "gmmk3-pro-100-iso",
+          "boardId": 16,
+          "file": "gmmk3-pro-100-iso.bin",
+          "bytes": 49588,
+          "sha256": "DB6080B04321419E1C73C6E7004C6E8EB80D7779F4ED4BC0D2C44295018BFEB8",
+          "transport": "wb32-dfu",
+          "flashBytes": 262144,
+          "sramBytes": 36864,
+          "releaseId": "0.11.9",
+          "applicationOffset": 28672
+        }
+      ]
+    },
+    {
       "releaseId": "0.11.8",
       "targets": [
         {

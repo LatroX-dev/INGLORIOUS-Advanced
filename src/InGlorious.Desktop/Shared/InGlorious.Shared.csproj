@@ -27,6 +27,7 @@
     <Compile Include="../../InGlorious.Core/LightingPreviewEngine.cs" Link="LightingPreviewEngine.cs" />
     <Compile Include="../../InGlorious.Core/OnboardProtocol.cs" Link="OnboardProtocol.cs" />
     <Compile Include="../../InGlorious.Core/OnboardClient.cs" Link="OnboardClient.cs" />
+    <Compile Include="../../InGlorious.Core/OnboardHardwareProfiles.cs" Link="OnboardHardwareProfiles.cs" />
     <Compile Include="../../InGlorious.Core/OnboardTransportPool.cs" Link="OnboardTransportPool.cs" />
     <Compile Include="../../InGlorious.Core/OnboardDiagnostics.cs" Link="OnboardDiagnostics.cs" />
     <Compile Include="../../InGlorious.Core/DeviceDiagnosticSession.cs" Link="DeviceDiagnosticSession.cs" />
@@ -39,6 +40,7 @@
     <Compile Include="../../InGlorious.Core/StockDeviceCatalog.cs" Link="StockDeviceCatalog.cs" />
     <Compile Include="../../InGlorious.Core/StockFirmwareInspector.cs" Link="StockFirmwareInspector.cs" />
     <Compile Include="../../InGlorious.Core/InstallationIdentity.cs" Link="InstallationIdentity.cs" />
+    <Compile Include="../../InGlorious.Core/ProfileBankLayout.cs" Link="ProfileBankLayout.cs" />
     <Compile Include="../../InGlorious.Core/RetainedLoaderLayout.cs" Link="RetainedLoaderLayout.cs" />
     <Compile Include="../../InGlorious.Core/KnownFirmwareImages.cs" Link="KnownFirmwareImages.cs" />
     <Compile Include="../../InGlorious.Core/LegacyFirmwareMigration.cs" Link="LegacyFirmwareMigration.cs" />
@@ -61,4 +63,6 @@
     <EmbeddedResource Include="../../InGlorious.Core/Locales/*.json" LogicalName="InGlorious.Locales.%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup><Compile Include="../../InGlorious.Core/BoardDescriptorRegistry.cs" Link="BoardDescriptorRegistry.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../InGlorious.Core/HardwareControlCatalog.cs" Link="HardwareControlCatalog.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../InGlorious.Core/HardwareControlTestSession.cs" Link="HardwareControlTestSession.cs" /></ItemGroup>
 </Project>

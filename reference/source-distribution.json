@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "firmwareVersion": "0.11.4",
+  "firmwareVersion": "0.11.9",
   "repositories": [
     { "id": "qmk", "relative": ".", "url": "https://github.com/qmk/qmk_firmware", "commit": "7a1bbf37c5c07da4ea0a162bb139083a46ef40a1" },
     { "id": "chibios", "relative": "lib/chibios", "url": "https://github.com/qmk/ChibiOS", "commit": "6170ddf92d55be54c89b708d1882eea229edeb2c" },

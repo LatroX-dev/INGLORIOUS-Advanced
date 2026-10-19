@@ -10,7 +10,7 @@ internal static class StartupFixture
     internal static string Mode = "";
     internal static int GuardsCreated, GuardsDisposed, InstancesCreated, InstancesDisposed, WindowsCreated,
         BackgroundInitializations, Opens, TrayAttempts, TraysDisposed, PreferenceReads, Notices,
-        SetupWaits, DeferredBoundaryChecks;
+        SetupWaits, DeferredBoundaryChecks, DiagnosticInstallations, DiagnosticWrites, DiagnosticPathReads;
     internal static bool? Activation;
     internal static Action? Open, Exit;
 }
@@ -44,7 +44,8 @@ public sealed class WindowsInstallationGuard : IDisposable
     {
         if (!Application.Current.Dispatcher.CheckAccess() || Application.Current.ShutdownMode != ShutdownMode.OnExplicitShutdown ||
             StartupFixture.WindowsCreated != 0 || StartupFixture.InstancesCreated != 0 || StartupFixture.TrayAttempts != 0 ||
-            StartupFixture.BackgroundInitializations != 0 || StartupFixture.PreferenceReads != 0 || StartupFixture.Notices != 0 || StartupFixture.GuardsDisposed != 0)
+            StartupFixture.BackgroundInitializations != 0 || StartupFixture.PreferenceReads != 0 || StartupFixture.Notices != 0 || StartupFixture.GuardsDisposed != 0 ||
+            StartupFixture.DiagnosticInstallations != 0 || StartupFixture.DiagnosticWrites != 0 || StartupFixture.DiagnosticPathReads != 0)
             throw new InvalidOperationException("Waiting for setup must retain the guard on a responsive dispatcher without opening the editor, devices, tray, preferences or startup notices.");
         StartupFixture.DeferredBoundaryChecks++;
     }
@@ -108,4 +109,31 @@ public static class L
 {
     public static void SetLanguage(string _) { }
     public static string T(string value) => value;
+}
+
+internal sealed record OnboardMetadataDiagnostic;
+internal static class OnboardMetadata
+{
+    private static Action<OnboardMetadataDiagnostic>? _sink;
+    internal static Action<OnboardMetadataDiagnostic>? DiagnosticSink
+    {
+        get => _sink;
+        set { _sink = value; if (value is not null) StartupFixture.DiagnosticInstallations++; }
+    }
+}
+internal static class OnboardDiscoveryDiagnostics
+{
+    internal static void AppendMetadata(string directory, OnboardMetadataDiagnostic entry)
+    {
+        if (directory != Path.Combine(AppContext.BaseDirectory, "fixture-data", "diagnostics"))
+            throw new InvalidOperationException("Diagnostic fixture received an unexpected directory.");
+        StartupFixture.DiagnosticWrites++;
+    }
+}
+internal static class Paths
+{
+    internal static string DataRoot
+    {
+        get { StartupFixture.DiagnosticPathReads++; return Path.Combine(AppContext.BaseDirectory, "fixture-data"); }
+    }
 }

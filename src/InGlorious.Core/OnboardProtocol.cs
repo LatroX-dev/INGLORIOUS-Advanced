@@ -465,13 +465,26 @@ public sealed class OnboardCommandException(byte status, string message) : IOExc
 public static class OnboardProtocol
 {
     public const byte Info = 1, Read = 2, Write = 3, Begin = 4, Commit = 5, Abort = 6, ReconnectUsb = 8, ReadRuntimeBrightness = 9, SetRuntimeBrightness = 10, GetExtensions = 11, LightingTest = 12, GetFirmwareVersion = 13;
-    public const byte DeviceTest = 14, DeviceTestLed = 15, ReadKnobStatus = 16;
+    public const byte DeviceTest = 14, DeviceTestLed = 15, ReadKnobStatus = 16, ReadHardwareControls = 17;
+    public const byte ProfileStatus = 18, ProfileRead = 19, ProfileBegin = 20, ProfileWrite = 21,
+        ProfileCommit = 22, ProfileAbort = 23, ProfileInstallationIdentity = 24;
     public static byte[] Packet(byte command, byte sequence, ReadOnlySpan<byte> payload)
     {
-        if ((command is < 1 or > 6 && command is not ReconnectUsb and not ReadRuntimeBrightness and not SetRuntimeBrightness and not GetExtensions and not LightingTest and not GetFirmwareVersion and not DeviceTest and not DeviceTestLed and not ReadKnobStatus) || payload.Length > 24 || (command is ReconnectUsb or ReadRuntimeBrightness or GetExtensions or GetFirmwareVersion or ReadKnobStatus && payload.Length != 0) || (command == SetRuntimeBrightness && payload.Length != 1) || (command == LightingTest && (payload.Length != 1 || payload[0] > 2)) || (command == DeviceTest && (payload.Length != 1 || payload[0] > 3)) || (command == DeviceTestLed && (payload.Length != 5 || payload[0] > 2 || (payload[0] != 2 && payload[1] != 0) || (payload[0] == 0 && payload[2..].IndexOfAnyExcept((byte)0) >= 0)))) throw new ArgumentOutOfRangeException(nameof(payload));
+        if ((command is < 1 or > 6 && command is not ReconnectUsb and not ReadRuntimeBrightness and not SetRuntimeBrightness and not GetExtensions and not LightingTest and not GetFirmwareVersion and not DeviceTest and not DeviceTestLed and not ReadKnobStatus and not ReadHardwareControls && command is not (>= ProfileStatus and <= ProfileInstallationIdentity)) || payload.Length > 24 || (command is ReadRuntimeBrightness or GetExtensions or GetFirmwareVersion or ReadKnobStatus or ReadHardwareControls && payload.Length != 0) || (command == SetRuntimeBrightness && payload.Length != 1) || (command == LightingTest && (payload.Length != 1 || payload[0] > 2)) || (command == DeviceTest && (payload.Length != 1 || payload[0] > 3)) || (command == DeviceTestLed && (payload.Length != 5 || payload[0] > 2 || (payload[0] != 2 && payload[1] != 0) || (payload[0] == 0 && payload[2..].IndexOfAnyExcept((byte)0) >= 0))) || !ValidProfileRequest(command, payload)) throw new ArgumentOutOfRangeException(nameof(payload));
         var result = new byte[32]; result[0] = (byte)'I'; result[1] = (byte)'G'; result[2] = 1; result[3] = command; result[4] = sequence; result[6] = (byte)payload.Length;
         payload.CopyTo(result.AsSpan(8)); return result;
     }
+    private static bool ValidProfileRequest(byte command, ReadOnlySpan<byte> p) => command switch
+    {
+        ReconnectUsb => p.IsEmpty || (p.Length == 16 && p[0] is >= 1 and <= 3 && p.Slice(1, 3).IndexOfAnyExcept((byte)0) < 0),
+        ProfileStatus => p.Length == 1 && p[0] <= 3,
+        ProfileRead => p.Length == 16 && p[0] is >= 1 and <= 3 && p[1] is >= 1 and <= 12,
+        ProfileBegin => p.Length == 24 && p[0] is >= 1 and <= 3 && p[1] == 0 && BinaryPrimitives.ReadUInt16LittleEndian(p[2..]) is >= 8 and <= 7680 && BinaryPrimitives.ReadUInt32LittleEndian(p[20..]) != 0,
+        ProfileWrite => p.Length >= 9 && p[4] is >= 1 and <= 3 && p[5] is >= 1 and <= 16 && p.Length == 8 + p[5] && BinaryPrimitives.ReadUInt32LittleEndian(p) != 0,
+        ProfileCommit or ProfileAbort => p.Length == (command == ProfileCommit ? 20 : 8) && p[4] is >= 1 and <= 3 && p.Slice(5, 3).IndexOfAnyExcept((byte)0) < 0 && BinaryPrimitives.ReadUInt32LittleEndian(p) != 0,
+        ProfileInstallationIdentity => p.IsEmpty,
+        _ => true
+    };
     public static void ValidateRequest(byte[] packet)
     {
         if (packet.Length != 32 || packet[0] != 'I' || packet[1] != 'G' || packet[2] != 1 || packet[5] != 0 || packet[7] != 0 || packet[6] > 24 ||

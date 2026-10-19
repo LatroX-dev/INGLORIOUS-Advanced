@@ -13,7 +13,17 @@ Configure Glorious keyboards with per-key lighting, effects, key assignments, ma
 
 I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
 
-**App 0.6.65 · Firmware 0.11.8**
+**App 0.7.0 · Firmware 0.11.11 for GMMK 3 PRO 100% ISO; 0.11.9 for other supported models**
+
+### New in 0.7.0: use your keyboard's switches
+
+- **Three onboard profiles:** on the **GMMK 3 PRO 100% ISO**, use the physical profile switch to change between three saved configurations. Each has its own lighting, bindings and four layers. Switching works with the app closed.
+- **Windows/macOS switch:** on supported **GMMK 3 wired keyboards**, adapt standard modifier keys to the selected OS while keeping your layers and custom bindings.
+- The Windows app shows both switch positions beside the layer selection and follows the selected hardware profile automatically.
+
+These features require the included firmware update. Profile switching is limited to the wired, non-HE GMMK 3 PRO 100% ISO. Other GMMK 3 models remain experimental; wireless and HE variants are not supported. [How the switches work](docs/getting-started.md#use-the-keyboards-switches).
+
+**[Download 0.7.0](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases/tag/v0.7.0) · [What's changed](CHANGELOG.md#070)**
 
 Get installers and packages from the [Releases page](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases). macOS and Linux builds are Early Alpha; physical-device testing is still limited.
 
@@ -54,7 +64,7 @@ Read the [setup and recovery guide](docs/getting-started.md). The **?** button o
 | GMMK 3, wired non-HE, 65%, 75% and 100% | ANSI, ISO | Experimental |
 | GMMK 3 PRO, wired non-HE, 100% | ISO | Hardware tested on Windows |
 
-There are **16 model/layout variants**, including **13 experimental variants**. Experimental devices can be configured and installed; their physical testing is still pending. On one GMMK 3 PRO 100% ISO, installation, normal typing and lighting, original-firmware recovery, and an update to firmware 0.11.4 with the complete lighting sequence have been tested on Windows. This status applies only to the wired, non-HE 100% ISO variant. The Numpad's original-firmware recovery, first installation, automatic reconnection, lighting sequence and typing test have been used on Windows with app 0.6.43. See the [hardware acceptance checklist](docs/hardware-acceptance.md) for the remaining tests.
+There are **16 model/layout variants**, including **13 experimental variants**. Experimental devices can be configured and installed; their physical testing is still pending. On one GMMK 3 PRO 100% ISO, Windows testing covers installation, typing and lighting, original-firmware recovery, the full lighting test, the OS switch, and independent profile switching with the app closed and after reconnecting. Automatic loading and configuration transfer were also confirmed with app 0.7.0. This status applies only to the wired, non-HE 100% ISO variant. The Numpad's original-firmware recovery, first installation, automatic reconnection, lighting sequence and typing test have been used on Windows with app 0.6.43. See the [hardware acceptance checklist](docs/hardware-acceptance.md) for the remaining tests.
 
 GMMK 3 PRO support is limited to the **100% ISO wired, non-HE variant**. Other PRO sizes and layouts, GMMK HE, GMBK, GMMK Eternal, Bluetooth and other wireless modes are not supported. Check the [complete model list](docs/model-support.md) before installing firmware.
 
@@ -79,6 +89,8 @@ These screenshots show the Windows editor with offline demo data. They do not de
 - Key and encoder assignments, four layers and a shared macro library with import/export.
 - Import and export key bindings for selected layers, including assigned macros, without changing lighting. The Numpad slider can be included separately.
 - Local profiles for each device, with configuration readback after transfer.
+- Three independent onboard profiles selected by the physical switch on the GMMK 3 PRO 100% ISO.
+- Windows/macOS modifier switching on supported GMMK 3 wired models, without using an extra layer.
 - Adjustable USB polling rate and debounce time.
 - Standby lighting and an optional INGLORIOUS screensaver, under Device.
 - Numpad slider: disabled, lighting brightness, relative volume or MIDI control.

@@ -71,6 +71,31 @@ Saving a profile keeps a copy on your computer. It does not change the keyboard 
 
 Use the **?** button next to Settings for help in your language. Language follows **System** by default.
 
+## Use the keyboard's switches
+
+App 0.7.0 includes the required firmware. Update the keyboard through **Device** first if the app offers a firmware update. Installing the app alone does not enable these controls.
+
+### Windows/macOS
+
+On supported GMMK 3 wired models, set the physical switch to your operating system. Standard Windows/Alt modifier keys adapt to that mode. Your four layers, custom bindings, macros and knob actions stay as configured. Release held keys after moving the switch. The function works with the app closed.
+
+The Windows app shows a switch icon and **Windows** or **macOS** beside the layer selection. Hover over the icon for its explanation. The keyboard diagram continues to label physical key positions; it does not swap the printed key labels.
+
+### Profiles 1, 2 and 3
+
+The **GMMK 3 PRO 100% ISO wired, non-HE** can store three independent configurations. Other models do not yet support the profile selector.
+
+1. Move the physical profile switch to **1**, **2** or **3**, then release all keys.
+2. In the Windows app, wait for that profile number and its configuration to appear.
+3. Edit lighting, bindings or other settings, then choose **Send to keyboard**. Only the selected hardware profile is updated.
+4. Move the switch to another position to use its saved configuration, even with the app closed.
+
+Each profile has its own four layers. **Profile 2** is therefore a separate configuration, not **Layer 2**. Initially, positions without saved changes use the existing configuration, so they may look identical. Saving a profile copy on the computer remains separate from transferring it to a hardware profile.
+
+The Windows app keeps unsaved edits for each position while switching. On the macOS and Linux Early Alpha apps, use **Read from keyboard** after moving the profile switch to load that position before editing it.
+
+These controls do not add Bluetooth or wireless support. See the [model list](model-support.md#physical-switches) for the exact supported variants.
+
 ## Update INGLORIOUS firmware
 
 Every app package includes the matching firmware for all supported models. The app compares the version reported by the keyboard with this included firmware. An update is offered only when an older supported version is recognized. Installing a newer app does not flash the keyboard automatically. Open an available firmware update from the device's firmware area and follow the guided reconnect steps. Confirm the displayed device and select **Back up and update**. The backup, checks and update then run together.

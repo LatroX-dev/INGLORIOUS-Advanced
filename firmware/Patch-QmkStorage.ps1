@@ -79,6 +79,62 @@ wear_leveling_status_t wear_leveling_write(uint32_t address, const void *value, 
 
 '@
 $tail = $tail.Replace("`r`n", "`n").Replace("`n", $nl)
+$profileUpgrades = @(
+    @('static wear_leveling_status_t ig_wear_leveling_write_internal(const uint32_t address, const void *value, size_t length, bool force) {', @'
+#if IG_PROFILE_BANK_ENABLE
+__attribute__((unused)) // The bank build rejects every legacy write path.
+#endif
+static wear_leveling_status_t ig_wear_leveling_write_internal(const uint32_t address, const void *value, size_t length, bool force) {
+'@),
+    @(@'
+    if (ig_storage_borrowed) return WEAR_LEVELING_FAILED;
+    return ig_wear_leveling_init_internal();
+'@, @'
+    if (ig_storage_borrowed) return WEAR_LEVELING_FAILED;
+#if IG_PROFILE_BANK_ENABLE
+    // The retained legacy area is immutable on bank-enabled board16, even on
+    // initial QMK boot before user hooks. Never consolidate a damaged/full log.
+    ig_storage_read_only_reload = true;
+    wear_leveling_status_t status = ig_wear_leveling_init_internal();
+    ig_storage_read_only_reload = false;
+    return status;
+#else
+    return ig_wear_leveling_init_internal();
+#endif
+'@),
+    @('    if (ig_storage_borrowed || ig_storage_fault) return WEAR_LEVELING_FAILED;', @'
+#if IG_PROFILE_BANK_ENABLE
+    return WEAR_LEVELING_FAILED; // Never erase immutable legacy storage.
+#else
+    if (ig_storage_borrowed || ig_storage_fault) return WEAR_LEVELING_FAILED;
+#endif
+'@),
+    @(@'
+    if (ig_storage_borrowed || ig_storage_fault || !value || address > WEAR_LEVELING_LOGICAL_SIZE || length > WEAR_LEVELING_LOGICAL_SIZE - address) return WEAR_LEVELING_FAILED;
+    return ig_wear_leveling_write_internal(address, value, length, false);
+'@, @'
+#if IG_PROFILE_BANK_ENABLE
+    (void)address; (void)value; (void)length;
+    return WEAR_LEVELING_FAILED; // Explicit bank saves use only the bounded adapter.
+#else
+    if (ig_storage_borrowed || ig_storage_fault || !value || address > WEAR_LEVELING_LOGICAL_SIZE || length > WEAR_LEVELING_LOGICAL_SIZE - address) return WEAR_LEVELING_FAILED;
+    return ig_wear_leveling_write_internal(address, value, length, false);
+#endif
+'@)
+)
+for ($i=0; $i -lt $profileUpgrades.Count; $i++) {
+    for ($j=0; $j -lt 2; $j++) { $profileUpgrades[$i][$j] = $profileUpgrades[$i][$j].Replace("`r`n", "`n").Replace("`n", $nl) }
+}
+$existingSource = $source
+# Normalize only these reviewed additions before rechecking the pinned baseline.
+if ($source.Contains('/* INGLORIOUS_CACHE_STAGING_BEGIN */')) {
+    foreach ($upgrade in $profileUpgrades) {
+        if ($source.Contains($upgrade[1])) {
+            if ([regex]::Matches($source, [regex]::Escape($upgrade[1])).Count -ne 1) { throw 'Unexpected profile-storage patch structure.' }
+            $source = $source.Replace($upgrade[1], $upgrade[0])
+        }
+    }
+}
 $baseline = $source
 $alreadyPatched = $source.Contains('/* INGLORIOUS_CACHE_STAGING_BEGIN */')
 if ($alreadyPatched) {
@@ -98,6 +154,10 @@ foreach ($edit in $edits) {
 }
 $patched += $tail
 if ($alreadyPatched -and $source -cne $patched) { throw 'Existing storage patch differs from this generator. No file was changed.' }
-$changed = $source -cne $patched
+foreach ($upgrade in $profileUpgrades) {
+    if ([regex]::Matches($patched, [regex]::Escape($upgrade[0])).Count -ne 1) { throw 'Profile storage patch anchor is not unique.' }
+    $patched = $patched.Replace($upgrade[0], $upgrade[1])
+}
+$changed = $existingSource -cne $patched
 if ($Apply -and $changed) { [IO.File]::WriteAllBytes($path, $utf8.GetBytes($patched)) }
 [pscustomobject]@{source=$path; originalSha256=$originalHash; patchedSha256=(Get-TextHash $patched); applied=[bool]$Apply; changed=[bool]($Apply -and $changed); secondStagingBytes=0}

@@ -182,6 +182,14 @@ public partial class MainWindow : Window
             if (args.Contains("--effects-selected")) { SetLightingEditor(true); SetEffectScope(true); }
             if (args.Contains("--device-settings")) SetTab(4);
             if (args.Contains("--profiles")) SetTab(5);
+            if (args.Contains("--hardware-switches-preview") && Device.Id == "gmmk3-pro-100-iso")
+            {
+                SetOfflineConnectionFixture([Device.Id]);
+                BuildDeviceButtons();
+                _hardwareSwitchDevice = Device.Id;
+                _hardwareSwitchReading = new("offline-preview", null, new(Device.Id, 2, 2, 1, 2, 1, 0, 7272, 7), Guid.Empty);
+                RefreshHardwareSwitchView();
+            }
         }
         if (_screenshotMode) await InspectBackupAsync(); // Offline verification never enumerates or opens hardware.
         else
@@ -398,6 +406,7 @@ public partial class MainWindow : Window
         }
         finally { _refreshing = false; }
         RefreshInspector();
+        RefreshHardwareSwitchView();
     }
 
     private void BuildDeviceButtons()
@@ -416,7 +425,7 @@ public partial class MainWindow : Window
         DeviceModeText.Visibility = !_connectionScanFailed && (IsActiveDeviceConnected || ConnectedDevices.Length == 0 && _setupDevices.Length > 0) ? Visibility.Collapsed : Visibility.Visible;
         DeviceModeText.Foreground = Brush(IsActiveDeviceConnected ? "#75D9CF" : "#A0A7B0");
         ReadDeviceButton.IsEnabled = !offline && IsActiveDeviceConnected;
-        TransferButton.IsEnabled = ReadDeviceButton.IsEnabled && !DeviceConfigurationNeedsRead;
+        TransferButton.IsEnabled = ReadDeviceButton.IsEnabled && !DeviceConfigurationNeedsRead && !HardwareProfileAwaitingRefresh;
         ManageFirmwareButton.IsEnabled = RestoreOriginalFirmwareButton.IsEnabled = !offline && IsActiveDeviceConnected;
         ManageFirmwareButton.Visibility = offline ? Visibility.Collapsed : Visibility.Visible;
         DeviceRecoveryOverview.Visibility = offline ? Visibility.Collapsed : Visibility.Visible;
@@ -1493,6 +1502,7 @@ public partial class MainWindow : Window
         var editingSlider = _activeTab == 1 && _editingSlider && Device.Id == "numpad";
         CurrentLayerChoice.Visibility = editingSlider || _activeTab >= 4 || (_activeTab == 2 && !_macroAssigning) ? Visibility.Collapsed : Visibility.Visible;
         CurrentLayerHost.Visibility = CurrentLayerChoice.Visibility;
+        RefreshHardwareSwitchView();
         LightingPresetsButton.Visibility = _activeTab == 0 ? Visibility.Visible : Visibility.Collapsed;
         LayerEditingHelp.Visibility = !editingSlider && (_activeTab is 1 or 3) ? Visibility.Visible : Visibility.Collapsed;
         SelectionBar.Visibility = editingSlider || _activeTab == 0 && (_showLightingEffects && !_effectForSelection) ? Visibility.Collapsed : KeyboardWorkspace.Visibility;
@@ -1641,17 +1651,24 @@ public partial class MainWindow : Window
         if (Device.IsOfflineOnly) { Status(L.T("Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar.")); return; }
         if (!IsActiveDeviceConnected) { Status(L.T("Gerät nicht verbunden")); return; }
         if (DeviceConfigurationNeedsRead) { Status(DeviceConfigurationReadNotice); return; }
-        if (_readingDevice) return;
+        if (HardwareProfileAwaitingRefresh) { Status(L.T("Das Profil auf der Tastatur hat sich geändert. Bitte erneut auslesen.")); return; }
+        if (_readingDevice || _knobStatusPauseDepth != 0) return;
         if (!ResolvePendingEdits()) return;
         CommitNames();
-        await _sharedBrightness.StopAsync();
+        var wasEnabled = IsEnabled;
+        IsEnabled = false;
         try
         {
-            var transfer = new TransferWindow(ProjectService.Clone(_project), offlinePreview: _screenshotMode) { Owner = this };
+            using var pausedKnob = await PauseKnobStatusAsync();
+            await _sharedBrightness.StopAsync();
+            var transfer = new TransferWindow(ProjectService.Clone(_project), offlinePreview: _screenshotMode,
+                profileBinding: _hardwareProfileBindings.GetValueOrDefault(Device.Id)) { Owner = this };
             transfer.ShowDialog();
             if (transfer.DeviceSaveVerified)
             {
+                if (transfer.DeviceProfileSnapshot is { } savedProfile) RememberHardwareProfileSnapshot(savedProfile);
                 MarkDeviceConfigurationRead(_project);
+                CaptureSession();
                 _confirmedDeviceSaves[Device.Id] = (Fingerprint(_project), DateTime.Now);
                 _startupResults.Remove(Device.Id);
                 UpdateSourceHint();
@@ -1667,12 +1684,12 @@ public partial class MainWindow : Window
             }
             if (transfer.FirmwareGuideRequested) { await CheckFirmwareGuideAsync(force: true, deviceId: Device.Id); return; }
             if (transfer.ImportedProject is not { } imported) return;
-            RecordDeviceRead(imported);
+            RecordDeviceRead(imported, profileSnapshot: transfer.DeviceProfileSnapshot);
             if (!ConfirmReplace()) return;
-            AdoptDeviceProject(imported, transfer.ImportedGeneration);
+            AdoptDeviceProject(imported, transfer.ImportedGeneration, profileSnapshot: transfer.DeviceProfileSnapshot);
         }
         catch (Exception ex) { ShowError(L.T("Die Konfiguration kann nicht übertragen werden."), ex); }
-        finally { StartSharedBrightnessIfReady(); }
+        finally { IsEnabled = wasEnabled; StartSharedBrightnessIfReady(); }
     }
 
     private async void Firmware_Click(object sender, RoutedEventArgs e)
@@ -1687,26 +1704,31 @@ public partial class MainWindow : Window
         if (!Device.IsOfflineOnly) await OpenDeviceSetupAsync(Device.Id, SetupOperation.Restore);
     }
 
-    private void AdoptDeviceProject(AppProject project, uint? generation, OnboardInfo? info = null)
+    private void AdoptDeviceProject(AppProject project, uint? generation, OnboardInfo? info = null,
+        OnboardHardwareProfileSnapshot? profileSnapshot = null)
     {
         _macroAssigning = false;
         if (project.DeviceId != _project.DeviceId) throw new InvalidDataException(L.T("Die gelesene Konfiguration gehört zu einem anderen Gerät."));
         _project = ProjectService.Clone(project); _projectPath = null; _savedFingerprint = ""; _layerIndex = 0;
         _selection.Clear();
         _undo.Clear(); _redo.Clear(); _macroId = null;
-        SetProjectSource("Vom Gerät gelesen" + (generation.HasValue ? $" · Stand {generation.Value}" : "") + $" · {DateTime.Now:HH:mm}");
-        RecordDeviceRead(_project, info);
+        if (profileSnapshot is not null) RememberHardwareProfileSnapshot(profileSnapshot);
+        else _hardwareProfileBindings.Remove(project.DeviceId);
+        SetProjectSource(profileSnapshot is not null ? L.Format("Profil {0} von Tastatur gelesen", profileSnapshot.Status.Slot) :
+            "Vom Gerät gelesen" + (generation.HasValue ? $" · Stand {generation.Value}" : "") + $" · {DateTime.Now:HH:mm}");
+        RecordDeviceRead(_project, info, profileSnapshot);
+        CaptureSession();
         RefreshAll(); Status(L.T("Konfiguration von Tastatur geladen"));
     }
 
-    private void RecordDeviceRead(AppProject project, OnboardInfo? info = null)
+    private void RecordDeviceRead(AppProject project, OnboardInfo? info = null, OnboardHardwareProfileSnapshot? profileSnapshot = null)
     {
         if (project.DeviceId != Device.Id) throw new InvalidDataException(L.T("Die Konfiguration gehört zu einem anderen Gerät."));
         MarkDeviceConfigurationRead(project, info);
-        if (info?.Persistent == false)
+        if (profileSnapshot?.Status.StorageHealthy == false || profileSnapshot is null && info?.Persistent == false)
         {
             _confirmedDeviceSaves.Remove(Device.Id);
-            _startupResults[Device.Id] = new(Device.Id, StartupDeviceState.Loaded, project, info);
+            _startupResults[Device.Id] = new(Device.Id, StartupDeviceState.Loaded, project, info, profileSnapshot);
         }
         else
         {
@@ -1727,16 +1749,17 @@ public partial class MainWindow : Window
     {
         if (Device.IsOfflineOnly) { Status(L.T("Für dieses Modell kannst du Profile erstellen. Übertragen und Firmwarewechsel sind noch nicht verfügbar.")); return; }
         if (!IsActiveDeviceConnected) { Status(L.T("Gerät nicht verbunden")); return; }
-        if (_readingDevice || _screenshotMode) return;
+        if (_readingDevice || _screenshotMode || _knobStatusPauseDepth != 0) return;
         if (!ResolvePendingEdits()) return;
         CommitNames();
         var deviceId = _project.DeviceId;
         InvalidateDeviceConfirmation(deviceId);
         _readingDevice = true; EditorSurface.IsEnabled = false; ReadDeviceButton.Content = L.T("Wird gelesen …");
         Status(L.T("Passende INGLORIOUS-Firmware wird gesucht. Es werden keine Einstellungen geschrieben …"));
-        await _sharedBrightness.StopAsync();
         try
         {
+            using var pausedKnob = await PauseKnobStatusAsync();
+            await _sharedBrightness.StopAsync();
             // Manual reload is separate from the one-time startup read.
             var candidates = (await Task.Run(OnboardClient.FindDevices)).Where(d => d.DeviceId == deviceId).ToList();
             if (candidates.Count == 0) throw new IOException(L.T("Keine passende eigene INGLORIOUS-Firmware erkannt. Ein Gerät mit Original-Firmware kann hier noch nicht ausgelesen werden."));
@@ -1746,6 +1769,21 @@ public partial class MainWindow : Window
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var before = await client.GetInfoAsync(deadline.Token);
             Status(L.T("Gerätestand wird vollständig gelesen und auf unveränderten Stand geprüft …"));
+            if (await client.GetHardwareProfileStatusAsync(cancellationToken: deadline.Token) is { } hardwareProfile)
+            {
+                if (hardwareProfile.SwitchPending || hardwareProfile.UploadOpen || hardwareProfile.ActiveSlot == 0)
+                    throw new IOException(L.T("Zum Wechseln alle Tasten loslassen."));
+                var snapshot = await client.ReadHardwareProfileAsync(hardwareProfile.ActiveSlot, deadline.Token);
+                var current = await client.GetHardwareProfileStatusAsync(cancellationToken: deadline.Token);
+                if (current is null || current.SwitchPending || current.UploadOpen || current.ActiveSlot != snapshot.Status.Slot ||
+                    current.Generation != snapshot.Status.Generation || current.Crc32 != snapshot.Status.Crc32 ||
+                    await client.GetInstallationIdAsync(deadline.Token) != snapshot.InstallationId)
+                    throw new IOException(L.T("Das Profil auf der Tastatur hat sich geändert. Bitte erneut auslesen."));
+                var profileProject = OnboardSerializer.Decode(snapshot.Payload);
+                if (!ConfirmReplace()) { Status(L.T("Übernahme abgebrochen. Profil unverändert.")); return; }
+                AdoptDeviceProject(profileProject, null, profileSnapshot: snapshot);
+                return;
+            }
             var data = await client.ReadAsync(deadline.Token);
             var after = await client.GetInfoAsync(deadline.Token);
             if (before != after || after.DeviceId != deviceId || (after.Flags & 4) != 0 || after.StagingBytes != 0 || OnboardProtocol.Crc32(data) != after.ActiveCrc)
@@ -1757,6 +1795,7 @@ public partial class MainWindow : Window
             if (!ConfirmReplace()) { Status(L.T("Übernahme abgebrochen. Profil unverändert.")); return; }
             AdoptDeviceProject(project, after.Generation, after);
         }
+        catch (OnboardMetadataQueryException) { ShowDeviceMetadataReadFailure(); }
         catch (Exception ex) { ShowError(L.T("Gerätestand konnte nicht übernommen werden. Profil unverändert."), ex); }
         finally { _readingDevice = false; StartSharedBrightnessIfReady(); EditorSurface.IsEnabled = true; ReadDeviceButton.Content = L.T("Von Tastatur laden"); }
     }
@@ -2032,7 +2071,12 @@ public partial class MainWindow : Window
         RefreshAll(); Status(_defaultLoadError ?? StartupNotice ?? Device.Name);
     }
 
-    private void CaptureSession() => _sessions[_project.DeviceId] = new(_project, _savedFingerprint, _projectPath, _layerIndex, _macroId, _selection.ToArray(), _undo.ToArray(), _redo.ToArray(), _sourceDescription, _sourceFingerprint, _defaultLoadError);
+    private void CaptureSession()
+    {
+        var session = new EditorSession(_project, _savedFingerprint, _projectPath, _layerIndex, _macroId, _selection.ToArray(), _undo.ToArray(), _redo.ToArray(), _sourceDescription, _sourceFingerprint, _defaultLoadError);
+        _sessions[_project.DeviceId] = session;
+        CaptureHardwareProfileDraft(_project.DeviceId, session);
+    }
 
     private bool ConfirmReplace()
     {
@@ -2231,6 +2275,7 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
+        if (_knobStatusPauseDepth != 0) { e.Cancel = true; Status(L.T("Der Gerätezugriff läuft noch. Bitte warte auf das Prüfergebnis.")); return; }
         if (KeepWindowInTray()) { e.Cancel = true; return; }
         if (_startupLoading || _startupFinishing) { _startupCancellation.Cancel(); return; }
         if (_readingDevice) { e.Cancel = true; Status(L.T("Der Gerätestand wird noch gelesen. Bitte warte auf das Prüfergebnis.")); return; }
@@ -2243,8 +2288,13 @@ public partial class MainWindow : Window
     {
         CommitNames(); CaptureSession();
         var dirty = _sessions.Where(s => Fingerprint(s.Value.Project) != s.Value.SavedFingerprint).Select(s => s.Key).ToList();
-        if (dirty.Count == 0) return true;
-        var names = dirty.Select(id => _sessions[id].Project.Name + " · " + DeviceCatalog.Get(id).Name).ToArray();
+        var hardwareDrafts = _hardwareProfileDrafts.Where(pair =>
+            !_sessions.Values.Any(session => ReferenceEquals(session.Project, pair.Value.Session.Project)) &&
+            Fingerprint(pair.Value.Session.Project) != pair.Value.Session.SavedFingerprint).ToArray();
+        if (dirty.Count == 0 && hardwareDrafts.Length == 0) return true;
+        var names = dirty.Select(id => _sessions[id].Project.Name + " · " + DeviceCatalog.Get(id).Name)
+            .Concat(hardwareDrafts.Select(pair => pair.Value.Session.Project.Name + " · " +
+                DeviceCatalog.Get(pair.Key.Device).Name + " · " + L.Format("Profil {0}", pair.Key.Slot))).ToArray();
         var result = choose?.Invoke(names) ?? UnsavedChangesWindow.Ask(this, L.T("Ungespeicherte Profile"), L.T("Diese geänderten Profile vor dem Beenden speichern?\n\n"), names);
         if (result == UnsavedChangesChoice.Cancel) return false;
         if (result == UnsavedChangesChoice.Discard) return true;
@@ -2256,6 +2306,8 @@ public partial class MainWindow : Window
                 SwitchDevice(id);
                 if (!(save?.Invoke() ?? SaveProject(false))) return false;
             }
+            foreach (var (key, draft) in hardwareDrafts)
+                if (!(save?.Invoke() ?? SaveHardwareProfileDraft(key, draft))) return false;
             return true;
         }
         finally { SwitchDevice(originalDevice); }
@@ -2333,6 +2385,7 @@ public partial class MainWindow : Window
         await RunStartupChecksAsync(Check);
         await RunConnectionChecksAsync(Check);
         await RunKnobRuntimeChecksAsync(Check);
+        await RunHardwareProfileChecksAsync(Check);
         SwitchDevice("pro-iso");
         var key = Device.Keys.First(k => k.LedIndex is not null).Id;
         _selection.Clear(); _selection.Add(key);
@@ -2392,7 +2445,7 @@ public partial class MainWindow : Window
         }
         finally { if (File.Exists(testPath)) File.Delete(testPath); }
         Check(!_backup?.HasVerifiedDeviceDump ?? true, "Archive verification never claims a complete device dump");
-        var defaultTests = Path.Combine(Path.GetTempPath(), "inglorious-default-ui-" + Guid.NewGuid().ToString("N"));
+        var defaultTests = Path.Combine(Paths.WorkspaceRoot, "workspace", "checks", "default-ui-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(defaultTests);
         try
         {

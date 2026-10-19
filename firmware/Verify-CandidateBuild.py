@@ -72,6 +72,8 @@ verify(manifest['configSchemas'] == [1, 2, 3, 4, 5, 6, 7], 'Declared configurati
 verify(manifest['targets'] == [t['deviceId'] for t in selected], 'Build selection differs from requested targets')
 verify(manifest['engineering'] == args.engineering and manifest['includesResidentLoader'] is False, 'Application-only build classification differs')
 verify([t['deviceId'] for t in manifest['targetBuilds']] == manifest['targets'], 'Per-target identity selection differs')
+verify(manifest.get('profileBanks') == any(t.get('profileBankLayout') == 'profile-pairs-v1' for t in selected),
+       'Build profile-bank summary differs from the selected targets')
 if len(selected) > 1:
     verify(all(manifest[field] is None for field in ('identityVersionHeaderPath','identityVersionHeaderSha256',
                                                   'applicationOffsetBytes','protectedPrefixBytes','identityBytes')), 'Mixed-target build has a misleading global identity/layout')
@@ -111,6 +113,9 @@ results = []
 for target in selected:
     name = target['name']
     retained = target['boardId'] == 16
+    profile_banks = target.get('profileBankLayout') == 'profile-pairs-v1'
+    verify(('profileBankLayout' in target) == profile_banks and profile_banks == retained,
+           f'{name}: profile banks are enabled only for the exact reviewed board')
     identity = next(t for t in manifest['targetBuilds'] if t['deviceId'] == target['deviceId'])
     identity_header = target.get('versionHeaderPath', 'inglorious/ig_version.h')
     verify(identity['identityVersionHeaderPath'] == identity_header and identity['identityVersionHeaderSha256'] == sha(ROOT/identity_header),
@@ -124,7 +129,11 @@ for target in selected:
     build_ids = re.findall(r'^#define IG_FW_BUILD_ID 0x([0-9A-Fa-f]{8})UL$', identity_text, re.M)
     verify(len(build_ids) == 1 and identity['firmwareVersion'] == '.'.join(map(str,version_parts)) and
            identity['firmwareBuildId'] == build_ids[0].upper(), f'{name}: manifest version differs from selected header')
-    verify((identity['firmwareVersion'],identity['firmwareBuildId']) == ('0.11.8','000B0801'), f'{name}: release version changed')
+    expected_version = ('0.11.11','000B0B01') if retained else ('0.11.9','000B0901')
+    verify((identity['firmwareVersion'],identity['firmwareBuildId']) == expected_version, f'{name}: release version changed')
+    expected_bank = dict(id='profile-pairs-v1', offset=172032, length=49152, recordBytes=8192, recordCount=6, profileCount=3)
+    verify(identity.get('profileBankLayout') == (expected_bank if profile_banks else None),
+           f'{name}: per-target profile bank geometry differs')
     if len(selected) == 1:
         verify(all(manifest[field] == identity[field] for field in ('firmwareVersion','firmwareBuildId','identityVersionHeaderPath',
                    'identityVersionHeaderSha256','applicationOffsetBytes','protectedPrefixBytes','identityBytes')), 'Single-target identity/layout differs')
@@ -140,6 +149,9 @@ for target in selected:
            identity['identityBytes'] == identity_bytes, f'{name}: per-target image layout differs')
     code_end = storage_base - identity_bytes
     limit = target['flashBytes'] - targets['storageBytes'] - application_offset - identity_bytes
+    if profile_banks:
+        code_end = 0x0802A000
+        limit = code_end - application_base
     verify(1024 <= len(binary) <= limit, f'{name}: code enters trailing storage')
     sp, pc = struct.unpack_from('<II', binary)
     verify(0x20000000 <= sp <= 0x20000000 + target['ramBytes'] and sp % 4 == 0, f'{name}: stack vector')
@@ -235,8 +247,12 @@ for target in selected:
         verify(identity['cleanTargetBuild'] is True, 'Board 16 must be clean-built')
         verify(re.search(r'^#define IG_BOARD 16$', config, re.M) is not None, 'Wrong compiled board ID')
         verify(re.search(r'^#define WEAR_LEVELING_EFL_FLASH_SIZE 262144$', config, re.M) is not None, 'Wrong storage capacity')
-        verify(application_base == 0x08007000 and limit == 0x30F00 and code_end == 0x08037F00 and storage_base == 0x08038000 and targets['storageBytes'] == 0x8000,
-               'Application must exclude resident prefix and trailing storage')
+        verify(re.search(r'^#define IG_PROFILE_BANK_ENABLE 1$', config, re.M) is not None, 'Profile-bank compile gate absent')
+        verify(application_base == 0x08007000 and limit == 0x23000 and code_end == 0x0802A000 and storage_base == 0x08038000 and targets['storageBytes'] == 0x8000,
+               'Application must exclude resident prefix, profile bank, identity page and legacy storage')
+        for hook in ('ig_pb_scan_bank', 'ig_pb_read_profile', 'ig_pb_save_profile', 'ig_profile_flash_ready',
+                     'ig_profile_flash_bytes', 'ig_profile_flash_identity', 'ig_profile_flash_begin', 'ig_profile_flash_end', 'ig_profile_flash_io'):
+            verify(application_base <= symbol_address(map_text,hook) < application_base+len(binary), 'Profile-bank implementation absent from linked image')
         verify(symbol_address(map_text, '_vectors') == application_base, 'Linked vector table is not at the application origin')
         entry = symbol_address(map_text, '_crt0_entry')
         reset_handler = symbol_address(map_text, 'Reset_Handler')

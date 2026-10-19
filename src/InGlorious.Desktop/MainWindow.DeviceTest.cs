@@ -13,8 +13,10 @@ public sealed partial class MainWindow
         if (_firmwareFlow || _busy || _startupWindowClosed || _allowClose) return;
         var priorBusy = _busy;
         _firmwareFlow = _busy = true; _root.IsEnabled = false;
+        IDisposable? knobStatusPause = null;
         try
         {
+            knobStatusPause = await PauseKnobStatusAsync();
             await _sharedBrightness.StopAsync();
             if (DeviceSetupService.IsGloriousCoreRunning() is not false)
             { Status(L.T("Schließe Glorious CORE, bevor du fortfährst.")); return; }
@@ -32,9 +34,13 @@ public sealed partial class MainWindow
         { Trace.TraceError("Device test failed: {0}", error); Status(DeviceSetupService.ForUser(error)); }
         finally
         {
-            _firmwareFlow = false; _busy = priorBusy;
-            if (!_startupWindowClosed && !_allowClose)
-            { _root.IsEnabled = !_busy; UpdateFooter(); await UpdateBrightnessService(); await RefreshConnectionsAsync(); }
+            try
+            {
+                _firmwareFlow = false; _busy = priorBusy;
+                if (!_startupWindowClosed && !_allowClose)
+                { _root.IsEnabled = !_busy; UpdateFooter(); await UpdateBrightnessService(); await RefreshConnectionsAsync(); }
+            }
+            finally { knobStatusPause?.Dispose(); }
         }
     }
 }

@@ -1,6 +1,6 @@
 # GMMK 3 PRO 100% ISO support
 
-Reviewed: 2026-10-16. This exact wired, non-HE variant is supported without an experimental label after testing on one device under Windows. Installation, original-firmware restoration, normal typing and lighting, and an update to firmware 0.11.4 with the complete lighting sequence have been confirmed. The remaining checks are listed below.
+Reviewed: 2026-10-19. This exact wired, non-HE variant is supported without an experimental label after testing on one device under Windows. Installation, original-firmware restoration, normal typing and lighting, the complete lighting sequence, Windows/macOS modifier switching, and three independent saved profiles with firmware 0.11.11 have been confirmed within the scope below. App 0.7.0 automatic loading and one configuration transfer were also confirmed. The remaining checks are listed below.
 
 Other sizes, ANSI layouts, HE variants and wireless operation are not covered. The model is identified separately from the generic GMMK 3 100% ISO; it is never selected by a similar retail name alone.
 
@@ -39,12 +39,17 @@ Firmware 0.11.3 adds a volatile device-test session for this variant. It records
 
 New configurations default to red. Existing saved configuration retains its colors. The app can import matching saved CORE per-key colors and simple bindings into an unsaved profile copy; it shows omitted settings and requires an explicit transfer to the keyboard.
 
+Firmware 0.11.11 supports three independent hardware profiles selected by the physical switch, each with its own four layers. A separate bank occupies `0x0802A000`–`0x08035FFF`; the legacy configuration remains a read-only fallback for positions without saved data. The update image layout preserves both areas. The exact protocol and storage guarantees are described in the [firmware protocol](../firmware/protocol.md#private-board-16-hardware-profiles-profile-pairs-v1).
+
+Windows-side tests confirmed independent saved colors, a key-binding change isolated to one profile, switching with the app closed, reconnecting in profile 2, and loading the active profile in the app. The OS switch was checked in both directions, including with the app closed. See [hardware controls](hardware-controls.md) for the observations and limits.
+
 ## Remaining acceptance
 
 - Exercise original-firmware restoration through the integrated app guide on this variant; the earlier verified restoration used the separate engineering flow.
 - Test every physical key, Fn action, knob direction and knob press.
 - Compare every key, side and logo LED with the preview.
 - Transfer a harmless macro, layer and lighting profile; verify it after reconnecting with the app closed.
+- Verify three distinct hardware profiles survive a later firmware update, and test all layers, macros, knob settings and differing polling rates in each profile.
 - Test native macOS/Linux packages and permissions separately.
 
 Offline adapter, protocol, native-runtime and linked-firmware checks do not substitute for these physical results. See [hardware acceptance](hardware-acceptance.md) for the complete checklist. Original device images, personal configurations and local reports are excluded from the public source export.

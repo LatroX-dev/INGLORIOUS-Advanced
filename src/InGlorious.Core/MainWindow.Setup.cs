@@ -16,6 +16,7 @@ public partial class MainWindow
         OnboardFirmwareVersion? installedVersion = null;
         try
         {
+            using var pausedKnob = await PauseKnobStatusAsync();
             await _sharedBrightness.StopAsync();
             var dialog = new DeviceSetupWindow(preferredDeviceId, operation, _screenshotMode, preferredInstanceId) { Owner = owner ?? this };
             dialog.ShowDialog();

@@ -4,6 +4,9 @@
     <Compile Include="../../src/InGlorious.Core/Models.cs" Link="Models.cs" />
     <Compile Include="../../src/InGlorious.Core/Onboard*.cs" Link="%(Filename).cs" />
     <Compile Include="../../src/InGlorious.Core/StartupDeviceLoader.cs" Link="StartupDeviceLoader.cs" />
+    <Compile Include="../../src/InGlorious.Core/ProfileBankLayout.cs" Link="ProfileBankLayout.cs" />
+    <Compile Include="../../src/InGlorious.Core/InstallationIdentity.cs" Link="InstallationIdentity.cs" />
+    <Compile Include="../../src/InGlorious.Core/RetainedLoaderLayout.cs" Link="RetainedLoaderLayout.cs" />
     <EmbeddedResource Include="../../reference/qmk/*.json" />
   </ItemGroup>
   <ItemGroup>
@@ -14,4 +17,5 @@
   <ItemGroup><Compile Include="../../src/InGlorious.Core/FirmwareChangelog.cs" Link="FirmwareChangelog.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/InGlorious.Core/BoardDescriptorRegistry.cs" Link="BoardDescriptorRegistry.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../tools/InGlorious.Device/DeviceArguments.cs" Link="DeviceArguments.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/InGlorious.Core/HardwareControlCatalog.cs" Link="HardwareControlCatalog.cs" /></ItemGroup>
 </Project>

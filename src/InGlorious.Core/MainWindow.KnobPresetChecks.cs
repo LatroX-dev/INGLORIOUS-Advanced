@@ -70,6 +70,56 @@ public partial class MainWindow
             _readKnobRuntime = (_, _) => pending.Task;
             var read = RefreshKnobStatusAsync(true); _connectionRevision++; pending.SetResult((snapshot, "fixture")); await read;
             check(_knobStatus is null && tip.Content.ToString() == baseText, "Knob status: responses from an outdated connection are ignored");
+            foreach (var cancelRead in new[] { false, true })
+            {
+                _knobStatusNextRead = default;
+                var replyReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var disposalStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var disposalFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var foregroundStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var foregroundFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var pollCalls = 0; var foregroundEntered = false;
+                var beforePause = Fingerprint(_project);
+                CancellationToken readToken = default;
+                _readKnobRuntime = async (_, token) =>
+                {
+                    pollCalls++; readToken = token;
+                    try { await replyReady.Task.WaitAsync(token); return (snapshot, "fixture"); }
+                    finally { disposalStarted.TrySetResult(); await disposalFinished.Task; }
+                };
+                var activeRead = RefreshKnobStatusAsync(true);
+                async Task ForegroundOperation()
+                {
+                    using var pause = await PauseKnobStatusAsync();
+                    foregroundEntered = true; foregroundStarted.TrySetResult();
+                    await foregroundFinished.Task;
+                }
+                var foreground = ForegroundOperation();
+                try
+                {
+                    await RefreshKnobStatusAsync(true);
+                    check(!foregroundEntered && !foreground.IsCompleted && pollCalls == 1 && !readToken.IsCancellationRequested,
+                        "Knob status: foreground transfer waits for the active poll and suppresses further ticks without canceling its shared stream");
+                    if (cancelRead) _knobStatusCancellation!.Cancel(); else replyReady.TrySetResult();
+                    await disposalStarted.Task;
+                    check(!foregroundEntered && !activeRead.IsCompleted,
+                        "Knob status: " + (cancelRead ? "canceled" : "completed") + " read must finish transport disposal before transfer can open");
+                    disposalFinished.TrySetResult(); await activeRead; await foregroundStarted.Task;
+                    await RefreshKnobStatusAsync(true);
+                    check(foregroundEntered && pollCalls == 1 && !CanReadKnobStatus && Fingerprint(_project) == beforePause,
+                        "Knob status: the transfer scope keeps polling paused and preserves all unsaved configuration");
+                    using (await PauseKnobStatusAsync())
+                        check(_knobStatusPauseDepth == 2, "Knob status: nested foreground operations retain the pause");
+                    check(_knobStatusPauseDepth == 1, "Knob status: releasing an inner pause does not resume polling during transfer");
+                }
+                finally
+                {
+                    replyReady.TrySetResult(); disposalFinished.TrySetResult(); foregroundFinished.TrySetResult();
+                    await activeRead; await foreground;
+                }
+                check(_knobStatusPauseDepth == 0 && CanReadKnobStatus,
+                    "Knob status: finishing transfer restores ordinary polling readiness");
+            }
             Status("Prior message"); ShowKnobChangeNotice("First"); ShowKnobChangeNotice("Second");
             _knobNoticeUntil = DateTime.UtcNow.AddSeconds(-1); ExpireKnobChangeNotice();
             check(StatusText.Text == "Prior message", "Knob status: consecutive change notices expire to the original footer");

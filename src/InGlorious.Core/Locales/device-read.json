@@ -1,0 +1,15 @@
+{
+  "Die Tastatur konnte gerade nicht gelesen werden. Bitte versuche es erneut. Dein Profil bleibt unverändert.": {
+    "en": "The keyboard could not be read just now. Please try again. Your profile is unchanged.",
+    "es": "No se pudo leer el teclado en este momento. Inténtalo de nuevo. Tu perfil no ha cambiado.",
+    "fr": "Le clavier n’a pas pu être lu pour le moment. Veuillez réessayer. Votre profil reste inchangé.",
+    "it": "Al momento non è stato possibile leggere la tastiera. Riprova. Il tuo profilo non è stato modificato.",
+    "pt-BR": "Não foi possível ler o teclado neste momento. Tente novamente. Seu perfil não foi alterado.",
+    "pl": "Nie udało się teraz odczytać klawiatury. Spróbuj ponownie. Twój profil pozostaje bez zmian.",
+    "tr": "Klavye şu anda okunamadı. Lütfen tekrar deneyin. Profiliniz değişmedi.",
+    "ru": "Сейчас не удалось прочитать настройки клавиатуры. Попробуйте ещё раз. Ваш профиль не изменён.",
+    "ja": "現在、キーボードの設定を読み取れませんでした。もう一度お試しください。プロファイルは変更されていません。",
+    "ko": "현재 키보드 설정을 읽을 수 없습니다. 다시 시도하세요. 프로필은 변경되지 않았습니다.",
+    "zh-Hans": "暂时无法读取键盘设置。请重试。您的配置文件未更改。"
+  }
+}

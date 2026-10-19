@@ -13,7 +13,10 @@ uint8_t ig_timing_active_interval(void);
 uint8_t ig_timing_saved_interval(void);
 uint8_t ig_timing_debounce_ms(void);
 bool ig_timing_reconnect_pending(void);
-// Invoke only after sending the explicit RAW8 acknowledgment. Repeated calls are idempotent.
+bool ig_timing_usb_active(void);
+void ig_timing_cancel_reconnect(void);
+// After RAW8 acknowledgment, or the board16 runtime's bound idle activation plan.
+// Repeated calls are idempotent and never restart the pending delay.
 bool ig_timing_schedule_reconnect(void);
 // Housekeeping only. safe requires no keys, macros, or staging transaction in progress.
 // A busy or suspended device defers the pending reconnect without discarding it.

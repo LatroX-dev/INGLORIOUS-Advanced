@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0
+
+- Use the physical profile switch on the GMMK 3 PRO 100% ISO to select three independent onboard profiles, even with the app closed.
+- Use the Windows/macOS switch on supported GMMK 3 wired keyboards to adapt standard modifier keys without changing your layers.
+- See the switch positions beside the layer selection in the Windows app.
+- Fixed occasional transfer errors after using the knob controls.
+- Fixed intermittent device-check failures before transferring settings.
+- Improved configuration loading while preserving local edits and opened profiles.
+- Fixed unreadable key lists while a dialog is open.
+
 ## 0.6.65
 
 - Adjust keyboard brightness with the knob or assigned keys, even with the app closed.

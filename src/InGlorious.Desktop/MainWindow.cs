@@ -187,6 +187,14 @@ public sealed partial class MainWindow : Window
             layerEditor.Name = "LayerEditorSelector"; layerEditor.IsVisible = _layerChoice.IsVisible;
             Grid.SetColumn(layerEditor, 1); top.Children.Add(layerEditor); workspace.Children.Add(top);
 
+            if (_page != "Profile" && _hardwareProfileBindings.TryGetValue(_state.Device.Id, out var hardwareBinding))
+            {
+                var hardwareProfile = Text(L.Format("In Bearbeitung: Profil {0}", hardwareBinding.Slot), true, 12);
+                hardwareProfile.Name = "HardwareProfileBinding";
+                ToolTip.SetTip(hardwareProfile, L.T("Mit „Von Tastatur laden“ wird das am Schalter gewählte Profil geöffnet."));
+                workspace.Children.Add(hardwareProfile);
+            }
+
             if (_page is "Tastenbelegung" or "Ebenen")
             {
                 var editingHint = Text(LayerGuidance.EditingHint, true, 11); editingHint.Name = "LayerEditingHint"; workspace.Children.Add(editingHint);

@@ -187,37 +187,48 @@ public sealed partial class MainWindow
     }
     private async Task ReadDeviceAsync()
     {
-        if (_state.Device.IsOfflineOnly || !await GuardNavigation() || Program.Offline) return;
+        if (_knobStatusPauseDepth != 0 || _state.Device.IsOfflineOnly || !await GuardNavigation() || Program.Offline) return;
+        IDisposable? knobStatusPause = null;
         try
         {
-            _busy = true; _root.IsEnabled = false; await _sharedBrightness.StopAsync();
+            _busy = true; _root.IsEnabled = false;
+            knobStatusPause = await PauseKnobStatusAsync();
+            await _sharedBrightness.StopAsync();
             var device = await ChooseDeviceAsync(); if (device is null) return;
             _busy = true; _root.IsEnabled = false; RequireDeviceConfigurationRead(device.DeviceId); UpdateFooter();
             var read = await PlatformDeviceService.ReadAsync(device);
             if (!await MayReplace(_state)) return;
-            MarkDeviceConfigurationRead(read.Project, read.Info);
+            MarkDeviceConfigurationRead(read.Project, read.Info, read.ProfileSnapshot);
             _sessions[device.DeviceId] = _state = EditorState.FromDevice(read.Project);
             _startupNotices.Remove(device.DeviceId);
             _startupReadFingerprints.Remove(device.DeviceId);
             _startupFallbackNotices.Remove(device.DeviceId);
-            if (!read.Info.Persistent) _startupFallbackNotices[device.DeviceId] = L.T("Das Gerät meldet keinen verfügbaren dauerhaften Speicher.");
-            if (read.Info.Persistent) _confirmed[device.DeviceId] = EditorState.Fingerprint(_state.Project);
-            Build(); Status(read.Info.Persistent ? L.T("Konfiguration von Tastatur geladen") : L.T("Das Gerät meldet keinen verfügbaren dauerhaften Speicher."));
+            var persistent = read.ProfileSnapshot?.Status.StorageHealthy ?? read.Info.Persistent;
+            if (!persistent) _startupFallbackNotices[device.DeviceId] = L.T("Das Gerät meldet keinen verfügbaren dauerhaften Speicher.");
+            if (persistent) _confirmed[device.DeviceId] = EditorState.Fingerprint(_state.Project);
+            Build(); Status(persistent ? L.T("Konfiguration von Tastatur geladen") : L.T("Das Gerät meldet keinen verfügbaren dauerhaften Speicher."));
         }
         catch (Exception ex) { Status(ex.Message); }
-        finally { _busy = false; _root.IsEnabled = true; UpdateFooter(); await UpdateBrightnessService(); }
+        finally
+        {
+            try { _busy = false; _root.IsEnabled = true; UpdateFooter(); await UpdateBrightnessService(); }
+            finally { knobStatusPause?.Dispose(); }
+        }
     }
     private async Task TransferAsync()
     {
-        if (_state.Device.IsOfflineOnly || !await GuardNavigation() || Program.Offline) return;
+        if (_knobStatusPauseDepth != 0 || _state.Device.IsOfflineOnly || !await GuardNavigation() || Program.Offline) return;
         if (DeviceConfigurationNeedsRead) { Status(DeviceConfigurationReadNotice); return; }
         var snapshot = ProjectService.Clone(_state.Project);
         var image = OnboardSerializer.Prepare(snapshot);
+        var profileBinding = _hardwareProfileBindings.GetValueOrDefault(snapshot.DeviceId);
         string? feedbackDeviceId = null;
+        IDisposable? knobStatusPause = null;
         try
         {
         OnboardDevice? target;
         _busy = true; _root.IsEnabled = false;
+        knobStatusPause = await PauseKnobStatusAsync();
         try { await _sharedBrightness.StopAsync(); target = await ChooseDeviceAsync(); }
         finally { _busy = false; _root.IsEnabled = true; }
         if (target is null) return;
@@ -262,9 +273,9 @@ public sealed partial class MainWindow
                         status.Text = value < 70 ? L.Format("Das Profil wird übertragen … {0} %", value)
                             : value < 80 ? L.T("Im Gerät speichern … dieser Schritt kann bis zu zwei Minuten dauern. Bitte angeschlossen lassen.")
                             : L.T("Die gespeicherten Einstellungen werden geprüft …");
-                    }), () => writeStarted = true);
-                if (!result.Transfer.ReadbackVerified) throw new IOException("Device readback was not verified.");
-                MarkDeviceConfigurationRead(snapshot);
+                    }), () => writeStarted = true, profileBinding);
+                if (!result.ReadbackVerified) throw new IOException("Device readback was not verified.");
+                MarkDeviceConfigurationRead(snapshot, profileSnapshot: result.ProfileSnapshot);
                 _confirmed[target.DeviceId] = EditorState.Fingerprint(snapshot); progress.Value = 100;
                 completionNotice = result.UsbNotice;
                 feedbackDeviceId = target.DeviceId;
@@ -274,12 +285,15 @@ public sealed partial class MainWindow
             {
                 Trace.TraceError("Configuration transfer failed: {0}", ex);
                 if (writeStarted) RequireDeviceConfigurationRead(target.DeviceId);
-                status.Text = ex is FirmwareUpdateRequiredException ? ex.Message : L.T(writeStarted
+                status.Text = profileBinding is not null && ex is OnboardCommandException { Status: 7 }
+                    ? L.T("Speichern konnte nicht bestätigt werden. Verbinde die Tastatur normal neu und lies das Profil erneut aus.")
+                    : ex is FirmwareUpdateRequiredException || profileBinding is not null && !writeStarted ? ex.Message : L.T(writeStarted
                     ? "Das Ergebnis ist unklar. Prüfe zuerst den Gerätestand."
                     : "Die Übertragung wurde nicht gestartet. Versuche es erneut.");
                 readBack.IsVisible = writeStarted;
                 guide.IsVisible = ex is FirmwareUpdateRequiredException;
-                if (!writeStarted && !guide.IsVisible) go.IsEnabled = true;
+                if (!writeStarted && !guide.IsVisible && profileBinding is null) go.IsEnabled = true;
+                if (!writeStarted && profileBinding is not null) RequireDeviceConfigurationRead(target.DeviceId);
             }
             finally
             {
@@ -294,16 +308,27 @@ public sealed partial class MainWindow
             var saved = false;
             try
             {
-                var read = await PlatformDeviceService.ReadAsync(target);
-                var exact = read.Info.Persistent && read.Payload.AsSpan().SequenceEqual(image.Payload);
+                var read = await PlatformDeviceService.ReadAsync(target, profileBinding);
+                var exact = (read.ProfileSnapshot?.Status.StorageHealthy ?? read.Info.Persistent) &&
+                    read.Payload.AsSpan().SequenceEqual(image.Payload);
                 if (exact)
                 {
-                    MarkDeviceConfigurationRead(read.Project, read.Info);
+                    MarkDeviceConfigurationRead(read.Project, read.Info, read.ProfileSnapshot);
                     _confirmed[target.DeviceId] = EditorState.Fingerprint(snapshot); saved = true;
                     feedbackDeviceId = target.DeviceId;
-                    if (read.Info.SupportsTiming) completionNotice = L.T("Bitte verbinde das USB-Kabel erneut, damit die neue Abfragerate aktiv wird.");
+                    if (read.ProfileSnapshot is { } recoveredProfile)
+                        completionNotice = await PlatformDeviceService.ConfirmHardwareProfileTimingAsync(target, recoveredProfile);
+                    else if (read.Info.SupportsTiming) completionNotice = L.T("Bitte verbinde das USB-Kabel erneut, damit die neue Abfragerate aktiv wird.");
                 }
-                else { _confirmed.Remove(target.DeviceId); status.Text = L.T("Änderungen noch nicht übertragen"); go.IsEnabled = true; }
+                else
+                {
+                    _confirmed.Remove(target.DeviceId);
+                    var bindingChanged = profileBinding is not null && read.ProfileSnapshot?.Binding != profileBinding;
+                    var storageUnavailable = read.ProfileSnapshot is { Status.StorageHealthy: false };
+                    status.Text = storageUnavailable ? L.T("Speichern konnte nicht bestätigt werden. Verbinde die Tastatur normal neu und lies das Profil erneut aus.")
+                        : bindingChanged ? L.T("Das Profil auf der Tastatur hat sich geändert. Bitte erneut auslesen.") : L.T("Änderungen noch nicht übertragen");
+                    go.IsEnabled = !bindingChanged && !storageUnavailable;
+                }
             }
             catch (Exception ex) { Trace.TraceError("Configuration readback failed: {0}", ex); _confirmed.Remove(target.DeviceId); status.Text = L.T("Der Gerätestand konnte nicht bestätigt werden. Prüfe die USB-Verbindung und versuche es erneut."); }
             finally
@@ -318,18 +343,23 @@ public sealed partial class MainWindow
         }
         finally
         {
-            _busy = false; _root.IsEnabled = true; await UpdateBrightnessService();
-            if (feedbackDeviceId is not null)
+            try
             {
-                _firmwareAssessments.TryGetValue(feedbackDeviceId, out var assessment);
-                await MaybeOfferExperimentalFeedbackAsync(feedbackDeviceId, DeviceFeedbackTrigger.ConfigurationTransfer, assessment?.Version);
+                _busy = false; _root.IsEnabled = true; await UpdateBrightnessService();
+                if (feedbackDeviceId is not null)
+                {
+                    _firmwareAssessments.TryGetValue(feedbackDeviceId, out var assessment);
+                    await MaybeOfferExperimentalFeedbackAsync(feedbackDeviceId, DeviceFeedbackTrigger.ConfigurationTransfer, assessment?.Version);
+                }
             }
+            finally { knobStatusPause?.Dispose(); }
         }
     }
     private bool _closing;
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
         if (_allowClose) return;
+        if (_knobStatusPauseDepth != 0) { e.Cancel = true; return; }
         if (KeepWindowInTray(e.CloseReason)) { e.Cancel = true; return; }
         if (Program.Offline) return;
         if (_startupLoading) { _allowClose = true; _startupCancellation?.Cancel(); return; }

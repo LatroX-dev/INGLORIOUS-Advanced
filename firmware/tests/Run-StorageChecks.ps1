@@ -26,6 +26,19 @@ try {
         if(($lines -join '') -notmatch "^PASS: board$board width$width slot$slotBytes, ([0-9]+) actual QMK storage checks;"){throw 'Missing harness result.'}
         $results+=@{board=$board;width=$width;slotBytes=$slotBytes;passed=[int]$Matches[1]}
     } }
+    # Bank-enabled board16 must never consolidate or mutate its retained legacy
+    # source, including initial boot and cache release after a bank save.
+    foreach($width in @(2,8)) {
+        $output=Join-Path $workspace "artifacts/firmware-storage-bank-tests-16-$width.exe"
+        $bankArguments=@('-std=c11','-Wall','-Wextra','-Werror','-DIG_CACHE_STAGING','-DIG_BOARD=16','-DIG_RETAINED_LOADER_BUILD=1','-DIG_PROFILE_BANK_ENABLE=1','-DWEAR_LEVELING_LOGICAL_SIZE=16384','-DWEAR_LEVELING_BACKING_SIZE=32768',"-DBACKING_STORE_WRITE_SIZE=$width",'-I'+(Join-Path $PSScriptRoot '../inglorious'),'-I'+(Join-Path $PSScriptRoot '../qmk_firmware/quantum'),'-I'+(Join-Path $PSScriptRoot '../qmk_firmware/quantum/wear_leveling'),'-I'+(Join-Path $PSScriptRoot '../qmk_firmware/lib/fnv'),(Join-Path $PSScriptRoot 'storage_bank_tests.c'),(Join-Path $PSScriptRoot '../qmk_firmware/lib/fnv/hash_64a.c'),'-o',$output)
+        & $compiler @bankArguments
+        if($LASTEXITCODE -ne 0){throw "Bank immutable-storage width$width compilation failed."}
+        $lines=@(& $output)
+        if($LASTEXITCODE -ne 0){throw "Bank immutable-storage width$width failed."}
+        $lines|Write-Output
+        if(($lines -join '') -notmatch "^PASS: bank board16 width$width, ([0-9]+) immutable legacy storage checks;"){throw 'Missing bank storage harness result.'}
+        $results+=@{board=16;width=$width;bankEnabled=$true;passed=[int]$Matches[1]}
+    }
     # Compile the actual storage implementation for every enumerated board, then
     # prove that undefined/future IDs cannot silently acquire a slot geometry.
     $geometryArguments=@($arguments | Where-Object { $_ -notlike '-DIG_BOARD=*' })
@@ -45,7 +58,7 @@ try {
     Write-Output 'All 15 default board geometries and retained-loader board 16 compile; four unknown-board and two retained-loader guards rejected. No hardware access.'
 }finally{$env:PATH=$oldPath}
 if($ReportPath){
-    $report=[ordered]@{schema=1;testedUtc=[DateTime]::UtcNow.ToString('o');hardwareAccess=$false;results=$results;compiledBoardIds=@(1..16);rejectedUnknownBoardCount=4;rejectedRetainedLoaderGateCount=2;patchedQmkSha256=$actual;patchSha256=(Get-FileHash (Join-Path $PSScriptRoot '../Patch-QmkStorage.ps1')).Hash;storageHeaderSha256=(Get-FileHash (Join-Path $PSScriptRoot '../inglorious/ig_storage.h')).Hash;storageImplementationSha256=(Get-FileHash (Join-Path $PSScriptRoot '../inglorious/ig_storage.inc')).Hash;harnessSha256=(Get-FileHash (Join-Path $PSScriptRoot 'storage_tests.c')).Hash}
+    $report=[ordered]@{schema=1;testedUtc=[DateTime]::UtcNow.ToString('o');hardwareAccess=$false;results=$results;compiledBoardIds=@(1..16);rejectedUnknownBoardCount=4;rejectedRetainedLoaderGateCount=2;patchedQmkSha256=$actual;patchSha256=(Get-FileHash (Join-Path $PSScriptRoot '../Patch-QmkStorage.ps1')).Hash;storageHeaderSha256=(Get-FileHash (Join-Path $PSScriptRoot '../inglorious/ig_storage.h')).Hash;storageImplementationSha256=(Get-FileHash (Join-Path $PSScriptRoot '../inglorious/ig_storage.inc')).Hash;harnessSha256=(Get-FileHash (Join-Path $PSScriptRoot 'storage_tests.c')).Hash;bankHarnessSha256=(Get-FileHash (Join-Path $PSScriptRoot 'storage_bank_tests.c')).Hash}
     $stream=[IO.FileStream]::new([IO.Path]::GetFullPath($ReportPath),[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
     try{$stream.Write([Text.UTF8Encoding]::new($false).GetBytes(($report|ConvertTo-Json -Depth 5)));$stream.Flush($true)}finally{$stream.Dispose()}
 }

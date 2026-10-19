@@ -7,6 +7,7 @@
   <ItemGroup>
     <None Update="Licenses\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Compile Include="..\..\src\InGlorious.Core\InstallationIdentity.cs" Link="InstallationIdentity.cs" />
+    <Compile Include="..\..\src\InGlorious.Core\ProfileBankLayout.cs" Link="ProfileBankLayout.cs" />
     <Compile Include="..\..\src\InGlorious.Core\RetainedLoaderLayout.cs" Link="RetainedLoaderLayout.cs" />
     <Compile Include="..\..\src\InGlorious.Core\KnownFirmwareImages.cs" Link="KnownFirmwareImages.cs" />
     <Compile Include="..\..\src\InGlorious.Core\LegacyFirmwareMigration.cs" Link="LegacyFirmwareMigration.cs" />

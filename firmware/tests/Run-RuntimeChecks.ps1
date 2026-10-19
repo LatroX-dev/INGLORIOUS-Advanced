@@ -54,6 +54,7 @@ if($ReportPath){
         versionHeaderSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot '../inglorious/ig_version.h')).Hash;
         harnessSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'runtime_tests.c')).Hash;
         versionTestsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'version_reporting_checks.h')).Hash;
+        hardwareControlsHeaderSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot '../inglorious/ig_hardware_controls.h')).Hash;
         colorOutputHeaderSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot '../inglorious/ig_color.h')).Hash;
         colorOutputTestsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'color_output_checks.h')).Hash;
         brightnessBindingTestsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'brightness_binding_checks.h')).Hash;

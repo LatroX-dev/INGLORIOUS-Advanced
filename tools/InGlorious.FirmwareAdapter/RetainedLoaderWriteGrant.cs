@@ -51,6 +51,7 @@ internal sealed class RetainedLoaderWriteGrant : IRetainedLoaderWriteGrant
             if (InstallationIdentity.Read(image) != identity) throw new InvalidDataException("UPDATE_RECOVERY_ID_CHANGED");
             if (request.Operation == "install")
             {
+                ProfileBankLayout.RequireInitialState(image, KnownFirmwareImages.GetStorageLayout(image, model.DeviceId, (byte)model.BoardId));
                 if (!current.AsSpan().SequenceEqual(original) || image.AsSpan(InstallationIdentity.Offset(model.FlashBytes) + InstallationIdentity.Size).ContainsAnyExcept((byte)0xFF))
                     throw new InvalidDataException("RETAINED_INSTALL_CHANGED");
             }
@@ -59,8 +60,9 @@ internal sealed class RetainedLoaderWriteGrant : IRetainedLoaderWriteGrant
                 if (Files.Hash(current) != request.ExpectedCurrentSha256) throw new InvalidDataException("CURRENT_CHANGED_SINCE_CAPTURE");
                 string currentVersion = KnownFirmwareImages.Validate(current, model.DeviceId, (byte)model.BoardId);
                 if (Version.Parse(currentVersion) > Version.Parse(targetVersion)) throw new InvalidDataException("FIRMWARE_DOWNGRADE_NOT_ALLOWED");
-                if (!current.AsSpan(model.FlashBytes - InstallationIdentity.StorageBytes).SequenceEqual(image.AsSpan(model.FlashBytes - InstallationIdentity.StorageBytes)))
-                    throw new InvalidDataException("UPDATE_CONFIGURATION_CHANGED");
+                ProfileBankLayout.RequirePreserved(current, image,
+                    KnownFirmwareImages.GetStorageLayout(current, model.DeviceId, (byte)model.BoardId),
+                    KnownFirmwareImages.GetStorageLayout(image, model.DeviceId, (byte)model.BoardId));
             }
         }
         return new(model, fingerprint, image);

@@ -49,6 +49,7 @@ public partial class MainWindow
         OnboardFirmwareVersion? installedVersion = null;
         try
         {
+            using var pausedKnob = await PauseKnobStatusAsync();
             _firmwareAssessments.Clear(); RefreshFirmwareVersionLabel();
             await _sharedBrightness.StopAsync();
             if (_startupClosed) return;

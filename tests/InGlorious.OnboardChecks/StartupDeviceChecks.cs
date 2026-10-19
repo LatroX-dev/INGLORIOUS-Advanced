@@ -13,7 +13,7 @@ internal static class StartupDeviceChecks
         check(DeviceCatalog.All.Count == 16 && DeviceCatalog.All.All(d => d.SupportsOnboardConfiguration) && !DeviceCatalog.Get("gmmk3-pro-100-iso").IsOfflineOnly, "Sixteen exact protocol boards are available for read-only startup loading");
         void OnlyRead(ObservedTransport transport, string label)
         {
-            check(transport.Inner.Commands.All(c => c is OnboardProtocol.Info or OnboardProtocol.Read), label + ": only INFO and READ, no write, abort, reconnect, brightness or lighting command");
+            check(transport.Inner.Commands.All(c => c is OnboardProtocol.Info or OnboardProtocol.Read or OnboardProtocol.GetExtensions), label + ": only configuration/capability reads, no write, abort, reconnect, brightness or lighting command");
             check(transport.Disposals == 1, label + ": transport disposed exactly once before returning");
         }
         void Failed(IReadOnlyList<StartupDeviceResult> results, string id, string label)

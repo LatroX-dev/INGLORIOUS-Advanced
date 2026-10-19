@@ -9,4 +9,5 @@
   </ItemGroup>
   <ItemGroup><Compile Include="../../src/InGlorious.Core/FirmwareRelease.cs" Link="FirmwareRelease.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/InGlorious.Core/BoardDescriptorRegistry.cs" Link="BoardDescriptorRegistry.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/InGlorious.Core/HardwareControlCatalog.cs" Link="HardwareControlCatalog.cs" /></ItemGroup>
 </Project>

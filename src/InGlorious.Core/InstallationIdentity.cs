@@ -38,9 +38,11 @@ public sealed record InstallationIdentity(byte BoardId, Guid InstallationId, str
         return new(record[9], id, Convert.ToHexString(record.Slice(28, 32)));
     }
 
-    public static byte[] CreateImage(ReadOnlySpan<byte> firmware, int flashBytes, InstallationIdentity identity, ReadOnlySpan<byte> original = default)
+    public static byte[] CreateImage(ReadOnlySpan<byte> firmware, int flashBytes, InstallationIdentity identity, ReadOnlySpan<byte> original = default, string? storageLayout = null)
     {
         int applicationOffset = RetainedLoaderLayout.ApplicationOffset(identity.BoardId);
+        ProfileBankLayout.ValidateGeometry(identity.BoardId == 16 ? "gmmk3-pro-100-iso" : "", identity.BoardId,
+            flashBytes, applicationOffset, firmware.Length, storageLayout);
         if (firmware.Length < 8 || firmware.Length > Offset(flashBytes) - applicationOffset)
             throw new InvalidDataException("Firmware overlaps recovery identity or is empty.");
         if (applicationOffset != 0)

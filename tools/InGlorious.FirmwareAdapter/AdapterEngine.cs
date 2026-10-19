@@ -101,6 +101,8 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
                 if (targetVersion != bundle.ReleaseId) throw new InvalidDataException("BUNDLE_RELEASE_MISMATCH");
                 int offset = InstallationIdentity.Offset(model.FlashBytes);
                 if (request.Operation == "install" && image.AsSpan(offset + InstallationIdentity.Size).ContainsAnyExcept((byte)0xFF)) throw new InvalidDataException("INITIAL_CONFIGURATION_NOT_ERASED");
+                if (request.Operation == "install" && !model.EngineeringOnly)
+                    ProfileBankLayout.RequireInitialState(image, KnownFirmwareImages.GetStorageLayout(image, model.DeviceId, (byte)model.BoardId));
             }
             else image = originalBytes!;
 
@@ -132,8 +134,9 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
                     string currentVersion = request.MigrateLegacy ? LegacyFirmwareMigration.Version : KnownFirmwareImages.Validate(before, model.DeviceId, (byte)model.BoardId);
                     if (Version.Parse(currentVersion) > Version.Parse(targetVersion!)) throw new InvalidDataException("FIRMWARE_DOWNGRADE_NOT_ALLOWED");
                     if (InstallationIdentity.Read(image) != identity) throw new InvalidDataException("UPDATE_RECOVERY_ID_CHANGED");
-                    if (!before.AsSpan(model.FlashBytes - InstallationIdentity.StorageBytes).SequenceEqual(image.AsSpan(model.FlashBytes - InstallationIdentity.StorageBytes)))
-                        throw new InvalidDataException("UPDATE_CONFIGURATION_CHANGED");
+                    ProfileBankLayout.RequirePreserved(before, image,
+                        request.MigrateLegacy ? null : KnownFirmwareImages.GetStorageLayout(before, model.DeviceId, (byte)model.BoardId),
+                        KnownFirmwareImages.GetStorageLayout(image, model.DeviceId, (byte)model.BoardId));
                 }
             }
             installationId = identity.InstallationId;

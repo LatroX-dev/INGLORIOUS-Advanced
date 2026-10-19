@@ -51,6 +51,13 @@ int main(void) {
     now += 99; ig_timing_task(true); CHECK(restarts == 0);
     now += 1; ig_timing_task(true); CHECK(restarts == 1 && restarted_interval == 4);
 
+    reset(); CHECK(ig_timing_usb_active());
+    USB_DRIVER.state = 0; CHECK(!ig_timing_usb_active());
+    USB_DRIVER.state = USB_ACTIVE;
+    CHECK(ig_timing_update(8,5) && ig_timing_schedule_reconnect());
+    ig_timing_cancel_reconnect(); now+=1000; ig_timing_task(true);
+    CHECK(!ig_timing_reconnect_pending() && restarts==0 && clears==0 && ig_timing_active_interval()==1 && ig_timing_saved_interval()==8);
+
     for (unsigned delay = 0; delay <= 40; ++delay) {
         reset(); CHECK(ig_timing_update(1, delay));
         matrix_row_t raw[MATRIX_ROWS] = {0}, cooked[MATRIX_ROWS] = {0};

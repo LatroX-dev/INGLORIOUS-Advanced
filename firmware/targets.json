@@ -337,10 +337,11 @@
       "sourceDerivative": "gmmk3-100-iso",
       "hardwareAcceptanceTested": false,
       "variant": "GMMK 3 PRO 100% ISO wired (non-HE)",
-      "firmwareBuildId": "000B0801",
+      "firmwareBuildId": "000B0B01",
       "versionHeaderPath": "boards/gmmk3-pro-100-iso/ig_board_version.h",
       "verifiedStockVendorId": "342D",
-      "firmwareVersion": "0.11.8"
+      "firmwareVersion": "0.11.11",
+      "profileBankLayout": "profile-pairs-v1"
     }
   ]
 }

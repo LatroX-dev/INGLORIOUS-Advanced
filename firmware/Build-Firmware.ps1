@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Board='all', [string]$OutputDirectory=(Join-Path $PSScriptRoot 'build'), [switch]$Engineering, [switch]$Clean)
+param([string]$Board='all', [string]$OutputDirectory=(Join-Path $PSScriptRoot 'build'), [switch]$Engineering, [switch]$Clean, [switch]$ProfileBanks)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $workspace=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -19,13 +19,16 @@ if($buildIdMatch.Count-ne1){throw 'Missing or ambiguous explicit firmware build 
 $firmwareVersion=$versionParts -join '.'
 $firmwareBuildId=$buildIdMatch[0].Groups[1].Value.ToUpperInvariant()
 if($firmwareVersion-cne$target.firmwareVersion-or$firmwareBuildId-cne$target.firmwareBuildId){throw ('Version header differs from target: '+$target.deviceId)}
-return [ordered]@{deviceId=$target.deviceId;firmwareVersion=$firmwareVersion;firmwareBuildId=$firmwareBuildId;
+$identity=[ordered]@{deviceId=$target.deviceId;firmwareVersion=$firmwareVersion;firmwareBuildId=$firmwareBuildId;
  identityVersionHeaderPath=$target.versionHeaderPath;identityVersionHeaderSha256=(Get-FileHash -LiteralPath $identityHeader).Hash;
  applicationOffsetBytes=$target.applicationOffsetBytes;protectedPrefixBytes=$target.protectedPrefixBytes;identityBytes=$target.identityBytes;
  cleanTargetBuild=([bool]$Clean-or[bool]$Engineering-or$target.boardId-eq16)}
+if($target.PSObject.Properties['profileBankLayout']){$identity['profileBankLayout']=[ordered]@{id=$target.profileBankLayout;offset=172032;length=49152;recordBytes=8192;recordCount=6;profileCount=3}}
+return $identity
 }
 $bash=Join-Path $PSScriptRoot 'toolchain/qmk-msys/{app}/usr/bin/bash.exe'
 $selection=& (Join-Path $PSScriptRoot 'Resolve-Targets.ps1') -Board $Board -Engineering:$Engineering
+if($ProfileBanks -and (@($selection.Targets).Count-ne1 -or $selection.Targets[0].boardId-ne16)){throw 'Profile-bank builds require the single reviewed board16 target.'}
 $targetManifest=$selection.Manifest
 $targetBuilds=@($selection.Targets|ForEach-Object{Get-TargetIdentity $_})
 $single=if($targetBuilds.Count-eq1){$targetBuilds[0]}else{$null}
@@ -67,7 +70,7 @@ $compilerVersion=$compilerOutput[0]
 if($LASTEXITCODE-ne0-or$compilerVersion-notmatch'15\.2\.0'){throw 'The expected local ARM compiler is not available'}
 $targets=$selection.Targets
 foreach($target in $targets){if($target.name-cnotmatch'\A[a-z0-9-]+\z'-or$target.qmk-cnotmatch'\Agmmk/[a-z0-9/]+\z'){throw 'Unsafe target name'}}
-& (Join-Path $PSScriptRoot 'Prepare-Overlay.ps1') -Board $Board -Engineering:$Engineering
+& (Join-Path $PSScriptRoot 'Prepare-Overlay.ps1') -Board $Board -Engineering:$Engineering -ProfileBanks:$ProfileBanks
 $output=[IO.Path]::GetFullPath($OutputDirectory)
 $releaseRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'releases'))
 if(!$output.StartsWith($workspace+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)-or$output.Equals($releaseRoot,[StringComparison]::OrdinalIgnoreCase)-or$output.StartsWith($releaseRoot+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Build output must remain in the workspace outside frozen releases'}
@@ -93,6 +96,7 @@ foreach($target in $targets) {
  $applicationBase=0x08000000+$applicationOffset
  $identityBytes=$target.identityBytes
  $limit=$target.flashBytes-$targetManifest.storageBytes-$applicationOffset-$identityBytes
+ if($target.PSObject.Properties['profileBankLayout']){$limit=0x2A000-$applicationOffset}
  $qmkMsys=((& $bash --noprofile --norc -c ('/usr/bin/cygpath -u '+"'"+$qmk.Replace("'","'\''")+"'")).Trim())
  if ($LASTEXITCODE -ne 0) { throw 'Could not resolve QMK source path.' }
  # MILC invokes a shell from native Windows Python, so resolve the pinned Bash to a Windows path.
@@ -134,6 +138,7 @@ $manifest=[ordered]@{
  compilerVersion=$compilerVersion;submodules=$submodules
  hardwareFlashed=$false;hardwareAcceptanceTested=$false;powerLossTested=$false
  engineering=[bool]$Engineering;releaseCandidate=$false
+ profileBanks=(@($targetBuilds|Where-Object{$_.Contains('profileBankLayout')}).Count-gt0)
  targetBuilds=$targetBuilds
  applicationOffsetBytes=$(if($single){$single.applicationOffsetBytes}else{$null})
  protectedPrefixBytes=$(if($single){$single.protectedPrefixBytes}else{$null})

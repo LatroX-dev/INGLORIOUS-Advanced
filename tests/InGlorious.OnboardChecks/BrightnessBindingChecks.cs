@@ -85,7 +85,7 @@ internal static class BrightnessBindingChecks
             var query = target.Commands.IndexOf(OnboardProtocol.GetFirmwareVersion);
             check(query >= 0 && query < begin && target.Commands.Count(command => command == OnboardProtocol.GetFirmwareVersion) == 1,
                 id + ": upload freshly checks firmware before staging instead of trusting a prior preview");
-            check(!target.Commands.Contains(OnboardProtocol.GetExtensions), id + ": brightness requires no guessed extension flag");
+            check(target.Commands.Contains(OnboardProtocol.GetExtensions) == (id == "gmmk3-pro-100-iso"), id + ": only hardware-profile boards require the additional explicit-write capability check");
             target.FirmwareVersion = new(0, 11, 4); target.Commands.Clear();
             await RejectUpload(client, image, check, id + ": cached supported firmware cannot permit an older current device", true);
             check(target.Commands.Contains(OnboardProtocol.GetFirmwareVersion) && NoWrites(target) && target.Generation == 1 && target.Active.SequenceEqual(image.Payload),

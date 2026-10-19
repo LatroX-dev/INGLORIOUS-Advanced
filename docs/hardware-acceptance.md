@@ -38,3 +38,17 @@ After that restoration, Windows initially reported an unrecognized USB device; a
 The GMMK 3 PRO 100% ISO wired (non-HE) completed a separately authorized first installation and original-firmware restoration on one device. Both operations had two matching full readbacks; normal typing and lighting were confirmed after each reconnection. Its resident loader remained unchanged. This initial round trip used a local engineering build. Subsequent app installation and the update to firmware 0.11.4 with app 0.6.54 completed on Windows; the tester confirmed the full lighting sequence and return to normal lighting on 2026-10-16. This exact variant is no longer marked experimental.
 
 This is partial acceptance: the full checklist above, including every control, configuration persistence and original restoration through the integrated app guide, remains open for that PRO variant. Thirteen other variants remain experimental and have no physical test evidence. Native macOS/Linux package, device, layout and permission testing is also pending. Automated checks and successful builds are reported separately.
+
+## Physical controls
+
+On 2026-10-18, the GMMK 3 PRO 100% ISO completed a local firmware 0.11.9 update with app 0.6.66 on Windows, followed by normal typing. The tester confirmed both OS-switch positions in the app, the actual left Windows/Alt exchange and return, operation after fully quitting the app, and switching while holding left Alt without a stuck modifier after release. See [hardware switches](hardware-controls.md) for the exact scope and remaining checks. This evidence does not establish physical acceptance for other models or for a macOS host.
+
+For every applicable model, follow the [hardware-control checklist](hardware-controls.md). Verify both Windows/macOS switch positions, holding and releasing affected modifiers across a switch, unchanged custom bindings and all four layers, and operation with the app closed. A working key matrix does not validate rear switches. Before supporting a profile selector on another model, verify its electrical mapping, independent profile storage and update-preservation layout. Record automated preservation checks separately from a physical firmware-update test.
+
+## Hardware profiles and app 0.7.0
+
+The GMMK 3 PRO 100% ISO's three selector positions were independently mapped, including reverse switching and starting in another position. With firmware 0.11.11 on Windows, a tester confirmed separate saved lighting in each position, switching with the app fully closed, retained profiles after reconnecting, and app loading that follows the selected position. A temporary key assignment in profile 2 left the other profiles unchanged. The detailed scope is recorded in [hardware switches](hardware-controls.md).
+
+With app 0.7.0 and the same firmware, the tester confirmed automatic configuration loading and one unchanged configuration transfer after the device-query corrections. This closes the requested single-transfer acceptance scenario, not a repeated-transfer or long-duration stress test.
+
+Still open on physical hardware: all four layers, macros, knob settings and differing polling rates in each profile; preservation of three distinct profiles through a subsequent firmware update; and use on native macOS/Linux. Simulated update and recovery checks are separate evidence and must not be reported as a physical firmware-update test.

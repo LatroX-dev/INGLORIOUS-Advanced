@@ -10,6 +10,8 @@ public sealed partial class MainWindow
     private Func<Task<IReadOnlyList<OnboardDevice>>> _findKnobDevices = PlatformDeviceService.FindAsync;
     private Func<OnboardDevice, CancellationToken, Task<OnboardKnobStatus?>> _readKnobStatus = PlatformDeviceService.GetKnobStatusAsync;
     private CancellationTokenSource? _knobStatusCancellation;
+    private TaskCompletionSource? _knobStatusCompletion;
+    private int _knobStatusPauseDepth;
     private OnboardKnobStatus? _knobStatus;
     private EditorState? _knobStatusState;
     private string? _knobStatusPath;
@@ -20,7 +22,7 @@ public sealed partial class MainWindow
     private IDisposable? _knobNoticeTimer;
     private string? _knobNoticePrevious;
 
-    private bool CanReadKnobStatus => CanRefreshConnections && IsVisible && WindowState != WindowState.Minimized && CurrentModelConnected &&
+    private bool CanReadKnobStatus => _knobStatusPauseDepth == 0 && CanRefreshConnections && IsVisible && WindowState != WindowState.Minimized && CurrentModelConnected &&
         _page == "Tastenbelegung" && (IsKnobSelection() || _state.Device.Keys.Any(key => (key.IsEncoder || key.Label == "Knob") &&
             _keyButtons.TryGetValue(key.Id, out var button) && button.IsPointerOver));
 
@@ -41,8 +43,29 @@ public sealed partial class MainWindow
     private void ResetKnobStatus()
     {
         _knobStatusRevision++;
-        _knobStatusCancellation?.Cancel();
+        if (_knobStatusPauseDepth == 0) _knobStatusCancellation?.Cancel();
         _knobStatus = null; _knobStatusState = null; _knobStatusPath = null; _knobStatusNextRead = default; _knobStatusReadAt = default;
+    }
+
+    private async Task<IDisposable> PauseKnobStatusAsync()
+    {
+        _knobStatusPauseDepth++;
+        ResetKnobStatus();
+        var pause = new KnobStatusPause(() => _knobStatusPauseDepth--);
+        try
+        {
+            // A canceled read can still be disposing its shared RAW lease. Do not let
+            // a foreground operation open that channel until the entire poll ends.
+            if (_knobStatusCompletion is { } completion) await completion.Task;
+            return pause;
+        }
+        catch { pause.Dispose(); throw; }
+    }
+
+    private sealed class KnobStatusPause(Action resume) : IDisposable
+    {
+        private Action? _resume = resume;
+        public void Dispose() => Interlocked.Exchange(ref _resume, null)?.Invoke();
     }
 
     private void SetKnobToolTip(Control control, string baseline)
@@ -82,12 +105,14 @@ public sealed partial class MainWindow
 
     private async Task RefreshKnobStatusAsync(bool allowOfflineFixture = false)
     {
+        if (_knobStatusPauseDepth != 0) return;
         if (!CanReadKnobStatus) { ResetKnobStatus(); return; }
         if (Program.Offline && !allowOfflineFixture || _knobStatusReading || DateTime.UtcNow < _knobStatusNextRead) return;
         var state = _state; var model = state.Device.Id; var revision = _knobStatusRevision; var connection = _connectionRevision;
         bool Current() => revision == _knobStatusRevision && connection == _connectionRevision && ReferenceEquals(state, _state) && CanReadKnobStatus;
         _knobStatusReading = true;
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var completion = _knobStatusCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         _knobStatusCancellation = cancellation;
         try
         {
@@ -95,7 +120,7 @@ public sealed partial class MainWindow
             if (!Current()) return;
             if (matches.Length != 1) throw new InvalidOperationException("No unique knob device.");
             var device = matches[0];
-            var status = await _readKnobStatus(device, cancellation.Token).WaitAsync(cancellation.Token);
+            var status = await _readKnobStatus(device, cancellation.Token);
             if (!Current()) return;
             if (status is not null && status.DeviceId != model) throw new InvalidDataException("Unexpected knob status device.");
             var sameRuntime = status is not null && _knobStatus is not null && ReferenceEquals(_knobStatusState, state) &&
@@ -116,7 +141,10 @@ public sealed partial class MainWindow
         finally
         {
             if (ReferenceEquals(_knobStatusCancellation, cancellation)) _knobStatusCancellation = null;
+            cancellation.Dispose();
             _knobStatusReading = false;
+            if (ReferenceEquals(_knobStatusCompletion, completion)) _knobStatusCompletion = null;
+            completion.TrySetResult();
         }
     }
 }

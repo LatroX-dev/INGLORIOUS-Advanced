@@ -466,6 +466,7 @@ int main(int argc, char **argv) {
     lighting_slider_checks();
     screensaver_checks();
     version_reporting_checks();
+    check(command(17,NULL,0)==9,"original PRO and numpad expose no unverified hardware switch GPIO");
     fallback_color_checks();
     color_output_checks();
     cache_staging_checks();

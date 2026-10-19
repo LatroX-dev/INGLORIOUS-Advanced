@@ -50,7 +50,7 @@ public sealed partial class MainWindow
     private void ApplyStartupResults(IReadOnlyList<StartupDeviceResult> results)
     {
         if (_startupWindowClosed || _allowClose) return;
-        _automaticFallbackSessions.Clear(); _deviceReadCrc.Clear(); _deviceReadRequired.Clear();
+        _automaticFallbackSessions.Clear(); _deviceReadCrc.Clear(); _deviceReadRequired.Clear(); _hardwareProfileBindings.Clear();
         var preferred = _preferences.ResolveStartDevice();
         results = DeviceCatalog.All.Select(device =>
         {
@@ -83,10 +83,10 @@ public sealed partial class MainWindow
                 continue;
             }
             _startupPlaceholders.Remove(result.DeviceId);
-            MarkDeviceConfigurationRead(result.Project!, result.Info!);
+            MarkDeviceConfigurationRead(result.Project!, result.Info!, result.ProfileSnapshot);
             _sessions[result.DeviceId] = session;
             _startupReadFingerprints[result.DeviceId] = EditorState.Fingerprint(session.Project);
-            if (result.Info!.Persistent) _confirmed[result.DeviceId] = EditorState.Fingerprint(session.Project);
+            if (result.ProfileSnapshot?.Status.StorageHealthy ?? result.Info!.Persistent) _confirmed[result.DeviceId] = EditorState.Fingerprint(session.Project);
             else _startupFallbackNotices[result.DeviceId] = L.T("Das Gerät meldet keinen verfügbaren dauerhaften Speicher.");
         }
         _state = OpenSession(StartupDeviceLoader.SelectDevice(preferred, results));
@@ -108,9 +108,10 @@ public sealed partial class MainWindow
     private void RegisterAutomaticFallback(EditorState session) => _automaticFallbackSessions[session.Device.Id] =
         (session, EditorState.Fingerprint(session.Project), session.Path);
 
-    private void MarkDeviceConfigurationRead(AppProject project, OnboardInfo? info = null)
+    private void MarkDeviceConfigurationRead(AppProject project, OnboardInfo? info = null, OnboardHardwareProfileSnapshot? profileSnapshot = null)
     {
-        _deviceReadCrc[project.DeviceId] = info?.ActiveCrc ?? OnboardSerializer.Prepare(project).Crc32;
+        _deviceReadCrc[project.DeviceId] = profileSnapshot?.Status.Crc32 ?? info?.ActiveCrc ?? OnboardSerializer.Prepare(project).Crc32;
+        RememberHardwareProfile(project.DeviceId, profileSnapshot);
         _deviceReadRequired.Remove(project.DeviceId);
         _automaticFallbackSessions.Remove(project.DeviceId);
         _configurationRefreshPending.Remove(project.DeviceId);
@@ -136,6 +137,7 @@ public sealed partial class MainWindow
         Status(L.T("Konfigurationen werden von den Geräten gelesen …"));
         try
         {
+            using var knobStatusPause = await PauseKnobStatusAsync();
             await _sharedBrightness.StopAsync();
             IReadOnlyList<StartupDeviceResult> results;
             try { results = await (read ?? StartupDeviceLoader.LoadDevicesAsync)(ids, cancellation.Token); }
@@ -179,15 +181,16 @@ public sealed partial class MainWindow
             var preserve = _sessions.TryGetValue(id, out var session) &&
                 (session.Dirty || session.Path is not null && !automatic || id == activeId && preserveActive);
             var previousKnown = _deviceReadCrc.TryGetValue(id, out var previousCrc);
-            var changed = !previousKnown || previousCrc != result.Info.ActiveCrc;
+            var changed = !previousKnown || previousCrc != (result.ProfileSnapshot?.Status.Crc32 ?? result.Info.ActiveCrc) ||
+                HardwareBindingChanged(id, result.ProfileSnapshot);
             if (preserve && changed)
             {
                 RequireDeviceConfigurationRead(id, previousKnown ? L.T("Die Konfiguration auf der Tastatur hat sich geändert. Deine Änderungen bleiben erhalten. Lade zuerst den aktuellen Gerätestand.") : null);
                 continue;
             }
-            MarkDeviceConfigurationRead(result.Project, result.Info);
+            MarkDeviceConfigurationRead(result.Project, result.Info, result.ProfileSnapshot);
             _startupFallbackNotices.Remove(id);
-            if (result.Info.Persistent) _confirmed[id] = EditorState.Fingerprint(result.Project);
+            if (result.ProfileSnapshot?.Status.StorageHealthy ?? result.Info.Persistent) _confirmed[id] = EditorState.Fingerprint(result.Project);
             else { _confirmed.Remove(id); _startupFallbackNotices[id] = result.Message; }
             _startupNotices[id] = preserve ? L.T("Aktueller Gerätestand gelesen. Deine Änderungen bleiben erhalten.") : result.Message;
             _startupReadFingerprints[id] = EditorState.Fingerprint(preserve ? session!.Project : result.Project);

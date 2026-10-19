@@ -7,7 +7,7 @@ namespace InGlorious.Core;
 public sealed partial class DeviceSetupService
 {
     private sealed record SetupImage(string DeviceId, byte BoardId, string File, int Bytes, string Sha256,
-        string Transport, int FlashBytes, int SramBytes, string? ReleaseId = null, int ApplicationOffset = 0);
+        string Transport, int FlashBytes, int SramBytes, string? ReleaseId = null, int ApplicationOffset = 0, string? StorageLayout = null);
     private sealed record ImageCatalog(int Schema, string ReleaseId, SetupImage[] Targets);
     private sealed record RecoveryRecord(int Schema, string DeviceId, Guid InstallationId, string OriginalSha256,
         string BackupManifest, string BackupManifestSha256, ushort OriginalVendor, ushort OriginalProduct);
@@ -85,6 +85,7 @@ public sealed partial class DeviceSetupService
                     session.BackupPath = originalManifest;
                     session.OriginalVendor = record.OriginalVendor;
                     session.OriginalProduct = record.OriginalProduct;
+                    ExportCurrentHardwareProfiles(session, current);
                     if (session.Operation == SetupOperation.Update)
                     {
                         try { session.InstalledFirmwareVersion = KnownFirmwareImages.Validate(current, session.DeviceId!, identity.BoardId); }
@@ -226,21 +227,25 @@ public sealed partial class DeviceSetupService
             target.BoardId != BoardDescriptorRegistry.Get(target.DeviceId).BoardId)
             throw Error("Das Firmware-Paket passt nicht zu diesem Modell.");
         RetainedLoaderLayout.ValidateLayout(target.DeviceId, target.BoardId, target.FlashBytes, target.ApplicationOffset);
+        ProfileBankLayout.ValidateGeometry(target.DeviceId, target.BoardId, target.FlashBytes, target.ApplicationOffset, target.Bytes, target.StorageLayout);
         var source = ContainedFile(_packageRoot, target.File);
         var bytes = File.ReadAllBytes(source);
         if (bytes.Length != target.Bytes || !HashEquals(bytes, target.Sha256)) throw Error("Das Firmware-Paket ist beschädigt oder unvollständig.");
         var original = target.ApplicationOffset == 0 ? Array.Empty<byte>() : ReadOriginalForBundle(session);
-        var full = InstallationIdentity.CreateImage(bytes, target.FlashBytes, session.Installation!, original);
+        var full = InstallationIdentity.CreateImage(bytes, target.FlashBytes, session.Installation!, original, target.StorageLayout);
         if (current is not null)
         {
             if (session.MigrateLegacy) LegacyFirmwareMigration.ValidateImage(current, target.DeviceId);
             if (current.Length != target.FlashBytes || (!session.MigrateLegacy && InstallationIdentity.Read(current) != session.Installation))
                 throw Error("Das Firmware-Paket passt nicht zu diesem Modell.");
-            current.AsSpan(current.Length - InstallationIdentity.StorageBytes).CopyTo(full.AsSpan(full.Length - InstallationIdentity.StorageBytes));
+            var previousLayout = session.MigrateLegacy ? null : KnownFirmwareImages.GetStorageLayout(current, target.DeviceId, target.BoardId);
+            ProfileBankLayout.Preserve(current, full, previousLayout, target.StorageLayout);
         }
         // The target must itself be in the retained approved-image catalog, including its release ID.
         var releaseId = TargetFirmwareVersionFor(target.DeviceId);
         if (KnownFirmwareImages.Validate(full, target.DeviceId, target.BoardId) != releaseId)
+            throw Error("Das Firmware-Paket ist nicht gültig.");
+        if (KnownFirmwareImages.GetStorageLayout(full, target.DeviceId, target.BoardId) != target.StorageLayout)
             throw Error("Das Firmware-Paket ist nicht gültig.");
         var imagePath = Path.Combine(session.Directory, "installation.bin");
         WriteNew(imagePath, full);
@@ -254,6 +259,35 @@ public sealed partial class DeviceSetupService
         };
         WriteNew(bundlePath, JsonSerializer.SerializeToUtf8Bytes(bundle, Json));
         return bundlePath;
+    }
+
+    private static void ExportCurrentHardwareProfiles(SetupSession session, byte[] current)
+    {
+        if (session.DeviceId != "gmmk3-pro-100-iso") return;
+        string? layout;
+        try { layout = KnownFirmwareImages.GetStorageLayout(current, session.DeviceId, 16); }
+        catch (InvalidDataException)
+        {
+            // Restore remains possible for damaged/unknown installations. The
+            // two complete verified current reads already preserve every byte.
+            return;
+        }
+        if (layout != ProfileBankLayout.Name) return;
+        foreach (var profile in ProfileBankLayout.Inspect(current.AsSpan(ProfileBankLayout.Start, ProfileBankLayout.Length)).Profiles)
+        {
+            AppProject project;
+            try
+            {
+                project = OnboardSerializer.Decode(profile.Payload);
+                if (project.DeviceId != session.DeviceId || OnboardSerializer.Get16(profile.Payload, 4) != profile.Schema) continue;
+            }
+            catch (InvalidDataException) { continue; }
+            var stem = Path.Combine(session.Directory, $"profile-{profile.Slot}-{Guid.NewGuid():N}");
+            WriteNew(stem + ".igcfg.bin", profile.Payload);
+            if (!File.ReadAllBytes(stem + ".igcfg.bin").AsSpan().SequenceEqual(profile.Payload)) throw new IOException("PROFILE_EXPORT_READBACK_FAILED");
+            project.Name = "Profile " + profile.Slot;
+            ProjectService.Save(stem + ".inglorious.json", project);
+        }
     }
 
     private static byte[] ReadOriginalForBundle(SetupSession session)

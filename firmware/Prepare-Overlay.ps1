@@ -1,6 +1,6 @@
 #requires -Version 7.2
 [CmdletBinding()]
-param([string]$Board = 'all', [switch]$Engineering)
+param([string]$Board = 'all', [switch]$Engineering, [switch]$ProfileBanks)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 function Write-IfDifferent([string]$Path,[string]$Text) {
@@ -26,9 +26,10 @@ function Assert-Pinned([string]$Relative) {
  $actual=& git -C $qmk hash-object --no-filters -- $Relative
  if($LASTEXITCODE -ne 0 -or $actual -cne $expected){throw "Modified upstream board source: $Relative"}
 }
-function Get-BaseArguments([string]$Text,[string]$Layout) {
+function Get-BaseArguments([string]$Text,[string]$Layout,[string]$Layer='') {
  $clean=[regex]::Replace($Text,'(?s)/\*.*?\*/|(?m)//[^\r\n]*','')
- $match=[regex]::Match($clean,'\b'+[regex]::Escape($Layout)+'\s*\(')
+ $prefix=if($Layer){'\['+[regex]::Escape($Layer)+'\]\s*=\s*'}else{'\b'}
+ $match=[regex]::Match($clean,$prefix+[regex]::Escape($Layout)+'\s*\(')
  if(!$match.Success){throw "Missing base layout $Layout"}
  $depth=1;$start=$match.Index+$match.Length;$values=[Collections.Generic.List[string]]::new()
  for($i=$start;$i-lt$clean.Length;$i++){
@@ -38,6 +39,45 @@ function Get-BaseArguments([string]$Text,[string]$Layout) {
  }
  if($depth-ne0-or$values.Count-eq0){throw 'Unterminated or empty base keymap'}
  return ,$values.ToArray()
+}
+function Get-OsSwitchDefinition($Target,$Json,$Keys,[string[]]$Codes) {
+ if($Target.boardId-lt10-or$Target.boardId-gt16){return "#define IG_HAS_OS_SWITCH 0`n"}
+ $variant=[regex]::Match($Target.qmk,'/(p(?:65|75|100))/(ansi|iso)$')
+ if(!$variant.Success){throw 'Missing exact manufacturer switch variant'}
+ $relative='reference/glorious-gmmk3/'+$variant.Groups[1].Value
+ $keymapPath=$relative+'/'+$variant.Groups[2].Value+'/keymaps/default/keymap.c'
+ # These original files were hash-checked against the pinned provenance above.
+ foreach($path in @($keymapPath,($relative+'/config.h'))){
+  if(@($provenance.originalSources|Where-Object path -CEQ $path).Count-ne1){throw "Unverified switch source: $path"}
+ }
+ $original=[IO.File]::ReadAllText((Join-Path $workspace $keymapPath))
+ $configText=[IO.File]::ReadAllText((Join-Path $workspace ($relative+'/config.h')))
+ $pinMatches=[regex]::Matches($configText,'(?m)^#define DIP_SWITCH_PINS\s+\{\s*([A-Z][0-9]+)\s*\}')
+ if($pinMatches.Count-ne1){throw 'Expected one fixed manufacturer OS switch pin'}
+ $pin=$pinMatches[0].Groups[1].Value
+ $otherPins=@($Json.matrix_pins.rows)+@($Json.matrix_pins.cols)+@($Json.encoder.rotary.pin_a)+@($Json.encoder.rotary.pin_b)
+ $otherPins+=@([regex]::Matches($configText,'(?m)^#define \w*PIN(?:_[0-9]+)?\s+([A-Z][0-9]+)\s*$')|ForEach-Object{$_.Groups[1].Value})
+ if($pin-in$otherPins){throw "OS switch pin overlaps matrix/encoder/LED/SPI: $($Target.name)"}
+ $polarity=[regex]::Match($original,'(?s)bool dip_switch_update_user\([^)]*\)\s*\{\s*if\s*\(index\s*==\s*0\)\s*\{\s*if\s*\(active\)\s*\{\s*layer_off\((WIN_BL|MACOS_BL)\);\s*layer_on\((WIN_BL|MACOS_BL)\);\s*\}\s*else\s*\{\s*layer_off\((WIN_BL|MACOS_BL)\);\s*layer_on\((WIN_BL|MACOS_BL)\);')
+ if(!$polarity.Success-or$polarity.Groups[1].Value-ceq$polarity.Groups[2].Value-or$polarity.Groups[1].Value-cne$polarity.Groups[4].Value-or$polarity.Groups[2].Value-cne$polarity.Groups[3].Value){throw 'Unrecognized manufacturer OS switch polarity'}
+ # QMK DIP inputs use pull-ups and active=!readPin(). Preserve each layout's polarity.
+ $macLevel=if($polarity.Groups[2].Value-ceq'MACOS_BL'){0}else{1}
+ $win=Get-BaseArguments $original $Target.layout 'WIN_BL';$mac=Get-BaseArguments $original $Target.layout 'MACOS_BL'
+ if($win.Count-ne$Keys.Count-or$mac.Count-ne$Keys.Count){throw 'Manufacturer OS layout geometry differs'}
+ $aliases=@{KC_LWIN='KC_LGUI';KC_RWIN='KC_RGUI';KC_LOPT='KC_LALT';KC_ROPT='KC_RALT';KC_LCMD='KC_LGUI';KC_RCMD='KC_RGUI'}
+ $values=@{KC_LGUI=0xE3;KC_LALT=0xE2;KC_RGUI=0xE7;KC_RALT=0xE6;KC_APP=0x65}
+ $bindings=@()
+ for($i=0;$i-lt$win.Count;$i++){
+  $w=$win[$i];$m=$mac[$i];if($aliases.ContainsKey($w)){$w=$aliases[$w]};if($aliases.ContainsKey($m)){$m=$aliases[$m]}
+  if($w-ceq'MO(WIN_FL)'-and$m-ceq'MO(MACOS_FL)'){continue} # Keep all four user layers independent of OS mode.
+  $code=$Codes[$i];if($aliases.ContainsKey($code)){$code=$aliases[$code]}
+  if($code-cne$w){throw "Manufacturer Windows binding differs from normalized base: $($Target.name) key $i"}
+  if($w-ceq$m){continue}
+  if(!$values.ContainsKey($w)-or!$values.ContainsKey($m)){throw "Unrecognized native OS binding: $w -> $m"}
+  $bindings+='{'+$Keys[$i].matrix[0]+','+$Keys[$i].matrix[1]+',0x'+$values[$w].ToString('X2')+',0x'+$values[$m].ToString('X2')+'}'
+ }
+ if($bindings.Count-lt3-or$bindings.Count-gt4){throw 'Unexpected native OS binding count'}
+ return "#define IG_HAS_OS_SWITCH 1`n#define IG_OS_SWITCH_PIN $pin`n#define IG_OS_MAC_LEVEL $macLevel`n#define IG_OS_BINDINGS { "+($bindings-join', ')+" }`n"
 }
 function Find-Key([string]$Code,$Keys,[string[]]$Codes) {
  $indices=@(0..($Codes.Count-1)|Where-Object{$Codes[$_] -ceq $Code})
@@ -50,6 +90,7 @@ $manifest=$selection.Manifest
 $actualCommit=(& git -C $qmk rev-parse HEAD).Trim()
 if($LASTEXITCODE-ne0-or$actualCommit-cne$manifest.qmkCommit){throw 'The QMK checkout does not match the target manifest'}
 $targets=$selection.Targets
+if($ProfileBanks -and (@($targets).Count-ne1 -or $targets[0].boardId-ne16)){throw 'Profile-bank builds require the single reviewed board16 target.'}
 if(@($targets|Where-Object boardId -ge 10).Count){
  $workspace=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
  $provenance=Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'ports/gmmk3/provenance.json')|ConvertFrom-Json
@@ -80,6 +121,7 @@ if(@($targets|Where-Object boardId -ge 10).Count){
 & (Join-Path $PSScriptRoot 'Patch-QmkStorage.ps1') -Apply | Out-Null
 $effects=Get-ChildItem -LiteralPath (Join-Path $qmk 'quantum/rgb_matrix/animations') -Filter '*.h' | ForEach-Object { foreach($match in [regex]::Matches([IO.File]::ReadAllText($_.FullName),'ENABLE_RGB_MATRIX_[A-Z_0-9]+')) { $match.Value } } | Sort-Object -Unique
 foreach($target in $targets){
+ $profileBankEnabled=[bool]$target.PSObject.Properties['profileBankLayout']
  $dir=Join-Path $PSScriptRoot ('keymaps/'+$target.name);New-Item -ItemType Directory -Path $dir -Force | Out-Null
  $board=Join-Path $qmk ('keyboards/'+$target.qmk)
  $jsonRelative='keyboards/'+$target.qmk+'/keyboard.json';$keymapRelative='keyboards/'+$target.qmk+'/keymaps/default/keymap.c'
@@ -118,6 +160,7 @@ foreach($target in $targets){
  }
  if($externalPins.Count-ne$(if($target.externalSpiCs){1}else{0})-or($target.externalSpiCs-and$externalPins[0]-cne$target.externalSpiCs)){throw "External flash pin mismatch: $($target.name)"}
  if($target.externalSpiCs){$boardHeader+="#define IG_EXTERNAL_SPI_CS $($target.externalSpiCs)`n"}
+ $boardHeader+=Get-OsSwitchDefinition $target $json $keys $codes
  Write-IfDifferent (Join-Path $dir 'ig_board.h') $boardHeader
  $config=@'
 #pragma once
@@ -149,6 +192,7 @@ foreach($target in $targets){
  $config=$config.Replace('__PID__',$target.runtimeProductId).Replace('__PRODUCT__',$target.product).Replace('__BOARD__',[string]$target.boardId).Replace('__CAPACITY__',[string]$target.flashBytes)
  if($Engineering){$config+="`n#define IG_ENGINEERING_BUILD 1`n"}
  if($target.boardId-eq16){$config+="`n#define IG_RETAINED_LOADER_BUILD 1`n"}
+ if($profileBankEnabled){$config+="`n#define IG_PROFILE_BANK_ENABLE 1`n"}
  if($target.slider){$config+="`n#define IG_HAS_SLIDER 1`n"}
  foreach($effect in $effects){$config+="`n#undef $effect"}
  Write-IfDifferent (Join-Path $dir 'config.h') ($config+"`n")
@@ -171,6 +215,7 @@ MCU_LDSCRIPT = IG___NAME__
  $rules+="`nENCODER_MAP_ENABLE = $(if($target.encoder){'yes'}else{'no'})`n"
  if($target.boardId-eq16){$rules+="LDFLAGS += -Wl,--undefined=ig_fw_identity`n"}
  if($target.mcu.StartsWith('WB32',[StringComparison]::Ordinal)){$rules+="USE_CHIBIOS_CONTRIB = yes`nSRC += `$(KEYMAP_PATH)/wb32_bulk.c`n"}
+ if($profileBankEnabled){$rules+="SRC += `$(KEYMAP_PATH)/ig_profile_bank.c`nSRC += `$(KEYMAP_PATH)/ig_profile_flash.c`n"}
  Write-IfDifferent (Join-Path $dir 'rules.mk') ($rules.Replace('__NAME__',$target.name)+"`n")
  $ldSource=if($target.mcu-ceq'STM32F303'){'lib/chibios/os/common/startup/ARMCMx/compilers/GCC/ld/STM32F303xC.ld'}elseif($target.boardId-eq16){'lib/chibios-contrib/os/common/startup/ARMCMx/compilers/GCC/ld/WB32FQ95xC.ld'}elseif($target.mcu-ceq'WB32FQ95'){'lib/chibios-contrib/os/common/startup/ARMCMx/compilers/GCC/ld/WB32FQ95xB.ld'}else{'lib/chibios-contrib/os/common/startup/ARMCMx/compilers/GCC/ld/WB32F3G71xB.ld'}
  $ld=[IO.File]::ReadAllText((Join-Path $qmk $ldSource))
@@ -179,6 +224,7 @@ MCU_LDSCRIPT = IG___NAME__
  $ld=$ld -replace $flashRegex,('${1}'+(($target.flashBytes-$manifest.storageBytes)/1024)+'k')
  if($target.boardId-eq16){
   $codeBytes=$target.flashBytes-$manifest.storageBytes-$target.applicationOffsetBytes-$target.identityBytes
+  if($profileBankEnabled){$codeBytes=0x2A000-$target.applicationOffsetBytes}
   $ld=$ld -replace 'flash0 \(rx\) : org = 0x08000000, len = \d+k',('flash0 (rx) : org = 0x{0:X8}, len = 0x{1:X}' -f (0x08000000+$target.applicationOffsetBytes),$codeBytes)
   if($ld-notmatch'ram0\s+\(wx\) : org = 0x20000000, len = 36k'){throw 'Engineering linker RAM layout changed'}
  }
@@ -193,7 +239,8 @@ MCU_LDSCRIPT = IG___NAME__
   Copy-IfDifferent (Join-Path $PSScriptRoot $target.versionHeaderPath) $dir
   Copy-IfDifferent (Join-Path $dir 'ig_board_version.h') $dest
  }
- foreach($file in @('inglorious.c','ig_effects.h','ig_color.h','ig_timing.h','ig_version.h','ig_timing.c','ig_storage.h','ig_storage.inc')){Copy-IfDifferent (Join-Path $PSScriptRoot ('inglorious/'+$file)) $dest}
+ foreach($file in @('inglorious.c','ig_effects.h','ig_color.h','ig_hardware_controls.h','ig_timing.h','ig_version.h','ig_timing.c','ig_storage.h','ig_storage.inc')){Copy-IfDifferent (Join-Path $PSScriptRoot ('inglorious/'+$file)) $dest}
+ if($profileBankEnabled){foreach($file in @('ig_profile_bank.h','ig_profile_bank.c','ig_profile_flash.h','ig_profile_flash.c','ig_profile_runtime.inc','ig_profile_selector.h','ig_profile_defaults.h')){Copy-IfDifferent (Join-Path $PSScriptRoot ('inglorious/'+$file)) $dest}}
  if($target.mcu.StartsWith('WB32',[StringComparison]::Ordinal)){Copy-IfDifferent (Join-Path $PSScriptRoot 'inglorious/wb32_bulk.c') $dest}
  $lddir=Join-Path $board 'ld';New-Item -ItemType Directory -Path $lddir -Force | Out-Null
  Copy-IfDifferent (Join-Path $dir ('IG_'+$target.name+'.ld')) $lddir

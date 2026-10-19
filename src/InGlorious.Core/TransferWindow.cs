@@ -11,6 +11,7 @@ public sealed partial class TransferWindow : Window
 {
     private readonly OnboardImage _image;
     private readonly AppProject _project;
+    private readonly OnboardProfileBinding? _profileBinding;
     private readonly Grid _root;
     private readonly TextBlock _deviceStatus;
     private readonly TextBlock _transferStatus;
@@ -25,18 +26,22 @@ public sealed partial class TransferWindow : Window
     private bool _deviceSearchCompleted, _deviceSearchFailed;
     private bool _busy, _closed;
     private bool _outcomeUncertain, _verificationInvalidated;
-    private bool _recoveryMode, _reconnectRequired, _closeAfterOperation;
+    private bool _recoveryMode, _reconnectRequired, _closeAfterOperation, _hardwareProfileReloadRequired;
     private bool _progressActive;
     private int _progressRevision;
     private readonly bool _offlinePreview;
     private AppProject? _readProject;
     private OnboardInfo? _currentInfo;
     private OnboardExtensions? _currentExtensions;
-    private sealed record VerifiedTarget(OnboardDevice Device, OnboardInfo Info, string Label, OnboardExtensions? Extensions = null);
+    private sealed record VerifiedTarget(OnboardDevice Device, OnboardInfo Info, string Label, OnboardExtensions? Extensions = null,
+        OnboardProfileBinding? ProfileBinding = null, OnboardHardwareProfileStatus? ProfileStatus = null);
     private VerifiedTarget? SelectedTarget => _targetChoice.SelectedItem as VerifiedTarget;
+    private bool CurrentStorageHealthy => _currentExtensions?.SupportsHardwareProfiles == true
+        ? DeviceProfileSnapshot?.Status.StorageHealthy ?? SelectedTarget?.ProfileStatus?.StorageHealthy == true
+        : _currentInfo?.Persistent == true;
     private async Task<OnboardExtensions?> ReadRequiredExtensionsAsync(OnboardClient client)
     {
-        if (!_image.RequiresScreensaver && !_image.RequiresKnobCycle) return null;
+        if (!_image.RequiresScreensaver && !_image.RequiresKnobCycle && _image.DeviceId != "gmmk3-pro-100-iso") return null;
         try { return await client.GetExtensionsAsync(); }
         catch (Exception ex) when (ex is IOException or NotSupportedException)
         {
@@ -45,16 +50,20 @@ public sealed partial class TransferWindow : Window
         }
     }
     public AppProject? ImportedProject { get; private set; }
+    public OnboardHardwareProfileSnapshot? DeviceProfileSnapshot { get; private set; }
     public bool DeviceSaveVerified { get; private set; }
     public bool FirmwareGuideRequested { get; private set; }
     public bool DeviceStateUncertain => _outcomeUncertain || _verificationInvalidated;
     public uint? ImportedGeneration => _currentInfo?.Generation;
     public string? CompletionNotice { get; private set; }
 
-    public TransferWindow(AppProject project, string? screenshotPath = null, bool offlinePreview = false)
+    public TransferWindow(AppProject project, string? screenshotPath = null, bool offlinePreview = false, OnboardProfileBinding? profileBinding = null)
     {
         _offlinePreview = offlinePreview || screenshotPath is not null;
         _project = ProjectService.Clone(project);
+        _profileBinding = profileBinding;
+        if (profileBinding is not null && (profileBinding.DeviceId != project.DeviceId || profileBinding.Slot is < 1 or > 3))
+            throw new ArgumentException("Profile binding does not match the editor.", nameof(profileBinding));
         _image = OnboardSerializer.Prepare(_project);
         Title = L.T("Auf Tastatur übertragen · INGLORIOUS Advanced");
         Width = 620; Height = 400; MinWidth = 540; MinHeight = 360;
@@ -71,6 +80,7 @@ public sealed partial class TransferWindow : Window
         var header = new StackPanel { Margin = new Thickness(0, 0, 0, 18) };
         header.Children.Add(Label(project.Name, 20, "#E4E7EB", FontWeights.SemiBold));
         header.Children.Add(Label(DeviceCatalog.Get(project.DeviceId).Name, 13, "#A0A7B0", margin: new Thickness(0, 4, 0, 0)));
+        if (profileBinding is not null) header.Children.Add(Label(L.Format("Profil {0}", profileBinding.Slot), 13, "#A0A7B0", margin: new Thickness(0, 4, 0, 0)));
         layout.Children.Add(header);
         var body = new StackPanel();
         body.Children.Add(Label(L.T("Der bisherige Gerätestand wird automatisch gesichert."), 13, "#A0A7B0", margin: new Thickness(0, 0, 0, 16)));
@@ -130,20 +140,11 @@ public sealed partial class TransferWindow : Window
         SetBusy(true, L.T("Passendes Gerät wird gesucht …"));
         try
         {
-            var candidates = await Task.Run(OnboardClient.FindDevices);
-            var matches = new List<VerifiedTarget>(); var failed = false;
-            foreach (var device in candidates.Where(d => d.DeviceId == _image.DeviceId))
-            {
-                try
-                {
-                    await using var client = OnboardClient.Open(device);
-                    var info = await client.GetInfoAsync();
-                    var extensions = await ReadRequiredExtensionsAsync(client);
-                    matches.Add(new(device, info, DeviceCatalog.Get(device.DeviceId).Name + " (" + (matches.Count + 1) + ")", extensions));
-                }
-                catch (Exception ex) { failed = true; System.Diagnostics.Trace.TraceError(ex.ToString()); }
-            }
-            SetDiscoveredTargets(matches, failed);
+            var result = await OnboardTransferDiscovery.FindAsync(_image.DeviceId, _image.RequiresScreensaver || _image.RequiresKnobCycle,
+                _profileBinding, entry => OnboardDiscoveryDiagnostics.Append(Path.Combine(Paths.DataRoot, "diagnostics"), entry));
+            SetDiscoveredTargets(result.Targets.Select((target, index) => new VerifiedTarget(target.Device, target.Info,
+                DeviceCatalog.Get(target.Device.DeviceId).Name + " (" + (index + 1) + ")", target.Extensions,
+                target.ProfileBinding, target.ProfileStatus)).ToArray(), result.Failed);
         }
         catch (Exception ex) { System.Diagnostics.Trace.TraceError(ex.ToString()); SetDiscoveredTargets([], failed: true); }
         finally { SetBusy(false); }
@@ -152,7 +153,7 @@ public sealed partial class TransferWindow : Window
     private void SetDiscoveredTargets(IReadOnlyList<VerifiedTarget> targets, bool failed = false)
     {
         ClearConfirmation(); _recoveryMode = false; _deviceSearchCompleted = true; _deviceSearchFailed = failed;
-        var matching = targets.Where(target => target.Device.DeviceId == _image.DeviceId && target.Info.DeviceId == _image.DeviceId).ToArray();
+        var matching = failed ? [] : targets.Where(target => target.Device.DeviceId == _image.DeviceId && target.Info.DeviceId == _image.DeviceId).ToArray();
         _targetChoice.ItemsSource = matching;
         _targetChoice.SelectedIndex = matching.Length == 1 ? 0 : -1;
         _transferStatus.Text = "";
@@ -178,7 +179,7 @@ public sealed partial class TransferWindow : Window
             ? _targetChoice.Items.Count > 1 ? L.T("Mehrere passende Geräte gefunden. Wähle ein Gerät.")
                 : _deviceSearchFailed ? L.T("Die Geräteprüfung ist fehlgeschlagen. Prüfe die USB-Verbindung und suche erneut.")
                 : L.T("Kein passendes Gerät gefunden. Prüfe die USB-Verbindung.")
-            : !target.Info.Persistent ? L.T("Das Gerät kann die Einstellungen gerade nicht speichern. Prüfe die USB-Verbindung.")
+            : !CurrentStorageHealthy ? L.T("Das Gerät kann die Einstellungen gerade nicht speichern. Prüfe die USB-Verbindung.")
                 : UnsupportedFeature(target.Info) ?? L.T("Bereit zur Übertragung");
         UpdateControls();
     }
@@ -186,7 +187,7 @@ public sealed partial class TransferWindow : Window
     private void UpdateControls()
     {
         var active = !_offlinePreview && !_busy && !_closed;
-        _findButton.Visibility = _deviceSearchCompleted && (_targetChoice.Items.Count != 1 || _deviceSearchFailed || DeviceStateUncertain || _currentInfo?.Persistent == false) ? Visibility.Visible : Visibility.Collapsed;
+        _findButton.Visibility = _deviceSearchCompleted && (_targetChoice.Items.Count != 1 || _deviceSearchFailed || DeviceStateUncertain || !CurrentStorageHealthy) ? Visibility.Visible : Visibility.Collapsed;
         _findButton.IsEnabled = active && !_outcomeUncertain;
         _targetChoice.Visibility = _targetChoice.Items.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         _targetChoice.IsEnabled = active && !_outcomeUncertain;
@@ -194,8 +195,9 @@ public sealed partial class TransferWindow : Window
         _readButton.IsEnabled = active && _recoveryMode && SelectedTarget is not null;
         _importButton.Visibility = _recoveryMode && _readProject is not null && !DeviceSaveVerified ? Visibility.Visible : Visibility.Collapsed;
         _importButton.IsEnabled = active && _recoveryMode && !_outcomeUncertain && _readProject is not null;
-        _transferButton.IsEnabled = active && !_outcomeUncertain && SelectedTarget is not null && _currentInfo?.Persistent == true && UnsupportedFeature(_currentInfo) is null;
-        var needsFirmware = _currentInfo is not null ? UnsupportedFeature(_currentInfo) is not null : _deviceSearchCompleted && _targetChoice.Items.Count == 0;
+        _transferButton.IsEnabled = active && !_outcomeUncertain && SelectedTarget is not null && CurrentStorageHealthy && _currentInfo is not null && UnsupportedFeature(_currentInfo) is null;
+        var needsFirmware = _currentInfo is not null ? HardwareProfileConflict() is null && FirmwareRequirement(_currentInfo) is not null
+            : _deviceSearchCompleted && _targetChoice.Items.Count == 0;
         _firmwareGuideButton.Visibility = needsFirmware && DeviceCatalog.Get(_image.DeviceId).HasApprovedFirmwareManagement ? Visibility.Visible : Visibility.Collapsed;
         _firmwareGuideButton.IsEnabled = active && !_outcomeUncertain;
         _firmwareGuideButton.Content = _currentInfo is not null ? L.T("Update öffnen") : L.T("Gerätestatus prüfen");
@@ -215,6 +217,7 @@ public sealed partial class TransferWindow : Window
     {
         if (_offlinePreview || _busy || _closed || !_recoveryMode) return;
         var target = SelectedTarget; if (target is null) return;
+        if (target.Extensions?.SupportsHardwareProfiles == true) { await ReadHardwareProfileRecoveryAsync(target); return; }
         var recoveryRead = _recoveryMode;
         ClearConfirmation(invalidated: true);
         SetBusy(true, L.T("Aktuelle Konfiguration wird vollständig gelesen und geprüft …"));
@@ -248,8 +251,9 @@ public sealed partial class TransferWindow : Window
     {
         if (_offlinePreview || _busy || _closed) return;
         var target = SelectedTarget;
-        if (target is null || _currentInfo?.Persistent != true || _outcomeUncertain) return;
+        if (target is null || !CurrentStorageHealthy || _currentInfo is null || _outcomeUncertain) return;
         if (UnsupportedFeature(_currentInfo) is { } unsupported) { _transferStatus.Text = unsupported; return; }
+        if (target.Extensions?.SupportsHardwareProfiles == true) { await TransferHardwareProfileAsync(target); return; }
         ClearConfirmation(invalidated: true); _reconnectRequired = false;
         SetBusy(true, L.T("Bisheriger Gerätestand wird vor der Übertragung gesichert …"));
         var applyStarted = false;
@@ -319,10 +323,10 @@ public sealed partial class TransferWindow : Window
         : L.T("Bitte verbinde das USB-Kabel erneut, damit die neue Abfragerate aktiv wird.");
     private void CompleteVerifiedOperation()
     {
-        _closeAfterOperation = DeviceSaveVerified && !DeviceStateUncertain && _currentInfo?.Persistent == true;
+        _closeAfterOperation = DeviceSaveVerified && !DeviceStateUncertain && CurrentStorageHealthy;
         if (_closeAfterOperation) { _progress.Value = 100; _transferStatus.Text = L.T("Die Übertragung ist bestätigt."); }
     }
-    private bool CanAutoClose => !_offlinePreview && !_busy && !_closed && _closeAfterOperation && DeviceSaveVerified && !DeviceStateUncertain && _currentInfo?.Persistent == true;
+    private bool CanAutoClose => !_offlinePreview && !_busy && !_closed && _closeAfterOperation && DeviceSaveVerified && !DeviceStateUncertain && CurrentStorageHealthy;
     private void FinishOperation()
     {
         // Called from the outer finally, after await-using has disposed the transport.
@@ -333,6 +337,7 @@ public sealed partial class TransferWindow : Window
     private void ClearConfirmation(bool invalidated = false)
     {
         DeviceSaveVerified = false; _closeAfterOperation = false; CompletionNotice = null;
+        DeviceProfileSnapshot = null;
         _readProject = null; _verificationInvalidated |= invalidated;
     }
     private void AcceptReadResult(byte[] data, OnboardInfo info)
@@ -357,7 +362,15 @@ public sealed partial class TransferWindow : Window
         _recoveryMode |= applyStarted;
     }
 
-    private string? UnsupportedFeature(OnboardInfo info) =>
+    private string? UnsupportedFeature(OnboardInfo info) => HardwareProfileConflict() ?? FirmwareRequirement(info);
+    private string? HardwareProfileConflict() =>
+        _hardwareProfileReloadRequired ? L.T("Schließe dieses Fenster und lies das Profil erneut von der Tastatur.") :
+        _profileBinding is not null && _currentExtensions?.SupportsHardwareProfiles != true
+            ? L.T("Das Profil auf der Tastatur hat sich geändert. Bitte erneut auslesen.") :
+        _currentExtensions?.SupportsHardwareProfiles == true && (_profileBinding is null || SelectedTarget?.ProfileBinding != _profileBinding ||
+            SelectedTarget.ProfileStatus?.ActiveSlot != _profileBinding.Slot || SelectedTarget.ProfileStatus.SwitchPending || SelectedTarget.ProfileStatus.UploadOpen || !SelectedTarget.ProfileStatus.StorageHealthy)
+            ? L.T("Das Profil auf der Tastatur hat sich geändert. Bitte erneut auslesen.") : null;
+    private string? FirmwareRequirement(OnboardInfo info) =>
         (_image.RequiresKnobCycle && _currentExtensions?.SupportsKnobCycle != true || _image.RequiresKnobOrder && _currentExtensions?.SupportsKnobOrder != true) ? L.T("Diese Drehregler-Einstellungen benötigen ein Firmware-Update. Es wird nichts übertragen.") :
         _image.RequiresScreensaver && _currentExtensions?.SupportsScreensaver != true ? L.T("Der Screensaver benötigt ein Firmware-Update. Es wird nichts übertragen.") :
         _image.RequiresStandby && !info.SupportsStandby ? L.T("Standby benötigt ein Firmware-Update. Es wird nichts übertragen.") :

@@ -10,6 +10,7 @@ public partial class MainWindow
         _checkingFirmwareGuide = true;
         try
         {
+            using var pausedKnob = await PauseKnobStatusAsync();
             await _sharedBrightness.StopAsync();
             var devices = _screenshotMode ? [] : await Task.Run(OnboardClient.FindDevices);
             var matches = devices.Where(item => item.DeviceId == Device.Id).ToArray();

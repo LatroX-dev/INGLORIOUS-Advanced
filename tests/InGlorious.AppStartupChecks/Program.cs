@@ -83,6 +83,15 @@ internal static class Program
                 Check(StartupFixture.TrayAttempts == (offline ? 0 : 1), "Offline startup cannot touch the native tray boundary.");
                 Check(StartupFixture.InstancesCreated == (offline ? 0 : 1), "Offline startup cannot claim the production instance boundary.");
                 Check(StartupFixture.PreferenceReads == 0, "Successful startup never reads settings from the notice boundary.");
+                Check(StartupFixture.DiagnosticInstallations == (offline ? 0 : 1) &&
+                    (OnboardMetadata.DiagnosticSink is null) == offline && StartupFixture.DiagnosticPathReads == 0,
+                    "Only guarded real startup installs diagnostics, without eagerly accessing the data directory.");
+                if (!offline)
+                {
+                    OnboardMetadata.DiagnosticSink!(new());
+                    Check(StartupFixture.DiagnosticWrites == 1 && StartupFixture.DiagnosticPathReads == 1,
+                        "The native metadata observer reaches only the substituted local diagnostic boundary.");
+                }
                 if (!offline && mode != "no-tray")
                 {
                     StartupFixture.Open!(); Check(window.IsVisible, "Tray open shows the same main window.");
@@ -100,9 +109,12 @@ internal static class Program
         Check(StartupFixture.GuardsCreated == 1 && StartupFixture.GuardsDisposed == 1, "Startup guard lives until application exit, including rejected starts.");
         bool rejects = mode is "secondary" or "secondary-background" or "secondary-unreachable" or "installer-running" or "guard-unavailable" or "instance-error" or "after-setup-timeout" or "after-setup-unavailable" or "after-setup-shutdown";
         Check(reachedWindow != rejects, "Rejected startup never reaches the editor branch.");
+        Check(OnboardMetadata.DiagnosticSink is null, "Application exit removes the metadata diagnostic observer.");
         if (rejects)
         {
             Check(StartupFixture.WindowsCreated == 0 && StartupFixture.TrayAttempts == 0 && StartupFixture.BackgroundInitializations == 0, "Rejected startup never constructs an editor or initializes devices/tray.");
+            Check(StartupFixture.DiagnosticInstallations == 0 && StartupFixture.DiagnosticWrites == 0 && StartupFixture.DiagnosticPathReads == 0,
+                "Rejected startup never installs diagnostics or accesses their storage boundary.");
             int notices = mode is "secondary" or "secondary-background" or "after-setup-shutdown" ? 0 : 1;
             Check(StartupFixture.Notices == notices && StartupFixture.PreferenceReads == notices, "Only the expected startup error notice is shown.");
             if (mode.StartsWith("secondary", StringComparison.Ordinal)) Check(StartupFixture.Activation == (mode != "secondary-background"), "Second normal launch activates; background launch does not.");

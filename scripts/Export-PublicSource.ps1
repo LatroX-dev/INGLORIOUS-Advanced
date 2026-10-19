@@ -41,13 +41,17 @@ $app = @(
     'MacroRecorderWindow.xaml','MacroRecorderWindow.xaml.cs','MacroRecording.cs',
     'FirmwareRelease.cs','FirmwareChangelog.cs','FirmwareMessages.cs','FirmwareLightingTestService.cs','MainWindow.Onboarding.cs','MainWindow.Standby.cs','UnsavedChangesWindow.cs','UiIcons.cs'
 )
-$app += @('RetainedLoaderLayout.cs','OnboardDiagnostics.cs','DeviceDiagnosticSession.cs','DeviceTestWindow.cs','MainWindow.DeviceTest.cs','DeviceSetupWindow.Options.cs')
+$app += @('RetainedLoaderLayout.cs','OnboardDiagnostics.cs','DeviceDiagnosticSession.cs','HardwareControlCatalog.cs','HardwareControlTestSession.cs','DeviceTestWindow.cs','MainWindow.DeviceTest.cs','DeviceSetupWindow.Options.cs')
 $app += @('MainWindow.KnobPresets.cs','MainWindow.KnobPresetChecks.cs','KnobOptionsWindow.cs')
 $app += @('OnboardTransportPool.cs')
+$app += @('OnboardTransferDiscovery.cs','OnboardDiscoveryDiagnostics.cs','OnboardMetadata.cs')
+$app += @('OnboardHardwareProfiles.cs','ProfileBankLayout.cs','TransferWindow.HardwareProfiles.cs','MainWindow.HardwareProfiles.cs','MainWindow.HardwareProfileChecks.cs')
+$app += @('MainWindow.DeviceReadErrors.cs')
 $allow = [Collections.Generic.List[string]]::new()
 $app += @('DeviceFeedback.cs','SupportContact.cs','DeviceFeedbackWindow.cs','MainWindow.Feedback.cs','CoreSettingsImport.cs','CoreImportWindow.cs','MainWindow.CoreImport.cs')
 foreach ($name in $app) { $allow.Add('src/InGlorious.Core/'+$name) }
 foreach ($name in @('feedback.json','core-import.json')) { $allow.Add('src/InGlorious.Core/Locales/'+$name) }
+foreach ($name in @('hardware-profiles.json','hardware-profile-transfer.json')) { $allow.Add('src/InGlorious.Core/Locales/'+$name) }
 foreach ($suite in @('InGlorious.FeedbackChecks','InGlorious.CoreImportChecks')) { $allow.Add('tests/'+$suite+'/'+$suite+'.csproj'); $allow.Add('tests/'+$suite+'/Program.cs') }
 $allow.Add('.github/ISSUE_TEMPLATE/device-feedback.md')
 $allow.Add('docs/core-import.md')
@@ -56,7 +60,10 @@ $allow.Add('docs/demo/README.md')
 $allow.Add('docs/demo/INGLORIOUS-Advanced-Demo-en.srt')
 $allow.Add('src/InGlorious.Core/SetupFirmwareCatalog.json')
 $allow.Add('src/InGlorious.Core/Locales/device-test.json')
+$allow.Add('src/InGlorious.Core/Locales/device-read.json')
 $allow.Add('tests/InGlorious.OnboardChecks/DiagnosticChecks.cs')
+$allow.Add('tests/InGlorious.OnboardChecks/DiscoveryChecks.cs')
+$allow.Add('tests/InGlorious.OnboardChecks/MetadataChecks.cs')
 $allow.Add('src/InGlorious.Core/KnownFirmwareCatalog.json')
 $allow.Add('src/InGlorious.Core/SetupToolCatalog.json')
 $allow.Add('src/InGlorious.Core/Locales/device-setup-ui.json')
@@ -98,15 +105,19 @@ $desktop = @('App.axaml','App.axaml.cs','EditorState.cs','InGlorious.Desktop.csp
 $desktop += @('DeviceFeedbackWindow.cs','MainWindow.Feedback.cs','CoreImportWindow.cs','MainWindow.CoreImport.cs')
 $desktop += @('DeviceTestWindow.cs','MainWindow.DeviceTest.cs','DeviceSetupWindow.Options.cs')
 $desktop += @('MainWindow.KnobPresets.cs','MainWindow.KnobStatus.cs')
+$desktop += @('MainWindow.HardwareProfiles.cs')
 foreach ($name in $desktop) { $allow.Add('src/InGlorious.Desktop/'+$name) }
 foreach ($name in @('inglorious-mark.png','inglorious.ico')) { $allow.Add('src/InGlorious.Core/Assets/'+$name) }
 foreach ($name in @('INGLORIOUS-Oxanium-SemiBold.ttf','Oxanium-OFL.txt','Oxanium-source.json')) { $allow.Add('src/InGlorious.Core/Assets/Fonts/'+$name) }
 foreach ($name in @('LICENSE','sources.json','pro-iso.json','numpad.json','pro-iso-default.c','numpad-default.c','pro-ansi.json','pro-ansi-default.c','pro-rev2-ansi.json','pro-rev2-ansi-default.c','pro-rev2-iso.json','pro-rev2-iso-default.c','gmmk2-65-ansi.json','gmmk2-65-ansi-default.c','gmmk2-65-iso.json','gmmk2-65-iso-default.c','gmmk2-96-ansi.json','gmmk2-96-ansi-default.c','gmmk2-96-iso.json','gmmk2-96-iso-default.c')) { $allow.Add('reference/qmk/'+$name) }
 foreach ($name in @('Build-Firmware.ps1','Resolve-Targets.ps1','Prepare-Overlay.ps1','Patch-QmkTiming.ps1','Patch-QmkStorage.ps1','Verify-CandidateBuild.py','engineering/targets.json','boards/gmmk3-pro-100-iso/ig_board_version.h','engineering/README.md','targets.json','protocol.md','README.md')) { $allow.Add('firmware/'+$name) }
-foreach ($name in @('inglorious.c','ig_version.h','ig_effects.h','ig_color.h','ig_timing.c','ig_timing.h','ig_storage.h','ig_storage.inc','wb32_bulk.c')) { $allow.Add('firmware/inglorious/'+$name) }
+foreach ($name in @('inglorious.c','ig_hardware_controls.h','ig_version.h','ig_effects.h','ig_color.h','ig_timing.c','ig_timing.h','ig_storage.h','ig_storage.inc','wb32_bulk.c')) { $allow.Add('firmware/inglorious/'+$name) }
+foreach ($name in @('ig_profile_selector.h','ig_profile_bank.h','ig_profile_bank.c','ig_profile_defaults.h','ig_profile_runtime.inc','ig_profile_flash.h','ig_profile_flash.c')) { $allow.Add('firmware/inglorious/'+$name) }
+foreach ($name in @('profile_selector_tests.c','profile_bank_tests.c','profile_bank_fixtures.c','profile_flash_tests.c','profile_runtime_tests.c','Run-ProfileSelectorChecks.ps1','Run-ProfileBankChecks.ps1','Run-ProfileFlashChecks.ps1','Run-ProfileRuntimeChecks.ps1','profile_flash_mocks/hal.h','profile_flash_mocks/profile_flash_qmk_mock.h')) { $allow.Add('firmware/tests/'+$name) }
+$allow.Add('firmware/tests/storage_bank_tests.c')
 foreach ($name in @('ig_board.h','cache_staging_checks.h','Run-PortChecks.ps1','Run-EngineeringChecks.ps1','storage_tests.c','Run-StorageChecks.ps1')) { $allow.Add('firmware/tests/'+$name) }
 foreach ($name in @('port_checks.c','diagnostic_checks.h','port_mock.h','raw_hid.h','eeprom.h','wear_leveling.h','keymap_introspection.h','bootloader.h','wait.h')) { $allow.Add('firmware/tests/ports/'+$name) }
-foreach ($name in @('runtime_tests.c','version_reporting_checks.h','brightness_binding_checks.h','color_sequences_checks.h','color_output_checks.h','standby_checks.h','lighting_test_checks.h','effects_tests.c','bulk_tests.c','qmk_mock.h','analog.h','bootloader.h','eeprom.h','ig_physical.h','keymap_introspection.h','qmk_midi.h','raw_hid.h','wait.h','wear_leveling.h','Run-RuntimeChecks.ps1','Run-EffectsChecks.ps1','Run-BulkChecks.ps1','README.md')) { $allow.Add('firmware/tests/'+$name) }
+foreach ($name in @('runtime_tests.c','hardware_controls_checks.h','version_reporting_checks.h','brightness_binding_checks.h','color_sequences_checks.h','color_output_checks.h','standby_checks.h','lighting_test_checks.h','effects_tests.c','bulk_tests.c','qmk_mock.h','analog.h','bootloader.h','eeprom.h','ig_physical.h','keymap_introspection.h','qmk_midi.h','raw_hid.h','wait.h','wear_leveling.h','Run-RuntimeChecks.ps1','Run-EffectsChecks.ps1','Run-BulkChecks.ps1','README.md')) { $allow.Add('firmware/tests/'+$name) }
 foreach ($name in @('hal.h','wear_leveling_efl_config.h','wear_leveling_internal.h','wear_leveling.h')) { $allow.Add('firmware/tests/bulk_mocks/'+$name) }
 foreach ($name in @('debounce.h','action.h','qmk_mock.h','usb_main.h','timer.h','timing_tests.c','Run-TimingChecks.ps1','Test-DescriptorPatch.ps1')) { $allow.Add('tests/TimingChecks/'+$name) }
 foreach ($suite in @('InGlorious.Checks','InGlorious.OnboardChecks','InGlorious.StockChecks','InGlorious.RecordingChecks','InGlorious.LightingTestChecks','InGlorious.PendingChecks','InGlorious.PreferencesChecks','InGlorious.PreviewChecks','InGlorious.ColorSequenceChecks','InGlorious.MacroLibraryChecks','InGlorious.KeyBindingChecks','InGlorious.IntegrationChecks','InGlorious.LightingPresetChecks','InGlorious.BoardRegistryChecks','InGlorious.ModelChecks')) {
@@ -115,7 +126,8 @@ foreach ($suite in @('InGlorious.Checks','InGlorious.OnboardChecks','InGlorious.
 $allow.Add('tests/InGlorious.Checks/ColorPaletteChecks.cs')
 $allow.Add('tests/InGlorious.OnboardChecks/FirmwareVersionChecks.cs')
 $allow.Add('tests/InGlorious.OnboardChecks/BrightnessBindingChecks.cs')
-foreach ($name in @('KnobPresetChecks.cs','KnobTransferChecks.cs','KnobFixtureExport.cs','KnobStatusChecks.cs','OnboardTransportPoolChecks.cs','KnobPressFixtureExport.cs','KnobPressChecks.cs')) { $allow.Add('tests/InGlorious.OnboardChecks/'+$name) }
+foreach ($name in @('KnobPresetChecks.cs','KnobTransferChecks.cs','KnobFixtureExport.cs','KnobStatusChecks.cs','HardwareControlChecks.cs','OnboardTransportPoolChecks.cs','KnobPressFixtureExport.cs','KnobPressChecks.cs')) { $allow.Add('tests/InGlorious.OnboardChecks/'+$name) }
+foreach ($name in @('HardwareProfileChecks.cs','ProfileBankLayoutChecks.cs')) { $allow.Add('tests/InGlorious.OnboardChecks/'+$name) }
 $allow.Add('tests/InGlorious.KeyBindingChecks/KnobBindingTransferChecks.cs')
 $allow.Add('firmware/tests/knob_cycle_checks.h')
 $allow.Add('tests/InGlorious.OnboardChecks/ExperimentalBoardChecks.cs')
@@ -123,6 +135,7 @@ $allow.Add('tests/InGlorious.OnboardChecks/EngineeringConfigurationChecks.cs')
 $allow.Add('src/InGlorious.Core/Locales/lighting-zones.json')
 $allow.Add('reference/discovery/gmbk-eternal-20261011.json')
 $allow.Add('docs/discovery-gmbk-eternal.md')
+$allow.Add('docs/hardware-controls.md')
 $allow.Add('docs/gmmk3-port.md')
 $allow.Add('docs/gmmk3-pro-port.md')
 $allow.Add('scripts/Test-Gmmk3References.py')

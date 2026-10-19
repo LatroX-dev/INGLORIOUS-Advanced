@@ -2,6 +2,12 @@ using System.IO;
 
 namespace InGlorious.Core;
 
+// The pool can identify a closed/poisoned stream without relying on arbitrary exception text.
+internal sealed class OnboardTransportResetException : IOException
+{
+    public OnboardTransportResetException() : base("The device connection is no longer available.") { }
+}
+
 /// <summary>One live RAW-HID stream per endpoint within this process; failed exchanges are never retried.</summary>
 internal static class OnboardTransportPool
 {
@@ -22,7 +28,7 @@ internal static class OnboardTransportPool
                     return new Lease(channel);
                 }
                 // Never open a second stream while the previous native handle is still closing.
-                if (!channel.IsClosed) throw new IOException("The device connection is still closing. Try again.");
+                if (!channel.IsClosed) throw new OnboardTransportResetException();
             }
             var created = new Channel(key, identity, open());
             Channels[key] = created;
@@ -33,7 +39,7 @@ internal static class OnboardTransportPool
     {
         lock (Sync)
         {
-            if (channel.References == 0 || channel.Poisoned) throw new IOException("The device connection is no longer available.");
+            if (channel.References == 0 || channel.Poisoned) throw new OnboardTransportResetException();
             channel.References++;
         }
     }
@@ -66,7 +72,7 @@ internal static class OnboardTransportPool
             await _exchange.WaitAsync(cancellation).ConfigureAwait(false);
             try
             {
-                if (Poisoned) throw new IOException("The device connection is no longer available.");
+                if (Poisoned) throw new OnboardTransportResetException();
                 cancellation.ThrowIfCancellationRequested();
                 try
                 {

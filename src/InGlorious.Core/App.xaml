@@ -186,6 +186,20 @@
         </Style>
         <Style TargetType="ListBox">
             <Setter Property="Background" Value="#15181B"/><Setter Property="Foreground" Value="{StaticResource Text}"/><Setter Property="BorderBrush" Value="{StaticResource Stroke}"/><Setter Property="Padding" Value="4"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/><Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBox">
+                <!-- Keep the disabled owner dark while a modal dialog is open. -->
+                <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
+                    <ScrollViewer x:Name="PART_ScrollViewer" Focusable="False" Padding="{TemplateBinding Padding}"
+                                  Background="{TemplateBinding Background}" CanContentScroll="{TemplateBinding ScrollViewer.CanContentScroll}"
+                                  HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                                  VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
+                        <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                    </ScrollViewer>
+                </Border>
+            </ControlTemplate></Setter.Value></Setter>
         </Style>
         <Style TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{StaticResource Text}"/><Setter Property="Padding" Value="8,8"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/>

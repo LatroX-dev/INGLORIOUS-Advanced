@@ -19,6 +19,9 @@ static uint16_t knob_tapped_code;
 static uint8_t weak_mods, last_registered_mods, last_registered_code;
 static unsigned keyboard_reports;
 static int raised_cs = -1, output_cs = -1;
+static int switch_input = -1;
+static bool switch_level;
+static unsigned switch_reads;
 static bool borrowed;
 static uint8_t active_interval = 1, mock_saved_interval = 1, debounce_ms = 5;
 static bool reconnect;
@@ -69,6 +72,8 @@ void rgb_matrix_enable_noeeprom(void) {}
 void rgb_matrix_mode_noeeprom(uint8_t mode) { (void)mode; }
 void gpio_write_pin_high(int pin) { raised_cs = pin; }
 void gpio_set_pin_output(int pin) { check(raised_cs == pin, "inactive SPI chip select before output enable"); output_cs = pin; }
+void gpio_set_pin_input_high(int pin) { check(pin == A13, "only verified OS GPIO can become an input"); switch_input = pin; }
+bool gpio_read_pin(int pin) { check(pin == A13 && switch_input == pin, "OS GPIO is initialized as pull-up before reading"); switch_reads++; return switch_level; }
 void matrix_scan(void) { scans++; if (release_at && scans == release_at) memset(pressed, 0, sizeof(pressed)); }
 void wait_ms(uint16_t ms) { now += ms; }
 void bootloader_jump(void) { jumps++; }
@@ -85,8 +90,22 @@ uint8_t ig_timing_active_interval(void) { return active_interval; }
 uint8_t ig_timing_saved_interval(void) { return mock_saved_interval; }
 uint8_t ig_timing_debounce_ms(void) { return debounce_ms; }
 bool ig_timing_reconnect_pending(void) { return reconnect; }
-bool ig_timing_schedule_reconnect(void) { reconnect = active_interval != mock_saved_interval; return reconnect; }
-void ig_timing_task(bool safe) { if (safe && reconnect) { active_interval = mock_saved_interval; reconnect = false; } }
+static bool mock_usb_active=true;
+static uint32_t mock_reconnect_started;
+static unsigned mock_reconnect_count, mock_reconnect_requests;
+bool ig_timing_usb_active(void) { return mock_usb_active; }
+void ig_timing_cancel_reconnect(void) { reconnect=false; }
+bool ig_timing_schedule_reconnect(void) {
+    if(active_interval==mock_saved_interval)return false;
+    if(!reconnect){mock_reconnect_started=now;mock_reconnect_requests++;reconnect=true;}
+    return true;
+}
+void ig_timing_task(bool safe) {
+#if IG_PROFILE_BANK_ENABLE
+    safe=safe && mock_usb_active && (uint32_t)(now-mock_reconnect_started)>=100;
+#endif
+    if (safe && reconnect) { active_interval = mock_saved_interval; reconnect = false; mock_reconnect_count++; }
+}
 
 static void boot(bool erase) {
     borrowed = false; if (erase) memset(backing, 0, sizeof(backing));
@@ -94,6 +113,10 @@ static void boot(bool erase) {
     stage_open = macro_running = runtime_ready = false; stage_received = 0; active_slot = -1;
     lighting_suspended = light_test_active = false; layer_state = default_layer_state = 0;
     writes = fail_write = jumps = scans = release_at = 0; now = 0; raised_cs = output_cs = -1;
+    switch_input = -1; switch_reads = 0;
+#if IG_HAS_OS_SWITCH
+    switch_level = !IG_OS_MAC_LEVEL;
+#endif
     knob_taps = knob_tapped_code = 0;
     weak_mods = last_registered_mods = last_registered_code = 0; keyboard_reports = 0;
     g_led_config = reference_leds;
@@ -140,6 +163,9 @@ static void check_recovery(void) {
     recovery_startup(); check(jumps==1,"fixed startup chord enters bootloader");
     for(uint8_t row=0;row<MATRIX_ROWS;row++) for(uint8_t col=0;col<MATRIX_COLS;col++) {
         if(pressed[row]&((matrix_row_t)1<<col)) continue;
+#if IG_BOARD == 16
+        if(row>=11 && row<=13 && col==7) continue; // Confirmed rear selector contacts are not keys.
+#endif
         pressed[row]|=(matrix_row_t)1<<col; check(!recovery_chord_held(),"third key blocks recovery"); pressed[row]&=~((matrix_row_t)1<<col);
     }
     jumps=scans=0; release_at=4; recovery_startup(); check(jumps==0,"early chord release prevents bootloader entry");
@@ -292,6 +318,7 @@ static void knob_test_install(const uint8_t *config) { knob_test_install_length(
 static void knob_test_reboot(void) { keyboard_post_init_user(); }
 #endif
 #include "../knob_cycle_checks.h"
+#include "../hardware_controls_checks.h"
 int main(int argc,char **argv) {
     check(argc>=4 && argc<=7,"three serializer fixtures supplied"); uint16_t default_length=load(argv[1],defaults); check(default_length==IG_SIZE,"schema1 default");
     check(sizeof(staging)==sizeof(uint8_t *),"no full duplicate staging allocation");
@@ -310,9 +337,9 @@ int main(int argc,char **argv) {
     for(uint16_t i=IG_KEYS_OFFSET;i<IG_ENCODER_OFFSET;i++) check(default_byte(i)==defaults[i],"all four default keymap layers");
     check(command(1,NULL,0)==0 && response[8]==IG_BOARD && response[9]==MATRIX_ROWS && response[10]==MATRIX_COLS && response[12]==RGB_MATRIX_LED_COUNT,"board identity and dimensions");
 #if IG_BOARD == 16
-    static const uint8_t expected_version[16]={1,0,16,0,0,0,11,0,8,0,0,0,1,8,11,0};
+    static const uint8_t expected_version[16]={1,0,16,0,0,0,11,0,11,0,0,0,1,11,11,0};
 #else
-    static const uint8_t expected_version[16]={1,0,IG_BOARD,0,0,0,11,0,8,0,0,0,1,8,11,0};
+    static const uint8_t expected_version[16]={1,0,IG_BOARD,0,0,0,11,0,9,0,0,0,1,9,11,0};
 #endif
     check(command(13,NULL,0)==0 && response[6]==16 && !memcmp(response+8,expected_version,16),"exact candidate version identity, reserved fields and build ID");
     uint8_t config[IG_MAX_SIZE], before[sizeof(backing)];
@@ -336,7 +363,7 @@ int main(int argc,char **argv) {
         }
         boot(false);
     }
-    check_recovery(); check_lighting(); check_reactive_expiry(); check_diagnostics(); check_physical_activity(); check_brightness_bindings();
+    check_recovery(); check_lighting(); check_reactive_expiry(); check_diagnostics(); check_physical_activity(); check_brightness_bindings(); check_hardware_controls();
     boot(false); knob_cycle_checks(config);
     boot(false); knob_order_checks(config);
     boot(false); knob_status_checks(config);

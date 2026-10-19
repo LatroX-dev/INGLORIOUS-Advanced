@@ -103,6 +103,8 @@ try {
 if($ReportPath) {
     $report = [ordered]@{schema=1;testedUtc=[DateTime]::UtcNow.ToString('o');hardwareAccess=$false;results=$results;sourceSha256=(Get-FileHash -LiteralPath (Join-Path $root 'firmware/inglorious/inglorious.c')).Hash;harnessSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'ports/port_checks.c')).Hash;scope='Actual common C runtime across additional models with real desktop payloads and pinned physical geometry. For GMMK3, the separate reference audit checks derivation from preserved manufacturer sources. Storage fault injection uses a mock; the separate storage harness tests the patched real wear-leveling driver.'}
     $report.knobCycleTestsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'knob_cycle_checks.h')).Hash
+    $report.hardwareControlsHeaderSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot '../inglorious/ig_hardware_controls.h')).Hash
+    $report.hardwareControlsTestsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'hardware_controls_checks.h')).Hash
     $report.knobFixtures=$knobFixtures
     $report.knobOrderFixtures=$knobOrderFixtures
     $report.knobPressFixtures=$knobPressFixtures

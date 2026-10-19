@@ -1,7 +1,9 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace InGlorious.Core;
 
@@ -11,6 +13,7 @@ public partial class MainWindow
     private void RunNavigationChecks(Action<bool, string> check)
     {
         if (!_screenshotMode) throw new InvalidOperationException("Navigation checks require offline UI-smoke mode.");
+        RunListThemeChecks(check);
         var oldWidth = Width; var oldHeight = Height;
         try
         {
@@ -203,6 +206,47 @@ public partial class MainWindow
         check(!_wholeSideSelection && Selected(left) && !HasPendingEdits && Unchanged(),
             id + ": discarded pending edits allow individual mode without changing its selected LEDs");
         _pendingEditDecisionOverride = null;
+    }
+
+    private void RunListThemeChecks(Action<bool, string> check)
+    {
+        var list = new ListBox { Style = (Style)FindResource(typeof(ListBox)) };
+        foreach (var label in new[] { "F10", "F11", "F12" }) list.Items.Add(label);
+        list.SelectedIndex = 2;
+        var parent = new Grid { Width = 280, Height = 200, Background = (Brush)FindResource("Surface") };
+        parent.Children.Add(list);
+        var args = Environment.GetCommandLineArgs();
+        var proofIndex = Array.IndexOf(args, "--list-theme-proof");
+        foreach (var state in new[] { "enabled", "list-disabled", "parent-disabled", "restored" })
+        {
+            list.IsEnabled = state != "list-disabled";
+            parent.IsEnabled = state != "parent-disabled";
+            parent.Measure(new Size(280, 200)); parent.Arrange(new Rect(0, 0, 280, 200)); parent.UpdateLayout();
+            var bitmap = new RenderTargetBitmap(280, 200, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(parent);
+            var pixels = new byte[280 * 200 * 4]; bitmap.CopyPixels(pixels, 280 * 4, 0);
+            var blank = (180 * 280 + 240) * 4;
+            check(pixels[blank] < 64 && pixels[blank + 1] < 64 && pixels[blank + 2] < 64 && pixels[blank + 3] == 255,
+                "List " + state + ": empty space keeps an opaque dark background");
+            var selected = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(2);
+            var bounds = selected.TransformToAncestor(parent).TransformBounds(new Rect(selected.RenderSize));
+            var brightTextPixels = 0;
+            for (var y = (int)bounds.Top + 3; y < (int)bounds.Bottom - 3; y++)
+                for (var x = (int)bounds.Left + 4; x < Math.Min((int)bounds.Right - 4, 100); x++)
+                {
+                    var offset = (y * 280 + x) * 4;
+                    if (pixels[offset] > 80 && pixels[offset + 1] > 80 && pixels[offset + 2] > 80) brightTextPixels++;
+                }
+            check(selected.IsSelected && brightTextPixels > 12,
+                "List " + state + ": unfocused selection retains legible light text");
+            if (proofIndex >= 0 && proofIndex + 1 < args.Length)
+            {
+                var prefix = Path.GetFullPath(args[proofIndex + 1]);
+                Directory.CreateDirectory(Path.GetDirectoryName(prefix)!);
+                var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                using var output = File.Create(prefix + "-" + state + ".png"); encoder.Save(output);
+            }
+        }
     }
 
     private Rect NavigationBounds(FrameworkElement element) => element.TransformToAncestor(EditorSurface).TransformBounds(new Rect(new Point(), element.RenderSize));

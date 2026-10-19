@@ -13,7 +13,16 @@
 #include "ig_timing.h"
 #include "ig_version.h"
 #include "ig_board.h"
+#include "ig_hardware_controls.h"
 #include "ig_storage.h"
+#ifndef IG_PROFILE_BANK_ENABLE
+#    define IG_PROFILE_BANK_ENABLE 0
+#endif
+#if IG_PROFILE_BANK_ENABLE
+#include "ig_profile_flash.h"
+static const uint8_t *ig_profile_payload;
+static void ig_profile_initialize(void);
+#endif
 #ifdef IG_HAS_SLIDER
 #    include "analog.h"
 #    include "qmk_midi.h"
@@ -203,6 +212,9 @@ static uint8_t default_byte(uint16_t offset) {
 }
 static uint8_t active_byte(uint16_t offset) {
     if (offset >= active_size) return 0;
+#if IG_PROFILE_BANK_ENABLE
+    if (ig_profile_payload) return ig_profile_payload[offset];
+#endif
     return active_slot < 0 ? default_byte(offset) : ee_byte(slot_base(active_slot) + IG_SLOT_HEADER + offset);
 }
 static uint16_t active_u16(uint16_t offset) { return (uint16_t)active_byte(offset) | ((uint16_t)active_byte(offset + 1) << 8); }
@@ -456,6 +468,9 @@ static void init_runtime(void) {
     slider_reset();
 #endif
     runtime_ready = true;
+#if IG_PROFILE_BANK_ENABLE
+    ig_profile_initialize();
+#endif
 }
 static bool any_keys_pressed(void) {
     for (uint8_t row = 0; row < MATRIX_ROWS; ++row) if (physical_keys_down(row)) return true;
@@ -496,6 +511,9 @@ static bool abort_staging(void) {
     if (!success) { storage_ok = false; init_runtime(); }
     return success;
 }
+#if IG_PROFILE_BANK_ENABLE
+#include "ig_profile_runtime.inc"
+#endif
 static void reply(uint8_t command, uint8_t seq, uint8_t status, const uint8_t *payload, uint8_t count) {
     uint8_t out[32] = {'I','G',1,command,seq,status,count,0};
     if (payload && count) memcpy(out + 8, payload, count);
@@ -508,6 +526,9 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
     if (!runtime_ready) { reply(command, seq, 3, NULL, 0); return; }
     if (data[5] || data[7] || count > 24) { reply(command, seq, 1, NULL, 0); return; }
     for (uint8_t i = count; i < 24; ++i) if (p[i]) { reply(command, seq, 1, NULL, 0); return; }
+#if IG_PROFILE_BANK_ENABLE
+    if (command >= 3 && command <= 6) { reply(command, seq, 9, NULL, 0); return; } // Never reinterpret implicit legacy writes or aborts.
+#endif
     switch (command) {
         case 1:
             if (count) { status = 1; break; }
@@ -563,9 +584,14 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
             if (!abort_staging()) status = 7;
             break;
         case 8:
+#if IG_PROFILE_BANK_ENABLE
+            status = ig_profile_reconnect(p, count);
+            if (status) break;
+#else
             if (count) { status = 1; break; }
             if (!storage_ok) { status = 7; break; }
             if (stage_open || macro_running || any_keys_pressed() || light_test_remaining(timer_read32()) || diagnostic_remaining(timer_read32())) { status = 3; break; }
+#endif
             out[0] = ig_timing_active_interval(); out[1] = ig_timing_saved_interval(); out[2] = out[0] != out[1]; size = 4;
             break;
         case 9: // Read volatile state only; no ADC read, EEPROM or flash access.
@@ -577,7 +603,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
             brightness = p[0]; out[0] = brightness; size = 1; break;
         case 11: // Extension discovery leaves the original INFO layout and all config schemas intact.
             if (count) { status = 1; break; }
-            put16(out, 1); put16(out + 2, (IG_BOARD==16 ? 7 : 3) | (IG_HAS_ENCODER ? 120 : 0)); put16(out + 4, IG_LIGHT_TEST_MS); size = 8; break;
+            put16(out, 1); put16(out + 2, (IG_BOARD==16 ? 7 : 3) | (IG_HAS_ENCODER ? 120 : 0) | (IG_HAS_OS_SWITCH ? 128 : 0) | (IG_PROFILE_BANK_ENABLE ? 256 : 0)); put16(out + 4, IG_LIGHT_TEST_MS); size = 8; break;
         case 12: { // 0=status, 1=start once, 2=stop. Never persistent and never extends a running deadline.
             if (count != 1) { status = 1; break; }
             if (p[0] > 2) { status = 2; break; }
@@ -624,6 +650,15 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
             if (count) { status = 1; break; }
             knob_status(out); size = 24; break;
 #endif
+#if IG_HAS_OS_SWITCH
+        case 17: // Read-only hardware switch status; no GPIO/flash access in a host request.
+            if (count) { status = 1; break; }
+            ig_hardware_status(out); size = 8; break;
+#endif
+#if IG_PROFILE_BANK_ENABLE
+        case 18: case 19: case 20: case 21: case 22: case 23: case 24:
+            status = ig_profile_command(command, p, count, out, &size); break;
+#endif
         default: status = 9; break;
     }
     reply(command, seq, status, out, status ? 0 : size);
@@ -632,7 +667,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
 
 uint16_t keycode_at_keymap_location(uint8_t layer, uint8_t row, uint8_t col) {
     if (layer >= 4 || row >= MATRIX_ROWS || col >= MATRIX_COLS) return KC_NO;
-    return active_u16(IG_KEYS_OFFSET + 2 * (layer * MATRIX_ROWS * MATRIX_COLS + row * MATRIX_COLS + col));
+    return ig_hardware_keycode(row, col, active_u16(IG_KEYS_OFFSET + 2 * (layer * MATRIX_ROWS * MATRIX_COLS + row * MATRIX_COLS + col)));
 }
 uint16_t keycode_at_encodermap_location(uint8_t layer, uint8_t index, bool clockwise) {
 #if IG_HAS_ENCODER
@@ -1067,6 +1102,16 @@ void housekeeping_task_user(void) {
 #if IG_HAS_ENCODER
     (void)knob_signal_remaining(now);
 #endif
+#if IG_HAS_OS_SWITCH
+    bool hardware_idle = !lighting_suspended && !stage_open && !macro_running && !any_keys_pressed() && !ig_timing_reconnect_pending() && !light_test_active;
+#if IG_HAS_ENCODER
+    hardware_idle = hardware_idle && !knob_pending;
+#endif
+    ig_hardware_task(now, hardware_idle);
+#endif
+#if IG_PROFILE_BANK_ENABLE
+    ig_profile_task(now);
+#endif
     if (lighting_suspended) return;
     if (any_keys_pressed()) lighting_activity(); // A held physical key is not inactivity.
     macro_task();
@@ -1074,10 +1119,15 @@ void housekeeping_task_user(void) {
     slider_task();
 #endif
     bool was_pending = ig_timing_reconnect_pending();
+#if IG_PROFILE_BANK_ENABLE
+    ig_timing_task(ig_profile_reconnect_safe());
+#else
     ig_timing_task(!stage_open && !macro_running && !any_keys_pressed());
+#endif
     if (was_pending && !ig_timing_reconnect_pending()) effect_hit_count = 0;
 }
 void keyboard_pre_init_user(void) {
+    ig_hardware_init();
 #ifdef IG_EXTERNAL_SPI_CS
     gpio_write_pin_high(IG_EXTERNAL_SPI_CS); gpio_set_pin_output(IG_EXTERNAL_SPI_CS); // Leave external stock SPI flash inactive.
 #endif
@@ -1092,7 +1142,13 @@ static bool recovery_chord_held(void) {
         matrix_row_t expected = 0;
         if (row == IG_RECOVERY_KEY1_ROW) expected |= (matrix_row_t)1U << IG_RECOVERY_KEY1_COL;
         if (row == IG_RECOVERY_KEY2_ROW) expected |= (matrix_row_t)1U << IG_RECOVERY_KEY2_COL;
-        if (matrix_get_row(row) != expected) return false;
+        matrix_row_t actual = matrix_get_row(row);
+#if IG_BOARD == 16
+        // Confirmed rear profile contacts are not held keys. Other unused cells
+        // remain checked here; no unverified matrix position is ignored.
+        if (row >= 11 && row <= 13) actual &= ~((matrix_row_t)1U << 7);
+#endif
+        if (actual != expected) return false;
     }
     return true;
 }

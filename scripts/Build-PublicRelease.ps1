@@ -56,9 +56,24 @@ if(-not$FirmwareDirectory){
     }
     Invoke-Checked 'dotnet' @('run','--project',(Join-Path $root 'tests/InGlorious.OnboardChecks/InGlorious.OnboardChecks.csproj'),'-c','Release','--','--retained-loader-fixtures',(Join-Path $FirmwareDirectory 'fixtures'))
     Invoke-Checked 'python' @((Join-Path $root 'firmware/Verify-CandidateBuild.py'),$FirmwareDirectory)
-    foreach($runner in @('tests/InGlorious.ColorSequenceChecks/Run-ColorSequenceChecks.ps1','firmware/tests/Run-RuntimeChecks.ps1','firmware/tests/Run-EffectsChecks.ps1','firmware/tests/Run-BulkChecks.ps1','firmware/tests/Run-StorageChecks.ps1','tests/TimingChecks/Run-TimingChecks.ps1','tests/InGlorious.PreviewChecks/Run-PreviewChecks.ps1')){
+    foreach($runner in @('tests/InGlorious.ColorSequenceChecks/Run-ColorSequenceChecks.ps1','firmware/tests/Run-RuntimeChecks.ps1','firmware/tests/Run-EffectsChecks.ps1','firmware/tests/Run-BulkChecks.ps1','firmware/tests/Run-StorageChecks.ps1','firmware/tests/Run-EngineeringChecks.ps1','firmware/tests/Run-ProfileSelectorChecks.ps1','firmware/tests/Run-ProfileBankChecks.ps1','firmware/tests/Run-ProfileFlashChecks.ps1','tests/TimingChecks/Run-TimingChecks.ps1','tests/InGlorious.PreviewChecks/Run-PreviewChecks.ps1')){
         Invoke-Checked 'pwsh' @('-NoProfile','-File',(Join-Path $root $runner))
     }
+    # The independent port fixtures supply physical geometry and a neutral profile.
+    Invoke-Checked 'pwsh' @('-NoProfile','-File',(Join-Path $root 'firmware/tests/Run-PortChecks.ps1'),'-Board','gmmk3-pro-100-iso','-FixtureDirectory',(Join-Path $FirmwareDirectory 'fixtures'))
+    Invoke-Checked 'pwsh' @('-NoProfile','-File',(Join-Path $root 'firmware/tests/Run-ProfileRuntimeChecks.ps1'),'-FixtureDirectory',(Join-Path $FirmwareDirectory 'fixtures'))
+    # Cross-check the C writer's valid, interrupted and unsafe records in the host reader.
+    $bankFixtures=Join-Path $output 'profile-bank-fixtures'
+    Invoke-Checked 'dotnet' @('run','--project',(Join-Path $root 'tests/InGlorious.OnboardChecks/InGlorious.OnboardChecks.csproj'),'-c','Release','--','--hardware-profile-fixtures',$bankFixtures)
+    $compilerDirectory=Join-Path $root 'firmware/toolchain/qmk-msys/{app}/mingw64/bin'
+    $fixtureExporter=Join-Path $bankFixtures 'export-fixtures.exe'
+    $priorPath=$env:PATH
+    try{
+        $env:PATH=$compilerDirectory+[IO.Path]::PathSeparator+$priorPath
+        Invoke-Checked (Join-Path $compilerDirectory 'gcc.exe') @('-std=c11','-O2','-Wall','-Wextra','-Werror','-pedantic',(Join-Path $root 'firmware/inglorious/ig_profile_bank.c'),(Join-Path $root 'firmware/tests/profile_bank_fixtures.c'),'-o',$fixtureExporter)
+        Invoke-Checked $fixtureExporter @((Join-Path $bankFixtures 'payload.bin'),$bankFixtures)
+    }finally{$env:PATH=$priorPath}
+    Invoke-Checked 'dotnet' @('run','--project',(Join-Path $root 'tests/InGlorious.OnboardChecks/InGlorious.OnboardChecks.csproj'),'-c','Release','--','--profile-bank-fixtures',$bankFixtures)
 }
 $FirmwareDirectory=[IO.Path]::GetFullPath($FirmwareDirectory)
 # Existing binary input is accepted only against the checked-in, reviewed release catalog.

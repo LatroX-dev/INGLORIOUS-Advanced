@@ -7,6 +7,14 @@ public static class FirmwareChangelog
 {
     private static readonly FirmwareSemanticVersion Version08 = new(0, 8, 0);
     private static readonly FirmwareSemanticVersion Version09 = new(0, 9, 0);
+    private static readonly FirmwareReleaseNotes HardwareProfileNotes = new(new(0, 11, 11), Array.AsReadOnly(new[]
+    {
+        "Use the profile switch to select three saved keyboard configurations, even with the app closed."
+    }));
+    private static readonly FirmwareReleaseNotes OsSwitchNotes = new(new(0, 11, 9), Array.AsReadOnly(new[]
+    {
+        "Use the Windows/Mac switch to change modifier-key positions, even with the app closed."
+    }));
     private static readonly FirmwareReleaseNotes KnobFeedbackNotes = new(new(0, 11, 8), Array.AsReadOnly(new[]
     {
         "Set a different short-press action for each knob function.",
@@ -73,7 +81,7 @@ public static class FirmwareChangelog
         // No guessed starting version for an unknown device or a missing/default version report.
         // This catalog contains released changes only. Never derive a pending
         // change from a device response or an undocumented future target.
-        var newestDocumentedVersion = KnobFeedbackNotes.Version;
+        var newestDocumentedVersion = HardwareProfileNotes.Version;
         if (!installed.HasValue || installed.Value == default || installed.Value >= target || installed.Value >= newestDocumentedVersion)
             return Array.Empty<FirmwareReleaseNotes>();
         IReadOnlyList<FirmwareReleaseNotes>? notes = deviceId switch
@@ -88,6 +96,10 @@ public static class FirmwareChangelog
         if (notes is null) return Array.Empty<FirmwareReleaseNotes>();
         if (BoardDescriptorRegistry.ProtocolBoards.Any(board => board.DeviceId == deviceId && board.HasEncoder))
             notes = Array.AsReadOnly(new[] { KnobFeedbackNotes, KnobOrderNotes, KnobCycleNotes }.Concat(notes).ToArray());
+        if (HardwareControlCatalog.HasOsSwitch(deviceId))
+            notes = Array.AsReadOnly(new[] { OsSwitchNotes }.Concat(notes).ToArray());
+        if (HardwareControlCatalog.Find(deviceId)?.ProfileSwitchSupported == true)
+            notes = Array.AsReadOnly(new[] { HardwareProfileNotes }.Concat(notes).ToArray());
         return Array.AsReadOnly(notes.Where(note => installed.Value < note.Version && note.Version <= target && note.Version <= newestDocumentedVersion).ToArray());
     }
 }

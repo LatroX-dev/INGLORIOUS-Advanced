@@ -109,6 +109,40 @@ public sealed partial class TransferWindow
         }
         finally { screensaver.Close(); }
         RunCompactTransferChecks(deviceId, check);
+        if (deviceId == "pro-iso") RunHardwareProfileTargetChecks(check);
+    }
+
+    private static void RunHardwareProfileTargetChecks(Action<bool, string> check)
+    {
+        const string id = "gmmk3-pro-100-iso";
+        var project = ProjectService.Create(id); var image = OnboardSerializer.Prepare(project);
+        var binding = new OnboardProfileBinding(id, Guid.Parse("ab667fea-036b-4258-85b5-cd10c2d42f68"), 2, 5, image.Crc32);
+        var info = new OnboardInfo(id, 249, image.UsedBytes, 5, image.Crc32, 0, image.SchemaVersion);
+        var profile = new OnboardHardwareProfileStatus(id, 2, 2, 1, 2, 5, image.Crc32, image.UsedBytes, image.SchemaVersion);
+        var target = new VerifiedTarget(new(id, "Fixture", "offline-only"), info, "Fixture", new(1, 511, 21000), binding, profile);
+        var window = new TransferWindow(project, profileBinding: binding); // Never shown: no hardware/discovery.
+        try
+        {
+            window.SetDiscoveredTargets([target]);
+            check(window._transferButton.IsEnabled, "Hardware-profile transfer: matching installation, slot and generation are required");
+            foreach (var invalid in new[]
+            {
+                target with { ProfileBinding = binding with { Generation = 6 } },
+                target with { ProfileBinding = binding with { InstallationId = Guid.Empty } },
+                target with { ProfileStatus = profile with { ActiveSlot = 3 } },
+                target with { ProfileStatus = profile with { Flags = 5 } },
+                target with { ProfileStatus = profile with { Flags = 9 } },
+                target with { ProfileStatus = profile with { Flags = 0 } }
+            })
+            {
+                window.SetDiscoveredTargets([invalid]);
+                check(!window._transferButton.IsEnabled, "Hardware-profile transfer: changed, busy or unhealthy discovered target stays blocked");
+            }
+            window.SetDiscoveredTargets([target], failed: true);
+            check(window.SelectedTarget is null && !window._transferButton.IsEnabled && !window._readButton.IsEnabled,
+                "Hardware-profile transfer: incomplete discovery cannot expose the remaining keyboard as a target");
+        }
+        finally { window.Close(); }
     }
 
     private static void RunCompactTransferChecks(string deviceId, Action<bool, string> check)
@@ -144,8 +178,8 @@ public sealed partial class TransferWindow
             check(ReferenceEquals(window.SelectedTarget, second) && window._transferButton.IsEnabled,
                 deviceId + ": explicit target selection enables the checked target");
             window.SetDiscoveredTargets([first], failed: true);
-            check(window._findButton.Visibility == Visibility.Visible && window._transferButton.IsEnabled,
-                deviceId + ": partial discovery failure retains the valid target and offers retry");
+            check(window._findButton.Visibility == Visibility.Visible && !window._transferButton.IsEnabled && window.SelectedTarget is null,
+                deviceId + ": partial discovery failure cannot silently select the surviving target");
             window.SetDiscoveredTargets([first with { Info = info with { Flags = 248 } }]);
             check(!window._transferButton.IsEnabled && window._findButton.Visibility == Visibility.Visible,
                 deviceId + ": unavailable persistent storage blocks transfer and allows another search");

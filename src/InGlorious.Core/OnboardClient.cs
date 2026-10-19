@@ -40,7 +40,10 @@ public sealed record OnboardExtensions(ushort Version, ushort Flags, ushort Ligh
     public bool SupportsKnobOrder => Version == 1 && (Flags & 16) != 0;
     public bool SupportsKnobStatus => Version == 1 && (Flags & 32) != 0;
     public bool SupportsKnobPress => Version == 1 && (Flags & 64) != 0;
+    public bool SupportsOsSwitch => Version == 1 && (Flags & 128) != 0;
+    public bool SupportsHardwareProfiles => Version == 1 && (Flags & 256) != 0;
 }
+public sealed record OnboardHardwareControlStatus(string DeviceId, bool MacPosition, bool MacActive, bool Pending);
 public sealed record OnboardLightingTestStatus(bool Active, byte Pattern, ushort RemainingMs);
 public sealed record OnboardKnobStatus(string DeviceId, byte Layer, int ActivePresetBit, string? PresetId,
     bool CycleEnabled, bool SignalActive, ushort CounterClockwiseCode, ushort ClockwiseCode,
@@ -58,6 +61,7 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
     private byte _sequence;
     private ushort? _lightingTestDurationMs;
     private bool? _knobStatusSupported;
+    private bool? _hardwareControlsSupported;
     private static bool ValidateEngineeringAccess(string deviceId, bool allowEngineering)
     {
         if (BoardDescriptorRegistry.Get(deviceId).IsEngineeringOnly && !EngineeringConfigurationPolicy.IsEnabled(deviceId, allowEngineering))
@@ -110,7 +114,9 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
         byte[] data;
         try { data = await Send(OnboardProtocol.GetExtensions, [], ct); }
         catch (OnboardCommandException ex) when (ex.Status == 9) { _lightingTestDurationMs = 0; return new(0, 0, 0); } // Old firmware: read-only unsupported-command response.
-        if (data.Length != 8 || Get16(data, 0) != 1 || (Get16(data, 2) & ~127) != 0 || Get16(data, 6) != 0 ||
+        if (data.Length != 8 || Get16(data, 0) != 1 || (Get16(data, 2) & ~511) != 0 || Get16(data, 6) != 0 ||
+            ((Get16(data, 2) & 256) != 0 && expectedDeviceId != "gmmk3-pro-100-iso") ||
+            ((Get16(data, 2) & 128) != 0 && !HardwareControlCatalog.HasOsSwitch(expectedDeviceId)) ||
             ((Get16(data, 2) & 120) != 0 && !DeviceCatalog.Get(expectedDeviceId).HasEncoder) ||
             ((Get16(data, 2) & 16) != 0 && (Get16(data, 2) & 8) == 0) ||
             ((Get16(data, 2) & 32) != 0 && (Get16(data, 2) & 24) != 24) ||
@@ -119,6 +125,32 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
             throw new InvalidDataException(L.T("Ungültige Antwort zu den Firmware-Erweiterungen."));
         _lightingTestDurationMs = Get16(data, 4);
         return new(Get16(data, 0), Get16(data, 2), Get16(data, 4));
+    }
+    public async Task<OnboardHardwareControlStatus?> GetHardwareControlStatusAsync(CancellationToken cancellationToken = default)
+    {
+        await _exclusive.WaitAsync(cancellationToken);
+        try
+        {
+            if (!HardwareControlCatalog.HasOsSwitch(expectedDeviceId)) return null;
+            if (_hardwareControlsSupported is null)
+            {
+                var version = await FirmwareVersionCore(cancellationToken);
+                _hardwareControlsSupported = version is not null && version.Version >= new FirmwareSemanticVersion(0, 11, 9) &&
+                    (await ExtensionsCore(cancellationToken)).SupportsOsSwitch;
+            }
+            if (_hardwareControlsSupported != true) return null;
+            return ParseHardwareControlStatus(await Send(OnboardProtocol.ReadHardwareControls, [], cancellationToken), expectedDeviceId);
+        }
+        finally { _exclusive.Release(); }
+    }
+    internal static OnboardHardwareControlStatus ParseHardwareControlStatus(byte[] data, string deviceId)
+    {
+        if (!HardwareControlCatalog.HasOsSwitch(deviceId) || data.Length != 8 || data[0] != 1 ||
+            data[1] != BoardDescriptorRegistry.Get(deviceId).BoardId || data[2] != 1 ||
+            data[3] > 1 || data[4] > 1 || data[5] > 1 || data[6] != 0 || data[7] != 0 ||
+            (data[5] == 0 && data[3] != data[4]))
+            throw new InvalidDataException(L.T("Der Gerätestand konnte nicht gelesen werden. Bitte erneut versuchen."));
+        return new(deviceId, data[3] != 0, data[4] != 0, data[5] != 0);
     }
     public async Task<OnboardKnobStatus?> GetKnobStatusAsync(CancellationToken cancellationToken = default)
     {
@@ -210,6 +242,8 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
         await _exclusive.WaitAsync(cancellationToken);
         try
         {
+            if (expectedDeviceId == "gmmk3-pro-100-iso" && await HardwareProfilesSupportedCore(cancellationToken))
+                throw new InvalidDataException(L.T("Bitte wähle zuerst das Profil auf der Tastatur aus."));
             var info = await InfoCore(cancellationToken);
             if (!info.SupportsTiming) throw new InvalidDataException("Diese Firmware unterstützt keine USB-Neuanmeldung aus der App.");
             if (!info.Persistent || info.Generation != expectedGeneration || info.ActiveCrc != expectedCrc || (info.Flags & 4) != 0)
@@ -239,6 +273,8 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
         {
             var info = await InfoCore(cancellationToken);
             if (expectedGeneration.HasValue && info.Generation != expectedGeneration.Value) throw new IOException("Die Gerätekonfiguration hat sich seit deiner Sicherung geändert. Bitte erneut auslesen und sichern.");
+            if (expectedDeviceId == "gmmk3-pro-100-iso" && await HardwareProfilesSupportedCore(cancellationToken))
+                throw new InvalidDataException(L.T("Bitte wähle zuerst das Profil auf der Tastatur aus."));
             if (!info.Persistent) throw new IOException("Das Gerät meldet keinen verfügbaren dauerhaften Speicher.");
             if (imageSchema == 3 && !info.SupportsColorSequences) throw new InvalidDataException(L.T("Eigene Farbfolgen benötigen ein Firmware-Update. Es wird nichts übertragen."));
             if (imageSchema >= 4 && !info.SupportsStandby) throw new InvalidDataException(L.T(decoded.Standby.Mode == 2
@@ -362,7 +398,7 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
         var sequence = unchecked(++_sequence);
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         // Embedded-flash wear-level consolidation may exceed 20 seconds on WB32.
-        deadline.CancelAfter(TimeSpan.FromSeconds(command == OnboardProtocol.Commit ? 120 : 4));
+        deadline.CancelAfter(TimeSpan.FromSeconds(command is OnboardProtocol.Commit or OnboardProtocol.ProfileCommit ? 120 : 4));
         var response = await transport.ExchangeAsync(OnboardProtocol.Packet(command, sequence, payload), deadline.Token);
         return OnboardProtocol.ParseResponse(response, command, sequence);
     }
