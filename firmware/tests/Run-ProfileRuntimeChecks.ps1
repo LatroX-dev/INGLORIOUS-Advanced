@@ -3,8 +3,8 @@
 param([string]$FixtureDirectory='artifacts/hardware-controls/fixtures', [string]$ReportDirectory='artifacts/profile-switch/runtime-checks')
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-$fixtures=[IO.Path]::GetFullPath((Join-Path $root $FixtureDirectory))
-$output=[IO.Path]::GetFullPath((Join-Path $root $ReportDirectory))
+$fixtures=[IO.Path]::GetFullPath($FixtureDirectory,$root)
+$output=[IO.Path]::GetFullPath($ReportDirectory,$root)
 foreach($path in @($fixtures,$output)){if(!$path.StartsWith($root+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Check inputs and outputs must stay inside the project.'}}
 [IO.Directory]::CreateDirectory($output)|Out-Null
 $fixture=Join-Path $fixtures 'gmmk3-pro-100-iso-default.bin'
