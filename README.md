@@ -7,7 +7,7 @@
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
 [![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/latrox)
 
-**[Download](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases/latest) · [Setup & recovery](docs/getting-started.md) · [Supported keyboards](docs/model-support.md) · [Changelog](CHANGELOG.md) · [Help](SUPPORT.md)**
+**[Website](https://inglorious.latrox.dev) · [Download](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases/latest) · [Setup & recovery](docs/getting-started.md) · [Supported keyboards](docs/model-support.md) · [Changelog](CHANGELOG.md) · [Help](SUPPORT.md)**
 
 Configure Glorious keyboards with per-key lighting, effects, key assignments, macros and four layers. Settings run on the keyboard after transfer, so the app can be closed.
 
