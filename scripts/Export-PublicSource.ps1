@@ -230,6 +230,9 @@ function Assert-NoPrivateText([string]$Relative,[byte[]]$Bytes) {
         $publicKoFi = 'https://ko-fi.com/latrox'
         $urlStart = '(?<![^\s("''<>])'
         $urlEnd = '(?=[\s)"''<>]|$)'
+        # Only the exact project website chosen by the maintainer is public.
+        $publicWebsite = 'https://inglorious.latrox.dev'
+        $scan = $scan -creplace ($urlStart+[regex]::Escape($publicWebsite)+$urlEnd), 'PUBLIC_PROJECT_WEBSITE'
         if ($scan.Contains($publicKoFi,[StringComparison]::Ordinal)) {
             $scan = $scan -creplace ($urlStart+[regex]::Escape($publicKoFi)+$urlEnd), 'PUBLIC_FUNDING_URL'
         }

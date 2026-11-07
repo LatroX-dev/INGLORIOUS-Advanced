@@ -112,6 +112,17 @@ try {
   [IO.File]::WriteAllText($model,$original+"`n// "+$otherAddress)
   Rejected {&$exporter -SourceRoot $fixture} 'The public contact exception must not mask other mailboxes, aliases or bare domains.'
  }
+ # The approved website is allowed as a complete link, never as a broad domain exemption.
+ $publicWebsite='https://inglorious.latrox.dev'
+ [IO.File]::WriteAllText($model,$original+"`n// [Website]("+$publicWebsite+')')
+ Check ((&$exporter -SourceRoot $fixture).mode-eq'plan-only') 'The exact public project website is permitted.'
+ foreach($otherLink in @(('prefix'+$publicWebsite),($publicWebsite+'.invalid'),($publicWebsite+'/private'),
+  ($publicWebsite+'?user='+$privateContactToken),('https://example.invalid/?next='+$publicWebsite),
+  $publicWebsite.Replace('https:','http:'),($publicWebsite+'@example.invalid'),$publicDomain)){
+  [IO.File]::WriteAllText($model,$original+"`n// "+$otherLink)
+  Rejected {&$exporter -SourceRoot $fixture} 'The website exception must not mask other destinations, nested URLs, query data or bare domains.'
+ }
+ [IO.File]::WriteAllText($model,$original)
  # The same synthetic private token exercises public funding and badges. Keep
  # malformed identifiers assembled at runtime so this test remains exportable.
  $publicKoFi='https://ko-fi.com/latrox'
