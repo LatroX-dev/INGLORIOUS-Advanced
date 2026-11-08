@@ -33,6 +33,40 @@ function Verified([string]$Path,[long]$Bytes,[string]$Sha256){
     Assert-NoLink $Path
     if(-not(Test-Path -LiteralPath $Path -PathType Leaf)-or(Get-Item -LiteralPath $Path).Length-ne$Bytes-or$Sha256-cnotmatch'^[0-9A-F]{64}$'-or(Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash-cne$Sha256){throw ('Source integrity check failed: '+[IO.Path]::GetFileName($Path))}
 }
+function Get-VerifiedSourceArchive([object]$Archive){
+    $path=Safe-Child $cache $Archive.file
+    if(Test-Path -LiteralPath $path){Verified $path $Archive.bytes $Archive.sha256;return $path}
+    if(-not$Download){throw ('Source archive is missing; use -Download or populate the cache: '+$Archive.file)}
+    if($Archive.url-cnotmatch'^https://(dfu-util\.sourceforge\.net/releases/|codeload\.github\.com/)'-and$Archive.url-cne'https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.tar.bz2'){throw 'Unapproved source archive origin.'}
+    $wb32=$Archive.id-ceq'wb32-dfu-updater'-and$Archive.version-ceq'656f6a56354de86a8213b0d2dc8349b0aeb4b67e'-and
+        $Archive.file-ceq'wb32-dfu-updater-656f6a56354de86a8213b0d2dc8349b0aeb4b67e.tar.gz'-and$Archive.bytes-eq5586782-and
+        $Archive.url-ceq'https://codeload.github.com/WestberryTech/wb32-dfu-updater/tar.gz/656f6a56354de86a8213b0d2dc8349b0aeb4b67e'-and
+        $Archive.sha256-ceq'310992956CA30C7F57C00175AD993E239E90BB7DBB0260CCCC823376AFAD593F'
+    $attempts=if($wb32){3}else{1}
+    New-Item -ItemType Directory -Path $cache -Force|Out-Null
+    for($attempt=0;$attempt-lt$attempts;$attempt++){
+        $uri=$Archive.url
+        # GitHub's API tarball uses a different archive prefix. Retry the same
+        # canonical codeload archive with a fresh URL, preserving exact bytes.
+        if($attempt-gt0){$uri+='?inglorious-retry='+[Guid]::NewGuid().ToString('N')}
+        $partial=Safe-Child $cache ($Archive.file+'.'+[Guid]::NewGuid().ToString('N')+'.partial')
+        try{
+            try{
+                Invoke-WebRequest -Uri $uri -OutFile $partial -MaximumRedirection 5 -TimeoutSec 300
+            }catch{
+                if($attempt+1-ge$attempts){throw ('Source archive download failed after '+$attempts+' attempt(s): '+$Archive.file)}
+                Write-Warning ('Source archive download failed; retrying the same pinned official archive: '+$Archive.file)
+                continue
+            }
+            Verified $partial $Archive.bytes $Archive.sha256
+            Assert-NoLink $path
+            [IO.File]::Move($partial,$path)
+            return $path
+        }finally{
+            if(Test-Path -LiteralPath $partial){Assert-NoLink $partial;Remove-Item -LiteralPath $partial -Force}
+        }
+    }
+}
 foreach($path in @($public,$target,$qmk,$cache)){Assert-NoLink $path}
 if($public.Equals($root,[StringComparison]::OrdinalIgnoreCase)){throw 'Use a reviewed public export, never the working directory.'}
 if($target.Equals($public,[StringComparison]::OrdinalIgnoreCase)-or$target.StartsWith($public+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Output must be outside the public source input.'}
@@ -47,9 +81,13 @@ foreach($file in $export.files){
     if($file.path-match'(^|/)(backups|data|artifacts|workspace|bin|obj|\.git|vendor|toolchain|releases|candidates)(/|$)'-or$file.path-match'(?i)(local-firmware-bindings|\.bin$|\.exe$|\.dll$|\.log$)'){throw 'Private or built material is not permitted in the source export.'}
     Verified (Safe-Child $public $file.path) $file.bytes $file.sha256
 }
-foreach($required in @('LICENSE','COPYRIGHT.md','THIRD-PARTY-NOTICES.md','firmware/targets.json','src/InGlorious.Core/SetupFirmwareCatalog.json')){
+foreach($required in @('LICENSE','COPYRIGHT.md','THIRD-PARTY-NOTICES.md','firmware/targets.json','src/InGlorious.Core/SetupFirmwareCatalog.json','reference/source-distribution.json')){
     if(-not$paths.Contains($required)){throw ('Required release source is missing: '+$required)}
 }
+$sourceCatalogRecord=@($export.files|Where-Object path -CEQ 'reference/source-distribution.json')[0]
+Verified (Join-Path $root 'reference/source-distribution.json') $sourceCatalogRecord.bytes $sourceCatalogRecord.sha256
+$firmwareCatalog=Get-Content -LiteralPath (Safe-Child $public 'src/InGlorious.Core/SetupFirmwareCatalog.json') -Raw|ConvertFrom-Json
+if($catalog.firmwareVersion-cne$firmwareCatalog.releaseId){throw 'Corresponding-source firmware version differs from the reviewed firmware catalog.'}
 $actual=@(Get-ChildItem -LiteralPath $public -File -Recurse -Force)
 foreach($file in $actual){
     Assert-NoLink $file.FullName
@@ -63,14 +101,7 @@ foreach($repo in $catalog.repositories){
     if($LASTEXITCODE-ne0-or$commit.Count-ne1-or$commit[0]-cne$repo.commit){throw ('Pinned source commit is unavailable: '+$repo.id)}
 }
 foreach($archive in $catalog.archives){
-    $path=Safe-Child $cache $archive.file
-    if(-not(Test-Path -LiteralPath $path)){
-        if(-not$Download){throw ('Source archive is missing; use -Download or populate the cache: '+$archive.file)}
-        if($archive.url-cnotmatch'^https://(dfu-util\.sourceforge\.net/releases/|codeload\.github\.com/)'-and$archive.url-cne'https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.tar.bz2'){throw 'Unapproved source archive origin.'}
-        New-Item -ItemType Directory -Path $cache -Force|Out-Null
-        Invoke-WebRequest -Uri $archive.url -OutFile $path
-    }
-    Verified $path $archive.bytes $archive.sha256
+    Get-VerifiedSourceArchive $archive|Out-Null
 }
 New-Item -ItemType Directory -Path $target|Out-Null
 $appTarget=Join-Path $target 'inglorious'

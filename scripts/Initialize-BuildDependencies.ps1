@@ -43,7 +43,7 @@ function Get-VerifiedDownload([string]$Id){
             Assert-NoLink $partial
             try{
                 try{
-                    Invoke-WebRequest -Uri $requests[$attempt].Uri -Headers $requests[$attempt].Headers -UserAgent 'INGLORIOUS-Build' -OutFile $partial -MaximumRedirection 5 -TimeoutSec 300
+                    Invoke-WebRequest -Uri $requests[$attempt].Uri -Headers $requests[$attempt].Headers -OutFile $partial -MaximumRedirection 5 -TimeoutSec 300
                 }catch{
                     if($attempt+1-ge$requests.Count){throw ('Dependency download failed after '+$requests.Count+' attempt(s): '+$entry.file)}
                     Write-Warning ('Dependency download failed; retrying the same pinned official asset: '+$entry.file)
