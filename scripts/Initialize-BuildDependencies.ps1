@@ -29,10 +29,35 @@ function Get-VerifiedDownload([string]$Id){
     if(-not(Test-Path -LiteralPath $file)){
         if($Offline){throw ('Offline dependency is missing: '+$entry.file)}
         New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($file)) -Force|Out-Null
-        $partial=$file+'.'+[Guid]::NewGuid().ToString('N')+'.partial'
-        Invoke-WebRequest -Uri $entry.url -OutFile $partial -MaximumRedirection 5
-        if((Get-FileHash -LiteralPath $partial).Hash-cne$entry.sha256){throw ('Downloaded dependency checksum differs: '+$entry.file)}
-        Move-Item -LiteralPath $partial -Destination $file
+        $requests=@(@{Uri=$entry.url;Headers=@{}})
+        # The GitHub download route can fail while this exact official asset is
+        # available through its API. Keep the same version and checksum pin.
+        if($Id-ceq'qmk-msys'-and$entry.file-ceq'QMK_MSYS-1.12.0.exe'-and
+            $entry.url-ceq'https://github.com/qmk/qmk_distro_msys/releases/download/1.12.0/QMK_MSYS.exe'-and
+            $entry.sha256-ceq'21DF7D55F80870B22121D99867A541CC2A2ED834A28B908D379006A1F7C24C1C'){
+            $fallback=@{Uri='https://api.github.com/repos/qmk/qmk_distro_msys/releases/assets/325182216';Headers=@{Accept='application/octet-stream'}}
+            $requests+=@($fallback,$fallback)
+        }
+        for($attempt=0;$attempt-lt$requests.Count;$attempt++){
+            $partial=$file+'.'+[Guid]::NewGuid().ToString('N')+'.partial'
+            Assert-NoLink $partial
+            try{
+                try{
+                    Invoke-WebRequest -Uri $requests[$attempt].Uri -Headers $requests[$attempt].Headers -UserAgent 'INGLORIOUS-Build' -OutFile $partial -MaximumRedirection 5 -TimeoutSec 300
+                }catch{
+                    if($attempt+1-ge$requests.Count){throw ('Dependency download failed after '+$requests.Count+' attempt(s): '+$entry.file)}
+                    Write-Warning ('Dependency download failed; retrying the same pinned official asset: '+$entry.file)
+                    continue
+                }
+                Assert-NoLink $partial
+                if((Get-FileHash -LiteralPath $partial).Hash-cne$entry.sha256){throw ('Downloaded dependency checksum differs: '+$entry.file)}
+                Assert-NoLink $file
+                Move-Item -LiteralPath $partial -Destination $file
+                break
+            }finally{
+                if(Test-Path -LiteralPath $partial){Assert-NoLink $partial;Remove-Item -LiteralPath $partial -Force}
+            }
+        }
     }
     if((Get-FileHash -LiteralPath $file).Hash-cne$entry.sha256){throw ('Cached dependency checksum differs: '+$entry.file)}
     return $file
