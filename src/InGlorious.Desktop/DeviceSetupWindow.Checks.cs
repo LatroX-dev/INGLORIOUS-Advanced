@@ -12,6 +12,14 @@ public sealed partial class DeviceSetupWindow
     {
         if (!_offlinePreview || _service is not null) throw new InvalidOperationException("Offline setup fixture required.");
         var id = deviceId ?? _preferredDeviceId ?? "gmmk3-75-iso";
+        var automatic = step.StartsWith("auto-", StringComparison.Ordinal);
+        if (automatic)
+        {
+            if (_operation != SetupOperation.Update || !DeviceSetupService.SupportsAutomaticUpdateDevice(id)) throw new InvalidOperationException("Automatic update preview requires the supported device update flow.");
+            step = step[5..];
+        }
+        _automaticUpdateAvailable = automatic;
+        _automaticUpdateRunning = automatic && step is "connect" or "backup";
         var board = BoardDescriptorRegistry.Get(id);
         var stock = StockDeviceCatalog.All.First(match => match.CandidateDeviceIds.Contains(id));
         var runtime = _operation != SetupOperation.Install;
@@ -34,7 +42,8 @@ public sealed partial class DeviceSetupWindow
             _session = new(device, _operation, "offline-fixture")
             {
                 Stage = value, DeviceId = value is SetupStage.Disconnect or SetupStage.ConnectBootloader ? null : id,
-                InstalledFirmwareVersion = runtime ? "0.0.1" : null
+                InstalledFirmwareVersion = runtime ? "0.0.1" : null,
+                AutomaticUpdate = automatic, AutomaticRestartRequested = automatic && step == "reconnect"
             };
             _writeAttempted = value is SetupStage.Reconnect or SetupStage.Complete;
             if (value == SetupStage.Complete && _operation != SetupOperation.Restore)
@@ -287,12 +296,13 @@ public sealed partial class DeviceSetupWindow
                 L.SetLanguage(supported.Code);
                 foreach (var size in new[] { new Size(760, 590), new Size(1060, 520) })
                 foreach (var id in new[] { "numpad", "gmmk3-pro-100-iso", "gmmk3-75-iso" })
+                foreach (var operation in new[] { SetupOperation.Install, SetupOperation.Update })
                 {
-                    var window = new DeviceSetupWindow(id, offlinePreview: true);
+                    var window = new DeviceSetupWindow(id, operation, offlinePreview: true);
                     try
                     {
                         var root = (Border)window.Content!;
-                        foreach (var step in new[] { "select", "connect", "backup", "reconnect", "complete", "blocked" })
+                        foreach (var step in new[] { "select", "connect", "backup", "reconnect", "complete", "blocked" }.Concat(operation == SetupOperation.Update && DeviceSetupService.SupportsAutomaticUpdateDevice(id) ? new[] { "auto-select", "auto-connect", "auto-backup", "auto-reconnect", "auto-complete" } : Array.Empty<string>()))
                         {
                             window.ShowOfflineStep(step, id);
                             if (step == "complete")

@@ -146,6 +146,7 @@ internal static partial class SelfTests
         var restored = engine.Run(restore);
         Check(restored is { Status: "verified", WriteAttempted: true } && device.Image.AsSpan().SequenceEqual(original), "normal restore returns exact own original despite damaged application vectors");
         Check(device.Writes == 3, "only install update and restore wrote through bounded fake packets");
+        RestartModelChecks(root, model, original, application);
         if (profileFixtures is not null)
         {
             foreach (string name in new[] { "valid", "torn-inactive", "first-save-torn" })

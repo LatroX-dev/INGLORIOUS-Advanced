@@ -17,7 +17,7 @@ $previousPath=$env:PATH
 try {
  $env:PATH=$compilerDirectory+';'+(Join-Path $root 'firmware/toolchain/qmk-msys/{app}/usr/bin')+';'+$previousPath
  $exe=Join-Path $output 'profile-runtime.exe'
- $arguments=@('-std=c11','-O2','-Wall','-Wextra','-Werror','-DIG_PROFILE_BANK_ENABLE=1','-DIG_RETAINED_LOADER_BUILD=1',
+ $arguments=@('-std=c11','-O2','-Wall','-Wextra','-Werror','-DIG_PROFILE_BANK_ENABLE=1','-DIG_RETAINED_LOADER_BUILD=1','-DIG_APP_BOOTLOADER_ENABLE=1',
   '-I'+(Join-Path $PSScriptRoot 'ports'),'-I'+(Join-Path (Split-Path $fixtures -Parent) 'port-checks'),'-I'+(Join-Path $root 'firmware/keymaps/gmmk3-pro-100-iso'),
   (Join-Path $PSScriptRoot 'profile_runtime_tests.c'),(Join-Path $root 'firmware/inglorious/ig_profile_bank.c'),'-lm','-o',$exe)
  & $compiler @arguments
@@ -27,7 +27,7 @@ try {
  $lines|Write-Output
  $match=[regex]::Match(($lines-join"`n"),'PASS profile runtime: (\d+) checks; no hardware access; (\d+) explicit mock page operations\.')
  if(!$match.Success){throw 'No runtime result found.'}
- $sources=@('firmware/inglorious/inglorious.c','firmware/inglorious/ig_profile_runtime.inc','firmware/inglorious/ig_profile_defaults.h','firmware/inglorious/ig_profile_bank.h','firmware/inglorious/ig_profile_bank.c','firmware/inglorious/ig_profile_selector.h','firmware/inglorious/ig_profile_flash.h','firmware/tests/profile_runtime_tests.c','firmware/tests/ports/port_checks.c','firmware/tests/Run-ProfileRuntimeChecks.ps1')
+ $sources=@('firmware/inglorious/inglorious.c','firmware/inglorious/ig_app_bootloader.inc','firmware/inglorious/ig_version.h','firmware/boards/gmmk3-pro-100-iso/ig_board_version.h','firmware/inglorious/ig_hardware_controls.h','firmware/inglorious/ig_profile_runtime.inc','firmware/inglorious/ig_profile_defaults.h','firmware/inglorious/ig_profile_bank.h','firmware/inglorious/ig_profile_bank.c','firmware/inglorious/ig_profile_selector.h','firmware/inglorious/ig_profile_flash.h','firmware/tests/profile_runtime_tests.c','firmware/tests/ports/port_checks.c','firmware/tests/Run-ProfileRuntimeChecks.ps1')
  $report=[ordered]@{schema=1;hardwareAccess=$false;checks=[int]$match.Groups[1].Value;mockPageOperations=[int]$match.Groups[2].Value;fixtureSha256=$expected[0].sha256;sources=@($sources|ForEach-Object{@{path=$_;sha256=(Get-FileHash -LiteralPath (Join-Path $root $_)).Hash}})}
  [IO.File]::WriteAllText((Join-Path $output 'results.json'),($report|ConvertTo-Json -Depth 6),[Text.UTF8Encoding]::new($false))
  [IO.File]::WriteAllLines((Join-Path $output 'native-checks.log'),$lines,[Text.UTF8Encoding]::new($false))

@@ -15,7 +15,7 @@ public sealed class DeviceTestWindow : Window
     private readonly Dictionary<string, Action<Brush>> _keys = [];
     private readonly HashSet<string> _typingKeys = [];
     private readonly Viewbox _keyboard = new() { Name = "DeviceTestKeyboardView", Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Center, Margin = new(0, 12, 0, 12) };
-    private readonly Button _start = new();
+    private readonly Button _start = new() { Visibility = Visibility.Collapsed };
     private readonly StackPanel _lights = new() { Orientation = Orientation.Horizontal };
     private readonly StackPanel _physical = new() { Name = "DevicePhysicalTest", Visibility = Visibility.Collapsed, IsEnabled = false }, _typing = new() { Name = "DeviceTypingTest", Visibility = Visibility.Collapsed };
     private readonly TextBlock _lastKey = new() { Name = "DeviceTypingLastKey", TextWrapping = TextWrapping.Wrap, Margin = new(0, 10, 0, 0) };
@@ -25,7 +25,7 @@ public sealed class DeviceTestWindow : Window
     private DeviceDiagnosticSession? _session;
     private HardwareControlTestSession? _hardwareSession;
     private Task _starting = Task.CompletedTask, _pollTask = Task.CompletedTask;
-    private bool _polling, _closing, _closed;
+    private bool _opened, _polling, _closing, _closed;
     private readonly CancellationTokenSource _lifetime = new();
 
     public DeviceTestWindow(string deviceId, OnboardDevice? connection, bool preview = false)
@@ -146,7 +146,11 @@ public sealed class DeviceTestWindow : Window
         root.Children.Add(body); Grid.SetRow(_keyboard, 1); root.Children.Add(_keyboard); Grid.SetRow(lower, 2); root.Children.Add(lower); Grid.SetRow(footer, 3); root.Children.Add(footer); Content = root;
         _timer.Tick += async (_, _) => { if (_polling) return; _pollTask = PollAsync(); await _pollTask; };
         if (preview) ShowTypingTest();
-        Loaded += (_, _) => { if (_typing.Visibility == Visibility.Visible) root.Focus(); };
+        Loaded += async (_, _) =>
+        {
+            await StartOnOpenAsync();
+            if (!_closing && _typing.Visibility == Visibility.Visible) root.Focus();
+        };
         Closing += async (_, e) =>
         {
             if (_closed) return; e.Cancel = true; if (_closing) return;
@@ -155,10 +159,21 @@ public sealed class DeviceTestWindow : Window
             finally { _closed = true; _lifetime.Dispose(); _ = Dispatcher.BeginInvoke(Close); }
         };
     }
+    private async Task StartOnOpenAsync()
+    {
+        // WPF may raise Loaded again. Opening the test requests one start only;
+        // a failed or interrupted session needs an explicit retry.
+        if (_opened || _closing) return;
+        _opened = true;
+        if (_connection is null) return;
+        _starting = StartAsync();
+        await _starting;
+    }
     private async Task StartAsync()
     {
         if (_connection is null || _session is not null || _hardwareSession is not null || _closing || !_start.IsEnabled) return;
-        _start.IsEnabled = false;
+        _start.IsEnabled = false; _start.Visibility = Visibility.Collapsed;
+        _status.Text = L.T("Bitte warten …");
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token); timeout.CancelAfter(TimeSpan.FromSeconds(8));
@@ -321,11 +336,26 @@ public sealed class DeviceTestWindow : Window
     }
     private void RunOfflineCloseChecks(Action<bool, string> check)
     {
-        var fixture = new DeviceTestWindow(_device.Id, null, preview: true);
+        var fixture = new DeviceTestWindow(_device.Id, new(_device.Id, "offline", "offline"), preview: true);
         var failed = new DeviceTestWindow(_device.Id, null, preview: true) { _closing = true };
         var context = SynchronizationContext.Current;
         try
         {
+            // A preview must discard even an explicitly supplied connection before Loaded.
+            fixture.RaiseEvent(new RoutedEventArgs(LoadedEvent));
+            check(fixture._opened && fixture._starting.IsCompletedSuccessfully && fixture._connection is null &&
+                fixture._session is null && fixture._hardwareSession is null && !fixture._timer.IsEnabled &&
+                fixture._start.Visibility == Visibility.Collapsed,
+                "Device test: opening a preview needs no start click and cannot access USB");
+            var pending = new TaskCompletionSource();
+            fixture._starting = pending.Task;
+            fixture.RaiseEvent(new RoutedEventArgs(LoadedEvent));
+            check(ReferenceEquals(fixture._starting, pending.Task),
+                "Device test: repeated Loaded events cannot restart or replace a pending test");
+            pending.SetResult();
+            failed.RaiseEvent(new RoutedEventArgs(LoadedEvent));
+            check(!failed._opened && failed._starting.IsCompletedSuccessfully,
+                "Device test: a delayed Loaded event cannot start after closing begins");
             // Do not pump the standalone resource App's queued startup. This test exercises
             // only task/lifetime ordering; its stop callback has no UI or hardware access.
             SynchronizationContext.SetSynchronizationContext(null);

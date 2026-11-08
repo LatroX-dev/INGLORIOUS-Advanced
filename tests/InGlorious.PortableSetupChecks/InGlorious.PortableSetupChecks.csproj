@@ -14,6 +14,7 @@
     <Compile Include="../InGlorious.SetupChecks/LegacyMigrationChecks.cs" Link="LegacyMigrationChecks.cs" />
     <Compile Include="../InGlorious.SetupChecks/CoordinatorChecks.cs" Link="CoordinatorChecks.cs" />
     <Compile Include="../InGlorious.SetupChecks/FirmwareSequenceChecks.cs" Link="FirmwareSequenceChecks.cs" />
+    <Compile Include="../InGlorious.SetupChecks/AutomaticUpdateChecks.cs" Link="AutomaticUpdateChecks.cs" />
     <Compile Include="../InGlorious.SetupChecks/PortableUsbChecks.cs" Link="PortableUsbChecks.cs" />
   </ItemGroup>
 </Project>

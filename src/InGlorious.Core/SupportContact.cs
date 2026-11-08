@@ -5,6 +5,7 @@ namespace InGlorious.Core;
 /// <summary>Public contact destinations only. Never populated from device or profile data.</summary>
 public static class SupportContact
 {
+    public const string WebsiteUrl = "https://inglorious.latrox.dev";
     public const string IssueUrl = SoftwareUpdateService.RepositoryUrl + "/issues/new";
     public const string PublicEmail = "inglorious@latrox.dev";
     // The maintainer has configured forwarding for this public address.

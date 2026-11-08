@@ -121,7 +121,7 @@ public sealed class MacroLibraryWindow : Window
     private void Remove()
     {
         var selected = LibrarySelection(); if (selected.Count == 0) return;
-        if (MessageBox.Show(this, L.F($"{selected.Count} Makros aus der Bibliothek entfernen? Kopien in Profilen bleiben erhalten."), L.T("Makrobibliothek"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (!UnsavedChangesWindow.ConfirmDelete(this, L.T("Makrobibliothek"), L.F($"{selected.Count} Makros aus der Bibliothek entfernen? Kopien in Profilen bleiben erhalten."))) return;
         var remaining = _snapshot.Macros.Where(m => !selected.Contains(m)).ToList();
         _snapshot = SharedMacroLibrary.Save(_snapshot, remaining); RefreshLibrary();
         _status.Text = L.T("Aus der Bibliothek entfernt. Profile bleiben unverändert.");

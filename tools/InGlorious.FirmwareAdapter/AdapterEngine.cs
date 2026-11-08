@@ -13,7 +13,8 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
         string sessionId = Path.GetFileName(directory);
         List<Artifact> artifacts = []; List<IDisposable> locks = [];
         Fingerprint? fingerprint = null; string? fingerprintHash = null;
-        bool attempted = false, verified = false; Guid? installationId = null;
+        bool attempted = false, verified = false, restartAttempted = false, restartAcknowledged = false;
+        string? restartErrorCode = null; Guid? installationId = null;
         IDevice? device = null;
         IBackend? backend = null;
         IDisposable? operationLock = null;
@@ -157,16 +158,59 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
                 Files.New(directory, "write-attempt.json", Json.Bytes(new { utc = DateTimeOffset.UtcNow, operation = request.Operation, imageArtifact.Sha256, installationId }), "write-attempt");
             }, engineeringGrant);
             if (!attempted) throw new IOException("TRANSPORT_DID_NOT_MARK_WRITE");
-            byte[] after = CapturePair("after", "verified-read");
+            byte[]? secondReadback = null;
+            byte[] after = CapturePair("after", "verified-read", second => secondReadback = second);
             if (!after.AsSpan().SequenceEqual(image)) throw new IOException("FULL_READBACK_MISMATCH");
             if (device.Probe(model) != fingerprint) throw new IOException("POSTWRITE_IDENTITY_CHANGED");
+            if (request.RestartAfterVerify)
+            {
+                ValidateVectors(image, model);
+                if (model.ProtectedPrefixBytes != 0)
+                {
+                    // Reset goes through the original loader, never directly to
+                    // the relocated application and never an unreviewed prefix.
+                    RetainedLoaderLayout.ValidatePrefix(image);
+                    RetainedLoaderLayout.ValidateApplicationVectors(image.AsSpan(model.ProtectedPrefixBytes,
+                        InstallationIdentity.Offset(image.Length) - model.ProtectedPrefixBytes));
+                }
+                // Persist and lock both proofs before authorizing a single restart on
+                // this same handle. Neither an ACK nor a disconnect proves runtime recovery.
+                foreach (var artifact in artifacts.Where(a => a.Kind == "verified-read").ToArray())
+                    locks.Add(Files.Lock(Files.Child(directory, artifact.Path), artifact.Bytes, artifact.Sha256).Stream);
+                var restartGrant = VerifiedRestartGrant.Create(request, model, device, fingerprint, attempted, image, after, secondReadback!);
+                Files.New(directory, "firmware-verified.json", Json.Bytes(new { schema = 1, operation = request.Operation, model.DeviceId,
+                    installationId, fingerprintSha256 = fingerprintHash, imageArtifact.Sha256, verified = true }), "verified-before-restart");
+                try
+                {
+                    device.RestartAfterVerification(model, restartGrant, () =>
+                    {
+                        if (restartAttempted) throw new InvalidOperationException("RESTART_ALREADY_ATTEMPTED");
+                        Files.New(directory, "restart-attempt.json", Json.Bytes(new { utc = DateTimeOffset.UtcNow,
+                            model.DeviceId, imageArtifact.Sha256, installationId }), "restart-attempt");
+                        restartAttempted = true;
+                    });
+                    if (!restartAttempted) throw new IOException("TRANSPORT_DID_NOT_MARK_RESTART");
+                    // dfu-util's STM32 leave path permits a disconnect without a
+                    // device ACK. Its successful exit is not an acknowledgement.
+                    restartAcknowledged = model.Transport == "wb32-dfu";
+                }
+                catch (Exception restartError)
+                {
+                    // The firmware is already verified. A failed/missing restart ACK
+                    // requires normal reconnect, never another write or automatic retry.
+                    restartErrorCode = restartError.Message;
+                }
+                Files.New(directory, "restart-result.json", Json.Bytes(new { restartAttempted, restartAcknowledged,
+                    restartErrorCode, runtimeVerified = false }), "restart-result");
+            }
             // Transport disposal and audit output are part of completion, never reported early.
             FlushDeviceLog(); device.Dispose(); device = null;
             Files.New(directory, "installation.json", Json.Bytes(new { schema = 1, operation = request.Operation, model.DeviceId, installationId, originalSha256 = request.ExpectedBackupSha256, originalCaptureManifest = Path.GetFullPath(request.BackupPath!), fingerprint, verified = true }), "installation-receipt");
             verified = true;
-            return Save(new(1, request.Operation, sessionId, "verified", null, model.DeviceId, fingerprint, fingerprintHash, true, true, request.Operation != "restore", attempted, true, directory, artifacts.ToArray(), InstallationId: installationId));
+            return Save(new(1, request.Operation, sessionId, "verified", null, model.DeviceId, fingerprint, fingerprintHash, true, true, request.Operation != "restore", attempted, true, directory, artifacts.ToArray(), InstallationId: installationId,
+                RestartAttempted: restartAttempted, RestartAcknowledged: restartAcknowledged, RestartErrorCode: restartErrorCode));
 
-            byte[] CapturePair(string prefix, string kind)
+            byte[] CapturePair(string prefix, string kind, Action<byte[]>? completedPair = null)
             {
                 byte[] first = device!.ReadAll(model);
                 if (first.Length != model.FlashBytes) throw new IOException("FULL_READ_LENGTH");
@@ -176,6 +220,7 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
                 artifacts.Add(Files.New(directory, prefix + "-2.bin", second, kind));
                 if (!first.AsSpan().SequenceEqual(second)) throw new IOException("FULL_READ_PAIR_MISMATCH");
                 if (device.Probe(model) != fingerprint) throw new IOException("CAPTURE_IDENTITY_CHANGED");
+                completedPair?.Invoke(second);
                 return first;
             }
             void SaveCapture()
@@ -188,7 +233,8 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
         catch (Exception ex)
         {
             return Save(new(1, request.Operation, sessionId, attempted ? "failed" : "blocked", ex.Message, request.DeviceId,
-                fingerprint, fingerprintHash, false, false, false, attempted, verified, directory, artifacts.ToArray(), Error: ex.GetType().Name));
+                fingerprint, fingerprintHash, false, false, false, attempted, verified, directory, artifacts.ToArray(), Error: ex.GetType().Name,
+                RestartAttempted: restartAttempted, RestartAcknowledged: restartAcknowledged, RestartErrorCode: restartErrorCode));
         }
         finally
         {
@@ -225,6 +271,12 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
         if (request.Operation is "install" or "update" && request.BundlePath == null) throw new InvalidDataException("BUNDLE_REQUIRED");
         if ((request.Operation == "update") != (request.ExpectedCurrentSha256 is not null)) throw new InvalidDataException("CURRENT_IMAGE_BINDING_REQUIRED");
         if (request.MigrateLegacy && (request.Operation != "update" || request.DeviceId != "pro-iso")) throw new InvalidDataException("LEGACY_OPERATION_NOT_APPROVED");
+        if (request.RestartAfterVerify)
+        {
+            if (request.Operation != "update" || request.MigrateLegacy)
+                throw new InvalidDataException("RESTART_MODEL_OR_OPERATION_NOT_SUPPORTED");
+            VerifiedRestartGrant.ValidateModel(Model.Get(request.DeviceId));
+        }
         foreach (string? hash in new[] { request.ExpectedBackupSha256, request.ExpectedFingerprintSha256, request.ExpectedCurrentSha256 })
             if (hash != null && (hash.Length != 64 || hash.Any(c => !char.IsAsciiHexDigit(c)) || hash != hash.ToUpperInvariant())) throw new InvalidDataException("SHA256_INVALID");
     }

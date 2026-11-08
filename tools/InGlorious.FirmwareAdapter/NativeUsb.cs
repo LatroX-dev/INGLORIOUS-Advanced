@@ -154,6 +154,14 @@ internal sealed class NativeUsb : IDisposable
 
         public byte[] Exchange(byte[] request)
         {
+            WbProtocol.ValidatePacket(request, writesEnabled, selectedModel);
+            return ExchangePacket(request);
+        }
+
+        // Only bounded normal packets or the fixed, grant-protected restart packet
+        // reach this method; reset/go remain forbidden through IWbExchange.
+        private byte[] ExchangePacket(byte[] request)
+        {
             var started = DateTimeOffset.UtcNow;
             int sent = -1, received = -1;
             string? error = null;
@@ -161,7 +169,6 @@ internal sealed class NativeUsb : IDisposable
             try
             {
                 if (elapsed.ElapsedMilliseconds >= 300000) throw new TimeoutException("OPERATION_TIMEOUT");
-                WbProtocol.ValidatePacket(request, writesEnabled, selectedModel);
                 Check(Native.Bulk(handle, 0x01, request, request.Length, out sent, 5000), "sending allowed read request");
                 if (sent != request.Length) throw new IOException("Incomplete read request transfer.");
                 Check(Native.Bulk(handle, 0x81, response, response.Length, out received, 5000), "receiving bootloader data");
@@ -210,12 +217,26 @@ internal sealed class NativeUsb : IDisposable
                 RetainedLoaderLayout.ValidatePrefix(prefix);
                 engineeringGrant.Consume(selectedModel, Probe(model), image, prefix);
             }
+            completedWriteHash = null;
             beforeFirstWrite(); writesEnabled = true;
             try
             {
                 WbProtocol.WriteImage(this, image, selectedModel);
+                completedWriteHash = Files.Hash(image);
             }
             finally { writesEnabled = false; }
+        }
+
+        private string? completedWriteHash;
+        public void RestartAfterVerification(Model model, VerifiedRestartGrant grant, Action beforeRestart)
+        {
+            VerifiedRestartGrant.ValidateModel(model);
+            if (handle == 0 || writesEnabled || completedWriteHash == null) throw new InvalidDataException("VERIFIED_RESTART_REQUIRED");
+            grant.Consume(this, selectedModel, Probe(model), completedWriteHash);
+            byte[] packet = WbProtocol.VerifiedRestartPacket(selectedModel);
+            completedWriteHash = null; // Never retry an uncertain restart, even with another grant.
+            beforeRestart();
+            WbProtocol.CheckRestart(ExchangePacket(packet));
         }
 
         public void Dispose() { if (handle == 0) return; if (claimed) Native.Release(handle, 0); Native.Close(handle); handle = 0; }

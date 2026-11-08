@@ -83,4 +83,13 @@ public sealed class UnsavedChangesWindow : Window
         dialog.CancelButton.Style = (Style)dialog.FindResource("PrimaryButton");
         dialog.ShowDialog();
     }
+
+    public static bool ConfirmDelete(Window owner, string heading, string message)
+    {
+        var dialog = new UnsavedChangesWindow(heading, message, saveCaption: L.T("Löschen")) { Owner = owner };
+        dialog.DiscardButton.Visibility = Visibility.Collapsed;
+        UiIcons.SetKind(dialog.SaveButton, "delete");
+        dialog.ShowDialog();
+        return dialog.Choice == UnsavedChangesChoice.Save;
+    }
 }

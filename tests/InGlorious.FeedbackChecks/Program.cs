@@ -137,12 +137,18 @@ internal static class Program
         Check(SupportContact.PublicEmail == "inglorious@latrox.dev" && SupportContact.EmailEnabled && SupportContact.Email == SupportContact.PublicEmail, "configured public contact is enabled without exposing forwarding destination");
         Check(SupportContact.EmailUri is { Scheme: "mailto", Query.Length: 0, Fragment.Length: 0 } && SupportContact.EmailUri.AbsoluteUri == "mailto:" + SupportContact.Email,
             "general contact opens only the public address without metadata or prefilled content");
+        var website = new Uri(SupportContact.WebsiteUrl);
+        Check(website.OriginalString == "https://inglorious.latrox.dev" && website is { Scheme: "https", AbsolutePath: "/", Query.Length: 0, Fragment.Length: 0, UserInfo.Length: 0 },
+            "website uses the public HTTPS destination without device details or user-specific parameters");
         var settings = new AppSettingsWindow(new AppPreferences(), offlinePreview: true, connectedDevices: []);
         var contactButton = Find<Button>(settings, "ContactEmailButton");
         Check(contactButton.Visibility == Visibility.Visible && !contactButton.IsEnabled && (string)contactButton.ToolTip == SupportContact.Email,
             "settings contact remains visible without a keyboard; offline checks cannot open external apps");
+        var websiteButton = Find<Button>(settings, "WebsiteButton");
+        Check(websiteButton.Visibility == Visibility.Visible && !websiteButton.IsEnabled && (string)websiteButton.ToolTip == SupportContact.WebsiteUrl,
+            "settings website is visible without a keyboard; offline checks cannot open the browser");
         settings.Close();
-        foreach (var source in new[] { "Rückmeldung & Kontakt", "Bitte wählen", "Funktioniert gut", "Problem melden", "Kommentar (optional)", "Auf GitHub öffnen", "E-Mail öffnen", "Modell und Versionen werden ergänzt. Keine Dateien oder Gerätekennungen.", "GitHub-Rückmeldungen sind öffentlich. Prüfe den Text vor dem Absenden.", "Der Link konnte nicht geöffnet werden. Prüfe deine Standard-App für Browser oder E-Mail.",
+        foreach (var source in new[] { "Website", "Rückmeldung & Kontakt", "Bitte wählen", "Funktioniert gut", "Problem melden", "Kommentar (optional)", "Auf GitHub öffnen", "E-Mail öffnen", "Modell und Versionen werden ergänzt. Keine Dateien oder Gerätekennungen.", "GitHub-Rückmeldungen sind öffentlich. Prüfe den Text vor dem Absenden.", "Der Link konnte nicht geöffnet werden. Prüfe deine Standard-App für Browser oder E-Mail.",
             "Dein Modell wird experimentell unterstützt. Deine Rückmeldung zu Tasten und Beleuchtung hilft uns besonders.", "Rückmeldung geben", "Später",
             "Schritte zum Problem", "Erwartetes Verhalten", "Tatsächliches Verhalten", "Bericht kopieren",
             "Modell, Versionen und System werden ergänzt. Persönliche Dateien und Gerätekennungen bleiben ausgeschlossen.",

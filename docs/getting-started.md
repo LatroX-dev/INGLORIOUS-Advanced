@@ -98,13 +98,15 @@ These controls do not add Bluetooth or wireless support. See the [model list](mo
 
 ## Update INGLORIOUS firmware
 
-Every app package includes the matching firmware for all supported models. The app compares the version reported by the keyboard with this included firmware. An update is offered only when an older supported version is recognized. Installing a newer app does not flash the keyboard automatically. Open an available firmware update from the device's firmware area and follow the guided reconnect steps. Confirm the displayed device and select **Back up and update**. The backup, checks and update then run together.
+Every app package includes the matching firmware for all supported models. The app compares the version reported by the keyboard with this included firmware and offers an update only for an older supported version. Installing a newer app does not flash the keyboard automatically. Open the update from **Device**, confirm the displayed device and select **Back up and update**. The backup, checks and update then run together.
+
+With compatible INGLORIOUS firmware, the app enters update mode and reconnects the keyboard automatically: leave USB connected throughout. An older firmware version may first need the displayed key combination and reconnect steps. Follow the guide shown for your device.
 
 An ordinary update preserves the stored INGLORIOUS configuration. Save a profile copy before updating. Do not disconnect the keyboard or close INGLORIOUS Advanced while the write is running. An unknown version is not treated as outdated.
 
-After reconnecting, use **Test lighting** and the typing test described above, or select **Done**.
+When the update is complete, use **Test lighting** and the typing test described above, or select **Done**.
 
-**Test device** shows the layout of every supported keyboard, including the Numpad. Green keys are confirmed by the keyboard's diagnostic mode. If that mode is unavailable, yellow keys show matching inputs received by the computer; custom bindings or another connected keyboard can produce different positions. For Numpad digits, turn on Num Lock (the standard shortcut is **Fn + 0**).
+**Test device** starts the test directly and shows the layout of every supported keyboard, including the Numpad. Green keys are confirmed by the keyboard's diagnostic mode. If that mode is unavailable, yellow keys show matching inputs received by the computer; custom bindings or another connected keyboard can produce different positions. For Numpad digits, turn on Num Lock (the standard shortcut is **Fn + 0**).
 
 Experimental models show one optional feedback invitation after a successful installation or configuration transfer. You can choose **Later** and return through **Device → Feedback & contact**. Problem reports include the exact model, layout, app and firmware versions, and system information. Add the steps, expected behavior and actual behavior, then review the complete text before opening GitHub or email. Profiles, firmware backups, serial numbers and local paths are not collected. Long reports can be copied without truncation.
 

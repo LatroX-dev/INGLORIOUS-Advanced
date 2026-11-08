@@ -117,6 +117,9 @@ static bool ig_profile_reconnect_safe(void) {
     return (!ig_profile_interval_automatic || !ig_profile_read_busy()) && !stage_open && ig_profile_execution_idle() && ig_timing_usb_active();
 }
 static void ig_profile_apply(uint8_t slot, bool automatic_interval) {
+#if IG_APP_BOOTLOADER_ENABLE
+    app_bootloader_cancel();
+#endif
     const ig_pb_view *view = &ig_profile_views[slot - 1];
     ig_profile_payload = view->payload; ig_profile_active = slot;
     active_size = (uint16_t)view->length; active_crc = ig_profile_crcs[slot - 1];

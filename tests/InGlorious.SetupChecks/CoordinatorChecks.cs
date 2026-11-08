@@ -15,6 +15,7 @@ internal static partial class Program
             "Discovery never assigns reserved PowerShell process/home variables.");
         await CheckSuccessfulRoundTrips();
         await CheckUpdates();
+        await CheckAutomaticUpdates();
         await CheckDiscoveryAndTransitions();
         await CheckIdentifiedModelWithoutFirmware();
         await CheckCaptureFailures();
@@ -29,7 +30,7 @@ internal static partial class Program
 
     private static void CheckNativeToolLockHandoff()
     {
-        string root = Path.Combine(Path.GetTempPath(), "inglorious-tool-lock-checks-" + Guid.NewGuid().ToString("N"));
+        string root = Path.Combine(SetupFixture.FindRepo(), "workspace", "checks", "tool-lock-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         string path = Path.Combine(root, "synthetic-native-tool.bin");
         byte[] contents = [1, 3, 5, 7]; File.WriteAllBytes(path, contents);
@@ -372,11 +373,11 @@ internal static partial class Program
     {
         internal const string Port = "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(1)#USB(2)";
         internal const string OtherControllerPort = "PCIROOT(0)#PCI(1500)#USBROOT(0)#USB(1)#USB(2)";
-        internal string Root { get; } = Path.Combine(Path.GetTempPath(),"inglorious-setup-checks-"+Guid.NewGuid().ToString("N"));
+        internal string Root { get; } = Path.Combine(FindRepo(), "workspace", "checks", "inglorious-setup-checks-" + Guid.NewGuid().ToString("N"));
         internal string Archive => Path.Combine(Root,"archives");
         internal FakeSetupEnvironment Environment { get; }
         internal DeviceSetupService Service { get; }
-        internal SetupFixture(string id,bool forceSharedProPid=false)
+        internal SetupFixture(string id,bool forceSharedProPid=false, bool automaticUpdateTarget=false)
         {
             Directory.CreateDirectory(Root);Directory.CreateDirectory(Archive);
             var packages=Path.Combine(Root,"Firmware");Directory.CreateDirectory(packages);
@@ -386,7 +387,7 @@ internal static partial class Program
             foreach(var file in Directory.EnumerateFiles(firmwareDirectory,"*.bin"))
                 File.Copy(file,Path.Combine(packages,Path.GetFileName(file)));
             Environment=new(id,forceSharedProPid);
-            Service=new(Environment,Archive,packages);
+            Service=new(Environment,Archive,packages,automaticUpdateTarget ? _ => "0.11.13" : null);
         }
         internal async Task<SetupSession> BeginAndDisconnect(SetupOperation operation=SetupOperation.Install)
         {
@@ -404,7 +405,7 @@ internal static partial class Program
         public void Dispose()
         {
             var fullRoot=Path.GetFullPath(Root);
-            var tempPrefix=Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()))+Path.DirectorySeparatorChar;
+            var tempPrefix=Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.Combine(FindRepo(), "workspace", "checks")))+Path.DirectorySeparatorChar;
             if(!fullRoot.StartsWith(tempPrefix,StringComparison.OrdinalIgnoreCase) ||
                 !Path.GetFileName(fullRoot).StartsWith("inglorious-setup-checks-",StringComparison.Ordinal))
                 throw new InvalidOperationException("Refusing cleanup outside the isolated fixture directory.");
@@ -413,7 +414,7 @@ internal static partial class Program
                 if(File.GetAttributes(child).HasFlag(FileAttributes.ReparsePoint)) Directory.Delete(child);
             Directory.Delete(Root,true);
         }
-        private static string FindRepo()
+        internal static string FindRepo()
         {
             for(var p=new DirectoryInfo(AppContext.BaseDirectory);p is not null;p=p.Parent)
                 if(File.Exists(Path.Combine(p.FullName,"src","InGlorious.Core","SetupFirmwareCatalog.json")))return p.FullName;
@@ -541,6 +542,13 @@ internal static partial class Program
                 if(WriteFault=="wrong-operation")response["operation"]="capture";
                 if(WriteFault=="wrong-installation")response["installationId"]=Guid.NewGuid();
                 response["artifacts"]=items;response["verified"]=WriteFault!="unverified";response["writeAttempted"]=true;response["status"]=WriteFault=="unverified"?"error":"verified";
+                if (req.TryGetProperty("restartAfterVerify", out var restart) && restart.GetBoolean())
+                {
+                    Check(op == "update" && DeviceSetupService.SupportsAutomaticUpdateDevice(DeviceId), "Automatic restart is limited to approved device update flows.");
+                    response["restartAttempted"] = true;
+                    response["restartAcknowledged"] = WriteFault != "restart-unacknowledged";
+                    response["restartErrorCode"] = WriteFault == "restart-unacknowledged" ? "RESTART_UNCONFIRMED" : null;
+                }
             }
             else throw new InvalidOperationException("Unexpected fake adapter operation.");
             return Task.FromResult(JsonSerializer.SerializeToElement(response));

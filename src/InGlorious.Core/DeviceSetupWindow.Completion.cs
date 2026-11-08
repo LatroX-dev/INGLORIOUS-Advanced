@@ -104,8 +104,13 @@ public sealed partial class DeviceSetupWindow
         var info = await client.GetInfoAsync(timeout.Token);
         var extensions = await client.GetExtensionsAsync(timeout.Token);
         var version = await client.GetFirmwareVersionAsync(timeout.Token);
-        if (!IsExpectedReturnedRuntime(id, info, extensions, version))
+        if (!IsExpectedReturnedRuntime(id, info, extensions, version, session.AutomaticUpdate))
             throw new SetupException(L.T("Die erwartete Firmware-Version wurde noch nicht bestätigt."));
+        if (session.AutomaticUpdate)
+        {
+            using var configurationTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await _service.VerifyReturnedConfigurationAsync(session, client, configurationTimeout.Token);
+        }
         if (DeviceSetupService.IsGloriousCoreRunning() is not false)
             throw new SetupException(L.T("Schließe Glorious CORE, bevor du fortfährst."), recoverable: true);
         _runtimeVersion = version;
@@ -121,8 +126,8 @@ public sealed partial class DeviceSetupWindow
         return matches.Length == 1 ? matches[0] : null;
     }
 
-    private static bool IsExpectedReturnedRuntime(string id, OnboardInfo info, OnboardExtensions extensions, OnboardFirmwareVersion? version) =>
-        BoardDescriptorRegistry.TryGet(id, out _) && info.DeviceId == id && info.Persistent && (info.Flags & 4) == 0 && info.StagingBytes == 0 &&
+    private static bool IsExpectedReturnedRuntime(string id, OnboardInfo info, OnboardExtensions extensions, OnboardFirmwareVersion? version, bool automaticUpdate = false) =>
+        BoardDescriptorRegistry.TryGet(id, out _) && info.DeviceId == id && (info.Persistent || (automaticUpdate && id == "gmmk3-pro-100-iso" && extensions.SupportsHardwareProfiles)) && (info.Flags & 4) == 0 && info.StagingBytes == 0 &&
         info.SupportsEffects && info.SupportsTiming && info.SupportsColorSequences && info.SupportsRuntimeBrightness && info.SupportsStandby &&
         extensions.SupportsLightingTest && version is not null && version.DeviceId == id && version.BuildId != 0 &&
         FirmwareSemanticVersion.TryParse(DeviceSetupService.TargetFirmwareVersionFor(id), out var target) && version.Version == target;

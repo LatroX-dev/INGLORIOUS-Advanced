@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.8
+
+- Update supported keyboards without unplugging, after installing compatible firmware.
+- Macro deletion confirmations now match the app's design.
+- Added the project website to app settings.
+- Device tests start immediately when opened.
+
 ## 0.7.0
 
 - Use the physical profile switch on the GMMK 3 PRO 100% ISO to select three independent onboard profiles, even with the app closed.

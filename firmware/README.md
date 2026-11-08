@@ -1,6 +1,8 @@
 # INGLORIOUS onboard firmware
 
-App **0.7.0** bundles firmware **0.11.11**, build `0x000B0B01`, for the GMMK 3 PRO 100% ISO wired, non-HE target and **0.11.9**, build `0x000B0901`, for the other fifteen targets. Each release catalog records the exact version and image layout per model. Build success does not establish full physical acceptance. Model support and physical acceptance are listed in [the model overview](../docs/model-support.md).
+The current release bundles firmware **0.11.14**, build `0x000B0E01`, for all sixteen supported targets. Each release catalog records the exact image and layout per model. Build success does not establish full physical acceptance. Model support and physical acceptance are listed in [the model overview](../docs/model-support.md).
+
+All sixteen targets explicitly enable app-triggered bootloader entry, introduced in firmware 0.11.12; unknown boards cannot enable it. The first update from firmware without this capability still uses the physical startup gesture. The complete automatic update and return to normal operation have been confirmed on Windows with the GMMK PRO revision 1 ISO and GMMK Numpad. This does not establish physical acceptance for the other models or macOS/Linux; see [hardware acceptance](../docs/hardware-acceptance.md#automatic-firmware-updates).
 
 ## Behavior
 
@@ -22,13 +24,13 @@ This storage implementation does not promise atomic recovery from power loss dur
 
 [`protocol.md`](protocol.md) defines the 32-byte RAW-HID configuration protocol, feature flags, explicit version response and persistent configuration formats. Development USB PIDs `FEED:1C01` through `FEED:1C10` map to the 16 board IDs. These are development identities, not a commercial USB allocation. App handshake checks must agree with the expected model; a PID alone does not authorize writing.
 
-The runtime protocol offers no arbitrary memory access, firmware write, protection change or remote bootloader command. A physical startup gesture enters the bootloader. INGLORIOUS keyboard firmware uses Space+B; the Numpad uses Plus+Enter. Original-firmware gestures may differ: see [`setup-boot-gestures.md`](../docs/setup-boot-gestures.md).
+The runtime protocol offers no arbitrary memory access, firmware write or protection change. Supported builds advertise [app-triggered bootloader entry](protocol.md#private-app-triggered-bootloader-entry-01112), using an explicit capability and a version-bound prepare/commit exchange after user confirmation. Actual firmware writes remain in the separately verified bootloader workflow. Board 16 also binds entry to its active hardware profile, full generation and stable selector; OS-switch movement cancels entry on boards with that switch. The physical recovery route remains available: INGLORIOUS keyboard firmware uses Space+B; the Numpad uses Plus+Enter. Original-firmware gestures may differ: see [`setup-boot-gestures.md`](../docs/setup-boot-gestures.md).
 
 The generic installer composes an installation image using the reviewed firmware binary, a per-installation recovery identifier in the unused code gap and the configuration tail. The identifier is not part of the frozen raw firmware binary and is not an immutable hardware UID. Details are in [`device-setup.md`](../docs/device-setup.md).
 
 ## Build
 
-The public build prepares pinned dependencies and builds all targets without accessing hardware:
+The build prepares pinned dependencies and builds all targets without accessing hardware:
 
 ```powershell
 pwsh -NoProfile -File scripts/Initialize-BuildDependencies.ps1 -Scope Firmware
@@ -42,6 +44,8 @@ The GMMK 3 wired non-HE ports are normalized from pinned manufacturer sources. T
 
 The build records binary sizes, source hashes, compiler version, linker maps and stack reports. Firmware catalog hashes must match before those files can be packaged. A successful build proves neither hardware compatibility nor maximum stack usage under every input sequence.
 
+Bootloader entry reuses the pinned QMK STM32F303 or WB32 implementation already used by physical recovery. The build verifies those source files against the pinned commit; the independent artifact audit checks their hashes, linked implementation, startup hook and RAM bounds. Board 16 keeps the resident loader and enters through the existing QMK route. Its automatic round trip and preservation of all three hardware profiles still need a physical test; source inspection cannot establish the behavior of the proprietary retained loader or a USB host. The confirmed PRO revision 1 ISO and Numpad update paths do not cover this retained-loader variant.
+
 Board 16 produces an application-only image at `0x08007000`. Its first 28 KiB must be preserved from that device's independently verified original backup; vendor bytes are never distributed with the build. The linker excludes that prefix, the identity page at `0x08037F00`, and settings at `0x08038000`. The retained loader's early Space+B route is part of the installation safety policy. See [the layout and engineering notes](engineering/README.md). Build manifests record version and layout per target, so each artifact has an explicit version and application offset.
 
 Board 16 also provides opt-in physical key/encoder diagnostics and temporary all-LED or individual-LED colors. The session times out after ten seconds without a refresh, ends on USB suspend, and does not save settings or suppress normal key input. Other targets keep their existing manual lighting test. Exact command layouts are in [the protocol](protocol.md).
@@ -50,12 +54,14 @@ Board 16 also provides opt-in physical key/encoder diagnostics and temporary all
 
 ```powershell
 pwsh -NoProfile -File firmware/tests/Run-RuntimeChecks.ps1
-pwsh -NoProfile -File firmware/tests/Run-PortChecks.ps1 -FixtureDirectory artifacts/gmmk3-pro-port-fixtures
+pwsh -NoProfile -File firmware/tests/Run-RuntimeChecks.ps1 -AppBootloader
+pwsh -NoProfile -File firmware/tests/Run-PortChecks.ps1 -AppBootloader -FixtureDirectory artifacts/retained-loader-fixtures
+pwsh -NoProfile -File firmware/tests/Run-ProfileRuntimeChecks.ps1 -FixtureDirectory artifacts/retained-loader-fixtures
 pwsh -NoProfile -File firmware/tests/Run-StorageChecks.ps1
 pwsh -NoProfile -File firmware/tests/Run-BulkChecks.ps1
 ```
 
-Tests exercise actual C modules with simulated storage, time and USB traffic. The storage suite compiles the patched QMK driver and covers interrupted writes and readback failures. Port tests compare physical layout references, configuration round trips, recovery key positions and lighting sequences. None of these tests changes a real keyboard.
+Tests exercise actual C modules with simulated storage, time and USB traffic. The optional `-AppBootloader` runtime/port runs enable entry and test request identity, expiry, acknowledgment ordering and cancellation; default-off builds reject these commands. Board 16's separate profile-runtime suite checks its enabled path with full-generation changes, selector/OS movement, active uploads, pending profile changes and USB timing conflicts. The storage suite compiles the patched QMK driver and covers interrupted writes and readback failures. Port tests compare physical layout references, configuration round trips, recovery key positions and lighting sequences. None of these tests changes a real keyboard.
 
 ## License and source
 

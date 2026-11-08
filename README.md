@@ -13,7 +13,7 @@ Configure Glorious keyboards with per-key lighting, effects, key assignments, ma
 
 I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
 
-**App 0.7.0 · Firmware 0.11.11 for GMMK 3 PRO 100% ISO; 0.11.9 for other supported models**
+**App 0.7.8 · Firmware 0.11.14**
 
 Get installers and packages from the [Releases page](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases). macOS and Linux builds are Early Alpha; physical-device testing is still limited.
 
@@ -100,6 +100,8 @@ The app follows the system language by default, with English as fallback. It inc
 Open **Settings → Updates** to check for a new version or turn automatic checks on or off. Automatic checks run at startup and every twelve hours. Downloading and installing an update always requires your action. On Windows, the app opens the normal installer after handling unsaved changes. On macOS and Linux, it downloads the package and shows how to replace the app. Profiles and original-firmware backups are kept.
 
 New firmware comes with app updates when available. Updating the app does not flash a keyboard; the device guide handles firmware changes separately.
+
+With compatible INGLORIOUS firmware installed, the firmware guide can update the keyboard without unplugging it. First installation and older firmware still use the guided key combination. This update flow has been tested on Windows with the GMMK PRO ISO and GMMK Numpad; other models still need hardware testing.
 
 ## Custom firmware built on QMK
 

@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$ReportPath, [string]$KnobFixtureDirectory, [string]$KnobOrderFixtureDirectory, [string]$KnobPressFixtureDirectory)
+param([string]$ReportPath, [string]$KnobFixtureDirectory, [string]$KnobOrderFixtureDirectory, [string]$KnobPressFixtureDirectory, [switch]$AppBootloader)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
@@ -34,6 +34,7 @@ try {
         $output = Join-Path $workspace "artifacts\firmware-runtime-tests-$board.exe"
         $arguments = @('-std=c11', '-Wall', '-Wextra', '-Werror', ('-I' + $PSScriptRoot), (Join-Path $PSScriptRoot 'runtime_tests.c'), '-lm', '-o', $output)
         if ($board -eq 'pro') { $arguments += '-DIG_TEST_PRO' }
+        if ($AppBootloader) { $arguments += '-DIG_APP_BOOTLOADER_ENABLE=1' }
         & $compiler @arguments
         if ($LASTEXITCODE -ne 0) { throw "Offline harness compilation failed with exit $LASTEXITCODE for $board." }
         $fixtureArgs=@((Join-Path $workspace 'artifacts\protocol-fixtures'),(Join-Path $workspace 'artifacts\onboard-fixtures'))
@@ -45,7 +46,7 @@ try {
         $lines | Write-Output
         $summary = @($lines | Where-Object { $_ -match '^PASS: board([12]), ([0-9]+) firmware runtime checks;' })
         if ($summary.Count -ne 1 -or $summary[0] -notmatch '^PASS: board([12]), ([0-9]+) firmware runtime checks;' -or [int]$Matches[1] -ne $(if($board -eq 'pro'){1}else{2})) { throw 'Native runtime did not report the expected board result.' }
-        $results += [ordered]@{board=$board;passed=[int]$Matches[2]}
+        $results += [ordered]@{board=$board;passed=[int]$Matches[2];appBootloader=[bool]$AppBootloader}
     }
 } finally { $env:PATH = $originalPath }
 if($ReportPath){
@@ -63,6 +64,8 @@ if($ReportPath){
         knobOrderFixtures=$knobOrderFixtures;
         knobPressFixtures=$knobPressFixtures;
         cacheStagingTestsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'cache_staging_checks.h')).Hash;
+        appBootloaderSourceSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot '../inglorious/ig_app_bootloader.inc')).Hash;
+        appBootloaderTestsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'app_bootloader_checks.h')).Hash;
         storageHeaderSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot '../inglorious/ig_storage.h')).Hash;
         storageImplementationSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot '../inglorious/ig_storage.inc')).Hash;
         scope='Actual C runtime, read-only version reporting and all existing configuration, storage-failure, macro, recovery, timing, effects, standby and lighting-test regressions.'}

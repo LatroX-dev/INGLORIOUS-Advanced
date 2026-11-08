@@ -29,9 +29,9 @@ public static class HardwareControlCatalog
     public static string OsSwitchText(string deviceId, OnboardHardwareControlStatus? status, bool testStarted)
     {
         if (!HasOsSwitch(deviceId)) return "";
-        if (status is null) return L.T(testStarted
-            ? "Für den Schaltertest ist ein Firmware-Update erforderlich."
-            : "Windows / macOS: Test starten.");
+        if (status is null) return testStarted
+            ? L.T("Für den Schaltertest ist ein Firmware-Update erforderlich.")
+            : L.Format("Windows / macOS: {0}", "—");
         if (status.DeviceId != deviceId) throw new ArgumentException("Hardware-control status model mismatch.", nameof(status));
         return status.Pending
             ? L.Format("Windows / macOS: {0} → {1}. Lasse alle Tasten los.",

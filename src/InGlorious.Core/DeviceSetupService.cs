@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -39,6 +39,15 @@ public sealed class SetupSession
     public bool WriteAttempted { get; internal set; }
     public bool OutcomeUncertain { get; internal set; }
     public string? InstalledFirmwareVersion { get; internal set; }
+    public bool AutomaticUpdate { get; internal set; }
+    public bool AutomaticRestartRequested { get; internal set; }
+    public bool AutomaticRestartAcknowledged { get; internal set; }
+    internal bool BootloaderEntryAttempted;
+    internal DateTimeOffset? BootloaderEntryDeadline;
+    internal DateTimeOffset? RuntimeReturnDeadline;
+    internal byte[]? ExpectedRuntimeConfiguration;
+    internal OnboardProfileBinding? ExpectedHardwareProfile;
+    internal OnboardFirmwareVersion? ExpectedRuntimeVersion;
     internal SetupUsbNode? Bootloader;
     internal JsonElement Selection;
     internal string? FingerprintSha256, BackupPath, OriginalSha256, BundlePath, CurrentSha256;
@@ -49,6 +58,8 @@ public sealed class SetupSession
 }
 public sealed record SetupUsbNode(string InstanceId, ushort VendorId, ushort ProductId, string Name,
     string Service, IReadOnlyList<string> LocationPaths);
+internal sealed record SetupRuntimeConfiguration(byte[] Payload, OnboardProfileBinding? HardwareProfile = null,
+    OnboardHardwareProfileStatus? ProfileStatus = null);
 
 /// <summary>Per-operation discovery and provisioning. Never consumes private device bindings.
 /// USB metadata selects candidates; the observed cable transition and bootloader independently
@@ -58,14 +69,15 @@ public sealed partial class DeviceSetupService
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
     private readonly string _archiveRoot, _packageRoot;
     private readonly IDeviceSetupEnvironment _environment;
+    private readonly Func<string, string> _targetVersionFor;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private SetupSession? _active;
     public static string RecoveryDirectory => Path.Combine(Paths.UserDataRoot, "Firmware", "Devices");
     public DeviceSetupService() : this(OperatingSystem.IsWindows() ? new WindowsDeviceSetupEnvironment() : new PosixDeviceSetupEnvironment(),
         RecoveryDirectory,
         Path.Combine(AppContext.BaseDirectory, "Firmware")) { }
-    internal DeviceSetupService(IDeviceSetupEnvironment environment, string archiveRoot, string packageRoot)
-    { _environment = environment; _archiveRoot = Path.GetFullPath(archiveRoot); _packageRoot = Path.GetFullPath(packageRoot); }
+    internal DeviceSetupService(IDeviceSetupEnvironment environment, string archiveRoot, string packageRoot, Func<string, string>? targetVersionFor = null)
+    { _environment = environment; _archiveRoot = Path.GetFullPath(archiveRoot); _packageRoot = Path.GetFullPath(packageRoot); _targetVersionFor = targetVersionFor ?? TargetFirmwareVersionFor; }
 
     public async Task<IReadOnlyList<SetupDevice>> ListDevicesAsync()
     {
@@ -120,6 +132,12 @@ public sealed partial class DeviceSetupService
             var nodes = await _environment.ScanAsync();
             if (session.Stage == SetupStage.Reconnect)
             {
+                if (session.AutomaticUpdate && session.RuntimeReturnDeadline is { } deadline && DateTimeOffset.UtcNow >= deadline)
+                {
+                    // Firmware was already verified. A slow or failed restart must never rerun the write.
+                    session.RuntimeReturnDeadline = null;
+                    session.AutomaticRestartRequested = false;
+                }
                 if (nodes.Any(IsBootloader)) return Progress(session);
                 var board = BoardDescriptorRegistry.Get(session.DeviceId!);
                 var vendor = session.Operation != SetupOperation.Restore ? BoardDescriptorRegistry.RuntimeVendorId : session.OriginalVendor;
@@ -127,6 +145,16 @@ public sealed partial class DeviceSetupService
                 if (nodes.Count(node => node.Service != "Unavailable" && node.VendorId == vendor && node.ProductId == product && SamePort(node.LocationPaths, session.Device.LocationPaths)) == 1)
                     session.Stage = SetupStage.Complete;
                 return Progress(session);
+            }
+            if (session.AutomaticUpdate && session.Stage == SetupStage.ConnectBootloader)
+            {
+                if (session.BootloaderEntryDeadline is not { } deadline || DateTimeOffset.UtcNow >= deadline)
+                    return Block(session, "Der Update-Modus wurde nicht rechtzeitig erkannt. Verbinde das Gerät normal neu und starte das Update erneut.");
+                // Software entry may be faster than USB polling. The acknowledged command replaces
+                // the physical-disconnect observation, never the original instance and port checks.
+                var samePort = nodes.Where(node => SamePort(node.LocationPaths, session.Device.LocationPaths)).ToArray();
+                if (samePort.Length > 1) return Block(session, "Die USB-Verbindung hat sich geändert. Starte die Einrichtung erneut.");
+                if (nodes.Any(node => node.InstanceId == session.Device.InstanceId)) return Progress(session);
             }
             if (session.Stage == SetupStage.Disconnect)
             {
@@ -175,6 +203,119 @@ public sealed partial class DeviceSetupService
             return Progress(session);
         }
         finally { _gate.Release(); }
+    }
+
+    internal async Task<SetupProgress> StartAutomaticUpdateAsync(SetupSession session, OnboardFirmwareVersion expectedVersion,
+        bool explicitlyConfirmed, Func<Task<SetupRuntimeConfiguration>> readConfiguration, Func<Task> enterBootloader)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            AssertSession(session);
+            if (!explicitlyConfirmed || session.Operation != SetupOperation.Update || !session.Device.IsRuntime ||
+                !SupportsAutomaticUpdateDevice(expectedVersion.DeviceId) ||
+                !session.Device.CandidateDeviceIds.SequenceEqual([expectedVersion.DeviceId]) ||
+                expectedVersion.BuildId == 0 || expectedVersion.Version < OnboardClient.AppBootloaderMinimumVersion ||
+                session.Stage != SetupStage.Disconnect || session.BootloaderEntryAttempted ||
+                session.WriteAttempted || session.Consumed || session.OutcomeUncertain)
+                throw Error("Starte die Einrichtung erneut.");
+            if (!FirmwareSemanticVersion.TryParse(_targetVersionFor(expectedVersion.DeviceId), out var targetVersion) || expectedVersion.Version >= targetVersion)
+                throw Error("Die Firmware ist bereits aktuell oder neuer als die angebotene Version.");
+            await AssertCoreClosed();
+            await RequireBoundRuntimeAsync(session);
+            // Consume the entry attempt before calling external code; timeout or lost ACK never retries it.
+            session.BootloaderEntryAttempted = true;
+            session.AutomaticUpdate = true;
+            session.DeviceId = expectedVersion.DeviceId;
+            session.InstalledFirmwareVersion = expectedVersion.Version.ToString();
+            session.ExpectedRuntimeVersion = expectedVersion;
+            var configuration = await readConfiguration();
+            if (OnboardSerializer.Decode(configuration.Payload).DeviceId != session.DeviceId ||
+                !IsValidAutomaticProfileBinding(session.DeviceId, configuration))
+                throw Error("Gerät nicht eindeutig erkannt.");
+            session.ExpectedRuntimeConfiguration = configuration.Payload.ToArray();
+            session.ExpectedHardwareProfile = configuration.HardwareProfile;
+            WriteNew(Path.Combine(session.Directory, "before-update.igcfg.bin"), session.ExpectedRuntimeConfiguration);
+            if (session.ExpectedHardwareProfile is { } profile)
+                WriteNew(Path.Combine(session.Directory, "before-update-profile.json"), JsonSerializer.SerializeToUtf8Bytes(profile, Json));
+            await AssertCoreClosed();
+            await RequireBoundRuntimeAsync(session);
+            await enterBootloader();
+            session.BootloaderEntryDeadline = DateTimeOffset.UtcNow.AddSeconds(45);
+            session.Stage = SetupStage.ConnectBootloader;
+            return Progress(session);
+        }
+        catch
+        {
+            if (session.BootloaderEntryAttempted) session.Stage = SetupStage.Blocked;
+            throw;
+        }
+        finally { _gate.Release(); }
+    }
+
+    private async Task RequireBoundRuntimeAsync(SetupSession session)
+    {
+        var nodes = await _environment.ScanAsync();
+        var matches = nodes.Where(node => node.InstanceId == session.Device.InstanceId).ToArray();
+        if (nodes.Any(IsBootloader) || matches.Length != 1 || matches[0].Service == "Unavailable" ||
+            matches[0].VendorId != session.Device.VendorId || matches[0].ProductId != session.Device.ProductId ||
+            !SamePort(matches[0].LocationPaths, session.Device.LocationPaths))
+            throw Error("Die USB-Verbindung hat sich geändert. Starte die Einrichtung erneut.");
+    }
+
+    internal static bool SupportsAutomaticUpdateDevice(string deviceId) =>
+        BoardDescriptorRegistry.ProtocolBoards.Any(board => board.DeviceId == deviceId);
+
+    private static bool IsValidAutomaticProfileBinding(string deviceId, SetupRuntimeConfiguration configuration) =>
+        deviceId == "gmmk3-pro-100-iso" ? configuration.HardwareProfile is { } profile &&
+            configuration.ProfileStatus is { } status && status.StorageHealthy && !status.UploadOpen &&
+            !status.SwitchPending && !status.OsPending && status.PhysicalSlot == profile.Slot && status.ActiveSlot == profile.Slot &&
+            status.Bind(profile.InstallationId) == profile && (profile.Generation == 0) == status.LegacyFallback &&
+            profile.DeviceId == deviceId && profile.Slot is >= 1 and <= 3 && profile.InstallationId != Guid.Empty &&
+            profile.InstallationId != new Guid("ffffffff-ffff-ffff-ffff-ffffffffffff") &&
+            profile.Generation < ulong.MaxValue && profile.Crc32 == OnboardProtocol.Crc32(configuration.Payload) :
+            configuration.HardwareProfile is null && configuration.ProfileStatus is null;
+
+    internal static async Task<SetupRuntimeConfiguration> ReadAutomaticRuntimeConfigurationAsync(OnboardClient client,
+        string deviceId, CancellationToken cancellationToken)
+    {
+        if (deviceId != "gmmk3-pro-100-iso") return new(await client.ReadAsync(cancellationToken));
+        var status = await client.GetHardwareProfileStatusAsync(cancellationToken: cancellationToken);
+        if (status is null || !status.StorageHealthy || status.UploadOpen || status.SwitchPending || status.OsPending ||
+            status.ActiveSlot is < 1 or > 3 || status.PhysicalSlot != status.ActiveSlot)
+            throw Error("Die Gerätekonfiguration hat sich geändert. Bitte erneut laden.");
+        var snapshot = await client.ReadHardwareProfileAsync(status.ActiveSlot, cancellationToken);
+        if (snapshot.Status != status)
+            throw Error("Die Gerätekonfiguration hat sich geändert. Bitte erneut laden.");
+        return new(snapshot.Payload, snapshot.Binding, snapshot.Status);
+    }
+
+    internal async Task VerifyReturnedConfigurationAsync(SetupSession session, OnboardClient client, CancellationToken cancellationToken)
+    {
+        if (session.ExpectedHardwareProfile is { } expected)
+        {
+            // Verify the saved slot, even if the physical switch moved while the bootloader was running.
+            var snapshot = await client.ReadHardwareProfileAsync(expected.Slot, cancellationToken);
+            if (!snapshot.Status.StorageHealthy)
+            {
+                session.Stage = SetupStage.Blocked;
+                throw Error("Die Einstellungen konnten nach dem Update nicht bestätigt werden. Lade die Konfiguration erneut von der Tastatur.");
+            }
+            VerifyReturnedConfiguration(session, snapshot.Payload, snapshot.Binding);
+        }
+        else VerifyReturnedConfiguration(session, await client.ReadAsync(cancellationToken));
+    }
+
+    internal void VerifyReturnedConfiguration(SetupSession session, byte[] configuration, OnboardProfileBinding? profile = null)
+    {
+        AssertSession(session);
+        if (!session.AutomaticUpdate) return;
+        if (session.ExpectedRuntimeConfiguration is not { } expected || !expected.AsSpan().SequenceEqual(configuration) ||
+            session.ExpectedHardwareProfile != profile)
+        {
+            session.Stage = SetupStage.Blocked;
+            throw Error("Die Einstellungen konnten nach dem Update nicht bestätigt werden. Lade die Konfiguration erneut von der Tastatur.");
+        }
     }
 
     internal static string TransportFor(string id) => id is "pro-iso" or "pro-ansi" ? "stm32-dfuse" : "wb32-dfu";
@@ -240,8 +381,13 @@ public sealed partial class DeviceSetupService
         finally { foreach (var process in processes) process.Dispose(); }
     }
     private static SetupException Error(string message) => new(L.T(message));
-    public static string ForUser(Exception error) => error is SetupException ? error.Message :
-        L.T("Der Vorgang konnte nicht abgeschlossen werden. Es wird nichts automatisch wiederholt.");
+    public static string ForUser(Exception error) => error switch
+    {
+        SetupException => error.Message,
+        OnboardBootloaderEntryException => L.T("Der Wechsel in den Update-Modus wurde nicht bestätigt. Prüfe die USB-Verbindung."),
+        OnboardCommandException { Status: 3 } => L.T("Die Tastatur ist beschäftigt. Warte kurz und versuche es erneut."),
+        _ => L.T("Der Vorgang konnte nicht abgeschlossen werden. Es wird nichts automatisch wiederholt.")
+    };
     private void AssertSession(SetupSession session)
     { if (!ReferenceEquals(session, _active)) throw Error("Starte die Einrichtung erneut."); }
     private async Task AssertCoreClosed()
@@ -251,12 +397,12 @@ public sealed partial class DeviceSetupService
     private static SetupProgress Progress(SetupSession session) => new(session.Stage, L.T(session.Stage switch
     {
         SetupStage.Disconnect => "Trenne das Gerät vom USB-Kabel.",
-        SetupStage.ConnectBootloader => "Verbinde das Gerät im Update-Modus am selben USB-Anschluss.",
+        SetupStage.ConnectBootloader => session.AutomaticUpdate ? "Das Gerät wechselt in den Update-Modus …" : "Verbinde das Gerät im Update-Modus am selben USB-Anschluss.",
         SetupStage.ReadyToBackup => session.Operation == SetupOperation.Install
             ? "Gerät erkannt. Die Original-Firmware kann jetzt gesichert werden."
             : "Gerät erkannt. Die installierte Firmware kann jetzt geprüft werden.",
         SetupStage.ReadyToInstall => "Die Sicherung ist geprüft. Der Vorgang wird fortgesetzt.",
-        SetupStage.Reconnect => "Verbinde das Gerät ohne gedrückte Tasten neu.",
+        SetupStage.Reconnect => session.AutomaticRestartRequested ? "Die Tastatur startet neu …" : "Verbinde das Gerät ohne gedrückte Tasten neu.",
         SetupStage.Complete => "Firmware übertragen und Gerät wieder erkannt.",
         _ => "Der Vorgang wurde angehalten."
     }), session.DeviceId);
@@ -278,6 +424,7 @@ public sealed partial class DeviceSetupService
             request["expectedInstallationId"] = session.Installation!.InstallationId.ToString();
             if (operation is "install" or "update") request["bundlePath"] = session.BundlePath;
             if (operation == "update") request["expectedCurrentSha256"] = session.CurrentSha256;
+            if (operation == "update" && session.AutomaticUpdate) request["restartAfterVerify"] = true;
             if (session.MigrateLegacy) request["migrateLegacy"] = true;
         }
         return await _environment.InvokeAdapterAsync(request, session.Directory);

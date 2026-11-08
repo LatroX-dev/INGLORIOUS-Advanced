@@ -194,6 +194,78 @@ static void check_identity(void) {
     }
 }
 
+static void profile_bootloader_reset(uint8_t *request) {
+    profile_ready=true;profile_open=false;mock_usb_active=true;
+    memset(profile_flash,255,sizeof(profile_flash));boot(true);
+    memset(macro_held,0,sizeof(macro_held));memset(held_layer_keys,0,sizeof(held_layer_keys));
+    diagnostic_stop();profile_select(1);
+    memset(profile_identity,0,64);memcpy(profile_identity,"IGIDENT1",8);profile_identity[8]=1;profile_identity[9]=16;
+    for(uint8_t i=12;i<60;i++)profile_identity[i]=i;
+    put32(profile_identity+60,ig_pb_crc32(profile_identity,60));
+    memcpy(request,ig_fw_identity,16);memset(request+16,89,8);
+}
+static void check_profile_bootloader(void) {
+    uint8_t request[24], read[16]={1,12};profile_bootloader_reset(request);
+    static const uint8_t version[16]={1,0,16,0,0,0,11,0,14,0,0,0,1,14,11,0};
+    check(command(13,NULL,0)==0 && !memcmp(response+8,version,16),"retained-loader candidate exposes exact0.11.14 version");
+    check(command(11,NULL,0)==0 && (u16(response+10)&512),"retained-loader candidate explicitly advertises app entry");
+    unsigned before=profile_writes;
+    check(command(25,request,24)==0 && response[6]==24 && !memcmp(response+8,request,24),"board16 prepares the exact running identity and nonce");
+    check(app_bootloader_profile==1 && app_bootloader_profile_generation==ig_profile_views[0].generation,"preparation captures active slot and full generation");
+    profile_status(0);check(command(24,NULL,0)==0,"installation identity stays readable after preparation");
+    ig_profile_put64(read+4,ig_profile_views[0].generation);put32(read+12,ig_profile_crcs[0]);
+    check(command(19,read,16)==0 && !memcmp(response+20,ig_profile_defaults,12),"bound configuration read remains available while armed");
+    const uint8_t blocked[]={3,4,5,6,8,10,12,14,15,20,21,22,23};
+    for(unsigned i=0;i<sizeof(blocked);i++)check(command(blocked[i],NULL,0)==3 && app_bootloader_state==1,"profile mutation, timing and diagnostic actions cannot interrupt armed entry");
+    check(command(26,request,24)==0 && response[6]==24 && !memcmp(response+8,request,24) && !jumps,"retained-loader entry acknowledges the complete request before scheduling");
+    now+=149;housekeeping_task_user();check(!jumps,"board16 waits149ms");now++;housekeeping_task_user();
+    check(jumps==1 && !app_bootloader_state && profile_writes==before && !writes,"board16 uses one existing jump and preserves legacy and profile storage");
+    now+=1000;housekeeping_task_user();check(jumps==1,"returning stub cannot repeat entry");
+    // All profile-local unsafe states are exercised before prepare, between
+    // prepare/commit and after acknowledgment, using the real runtime handler.
+    for(unsigned reason=0;reason<15;reason++)for(unsigned phase=0;phase<3;phase++) {
+        profile_bootloader_reset(request);before=profile_writes;
+        if(phase)check(command(25,request,24)==0,"profile safety scenario prepared");
+        if(phase==2)check(command(26,request,24)==0,"profile safety scenario committed");
+        switch(reason) {
+            case 0: ig_profile_healthy=false;break;
+            case 1: ig_profile_refresh_pending=true;break;
+            case 2: ig_profile_token=1;break;
+            case 3: ig_profile_target=2;break;
+            case 4: ig_profile_interval_state=1;break;
+            case 5: ig_profile_active=0;break;
+            case 6: ig_profile_valid[0]=false;break;
+            case 7: pressed[11]=0;break;
+            case 8: pressed[12]=0x80;break;
+            case 9: ig_profile_selector.candidate=2;break;
+            case 10: ig_profile_selector.requested=0;break;
+            case 11: diagnostic_active=true;diagnostic_refreshed=now;break;
+            case 12: macro_held[1]=1;break;
+            case 13: held_layer_keys[0]=1;break;
+            case 14: mock_usb_active=false;break;
+        }
+        if(phase<2)check(command(phase?26:25,request,24)==3 && !app_bootloader_state,"unsafe profile state blocks entry and drops preparation");
+        now+=150;housekeeping_task_user();
+        check(!jumps && !app_bootloader_state && profile_writes==before && !writes,"late profile state change cancels entry without any storage write");
+    }
+    for(unsigned phase=0;phase<2;phase++) {
+        profile_bootloader_reset(request);check(command(25,request,24)==0,"full-generation scenario prepared");
+        if(phase)check(command(26,request,24)==0,"full-generation scenario committed");
+        ig_profile_views[0].generation+=UINT64_C(0x100000000);
+        if(!phase)check(command(26,request,24)==8,"same low32 generation cannot hide a changed64bit profile generation");
+        now+=150;housekeeping_task_user();check(!jumps && !app_bootloader_state,"full generation change cancels the pending jump");
+    }
+    profile_bootloader_reset(request);check(command(25,request,24)==0 && command(26,request,24)==0,"selector-race scenario acknowledged");
+    profile_select(2);profile_select(1);now+=150;housekeeping_task_user();
+    check(!jumps && !app_bootloader_state,"switching away and back cannot resurrect an acknowledged request even with identical fallback bytes");
+    profile_bootloader_reset(request);check(command(25,request,24)==0 && command(26,request,24)==0,"OS-switch race acknowledged");
+    switch_level=!switch_level;now+=150;housekeeping_task_user();now+=30;housekeeping_task_user();
+    check(!jumps && !app_bootloader_state,"rear OS switch also cancels board16 entry");
+    profile_bootloader_reset(request);check(profile_begin(2,ig_profile_defaults,IG_SIZE,191)==0,"real bound upload starts before entry attempt");
+    check(command(25,request,24)==3 && !app_bootloader_state && stage_open && ig_profile_token==191,"app entry never takes over or aborts another profile upload");
+    profile_abort(2,191);
+}
+
 int main(int argc,char **argv) {
     check(argc==2,"default serializer fixture supplied");check(load(argv[1],defaults)==IG_SIZE,"default schema1 size");
     memset(profile_flash,255,sizeof(profile_flash));boot(true);
@@ -348,6 +420,7 @@ int main(int argc,char **argv) {
                "bound stable active snapshot receives legacy-format ACK and schedules reconnect");
     check(profile_writes==before && !writes && ig_profile_active==1,"reconnect scheduling neither writes nor selects another profile");
     check_profile_usb_activation();
+    check_profile_bootloader();
     printf("PASS profile runtime: %u checks; no hardware access; %u explicit mock page operations.\n",checks,profile_writes);
     return 0;
 }

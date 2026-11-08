@@ -2,6 +2,7 @@ using InGlorious.FirmwareAdapter;
 
 if (args.SequenceEqual(new[] { "--self-test" })) return SelfTests.Run();
 if (args.Length == 3 && args[0] == "--self-test" && args[1] == "--firmware-directory") return SelfTests.Run(args[2]);
+if (args.Length == 3 && args[0] == "--self-test-restart" && args[1] == "--firmware-directory") return SelfTests.RunRestart(args[2]);
 if (args.Length == 7 && args[0] == "--self-test-engineering" && args[1] == "--engineering-candidate" && args[3] == "--engineering-original" && args[5] == "--engineering-repeat")
     return SelfTests.RunEngineering(args[2], args[4], args[6]);
 if (args.Length == 7 && args[0] == "--self-test-retained-loader" && args[1] == "--candidate" && args[3] == "--original" && args[5] == "--repeat")

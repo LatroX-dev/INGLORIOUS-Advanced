@@ -30,6 +30,8 @@ internal sealed class Stm32Device : IDevice
     private readonly List<object> commands = [];
     private int sequence;
     private Fingerprint? initial;
+    private string? completedWriteHash;
+    private bool disposed;
     private readonly Stopwatch elapsed = Stopwatch.StartNew();
     public object[] Log => commands.ToArray();
     internal Stm32Device(Selection selection, string evidence)
@@ -53,6 +55,14 @@ internal sealed class Stm32Device : IDevice
             "write" when file != null => [.. prefix, "-s", "0x08000000", "-D", file],
             _ => throw new InvalidDataException("STM_COMMAND_REJECTED")
         };
+    }
+    internal static string[] VerifiedRestartArguments(Selection selection, Model model)
+    {
+        VerifiedRestartGrant.ValidateModel(model);
+        if (model.Transport != "stm32-dfuse") throw new InvalidDataException("MODEL_TRANSPORT_MISMATCH");
+        // dfu-util 0.11 command mode: SET_ADDRESS then zero-length DNLOAD block 2.
+        // There is no -D payload, no erase/unprotect, and no USB-reset fallback.
+        return [.. Arguments(selection, "list")[..^1], "-s", "0x08000000:leave"];
     }
     internal static Fingerprint ParseListing(string output, Selection selected, Model model)
     {
@@ -94,6 +104,7 @@ internal sealed class Stm32Device : IDevice
     }
     public void WriteAll(Model model, byte[] image, Action beforeFirstWrite, IRetainedLoaderWriteGrant? engineeringGrant = null)
     {
+        completedWriteHash = null;
         if (engineeringGrant != null) throw new InvalidDataException("ENGINEERING_AUTHORIZATION_NOT_APPLICABLE");
         if (model.FlashBytes != 262144 || image.Length != 262144) throw new InvalidDataException("STM_FULL_IMAGE_REQUIRED");
         _ = Probe(model);
@@ -103,6 +114,15 @@ internal sealed class Stm32Device : IDevice
         // 0.11 supports -D - and buffers stdin before touching the device.
         if (OperatingSystem.IsWindows()) Run("write", Files.Child(evidence, artifact.Path), beforeFirstWrite);
         else Run("write", "-", beforeFirstWrite, image);
+        completedWriteHash = Files.Hash(image);
+    }
+    public void RestartAfterVerification(Model model, VerifiedRestartGrant grant, Action beforeRestart)
+    {
+        VerifiedRestartGrant.ValidateModel(model);
+        if (disposed || completedWriteHash == null) throw new InvalidDataException("VERIFIED_RESTART_REQUIRED");
+        grant.Consume(this, model, Probe(model), completedWriteHash);
+        completedWriteHash = null; // A lost exit/status must never cause another leave request.
+        RunCommand("verified-restart", VerifiedRestartArguments(selection, model), beforeRestart);
     }
     private string Run(string operation, string? file = null, Action? beforeFirstWrite = null, byte[]? standardInput = null)
     {
@@ -110,10 +130,14 @@ internal sealed class Stm32Device : IDevice
         if (standardInput is not null && (operation != "write" || file != "-" || standardInput.Length != 262144) ||
             operation == "write" && !OperatingSystem.IsWindows() && standardInput is null)
             throw new InvalidOperationException("VERIFIED_PROCESS_INPUT_REQUIRED");
-        string[] arguments = Arguments(selection, operation, file);
+        return RunCommand(operation, Arguments(selection, operation, file), beforeFirstWrite, standardInput);
+    }
+    private string RunCommand(string operation, string[] arguments, Action? beforeStart = null, byte[]? standardInput = null)
+    {
+        if (disposed) throw new ObjectDisposedException(nameof(Stm32Device));
         string name = "dfu-" + (++sequence).ToString("D3") + "-" + operation;
         if (elapsed.ElapsedMilliseconds >= 300000) throw new TimeoutException("OPERATION_TIMEOUT");
-        var request = new { executable = tool, arguments, write = operation == "write", utc = DateTimeOffset.UtcNow };
+        var request = new { executable = tool, arguments, write = operation == "write", restart = operation == "verified-restart", utc = DateTimeOffset.UtcNow };
         Files.New(evidence, name + ".request.json", Json.Bytes(request), "tool-request");
         var psi = new ProcessStartInfo(tool) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = standardInput is not null };
         psi.Environment["LC_ALL"] = "C";
@@ -124,7 +148,7 @@ internal sealed class Stm32Device : IDevice
         Task? inputTask = null;
         try
         {
-            beforeFirstWrite?.Invoke();
+            beforeStart?.Invoke();
             if (!process.Start()) throw new IOException("TOOL_START_FAILED");
             outTask = process.StandardOutput.ReadToEndAsync(); errTask = process.StandardError.ReadToEndAsync();
             if (standardInput is not null) inputTask = Files.WriteProcessInputAsync(process.StandardInput.BaseStream, standardInput);
@@ -151,5 +175,5 @@ internal sealed class Stm32Device : IDevice
             Files.New(evidence, name + ".result.json", Json.Bytes(commands[^1]), "tool-result");
         }
     }
-    public void Dispose() => toolLock.Dispose();
+    public void Dispose() { disposed = true; completedWriteHash = null; toolLock.Dispose(); }
 }

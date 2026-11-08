@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Local INGLORIOUS configuration runtime. No firmware-update or arbitrary-memory API.
+// Local INGLORIOUS configuration runtime. No firmware-write or arbitrary-memory API.
 #include QMK_KEYBOARD_H
 #include "raw_hid.h"
 #include "eeprom.h"
@@ -17,6 +17,21 @@
 #include "ig_storage.h"
 #ifndef IG_PROFILE_BANK_ENABLE
 #    define IG_PROFILE_BANK_ENABLE 0
+#endif
+#ifndef IG_APP_BOOTLOADER_ENABLE
+#    define IG_APP_BOOTLOADER_ENABLE 0
+#endif
+#if IG_APP_BOOTLOADER_ENABLE != 0 && IG_APP_BOOTLOADER_ENABLE != 1
+#    error "App bootloader entry requires an explicit boolean build gate"
+#endif
+#if IG_APP_BOOTLOADER_ENABLE && !(IG_BOARD == 1 || IG_BOARD == 2 || IG_BOARD == 3 || IG_BOARD == 4 || IG_BOARD == 5 || IG_BOARD == 6 || IG_BOARD == 7 || IG_BOARD == 8 || IG_BOARD == 9 || IG_BOARD == 10 || IG_BOARD == 11 || IG_BOARD == 12 || IG_BOARD == 13 || IG_BOARD == 14 || IG_BOARD == 15 || IG_BOARD == 16)
+#    error "App bootloader entry requires an explicitly supported board"
+#endif
+#if IG_APP_BOOTLOADER_ENABLE && IG_BOARD == 16 && !IG_PROFILE_BANK_ENABLE
+#    error "Board 16 app bootloader entry requires the retained-loader profile-bank runtime"
+#endif
+#if IG_APP_BOOTLOADER_ENABLE
+static void app_bootloader_cancel(void);
 #endif
 #if IG_PROFILE_BANK_ENABLE
 #include "ig_profile_flash.h"
@@ -452,6 +467,9 @@ static bool read_slot(uint8_t slot, uint32_t *generation, uint32_t *crc, uint16_
     return data && validate_config(data, *length);
 }
 static void init_runtime(void) {
+#if IG_APP_BOOTLOADER_ENABLE
+    app_bootloader_cancel();
+#endif
     knob_reset();
     active_slot = -1; active_generation = 0; active_size = IG_SIZE;
     uint32_t generations[2] = {0}, crcs[2] = {0};
@@ -514,6 +532,9 @@ static bool abort_staging(void) {
 #if IG_PROFILE_BANK_ENABLE
 #include "ig_profile_runtime.inc"
 #endif
+#if IG_APP_BOOTLOADER_ENABLE
+#include "ig_app_bootloader.inc"
+#endif
 static void reply(uint8_t command, uint8_t seq, uint8_t status, const uint8_t *payload, uint8_t count) {
     uint8_t out[32] = {'I','G',1,command,seq,status,count,0};
     if (payload && count) memcpy(out + 8, payload, count);
@@ -526,6 +547,10 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
     if (!runtime_ready) { reply(command, seq, 3, NULL, 0); return; }
     if (data[5] || data[7] || count > 24) { reply(command, seq, 1, NULL, 0); return; }
     for (uint8_t i = count; i < 24; ++i) if (p[i]) { reply(command, seq, 1, NULL, 0); return; }
+#if IG_APP_BOOTLOADER_ENABLE
+    app_bootloader_expire(timer_read32());
+    if (app_bootloader_blocks(command)) { reply(command, seq, 3, NULL, 0); return; }
+#endif
 #if IG_PROFILE_BANK_ENABLE
     if (command >= 3 && command <= 6) { reply(command, seq, 9, NULL, 0); return; } // Never reinterpret implicit legacy writes or aborts.
 #endif
@@ -603,7 +628,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
             brightness = p[0]; out[0] = brightness; size = 1; break;
         case 11: // Extension discovery leaves the original INFO layout and all config schemas intact.
             if (count) { status = 1; break; }
-            put16(out, 1); put16(out + 2, (IG_BOARD==16 ? 7 : 3) | (IG_HAS_ENCODER ? 120 : 0) | (IG_HAS_OS_SWITCH ? 128 : 0) | (IG_PROFILE_BANK_ENABLE ? 256 : 0)); put16(out + 4, IG_LIGHT_TEST_MS); size = 8; break;
+            put16(out, 1); put16(out + 2, (IG_BOARD==16 ? 7 : 3) | (IG_HAS_ENCODER ? 120 : 0) | (IG_HAS_OS_SWITCH ? 128 : 0) | (IG_PROFILE_BANK_ENABLE ? 256 : 0) | (IG_APP_BOOTLOADER_ENABLE ? 512 : 0)); put16(out + 4, IG_LIGHT_TEST_MS); size = 8; break;
         case 12: { // 0=status, 1=start once, 2=stop. Never persistent and never extends a running deadline.
             if (count != 1) { status = 1; break; }
             if (p[0] > 2) { status = 2; break; }
@@ -659,10 +684,17 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
         case 18: case 19: case 20: case 21: case 22: case 23: case 24:
             status = ig_profile_command(command, p, count, out, &size); break;
 #endif
+#if IG_APP_BOOTLOADER_ENABLE
+        case 25: case 26: case 27:
+            status = app_bootloader_command(command, p, count, out, &size); break;
+#endif
         default: status = 9; break;
     }
     reply(command, seq, status, out, status ? 0 : size);
     if (command == 8 && !status) ig_timing_schedule_reconnect(); // ACK must precede any scheduled USB restart.
+#if IG_APP_BOOTLOADER_ENABLE
+    if (command == 26 && !status) app_bootloader_schedule(); // Only after the complete bound ACK was queued.
+#endif
 }
 
 uint16_t keycode_at_keymap_location(uint8_t layer, uint8_t row, uint8_t col) {
@@ -910,6 +942,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (IS_KEYEVENT(record->event) &&
         (record->event.key.row >= MATRIX_ROWS || record->event.key.col >= MATRIX_COLS ||
          !ig_physical[record->event.key.row * MATRIX_COLS + record->event.key.col])) return true;
+#if IG_APP_BOOTLOADER_ENABLE
+    if (IS_KEYEVENT(record->event) || IS_ENCODEREVENT(record->event)) app_bootloader_cancel();
+#endif
     if (IS_KEYEVENT(record->event) || IS_ENCODEREVENT(record->event)) lighting_activity();
 #if IG_HAS_ENCODER
     if (!knob_process(keycode, record)) return false;
@@ -1081,6 +1116,9 @@ static void slider_task(void) {
         slider_activity_position = position;
         slider_activity_direction = 0;
         lighting_wake();
+#if IG_APP_BOOTLOADER_ENABLE
+        app_bootloader_cancel();
+#endif
     } else slider_activity_direction = direction;
     int16_t delta = position - slider_last;
     if (delta > -2 && delta < 2) return;
@@ -1093,6 +1131,9 @@ static void slider_task(void) {
 #endif
 void housekeeping_task_user(void) {
     uint32_t now = timer_read32();
+#if IG_APP_BOOTLOADER_ENABLE
+    app_bootloader_expire(now);
+#endif
     (void)light_test_remaining(now); // Stops even if rendering is idle or the host disappears.
     (void)diagnostic_remaining(now);
     // Newest first. Drop expired input history permanently so it cannot become
@@ -1125,6 +1166,9 @@ void housekeeping_task_user(void) {
     ig_timing_task(!stage_open && !macro_running && !any_keys_pressed());
 #endif
     if (was_pending && !ig_timing_reconnect_pending()) effect_hit_count = 0;
+#if IG_APP_BOOTLOADER_ENABLE
+    app_bootloader_task(timer_read32());
+#endif
 }
 void keyboard_pre_init_user(void) {
     ig_hardware_init();
@@ -1156,7 +1200,7 @@ static bool recovery_chord_held(void) {
 }
 static void recovery_startup(void) {
     // Startup only: debounce, require exactly the chord, then hold for 500 ms.
-    // No EEPROM reset and no remotely accessible boot command.
+    // No EEPROM reset. This physical recovery path also works without the app.
     matrix_scan(); wait_ms(50); matrix_scan(); // Covers every supported debounce setting (0..40 ms).
     if (!recovery_chord_held()) return;
     for (uint8_t sample = 0; sample < 50; ++sample) {
@@ -1183,6 +1227,9 @@ void keyboard_post_init_user(void) {
     rgb_matrix_mode_noeeprom(RGB_MATRIX_SOLID_COLOR);
 }
 void suspend_power_down_user(void) { lighting_suspended = true; light_test_active = false; (void)diagnostic_remaining(timer_read32()); cancel_macro(); memset(held_layer_keys, 0, sizeof(held_layer_keys)); effect_hit_count = 0;
+#if IG_APP_BOOTLOADER_ENABLE
+    app_bootloader_cancel();
+#endif
 #if IG_HAS_ENCODER
     if (knob_pending) knob_cancelled = true;
     knob_signal_active = false;

@@ -192,6 +192,7 @@ foreach($target in $targets){
  $config=$config.Replace('__PID__',$target.runtimeProductId).Replace('__PRODUCT__',$target.product).Replace('__BOARD__',[string]$target.boardId).Replace('__CAPACITY__',[string]$target.flashBytes)
  if($Engineering){$config+="`n#define IG_ENGINEERING_BUILD 1`n"}
  if($target.boardId-eq16){$config+="`n#define IG_RETAINED_LOADER_BUILD 1`n"}
+ if($target.boardId-in@(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)){$config+="`n#define IG_APP_BOOTLOADER_ENABLE 1`n"}else{throw 'App bootloader entry requires an explicitly supported target'}
  if($profileBankEnabled){$config+="`n#define IG_PROFILE_BANK_ENABLE 1`n"}
  if($target.slider){$config+="`n#define IG_HAS_SLIDER 1`n"}
  foreach($effect in $effects){$config+="`n#undef $effect"}
@@ -213,7 +214,7 @@ OPT_DEFS += -DIG_CACHE_STAGING
 MCU_LDSCRIPT = IG___NAME__
 '@
  $rules+="`nENCODER_MAP_ENABLE = $(if($target.encoder){'yes'}else{'no'})`n"
- if($target.boardId-eq16){$rules+="LDFLAGS += -Wl,--undefined=ig_fw_identity`n"}
+ $rules+="LDFLAGS += -Wl,--undefined=ig_fw_identity`n"
  if($target.mcu.StartsWith('WB32',[StringComparison]::Ordinal)){$rules+="USE_CHIBIOS_CONTRIB = yes`nSRC += `$(KEYMAP_PATH)/wb32_bulk.c`n"}
  if($profileBankEnabled){$rules+="SRC += `$(KEYMAP_PATH)/ig_profile_bank.c`nSRC += `$(KEYMAP_PATH)/ig_profile_flash.c`n"}
  Write-IfDifferent (Join-Path $dir 'rules.mk') ($rules.Replace('__NAME__',$target.name)+"`n")
@@ -236,10 +237,12 @@ MCU_LDSCRIPT = IG___NAME__
    $obsolete=Join-Path $generatedRoot 'ig_engineering_version.h'
    if(Test-Path -LiteralPath $obsolete){Remove-Item -LiteralPath $obsolete}
   }
+ }
+ if($target.boardId-eq16){
   Copy-IfDifferent (Join-Path $PSScriptRoot $target.versionHeaderPath) $dir
   Copy-IfDifferent (Join-Path $dir 'ig_board_version.h') $dest
  }
- foreach($file in @('inglorious.c','ig_effects.h','ig_color.h','ig_hardware_controls.h','ig_timing.h','ig_version.h','ig_timing.c','ig_storage.h','ig_storage.inc')){Copy-IfDifferent (Join-Path $PSScriptRoot ('inglorious/'+$file)) $dest}
+ foreach($file in @('inglorious.c','ig_effects.h','ig_color.h','ig_hardware_controls.h','ig_timing.h','ig_version.h','ig_timing.c','ig_storage.h','ig_storage.inc','ig_app_bootloader.inc')){Copy-IfDifferent (Join-Path $PSScriptRoot ('inglorious/'+$file)) $dest}
  if($profileBankEnabled){foreach($file in @('ig_profile_bank.h','ig_profile_bank.c','ig_profile_flash.h','ig_profile_flash.c','ig_profile_runtime.inc','ig_profile_selector.h','ig_profile_defaults.h')){Copy-IfDifferent (Join-Path $PSScriptRoot ('inglorious/'+$file)) $dest}}
  if($target.mcu.StartsWith('WB32',[StringComparison]::Ordinal)){Copy-IfDifferent (Join-Path $PSScriptRoot 'inglorious/wb32_bulk.c') $dest}
  $lddir=Join-Path $board 'ld';New-Item -ItemType Directory -Path $lddir -Force | Out-Null

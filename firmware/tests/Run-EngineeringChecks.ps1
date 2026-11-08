@@ -14,7 +14,10 @@ if([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encodin
 $normal=& $resolve
 if($normal.Engineering-or$normal.Targets.Count-ne16){throw 'Normal target selection failed'}
 foreach($target in @($normal.Targets|Where-Object boardId -lt 16)){
- if($target.firmwareVersion-cne'0.11.9'-or$target.firmwareBuildId-cne'000B0901'-or$target.applicationOffsetBytes-ne0-or$target.protectedPrefixBytes-ne0){throw 'Original board version/layout changed'}
+ $version='0.11.14'
+ $buildId='000B0E01'
+ $header='inglorious/ig_version.h'
+ if($target.firmwareVersion-cne$version-or$target.firmwareBuildId-cne$buildId-or$target.versionHeaderPath-cne$header-or$target.applicationOffsetBytes-ne0-or$target.protectedPrefixBytes-ne0){throw 'Original board version/layout changed'}
 }
 $explicit=& $resolve -Board gmmk3-pro-100-iso
 $engineering=& $resolve -Engineering -Board gmmk3-pro-100-iso
@@ -22,7 +25,7 @@ foreach($selection in @($explicit,$engineering)){
  if($selection.Targets.Count-ne1-or$selection.Targets[0].boardId-ne16){throw 'Exact board 16 selection failed'}
  $target=$selection.Targets[0]
  if($target.applicationOffsetBytes-ne28672-or$target.protectedPrefixBytes-ne28672-or$target.identityBytes-ne256){throw 'Retained-loader layout changed'}
- if($target.firmwareVersion-cne'0.11.11'-or$target.firmwareBuildId-cne'000B0B01'-or$target.profileBankLayout-cne'profile-pairs-v1'){throw 'Board 16 identity or profile bank layout changed'}
+ if($target.firmwareVersion-cne'0.11.14'-or$target.firmwareBuildId-cne'000B0E01'-or$target.profileBankLayout-cne'profile-pairs-v1'){throw 'Board 16 identity or profile bank layout changed'}
 }
 $cases=@(
  @{name='resolver engineering default';run={& $resolve -Engineering};reason='exact board'},
@@ -43,7 +46,7 @@ foreach($case in $cases){
  if(!$rejected){throw "Guard did not reject $($case.name)"}
  $results+=$case.name
 }
-Write-Output "PASS: 16 normal targets, unchanged first 15 layouts and 0.11.9 identities, retained-loader board 16 with 0.11.11 profile banks and explicit engineering selection; $($results.Count) unsafe selections rejected before compiler/overlay output. No hardware access."
+Write-Output "PASS: 16 normal targets, unchanged first15 layouts, all0.11.14 identities, retained-loader board16 with profile banks; $($results.Count) unsafe selections rejected before compiler/overlay output. No hardware access."
 if($ReportPath){
  $report=[ordered]@{schema=1;testedUtc=[DateTime]::UtcNow.ToString('o');hardwareAccess=$false;defaultTargetCount=16;retainedLoaderBoard=16;originalFifteenTargetDefinitionsSha256=$originalSha;rejectedSelections=$results;resolverSha256=(Get-FileHash -LiteralPath $resolve).Hash}
  $stream=[IO.FileStream]::new([IO.Path]::GetFullPath($ReportPath),[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)

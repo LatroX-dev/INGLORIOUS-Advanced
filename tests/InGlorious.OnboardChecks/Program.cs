@@ -33,6 +33,7 @@ async Task RejectAsync(Func<Task> action, string reason) { try { await action();
 
 Check(OnboardProtocol.Crc32("123456789"u8) == 0xCBF43926, "IEEE CRC32 reference vector");
 await FirmwareVersionChecks.Run(Check);
+await BootloaderEntryChecks.Run(Check);
 await BrightnessBindingChecks.Run(Check);
 KnobPresetChecks.Run(Check);
 await KnobTransferChecks.Run(Check);

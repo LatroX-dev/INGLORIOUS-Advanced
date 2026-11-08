@@ -20,7 +20,7 @@ internal static partial class SelfTests
             var dfu = NativeToolCatalog.Verify(NativeToolCatalog.DfuName);
             using (Files.Lock(dfu.Path, dfu.Bytes, dfu.Sha256).Stream) checks++;
             NativeCatalogChecks();
-            PacketChecks(); PageWriteChecks(); FileChecks(root); RequestChecks(root); EngineeringChecks(root); RetainedLoaderChecks(root); OperationLockChecks(root); StmChecks();
+            PacketChecks(); PageWriteChecks(); FileChecks(root); RequestChecks(root); EngineeringChecks(root); RetainedLoaderChecks(root); OperationLockChecks(root); StmChecks(); RestartChecks(root);
             string[] ids = ["pro-iso", "numpad", "pro-ansi", "pro-rev2-ansi", "pro-rev2-iso", "gmmk2-65-ansi", "gmmk2-65-iso", "gmmk2-96-ansi", "gmmk2-96-iso", "gmmk3-65-ansi", "gmmk3-65-iso", "gmmk3-75-ansi", "gmmk3-75-iso", "gmmk3-100-ansi", "gmmk3-100-iso"];
             foreach (string id in ids) EngineChecks(root, id);
             LegacyChecks(root);
@@ -341,15 +341,16 @@ internal static partial class SelfTests
     private sealed class FakeDevice : IDevice
     {
         internal readonly Fingerprint Fingerprint; internal byte[] Image; internal int Writes, Reads, BeforeWriteReads;
-        internal bool ReadFault, WriteFault, AfterFault; private bool wroteThisCall;
+        internal bool ReadFault, WriteFault, AfterFault, AfterPairFault, AfterIdentityFault, RestartFault;
+        internal int Restarts; private bool wroteThisCall;
         internal FakeDevice(Model model)
         {
             Image = new byte[model.FlashBytes]; Array.Fill(Image, (byte)0xFF); BinaryPrimitives.WriteUInt32LittleEndian(Image, 0x20001000); BinaryPrimitives.WriteUInt32LittleEndian(Image.AsSpan(4), Model.FlashBase + 0x101);
             bool stm = model.Transport == "stm32-dfuse";
             Fingerprint = new(model.Transport, (ushort)(stm ? 0x0483 : 0x342D), (ushort)(stm ? 0xDF11 : 0xDFA0), 1, "6.7", stm ? "0123456789AB" : "", 1, 0, 0, 0x100, stm ? null : 0x3A502980, model.BootVersion, Model.FlashBase, model.FlashBytes, model.SramBytes, stm ? "@Internal Flash /0x08000000/128*0002Kg" : null, null, stm ? "usb-serial-and-port" : "transport-session");
         }
-        public Fingerprint Probe(Model model) => Fingerprint;
-        public byte[] ReadAll(Model model) { Reads++; var bytes = Image.ToArray(); if ((ReadFault && Reads % 2 == 0) || (AfterFault && wroteThisCall)) bytes[100] ^= 1; return bytes; }
+        public Fingerprint Probe(Model model) => AfterIdentityFault && wroteThisCall ? Fingerprint with { PortPath = "9.9" } : Fingerprint;
+        public byte[] ReadAll(Model model) { Reads++; var bytes = Image.ToArray(); if ((ReadFault && Reads % 2 == 0) || (AfterFault && wroteThisCall) || (AfterPairFault && wroteThisCall && Reads % 2 == 0)) bytes[100] ^= 1; return bytes; }
         public void WriteAll(Model model, byte[] image, Action beforeFirstWrite, IRetainedLoaderWriteGrant? engineeringGrant = null)
         {
             if (model.ProtectedPrefixBytes != 0)
@@ -368,7 +369,14 @@ internal static partial class SelfTests
             }
             else Image = image.ToArray();
         }
-        public object[] Log => [new { reads = Reads, writes = Writes }];
+        public void RestartAfterVerification(Model model, VerifiedRestartGrant grant, Action beforeRestart)
+        {
+            Check(wroteThisCall && Reads - BeforeWriteReads == 4, "restart follows write and both complete readbacks");
+            grant.Consume(this, model, Probe(model), Files.Hash(Image));
+            beforeRestart(); Restarts++;
+            if (RestartFault) throw new IOException("FAKE_RESTART_DISCONNECTED");
+        }
+        public object[] Log => [new { reads = Reads, writes = Writes, restarts = Restarts }];
         public void Dispose() => wroteThisCall = false;
     }
 }

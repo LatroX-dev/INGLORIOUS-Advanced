@@ -1,4 +1,7 @@
 {
+  "Website": {
+    "en": "Website", "es": "Sitio web", "fr": "Site web", "it": "Sito web", "pt-BR": "Site", "pl": "Strona internetowa", "tr": "Web sitesi", "ru": "Сайт", "ja": "ウェブサイト", "ko": "웹사이트", "zh-Hans": "网站"
+  },
   "Kopieren nicht möglich. Markiere und kopiere den Text in der Vorschau.": {
     "en": "Could not copy. Select and copy the text in the preview.",
     "es": "No se pudo copiar. Selecciona y copia el texto de la vista previa.",

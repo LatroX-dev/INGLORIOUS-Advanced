@@ -19,7 +19,7 @@ internal sealed record AdapterRequest(int Schema, string Operation, string Sessi
     string? DeviceId = null, Selection? Selection = null, string? ExpectedFingerprintSha256 = null,
     string? BundlePath = null, string? BackupPath = null, bool ConfirmWrite = false,
     string? ExpectedBackupSha256 = null, Guid? ExpectedInstallationId = null,
-    string? ExpectedCurrentSha256 = null, bool MigrateLegacy = false);
+    string? ExpectedCurrentSha256 = null, bool MigrateLegacy = false, bool RestartAfterVerify = false);
 internal sealed record Fingerprint(string Transport, ushort Vid, ushort Pid, byte Bus, string PortPath,
     string Serial, byte Configuration, byte Interface, byte Alternate, ushort DeviceVersion,
     uint? ChipId, byte? BootVersion, uint FlashBase, int FlashBytes, int SramBytes, string? MemoryMap,
@@ -34,7 +34,8 @@ internal sealed record AdapterResponse(int Schema, string Operation, string Sess
     string? ErrorCode, string? DeviceId, Fingerprint? Fingerprint, string? FingerprintSha256,
     bool CanCapture, bool CanInstall, bool CanRestore, bool WriteAttempted, bool Verified,
     string EvidenceDirectory, Artifact[] Artifacts, Selection[]? Devices = null, string? Error = null,
-    Guid? InstallationId = null, string[]? CompatibleDeviceIds = null);
+    Guid? InstallationId = null, string[]? CompatibleDeviceIds = null,
+    bool RestartAttempted = false, bool RestartAcknowledged = false, string? RestartErrorCode = null);
 
 internal sealed record Model(string DeviceId, int BoardId, string Transport, int FlashBytes, int SramBytes, bool EngineeringOnly = false)
 {
@@ -69,6 +70,7 @@ internal interface IDevice : IDisposable
     Fingerprint Probe(Model model);
     byte[] ReadAll(Model model);
     void WriteAll(Model model, byte[] image, Action beforeFirstWrite, IRetainedLoaderWriteGrant? engineeringGrant = null);
+    void RestartAfterVerification(Model model, VerifiedRestartGrant grant, Action beforeRestart) => throw new InvalidDataException("RESTART_MODEL_NOT_SUPPORTED");
     object[] Log { get; }
 }
 internal interface IBackend : IDisposable

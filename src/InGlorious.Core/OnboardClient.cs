@@ -42,6 +42,7 @@ public sealed record OnboardExtensions(ushort Version, ushort Flags, ushort Ligh
     public bool SupportsKnobPress => Version == 1 && (Flags & 64) != 0;
     public bool SupportsOsSwitch => Version == 1 && (Flags & 128) != 0;
     public bool SupportsHardwareProfiles => Version == 1 && (Flags & 256) != 0;
+    public bool SupportsAppBootloaderEntry => Version == 1 && (Flags & 512) != 0;
 }
 public sealed record OnboardHardwareControlStatus(string DeviceId, bool MacPosition, bool MacActive, bool Pending);
 public sealed record OnboardLightingTestStatus(bool Active, byte Pattern, ushort RemainingMs);
@@ -53,7 +54,7 @@ public sealed record OnboardKnobStatus(string DeviceId, byte Layer, int ActivePr
     public string Label => L.T(SourceLabel);
 }
 
-/// <summary>Configuration and acknowledged USB re-enumeration only. No flashing, memory addresses or bootloader commands.</summary>
+/// <summary>Configuration, diagnostics and explicitly confirmed update-mode entry. No flash writes or memory addresses.</summary>
 public sealed partial class OnboardClient(IOnboardTransport transport, string expectedDeviceId, bool allowEngineering = false) : IAsyncDisposable
 {
     private readonly bool _allowEngineering = ValidateEngineeringAccess(expectedDeviceId, allowEngineering);
@@ -114,7 +115,8 @@ public sealed partial class OnboardClient(IOnboardTransport transport, string ex
         byte[] data;
         try { data = await Send(OnboardProtocol.GetExtensions, [], ct); }
         catch (OnboardCommandException ex) when (ex.Status == 9) { _lightingTestDurationMs = 0; return new(0, 0, 0); } // Old firmware: read-only unsupported-command response.
-        if (data.Length != 8 || Get16(data, 0) != 1 || (Get16(data, 2) & ~511) != 0 || Get16(data, 6) != 0 ||
+        if (data.Length != 8 || Get16(data, 0) != 1 || (Get16(data, 2) & ~1023) != 0 || Get16(data, 6) != 0 ||
+            ((Get16(data, 2) & 512) != 0 && !SupportsAppBootloaderDevice(expectedDeviceId)) ||
             ((Get16(data, 2) & 256) != 0 && expectedDeviceId != "gmmk3-pro-100-iso") ||
             ((Get16(data, 2) & 128) != 0 && !HardwareControlCatalog.HasOsSwitch(expectedDeviceId)) ||
             ((Get16(data, 2) & 120) != 0 && !DeviceCatalog.Get(expectedDeviceId).HasEncoder) ||

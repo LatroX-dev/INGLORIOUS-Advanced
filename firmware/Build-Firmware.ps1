@@ -22,6 +22,7 @@ if($firmwareVersion-cne$target.firmwareVersion-or$firmwareBuildId-cne$target.fir
 $identity=[ordered]@{deviceId=$target.deviceId;firmwareVersion=$firmwareVersion;firmwareBuildId=$firmwareBuildId;
  identityVersionHeaderPath=$target.versionHeaderPath;identityVersionHeaderSha256=(Get-FileHash -LiteralPath $identityHeader).Hash;
  applicationOffsetBytes=$target.applicationOffsetBytes;protectedPrefixBytes=$target.protectedPrefixBytes;identityBytes=$target.identityBytes;
+ appBootloaderEntry=($target.boardId-in@(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16));
  cleanTargetBuild=([bool]$Clean-or[bool]$Engineering-or$target.boardId-eq16)}
 if($target.PSObject.Properties['profileBankLayout']){$identity['profileBankLayout']=[ordered]@{id=$target.profileBankLayout;offset=172032;length=49152;recordBytes=8192;recordCount=6;profileCount=3}}
 return $identity
@@ -87,6 +88,13 @@ if(@($targets|Where-Object boardId -ge 10).Count){
 $inputFiles+=Get-Item -LiteralPath $selection.Path
 foreach($identity in $targetBuilds){$inputFiles+=Get-Item -LiteralPath (Join-Path $PSScriptRoot $identity.identityVersionHeaderPath)}
 foreach($relative in @('targets.json','Resolve-Targets.ps1','Prepare-Overlay.ps1','Build-Firmware.ps1','Patch-QmkTiming.ps1','Patch-QmkStorage.ps1','qmk_firmware/quantum/wear_leveling/wear_leveling.c','qmk_firmware/tmk_core/protocol/usb_descriptor.c')){$inputFiles+=Get-Item -LiteralPath (Join-Path $PSScriptRoot $relative)}
+foreach($relative in @('platforms/chibios/bootloaders/stm32_dfu.c','platforms/chibios/bootloaders/wb32_dfu.c','platforms/chibios/bootloader.mk','platforms/chibios/mcu_selection.mk','tmk_core/protocol/chibios/chibios.c','platforms/chibios/boards/GENERIC_STM32_F303XC/configs/config.h','platforms/chibios/boards/GENERIC_WB32_F3G71XX/configs/config.h','platforms/chibios/boards/GENERIC_WB32_FQ95XX/configs/config.h')){
+ $expectedBlob=(& git -C $qmk rev-parse ($expectedCommit+':'+$relative)).Trim()
+ if($LASTEXITCODE-ne0){throw ('Missing pinned bootloader source: '+$relative)}
+ $actualBlob=(& git -C $qmk hash-object --no-filters $relative).Trim()
+ if($LASTEXITCODE-ne0-or$actualBlob-cne$expectedBlob){throw ('Bootloader source differs from pinned QMK: '+$relative)}
+ $inputFiles+=Get-Item -LiteralPath (Join-Path $qmk $relative)
+}
 $inputHashes=@{}
 foreach($file in $inputFiles){$inputHashes[$file.FullName]=(Get-FileHash -LiteralPath $file.FullName).Hash}
 $records=@()
@@ -154,6 +162,7 @@ $manifest=[ordered]@{
  targets=@($targets | ForEach-Object { $_.deviceId })
  generatedSources=@($targets | ForEach-Object { $target=$_; Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot ('keymaps/'+$target.name)) -File | ForEach-Object { [ordered]@{path='keymaps/'+$target.name+'/'+$_.Name;bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash} } })
  commonSourceSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'inglorious/inglorious.c')).Hash
+ appBootloaderSourceSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'inglorious/ig_app_bootloader.inc')).Hash
  versionHeaderSha256=(Get-FileHash -LiteralPath $versionHeader).Hash
  identityVersionHeaderPath=$(if($single){$single.identityVersionHeaderPath}else{$null})
  identityVersionHeaderSha256=$(if($single){$single.identityVersionHeaderSha256}else{$null})

@@ -468,9 +468,10 @@ public static class OnboardProtocol
     public const byte DeviceTest = 14, DeviceTestLed = 15, ReadKnobStatus = 16, ReadHardwareControls = 17;
     public const byte ProfileStatus = 18, ProfileRead = 19, ProfileBegin = 20, ProfileWrite = 21,
         ProfileCommit = 22, ProfileAbort = 23, ProfileInstallationIdentity = 24;
+    public const byte PrepareBootloader = 25, CommitBootloader = 26, CancelBootloader = 27;
     public static byte[] Packet(byte command, byte sequence, ReadOnlySpan<byte> payload)
     {
-        if ((command is < 1 or > 6 && command is not ReconnectUsb and not ReadRuntimeBrightness and not SetRuntimeBrightness and not GetExtensions and not LightingTest and not GetFirmwareVersion and not DeviceTest and not DeviceTestLed and not ReadKnobStatus and not ReadHardwareControls && command is not (>= ProfileStatus and <= ProfileInstallationIdentity)) || payload.Length > 24 || (command is ReadRuntimeBrightness or GetExtensions or GetFirmwareVersion or ReadKnobStatus or ReadHardwareControls && payload.Length != 0) || (command == SetRuntimeBrightness && payload.Length != 1) || (command == LightingTest && (payload.Length != 1 || payload[0] > 2)) || (command == DeviceTest && (payload.Length != 1 || payload[0] > 3)) || (command == DeviceTestLed && (payload.Length != 5 || payload[0] > 2 || (payload[0] != 2 && payload[1] != 0) || (payload[0] == 0 && payload[2..].IndexOfAnyExcept((byte)0) >= 0))) || !ValidProfileRequest(command, payload)) throw new ArgumentOutOfRangeException(nameof(payload));
+        if ((command is < 1 or > 6 && command is not ReconnectUsb and not ReadRuntimeBrightness and not SetRuntimeBrightness and not GetExtensions and not LightingTest and not GetFirmwareVersion and not DeviceTest and not DeviceTestLed and not ReadKnobStatus and not ReadHardwareControls && command is not (>= ProfileStatus and <= CancelBootloader)) || payload.Length > 24 || (command is ReadRuntimeBrightness or GetExtensions or GetFirmwareVersion or ReadKnobStatus or ReadHardwareControls && payload.Length != 0) || (command == SetRuntimeBrightness && payload.Length != 1) || (command == LightingTest && (payload.Length != 1 || payload[0] > 2)) || (command == DeviceTest && (payload.Length != 1 || payload[0] > 3)) || (command == DeviceTestLed && (payload.Length != 5 || payload[0] > 2 || (payload[0] != 2 && payload[1] != 0) || (payload[0] == 0 && payload[2..].IndexOfAnyExcept((byte)0) >= 0))) || !ValidProfileRequest(command, payload)) throw new ArgumentOutOfRangeException(nameof(payload));
         var result = new byte[32]; result[0] = (byte)'I'; result[1] = (byte)'G'; result[2] = 1; result[3] = command; result[4] = sequence; result[6] = (byte)payload.Length;
         payload.CopyTo(result.AsSpan(8)); return result;
     }
@@ -483,8 +484,13 @@ public static class OnboardProtocol
         ProfileWrite => p.Length >= 9 && p[4] is >= 1 and <= 3 && p[5] is >= 1 and <= 16 && p.Length == 8 + p[5] && BinaryPrimitives.ReadUInt32LittleEndian(p) != 0,
         ProfileCommit or ProfileAbort => p.Length == (command == ProfileCommit ? 20 : 8) && p[4] is >= 1 and <= 3 && p.Slice(5, 3).IndexOfAnyExcept((byte)0) < 0 && BinaryPrimitives.ReadUInt32LittleEndian(p) != 0,
         ProfileInstallationIdentity => p.IsEmpty,
+        PrepareBootloader or CommitBootloader or CancelBootloader => p.Length == 24 &&
+            BinaryPrimitives.ReadUInt16LittleEndian(p) == 1 && IsAppBootloaderBoard(p[2]) && p[3] == 0 &&
+            BinaryPrimitives.ReadUInt16LittleEndian(p[10..]) == 0 && BinaryPrimitives.ReadUInt32LittleEndian(p[12..]) != 0 &&
+            p[16..].IndexOfAnyExcept((byte)0) >= 0,
         _ => true
     };
+    private static bool IsAppBootloaderBoard(byte boardId) => BoardDescriptorRegistry.ProtocolBoards.Any(board => board.BoardId == boardId);
     public static void ValidateRequest(byte[] packet)
     {
         if (packet.Length != 32 || packet[0] != 'I' || packet[1] != 'G' || packet[2] != 1 || packet[5] != 0 || packet[7] != 0 || packet[6] > 24 ||

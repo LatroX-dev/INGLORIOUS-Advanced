@@ -27,6 +27,7 @@ static int16_t analog_sample;
 static ig_rgb_t rendered[RGB_MATRIX_LED_COUNT];
 static uint8_t mock_active_interval=1, mock_saved_interval=1, mock_debounce=5;
 static bool mock_reconnect_pending;
+static bool mock_usb_active = true;
 static uint32_t mock_reconnect_at;
 static unsigned mock_reconnects;
 led_config_t g_led_config;
@@ -113,6 +114,7 @@ uint8_t ig_timing_active_interval(void) { return mock_active_interval; }
 uint8_t ig_timing_saved_interval(void) { return mock_saved_interval; }
 uint8_t ig_timing_debounce_ms(void) { return mock_debounce; }
 bool ig_timing_reconnect_pending(void) { return mock_reconnect_pending; }
+bool ig_timing_usb_active(void) { return mock_usb_active; }
 bool ig_timing_schedule_reconnect(void) {
     check(response[3]==8 && response[5]==0 && response[6]==4,"RAW8 ACK emitted before schedule hook");
     if(mock_active_interval==mock_saved_interval) return false;
@@ -140,6 +142,10 @@ static void reset(void) {
     g_led_config.flags[RGB_MATRIX_LED_COUNT - 2] = g_led_config.flags[RGB_MATRIX_LED_COUNT - 1] = LED_FLAG_UNDERGLOW;
     layer_state = default_layer_state = 0; brightness = 255;
     mock_reconnects=0;
+    mock_usb_active=true;
+#if IG_APP_BOOTLOADER_ENABLE
+    app_bootloader_state=0; memset(app_bootloader_nonce,0,sizeof(app_bootloader_nonce));
+#endif
     keyboard_pre_init_user();
     keyboard_post_init_user();
 }
@@ -343,6 +349,7 @@ static void prime_slider(int16_t value) { slider_reset(); sample_slider(value,3)
 #include "version_reporting_checks.h"
 #include "color_output_checks.h"
 #include "cache_staging_checks.h"
+#include "app_bootloader_checks.h"
 #include "brightness_binding_checks.h"
 #define KNOB_TEST_NOW mock_now
 #define KNOB_TEST_PIXELS rendered
@@ -470,6 +477,7 @@ int main(int argc, char **argv) {
     fallback_color_checks();
     color_output_checks();
     cache_staging_checks();
+    app_bootloader_checks();
     brightness_binding_checks();
     reset(); uint8_t knob_config[IG_MAX_SIZE]; make_v4(knob_config); knob_cycle_checks(knob_config);
     reset(); knob_order_checks(knob_config);

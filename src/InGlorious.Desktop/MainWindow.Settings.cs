@@ -114,17 +114,23 @@ public sealed partial class MainWindow
         var contact = new Button { Name = "ContactEmailButton", Content = L.T("E-Mail öffnen"),
             IsVisible = SupportContact.EmailUri is not null, IsEnabled = !offlinePreview, Margin = new Thickness(0, 0, 16, 0) };
         ToolTip.SetTip(contact, SupportContact.Email);
-        contact.Click += async (_, _) =>
+        var website = new Button { Name = "WebsiteButton", Content = L.T("Website"),
+            IsEnabled = !offlinePreview, Margin = new Thickness(0, 0, 10, 0) };
+        ToolTip.SetTip(website, SupportContact.WebsiteUrl);
+        async Task OpenContactLinkAsync(Uri uri)
         {
-            if (offlinePreview || SupportContact.EmailUri is not { } uri) return;
+            if (offlinePreview) return;
             try
             {
                 if (await Launcher.LaunchUriAsync(uri)) return;
             }
             catch { }
             error.Text = L.T("Der Link konnte nicht geöffnet werden. Prüfe deine Standard-App für Browser oder E-Mail.");
-        };
-        Grid.SetColumn(contact, 1); footer.Children.Add(contact);
+        }
+        contact.Click += async (_, _) => { if (SupportContact.EmailUri is { } uri) await OpenContactLinkAsync(uri); };
+        website.Click += async (_, _) => await OpenContactLinkAsync(new Uri(SupportContact.WebsiteUrl));
+        var contactLinks = Row(website, contact);
+        Grid.SetColumn(contactLinks, 1); footer.Children.Add(contactLinks);
         var cancel = new Button { Name = "CancelSettings", Content = L.T("Abbrechen"), IsCancel = true };
         cancel.Click += (_, _) => dialog.Close();
         var actions = Row(cancel, save); actions.HorizontalAlignment = HorizontalAlignment.Right;
@@ -185,6 +191,10 @@ public sealed partial class MainWindow
         var contact = controls.OfType<Button>().Single(control => control.Name == "ContactEmailButton");
         check(contact.GetLogicalAncestors().Contains(footer) && contact.IsVisible == (SupportContact.EmailUri is not null) && !contact.IsEnabled,
             "Settings: public contact is independent of the connected device and disabled in offline previews");
+        var website = controls.OfType<Button>().Single(control => control.Name == "WebsiteButton");
+        check(website.GetLogicalAncestors().Contains(footer) && website.IsVisible && !website.IsEnabled &&
+            (string?)ToolTip.GetTip(website) == SupportContact.WebsiteUrl,
+            "Settings: website remains in the contact footer without a keyboard and cannot open a browser in offline previews");
         var start = controls.OfType<ToggleSwitch>().Single(control => control.Name == "AutostartCheck");
         window.Width = window.MinWidth; window.Height = window.MinHeight;
         check(ReferenceEquals(start, SettingsControls(window).OfType<ToggleSwitch>().Single(control => control.Name == "AutostartCheck")),

@@ -1,6 +1,8 @@
 # INGLORIOUS firmware protocol 1 / configuration schemas 1 through 7
 
-This documents protocol 1 and configuration schemas 1–7, including the OS-switch extension introduced in firmware 0.11.9 and **board-16 hardware profiles in firmware 0.11.11** (build ID `0x000B0B01`), bundled with app 0.7.0. Physical acceptance covers independent profile changes, switching, reconnecting and app loading on one GMMK 3 PRO 100% ISO under Windows; further recovery and firmware-update checks remain open. Existing model/layout support is tracked separately in [the model overview](../docs/model-support.md). All multi-byte integers are little-endian. No packet enters a bootloader, resets the MCU, writes application firmware, changes protection, or exposes arbitrary memory. Command 8 explicitly schedules a USB re-enumeration to apply a saved keyboard polling interval. Hardware-profile activation has the separately bounded timing behavior documented below.
+This documents protocol 1 and configuration schemas 1–7 in firmware **0.11.14**, build ID `0x000B0E01`, for all sixteen supported targets. It includes the OS-switch extension introduced in firmware 0.11.9, board-16 hardware profiles introduced in 0.11.11 and app-triggered bootloader entry introduced in 0.11.12. Profile acceptance covers independent changes, switching, reconnecting and app loading on one GMMK 3 PRO 100% ISO under Windows. The automatic firmware-update path has physical Windows evidence for the GMMK PRO revision 1 ISO and GMMK Numpad; the other models, the retained-loader profile-preservation path and native macOS/Linux remain unverified. See [hardware acceptance](../docs/hardware-acceptance.md#automatic-firmware-updates). Existing model/layout support is tracked separately in [the model overview](../docs/model-support.md).
+
+All multi-byte integers are little-endian. No packet writes application firmware, changes protection or exposes arbitrary memory. Commands 25–27 provide the narrowly gated bootloader-entry exception documented below; other builds expose no RAW-HID bootloader entry. Command 8 only schedules USB re-enumeration to apply a saved keyboard polling interval. Hardware-profile activation has the separately bounded timing behavior documented below.
 
 ## Identity and transport
 
@@ -49,7 +51,7 @@ Common packet: bytes 0..1 ASCII `IG`, byte 2 protocol `1`, byte 3 command, byte 
 | `0x08 APPLY_USB_INTERVAL` | empty on legacy firmware; 16-byte profile binding on bank-capable board16; idle device required | active interval byte, saved interval byte, queued byte(0/1), reserved zero |
 | `0x09 READ_RUNTIME_BRIGHTNESS` | empty | brightness byte, active slider mode byte, two reserved zero bytes |
 | `0x0A SET_RUNTIME_BRIGHTNESS` | one brightness byte0..255 | the exact accepted brightness byte |
-| `0x0B GET_EXTENSIONS` | empty | version u16=1, flags u16(bit0=bounded manual light test, bit1=standby screensaver, bit2=board16 diagnostics, bit3=encoder presets/cycling, bit4=ordered encoder presets, bit5=read-only live knob status, bit6=per-function knob press, bit7=physical OS switch, bit8=board16 hardware profiles), durationMs u16=21000, reserved u16=0 |
+| `0x0B GET_EXTENSIONS` | empty | version u16=1, flags u16(bit0=bounded manual light test, bit1=standby screensaver, bit2=board16 diagnostics, bit3=encoder presets/cycling, bit4=ordered encoder presets, bit5=read-only live knob status, bit6=per-function knob press, bit7=physical OS switch, bit8=board16 hardware profiles, bit9=app bootloader entry), durationMs u16=21000, reserved u16=0 |
 | `0x0C LIGHT_TEST` | action byte: 0=status, 1=start, 2=stop | active byte0/1, pattern byte0=idle/1=keyboard/2=Numpad, remainingMs u16 |
 | `0x0D GET_FIRMWARE_VERSION` | empty | 16-byte release identity described below; no state changes |
 | `0x0E PHYSICAL_DIAGNOSTICS` | action byte: 0=status, 1=start/refresh, 2=stop, 3=refresh-only | 24 bytes described in board 16 diagnostics below |
@@ -63,8 +65,13 @@ Common packet: bytes 0..1 ASCII `IG`, byte 2 protocol `1`, byte 3 command, byte 
 | `0x16 PROFILE_COMMIT` | 20-byte token/slot/generation/CRC binding | 16-byte verified slot/length/generation/CRC |
 | `0x17 PROFILE_ABORT` | 8-byte token/slot binding | exact request echo |
 | `0x18 PROFILE_INSTALLATION_IDENTITY` | empty | 20-byte format/board/installation GUID |
+| `0x19 PREPARE_APP_BOOTLOADER` | exact 16-byte firmware identity + nonzero 8-byte nonce | exact 24-byte request echo |
+| `0x1A COMMIT_APP_BOOTLOADER` | same identity and nonce as the active preparation | exact 24-byte request echo before deferred bootloader entry |
+| `0x1B CANCEL_APP_BOOTLOADER` | same identity and nonce as the active preparation | exact 24-byte request echo; preparation cancelled |
 
 Commands decimal18–24 (`0x12`–`0x18`) require `GET_EXTENSIONS` bit8 and board16. The earlier private diagnostic build0.11.10 used decimal18 for an unrelated read-only matrix probe; a version number or board match alone is insufficient to select the hardware-profile protocol.
+
+Commands decimal25–27 (`0x19`–`0x1B`) require `GET_EXTENSIONS` bit9 (`0x0200`), an explicitly supported board and its exact running firmware identity. The current release is 0.11.14, build `0x000B0E01`, for board IDs1–16. A model match, USB PID or version threshold alone does not enable this path.
 
 INFO payload: board byte0 (1 PRO, 2 Numpad), rows byte1, cols byte2, layers byte3=4, LEDs byte4, macro slots byte5=32, max events per macro byte6=128, flags byte7 (bit0 persistent storage available, bit1 slider present, bit2 staging active, bit3 schema2 effects supported, bit4 runtime timing and command8 supported, bit5 schema3 color sequences supported, bit6 volatile brightness commands9/10 supported, bit7 schema4 autonomous standby supported), **active** blob size u16 at8, **active** event capacity u16 at10 (768 in schema1/2; PRO668 or Numpad702 in schema3/4/5/6/7), active generation u32 at12, active CRC32 u32 at16, received staging bytes u16 at20, **active** config schema u16 at22 (1,2,3,4,5,6,7). Firmware0.6 sets bits3..7 even while preserving an active schema1 blob. Current firmware accepts each supported size at BEGIN; schema2/3/4/5 have the same length, schema6 adds8 bytes and schema7 adds72 bytes on encoder boards. The active size is not an upload-capacity restriction. An older host that rejects unknown capability bits must stop before writing; a newer host must check the relevant capabilities before uploading settings. In particular schema3 requires bit5 even if its stored color sequences are currently unused by the chosen effects.
 
@@ -272,9 +279,47 @@ The two logical slots detect partial writes; they do not yet prove atomic power-
 
 ## Fixed physical recovery gesture
 
-Hold **Space+B on PRO ISO**, or **Plus+Enter on the Numpad**, while connecting USB. Keep both held for approximately three seconds. Exactly these two physical switches must be down; any third switch or release cancels entry. The check runs only once during startup, after matrix initialization: 50 ms debounce (covering all supported0..40ms settings), followed by500 ms of sustained exclusive holding. The upstream Numpad additionally waits two seconds while enabling its lighting hardware. Physical coordinates are PRO `(9,4)+(4,5)`, Numpad `(1,3)+(3,3)`, so remapping and corrupt configuration do not remove the gesture.
+Hold **Space+B on a supported keyboard**, or **Plus+Enter on the Numpad**, while connecting USB. Keep both held for approximately three seconds. Exactly these two physical keys must be down; any third key or release cancels entry. Board16's verified rear selector contacts are excluded from that key count. The check runs only once during startup, after matrix initialization: 50 ms debounce (covering all supported0..40ms settings), followed by500 ms of sustained exclusive holding. The upstream Numpad additionally waits two seconds while enabling its lighting hardware. Coordinates are generated from each target's fixed physical layout: PRO ISO `(9,4)+(4,5)` and Numpad `(1,3)+(3,3)`, for example. Remapping and corrupt configuration do not remove the gesture.
 
-The gesture invokes the upstream QMK ROM-bootloader jump without clearing configuration. It is unavailable through RAW HID or configurable keycodes. Native mocked tests can verify gesture timing/selection; successful actual ROM entry on flashed hardware remains a separate acceptance check. The MCU hardware boot control remains the fallback if application startup itself fails.
+The gesture invokes the upstream QMK ROM-bootloader jump without clearing configuration. Configurable boot/reset keycodes remain rejected. Builds with app-triggered bootloader entry enabled additionally offer the separate RAW-HID path below; this does not remove or remap physical recovery. Native mocked tests can verify gesture timing/selection; actual ROM entry remains a model-specific physical acceptance check. The MCU hardware boot control remains the fallback if application startup itself fails.
+
+<a id="private-app-triggered-bootloader-entry-01112"></a>
+
+## App-triggered bootloader entry (introduced in 0.11.12)
+
+The current 0.11.14/build `0x000B0E01` release enables this feature for all sixteen supported targets. `IG_APP_BOOTLOADER_ENABLE` defaults to zero; enabling it requires an explicitly listed board ID1–16, and board16 additionally requires its retained-loader/profile-bank runtime. Generated configurations enable it for those targets and advertise extension bit9 (`0x0200`). Builds with the feature disabled return unsupported-command status9 for RAW25–27. The first update from firmware without this capability still requires physical bootloader entry. Native checks and independently verified ARM builds establish the software behavior; separate Windows sessions confirmed complete automatic updates for PRO revision 1 ISO and Numpad. Other models and operating systems still require physical acceptance.
+
+The existing QMK bootloader route is retained for each family:
+
+| Boards | MCU | Existing QMK entry |
+| --- | --- | --- |
+| 1,3 | STM32F303 | `stm32_dfu.c`, ROM at `0x1FFFD800` |
+| 2,4–9 | WB32F3G71 | `wb32_dfu.c`, ROM at `0x1FFFE000` |
+| 10–15 | WB32FQ95 | `wb32_dfu.c`, ROM at `0x1FFFE000` |
+| 16 | WB32FQ95 with retained loader | Same `wb32_dfu.c` entry; application remains at `0x08007000`, resident prefix remains protected |
+
+Both pinned QMK implementations set a RAM marker at the target's RAM end minus four bytes and request a system reset. Their early startup hook clears the marker before entering ROM. The build verifies the bootloader sources, family selection and startup configuration against QMK commit `7a1bbf37c5c07da4ea0a162bb139083a46ef40a1`; the independent artifact audit checks source hashes, linked symbol ownership, application ranges and RAM extent. No host-supplied jump address or new bootloader is added. The proprietary board16 loader is not distributed or rewritten, and source checks alone cannot establish its complete reset behavior or host USB enumeration. Automatic physical acceptance is still required for every model family.
+
+All three commands use exactly 24 payload bytes and the ordinary protocol-1 envelope, sequence and zero-padding checks:
+
+| Payload offset | Field |
+| --- | --- |
+| 0..15 | Exact bytes returned by `GET_FIRMWARE_VERSION` for this running device: format, board, reserved fields, numeric version and build ID |
+| 16..23 | Fresh nonzero caller-generated 8-byte nonce shared by this preparation, commit and any pre-commit cancellation |
+
+The firmware compares all 16 identity bytes, not just the displayed version. Every successful reply echoes all 24 request bytes. Hosts must also match the reply command, request sequence and success status. The nonce correlates a request; it is not authentication, a firmware signature or proof of physical device identity. The most recently retired nonce is remembered until replaced or rebooted to reject immediate stale replay; this is not a persistent replay history.
+
+**RAW25 PREPARE:** require healthy storage, initialized runtime, active USB and idle input. Snapshot the current configuration generation, CRC and length without writing storage. Boards with an OS switch also bind its stable effective position. Board16 additionally captures the active profile slot and its full 64-bit generation, requires healthy profile storage and exactly one stable selector contact matching that slot, and rejects a pending profile refresh, upload owner or USB timing plan. Preparation expires after 5000 ms. An identical preparation may be acknowledged again but never extends the deadline or replaces the snapshot. A competing request cannot take over an armed preparation.
+
+**RAW26 COMMIT:** require the matching live preparation, exact identity and nonce, unchanged configuration and safe idle state. Send the complete acknowledgment through RAW HID before scheduling entry. Housekeeping waits at least 150 ms, rechecks the conditions and calls the existing QMK `bootloader_jump()` once. If housekeeping resumes at or beyond 1000 ms after acknowledgment, cancel instead of performing a late jump. Clear the armed state before invoking the jump, including when a test stub returns. A duplicate COMMIT is not a second entry request.
+
+**RAW27 CANCEL:** cancel only a still-prepared matching request and echo its payload. No matching live preparation returns status8; a committed request returns busy status3. Hosts may cancel after a confirmed PREPARE only when they know COMMIT was not sent. They must not send cancellation or retry COMMIT after an uncertain commit result.
+
+Held physical or layer keys, running or held macro input, pending knob actions, uploads, manual lighting/device tests, unhealthy storage, USB suspend/disconnect or a queued USB interval change prevent entry. Physical key/encoder events, deliberate filtered slider movement, configuration reload/change and USB suspend cancel an armed request; housekeeping also enforces active USB and the saved configuration snapshot. OS-switch movement and any board16 profile activation invalidate the request, including a switch away and back to identical profile bytes. A cancelled request never resumes when the device becomes idle. During an armed interval, commands3–6, 8, 10, 12, 14, 15 and20–23 return busy. Identity, configuration reads and read-only runtime status remain available, including board16 RAW18/19/24 so the host can recheck the active slot, full generation and installation identity before committing.
+
+Relevant status codes are1 for malformed requests or a zero nonce,3 for busy state,7 for storage failure,8 for mismatched identity/nonce, expired or stale preparation/configuration, and9 for an unsupported build. The ordinary packet-validation errors still apply. None of these commands changes configuration, clears settings, writes firmware or changes protection.
+
+The app must obtain explicit user confirmation, validate the exact normal-device identity and supported build, preserve the verified configuration/recovery data and serialize the operation against background polling before preparing. It compares the PREPARE echo, sends COMMIT exactly once and compares its echo. Missing or unexpected acknowledgment means the result is uncertain, not permission to resend. It then verifies the normal-device → expected bootloader transition before entering the existing backup/target-check/write/two-readback workflow. Returning from the bootloader is a separate device-family adapter operation, followed by normal-device/version/configuration verification. The capability does not authorize firmware replacement by itself; physical recovery and the original-firmware setup path remain available.
 
 ## Physical OS switch (firmware 0.11.9)
 

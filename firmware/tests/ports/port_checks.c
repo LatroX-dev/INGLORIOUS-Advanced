@@ -60,7 +60,13 @@ uint16_t keycode_at_keymap_location_raw(uint8_t layer, uint8_t row, uint8_t col)
     return u16(defaults + IG_KEYS_OFFSET + ((layer * MATRIX_ROWS + row) * MATRIX_COLS + col) * 2);
 }
 matrix_row_t matrix_get_row(uint8_t row) { check(row < MATRIX_ROWS, "matrix row"); return pressed[row]; }
-void raw_hid_send(uint8_t *packet, uint8_t length) { check(length == 32, "RAW frame length"); memcpy(response, packet, length); replies++; }
+void raw_hid_send(uint8_t *packet, uint8_t length) {
+    check(length == 32, "RAW frame length");
+#if IG_APP_BOOTLOADER_ENABLE
+    if (packet[3] == 26 && !packet[5]) check(app_bootloader_state == 1 && !jumps, "commit acknowledgment precedes scheduling and jump");
+#endif
+    memcpy(response, packet, length); replies++;
+}
 void register_code(uint8_t code) { registered[code] = 1; last_registered_mods = weak_mods; last_registered_code = code; }
 void unregister_code(uint8_t code) { registered[code] = 0; }
 uint32_t timer_read32(void) { return now; }
@@ -108,6 +114,9 @@ void ig_timing_task(bool safe) {
 }
 
 static void boot(bool erase) {
+#if IG_APP_BOOTLOADER_ENABLE
+    app_bootloader_cancel(); memset(app_bootloader_nonce, 0, sizeof(app_bootloader_nonce));
+#endif
     borrowed = false; if (erase) memset(backing, 0, sizeof(backing));
     memset(pressed, 0, sizeof(pressed)); memset(registered, 0, sizeof(registered));
     stage_open = macro_running = runtime_ready = false; stage_received = 0; active_slot = -1;
@@ -319,6 +328,35 @@ static void knob_test_reboot(void) { keyboard_post_init_user(); }
 #endif
 #include "../knob_cycle_checks.h"
 #include "../hardware_controls_checks.h"
+static void check_app_bootloader_port(void) {
+    boot(true); now += 30; housekeeping_task_user();
+    uint8_t request[24]; memcpy(request,ig_fw_identity,16); memset(request+16,71,8);
+    check(command(11,NULL,0)==0 && ((u16(response+10)&512)!=0)==(IG_APP_BOOTLOADER_ENABLE!=0),"app-entry capability agrees with explicit build gate");
+#if IG_APP_BOOTLOADER_ENABLE && !IG_PROFILE_BANK_ENABLE
+    uint8_t prior_backing[sizeof(backing)]; memcpy(prior_backing,backing,sizeof(backing));
+    check(command(25,request,24)==0 && response[6]==24 && !memcmp(response+8,request,24),"every supported port prepares its exact identity and nonce");
+    request[2]^=1;check(command(26,request,24)==8 && !jumps,"wrong board cannot commit app entry");request[2]^=1;
+    request[23]^=1;check(command(26,request,24)==8 && !jumps,"wrong nonce cannot commit app entry");request[23]^=1;
+    check(command(26,request,24)==0 && response[6]==24 && !memcmp(response+8,request,24) && !jumps,"exact entry commit is acknowledged without an immediate jump");
+    now+=149;housekeeping_task_user();check(!jumps,"every port keeps the acknowledgment delay");
+    now++;housekeeping_task_user();check(jumps==1 && !app_bootloader_state,"every port invokes its existing bootloader entry once");
+    now+=1000;housekeeping_task_user();check(jumps==1 && !writes && !memcmp(prior_backing,backing,sizeof(backing)),"entry does not repeat or alter configuration");
+#if IG_HAS_OS_SWITCH
+    for(uint8_t phase=0;phase<3;phase++) {
+        boot(true);now+=30;housekeeping_task_user();memset(request+16,72,8);
+        if(phase)check(command(25,request,24)==0,"OS switch scenario prepared");
+        if(phase==2)check(command(26,request,24)==0,"OS switch scenario committed");
+        switch_level=!switch_level;
+        if(phase<2)check(command(phase?26:25,request,24)==3 && !app_bootloader_state,"fresh OS switch movement blocks entry before housekeeping");
+        now+=150;housekeeping_task_user();now+=30;housekeeping_task_user();
+        check(!jumps && !app_bootloader_state,"OS switch change cancels without rearming after debounce");
+    }
+#endif
+#elif !IG_APP_BOOTLOADER_ENABLE
+    for(uint8_t cmd=25;cmd<=27;cmd++)check(command(cmd,request,24)==9 && !jumps,"default-off build rejects app entry");
+#endif
+}
+
 int main(int argc,char **argv) {
     check(argc>=4 && argc<=7,"three serializer fixtures supplied"); uint16_t default_length=load(argv[1],defaults); check(default_length==IG_SIZE,"schema1 default");
     check(sizeof(staging)==sizeof(uint8_t *),"no full duplicate staging allocation");
@@ -336,11 +374,7 @@ int main(int argc,char **argv) {
     check(writes==0,"fresh default colors do not cause storage writes"); layer_state=0;
     for(uint16_t i=IG_KEYS_OFFSET;i<IG_ENCODER_OFFSET;i++) check(default_byte(i)==defaults[i],"all four default keymap layers");
     check(command(1,NULL,0)==0 && response[8]==IG_BOARD && response[9]==MATRIX_ROWS && response[10]==MATRIX_COLS && response[12]==RGB_MATRIX_LED_COUNT,"board identity and dimensions");
-#if IG_BOARD == 16
-    static const uint8_t expected_version[16]={1,0,16,0,0,0,11,0,11,0,0,0,1,11,11,0};
-#else
-    static const uint8_t expected_version[16]={1,0,IG_BOARD,0,0,0,11,0,9,0,0,0,1,9,11,0};
-#endif
+    static const uint8_t expected_version[16]={1,0,IG_BOARD,0,0,0,11,0,14,0,0,0,1,14,11,0};
     check(command(13,NULL,0)==0 && response[6]==16 && !memcmp(response+8,expected_version,16),"exact candidate version identity, reserved fields and build ID");
     uint8_t config[IG_MAX_SIZE], before[sizeof(backing)];
     for(int fixture=1;fixture<4;fixture++) {
@@ -371,5 +405,6 @@ int main(int argc,char **argv) {
     if(argc>=5 && argv[4][0]) { boot(false); knob_fixture_checks(argv[4],false); }
     if(argc>=6) { boot(false); knob_fixture_checks(argv[5],true); }
     if(argc==7) { boot(false); knob_press_fixture_checks(argv[6]); }
+    check_app_bootloader_port();
     printf("PASS board%d: %u native port checks; no hardware access.\n",IG_BOARD,checks); return 0;
 }

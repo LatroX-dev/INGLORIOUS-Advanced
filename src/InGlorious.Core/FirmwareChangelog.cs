@@ -7,6 +7,10 @@ public static class FirmwareChangelog
 {
     private static readonly FirmwareSemanticVersion Version08 = new(0, 8, 0);
     private static readonly FirmwareSemanticVersion Version09 = new(0, 9, 0);
+    private static readonly FirmwareReleaseNotes AppUpdateNotes = new(new(0, 11, 12), Array.AsReadOnly(new[]
+    {
+        "Enable future firmware updates without unplugging the keyboard."
+    }));
     private static readonly FirmwareReleaseNotes HardwareProfileNotes = new(new(0, 11, 11), Array.AsReadOnly(new[]
     {
         "Use the profile switch to select three saved keyboard configurations, even with the app closed."
@@ -81,7 +85,7 @@ public static class FirmwareChangelog
         // No guessed starting version for an unknown device or a missing/default version report.
         // This catalog contains released changes only. Never derive a pending
         // change from a device response or an undocumented future target.
-        var newestDocumentedVersion = HardwareProfileNotes.Version;
+        var newestDocumentedVersion = AppUpdateNotes.Version;
         if (!installed.HasValue || installed.Value == default || installed.Value >= target || installed.Value >= newestDocumentedVersion)
             return Array.Empty<FirmwareReleaseNotes>();
         IReadOnlyList<FirmwareReleaseNotes>? notes = deviceId switch
@@ -94,12 +98,13 @@ public static class FirmwareChangelog
             _ => null
         };
         if (notes is null) return Array.Empty<FirmwareReleaseNotes>();
+        notes = Array.AsReadOnly(new[] { AppUpdateNotes }.Concat(notes).ToArray());
         if (BoardDescriptorRegistry.ProtocolBoards.Any(board => board.DeviceId == deviceId && board.HasEncoder))
             notes = Array.AsReadOnly(new[] { KnobFeedbackNotes, KnobOrderNotes, KnobCycleNotes }.Concat(notes).ToArray());
         if (HardwareControlCatalog.HasOsSwitch(deviceId))
             notes = Array.AsReadOnly(new[] { OsSwitchNotes }.Concat(notes).ToArray());
         if (HardwareControlCatalog.Find(deviceId)?.ProfileSwitchSupported == true)
             notes = Array.AsReadOnly(new[] { HardwareProfileNotes }.Concat(notes).ToArray());
-        return Array.AsReadOnly(notes.Where(note => installed.Value < note.Version && note.Version <= target && note.Version <= newestDocumentedVersion).ToArray());
+        return Array.AsReadOnly(notes.Where(note => installed.Value < note.Version && note.Version <= target && note.Version <= newestDocumentedVersion).OrderByDescending(note => note.Version).ToArray());
     }
 }

@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param([string]$ReportPath, [switch]$Engineering, [Alias('Board')][string]$TargetBoard='all', [string]$FixtureDirectory, [string]$KnobFixtureDirectory, [string]$KnobOrderFixtureDirectory, [string]$KnobPressFixtureDirectory)
+param([string]$ReportPath, [switch]$Engineering, [Alias('Board')][string]$TargetBoard='all', [string]$FixtureDirectory, [string]$KnobFixtureDirectory, [string]$KnobOrderFixtureDirectory, [string]$KnobPressFixtureDirectory, [switch]$AppBootloader)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -81,6 +81,7 @@ try {
         [IO.File]::WriteAllText((Join-Path $generated 'port_model.h'),"#pragma once`n#define IG_BOARD $($board.boardId)`n#define MATRIX_ROWS $($board.rows)`n#define MATRIX_COLS $($board.cols)`n#define RGB_MATRIX_LED_COUNT $($board.leds)`n",$utf8)
         $executable = Join-Path $generated 'port-checks.exe'
         $gate=@(if($board.boardId-eq16){'-DIG_RETAINED_LOADER_BUILD=1'})
+        if($AppBootloader -and $board.boardId-ne16){$gate+='-DIG_APP_BOOTLOADER_ENABLE=1'}
         & $compiler @gate '-std=c11' '-Wall' '-Wextra' '-Werror' ('-I'+(Join-Path $PSScriptRoot 'ports')) ('-I'+$generated) ('-I'+(Join-Path $root ('firmware/keymaps/'+$board.name))) (Join-Path $PSScriptRoot 'ports/port_checks.c') '-lm' '-o' $executable
         if ($LASTEXITCODE -ne 0) { throw ('Port harness compilation failed: '+$board.name) }
         $paths = @('default','configured','v4-configured') | ForEach-Object { Join-Path $fixtureRoot ($board.deviceId+'-'+$_+'.bin') }
@@ -97,12 +98,14 @@ try {
         $lines | Write-Output
         $match = [regex]::Match(($lines -join "`n"), 'PASS board(\d+): (\d+) native port checks; no hardware access\.')
         if (-not $match.Success -or [int]$match.Groups[1].Value -ne $board.boardId) { throw 'Missing expected board result.' }
-        $results += [ordered]@{ deviceId=$board.deviceId; boardId=$board.boardId; checks=[int]$match.Groups[2].Value; fixtures=@($paths | ForEach-Object { @{ file=[IO.Path]::GetFileName($_); sha256=(Get-FileHash -LiteralPath $_).Hash } }); referenceSha256=(Get-FileHash -LiteralPath (Join-Path $generated 'port_reference.h')).Hash }
+        $results += [ordered]@{ deviceId=$board.deviceId; boardId=$board.boardId; appBootloader=[bool]($AppBootloader -and $board.boardId-ne16); checks=[int]$match.Groups[2].Value; fixtures=@($paths | ForEach-Object { @{ file=[IO.Path]::GetFileName($_); sha256=(Get-FileHash -LiteralPath $_).Hash } }); referenceSha256=(Get-FileHash -LiteralPath (Join-Path $generated 'port_reference.h')).Hash }
     }
 } finally { $env:PATH=$priorPath }
 if($ReportPath) {
     $report = [ordered]@{schema=1;testedUtc=[DateTime]::UtcNow.ToString('o');hardwareAccess=$false;results=$results;sourceSha256=(Get-FileHash -LiteralPath (Join-Path $root 'firmware/inglorious/inglorious.c')).Hash;harnessSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'ports/port_checks.c')).Hash;scope='Actual common C runtime across additional models with real desktop payloads and pinned physical geometry. For GMMK3, the separate reference audit checks derivation from preserved manufacturer sources. Storage fault injection uses a mock; the separate storage harness tests the patched real wear-leveling driver.'}
     $report.knobCycleTestsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'knob_cycle_checks.h')).Hash
+    $report.appBootloaderSourceSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot '../inglorious/ig_app_bootloader.inc')).Hash
+    $report.versionHeaderSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot '../inglorious/ig_version.h')).Hash
     $report.hardwareControlsHeaderSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot '../inglorious/ig_hardware_controls.h')).Hash
     $report.hardwareControlsTestsSha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'hardware_controls_checks.h')).Hash
     $report.knobFixtures=$knobFixtures

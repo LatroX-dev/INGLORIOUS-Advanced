@@ -23,7 +23,7 @@ Run the checklist separately on Windows, Linux and macOS. On Linux, include acce
 
 ## Update
 
-Use a supported older INGLORIOUS version and a saved profile. Confirm the app displays the actual installed and included versions and offers only a newer version. Select **Back up and update** once; backup and update must run together and preserve the configuration. Close/reopen the app and reconnect the keyboard to check persistence. Test the current/equal/newer-version cases without writing: no pending update should be invented.
+Use a supported older INGLORIOUS version and a saved profile. Confirm the app displays the actual installed and included versions and offers only a newer version. Select **Back up and update** once; backup and update must run together and preserve the configuration. With compatible firmware, confirm update-mode entry and return to normal operation without unplugging or a key combination. Older firmware must use the guided physical entry steps. Close/reopen the app and reconnect the keyboard after completion to check persistence. Test the current/equal/newer-version cases without writing: no pending update should be invented.
 
 ## Stop conditions
 
@@ -38,6 +38,19 @@ After that restoration, Windows initially reported an unrecognized USB device; a
 The GMMK 3 PRO 100% ISO wired (non-HE) completed a separately authorized first installation and original-firmware restoration on one device. Both operations had two matching full readbacks; normal typing and lighting were confirmed after each reconnection. Its resident loader remained unchanged. This initial round trip used a local engineering build. Subsequent app installation and the update to firmware 0.11.4 with app 0.6.54 completed on Windows; the tester confirmed the full lighting sequence and return to normal lighting on 2026-10-16. This exact variant is no longer marked experimental.
 
 This is partial acceptance: the full checklist above, including every control, configuration persistence and original restoration through the integrated app guide, remains open for that PRO variant. Thirteen other variants remain experimental and have no physical test evidence. Native macOS/Linux package, device, layout and permission testing is also pending. Automated checks and successful builds are reported separately.
+
+## Automatic firmware updates
+
+The complete automatic update path has been confirmed on Windows for these two models:
+
+| Model | Transport | Confirmed scope |
+| --- | --- | --- |
+| GMMK PRO revision 1 ISO | STM32 DFU | Entry from the app, backup and update, automatic restart, normal typing and retained lighting. |
+| GMMK Numpad | WB32 DFU | Update to firmware 0.11.14 without unplugging or a key combination, automatic restart, normal typing and retained lighting. |
+
+For both sessions, two full readbacks matched the written image, and the stored configuration and recovery-identity region were preserved byte for byte. The recorded write and restart were each attempted once. Return to normal operation was confirmed by the tester; there is no separate saved post-update runtime receipt. These are individual successful sessions, not repeated-run or long-duration reliability tests.
+
+The automatic update path remains physically unverified on the GMMK 3 PRO 100% ISO, including preservation of its three distinct hardware profiles, and on the other supported models. Native macOS/Linux automatic updates also remain unverified. Those limits do not change the existing model-support labels. Build and simulated checks are separate evidence.
 
 ## Physical controls
 

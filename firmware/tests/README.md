@@ -2,6 +2,8 @@
 
 These tests compile the actual INGLORIOUS C runtime and its helpers with mocked hardware interfaces. They do not discover, open, update or flash a physical device. The native compiler is the existing QMK-MSYS GCC; the runners do not install tools or modify the system PATH.
 
+`Run-RuntimeChecks.ps1 -AppBootloader` enables app-triggered bootloader entry on the PRO ISO and Numpad native harnesses. It checks exact firmware identity and nonce matching, prepare/commit/cancel sequencing, acknowledged and bounded deferred entry, timer wrap, concurrent input/storage/USB activity, cancellation and unchanged configuration storage. `Run-PortChecks.ps1 -AppBootloader` covers the other thirteen legacy-layout targets, including encoderless models and physical OS-switch guards; its board-16 baseline remains disabled. `Run-ProfileRuntimeChecks.ps1` separately enables board 16 with the real profile runtime and checks full 64-bit generations, selector/OS changes, profile-bank faults, uploads, pending activation and USB timing. The source defaults to disabled, rejects unknown board IDs and rejects board-16 entry without its profile-bank runtime. Passing these simulations does not validate a physical bootloader transition or restart after writing.
+
 ## Prepare fixtures
 
 The runtime checks consume synthetic configurations emitted by the desktop serializer. From the repository root:
@@ -25,7 +27,10 @@ For the storage-driver checks, prepare the pinned QMK checkout and apply the ove
 
 ```powershell
 pwsh -NoProfile -File firmware/tests/Run-RuntimeChecks.ps1 -KnobFixtureDirectory artifacts/knob-fixtures -KnobOrderFixtureDirectory artifacts/knob-order-fixtures
+pwsh -NoProfile -File firmware/tests/Run-RuntimeChecks.ps1 -AppBootloader
 pwsh -NoProfile -File firmware/tests/Run-PortChecks.ps1 -FixtureDirectory artifacts/retained-loader-fixtures -KnobFixtureDirectory artifacts/knob-fixtures -KnobOrderFixtureDirectory artifacts/knob-order-fixtures
+pwsh -NoProfile -File firmware/tests/Run-PortChecks.ps1 -AppBootloader -FixtureDirectory artifacts/retained-loader-fixtures
+pwsh -NoProfile -File firmware/tests/Run-ProfileRuntimeChecks.ps1 -FixtureDirectory artifacts/retained-loader-fixtures
 pwsh -NoProfile -File firmware/tests/Run-StorageChecks.ps1
 pwsh -NoProfile -File firmware/tests/Run-BulkChecks.ps1
 pwsh -NoProfile -File firmware/tests/Run-EffectsChecks.ps1

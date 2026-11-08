@@ -41,7 +41,7 @@ Keep separate publication checkouts under `workspace/public`, temporary validati
 pwsh -NoProfile -File scripts/New-CorrespondingSource.ps1 `
   -PublicSourceDirectory <reviewed-public-folder> `
   -QmkDirectory firmware/qmk_firmware `
-  -Destination artifacts/INGLORIOUS-Advanced-0.7.0-Source `
+  -Destination artifacts/INGLORIOUS-Advanced-0.7.8-Source `
   -Download
 ```
 

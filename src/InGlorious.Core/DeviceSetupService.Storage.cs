@@ -96,6 +96,9 @@ public sealed partial class DeviceSetupService
                     }
                 }
             }
+            if (session.AutomaticUpdate && (session.ExpectedRuntimeVersion is not { } expectedVersion ||
+                session.InstalledFirmwareVersion != expectedVersion.Version.ToString()))
+                throw Error("Die Firmware-Version hat sich geändert. Starte das Update erneut.");
             session.Stage = SetupStage.ReadyToInstall;
             log?.Report(L.T("Beide vollständigen Sicherungen stimmen überein."));
             return Progress(session);
@@ -181,6 +184,13 @@ public sealed partial class DeviceSetupService
             }
             session.Stage = SetupStage.Reconnect;
             session.OutcomeUncertain = false;
+            if (session.AutomaticUpdate)
+            {
+                session.AutomaticRestartRequested = response.TryGetProperty("restartAttempted", out var attempted) && attempted.ValueKind == JsonValueKind.True;
+                session.AutomaticRestartAcknowledged = session.AutomaticRestartRequested &&
+                    response.TryGetProperty("restartAcknowledged", out var acknowledged) && acknowledged.ValueKind == JsonValueKind.True;
+                session.RuntimeReturnDeadline = session.AutomaticRestartRequested ? DateTimeOffset.UtcNow.AddSeconds(45) : null;
+            }
             log?.Report(L.T("Die Firmware wurde geschrieben und zweimal vollständig geprüft."));
             return Progress(session);
         }

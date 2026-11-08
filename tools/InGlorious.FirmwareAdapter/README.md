@@ -4,8 +4,9 @@ This adapter is independent of the original device-bound updater wrappers. It co
 user serial number, private port, original-image hash or private binding file. It uses the
 sixteen exact board geometries in `Model.Get`, including the retained-loader profile
 described below. This is not a claim that every board has been tested on hardware.
-The coordinator must first establish the normal USB
-model and observe its physical disconnect/reconnect into the bootloader at the same port.
+The coordinator must first establish the normal USB model and observe its
+normal-device to bootloader transition at the same port. Physical recovery remains
+available; an app-triggered transition requires the separate firmware capability.
 
 No operation runs on launch or from help. The executable accepts only:
 
@@ -14,6 +15,7 @@ InGlorious.FirmwareAdapter --request REQUEST.json --response NEW_RESPONSE.json
 InGlorious.FirmwareAdapter --request REQUEST.json --response NEW_RESPONSE.json --engineering
 InGlorious.FirmwareAdapter --request REQUEST.json --response NEW_RESPONSE.json --engineering --engineering-write-authorization AUTHORIZATION.json
 InGlorious.FirmwareAdapter --self-test
+InGlorious.FirmwareAdapter --self-test-restart --firmware-directory FIRMWARE_DIRECTORY
 InGlorious.FirmwareAdapter --self-test-engineering --engineering-candidate CANDIDATE.bin --engineering-original ORIGINAL1.bin --engineering-repeat ORIGINAL2.bin
 InGlorious.FirmwareAdapter --self-test-retained-loader --candidate CANDIDATE.bin --original ORIGINAL1.bin --repeat ORIGINAL2.bin
 InGlorious.FirmwareAdapter --discover
@@ -124,8 +126,52 @@ in the target image does not make writes power-loss atomic.
 The write response is `status:"verified"`, `writeAttempted:true`, `verified:true` only after two
 complete matching readbacks, rechecked identity, command logging and device disposal. The
 readbacks have kind `verified-read`; before-images have kind `pre-write-read`. A successful
-install additionally leaves `installation.json`, and returns `installationId`. The user must
-physically reconnect; there is no reset, jump or leave command.
+install additionally leaves `installation.json`, and returns `installationId`. By default
+the user must physically reconnect. There is no standalone reset, jump or leave operation.
+
+### Optional verified update restart
+
+`restartAfterVerify:true` is accepted only for `operation:"update"` and an exact supported
+`Model` entry. This includes the two original STM32 PRO layouts, the thirteen ordinary
+WB32 models, and the GMMK 3 PRO 100% ISO retained-loader model. It remains false by
+default and is rejected for installation, restore, read-only requests, legacy migration,
+engineering modes and unknown devices. Source support is not proof of a successful
+automatic restart on every physical model; hardware acceptance remains separate.
+
+After the exact image has been written, both complete readbacks must match it and the
+fingerprint must still match. Before a restart, the adapter persists and locks both
+readbacks, creates a one-use continuation for that same device session, and saves
+`firmware-verified.json`.
+The transport additionally binds it to its completed write hash. Only then may it restart:
+
+- WB32: the fixed upstream `CMD_RESET` packet with a 1000 ms delay, from the same open USB
+  handle. The retained-loader model also requires the reviewed prefix and application
+  vectors; reset follows that original loader, without a direct jump or prefix writes.
+- STM32: pinned dfu-util 0.11, fixed command-only `-s 0x08000000:leave`, after a fresh
+  matching serial/port/memory-map probe in the same update session. It sends SET_ADDRESS
+  and a zero-length DNLOAD block 2. There is no `-D`, image payload, erase, unprotect,
+  `force`, USB-reset fallback, or repeated leave request.
+
+The ordinary WB packet and STM command allowlists still reject reset/go/leave, including
+while writes are enabled. No arbitrary address, delay, packet or independent restart
+operation can be supplied in JSON.
+
+The response adds `restartAttempted`, `restartAcknowledged` and nullable `restartErrorCode`.
+`restartAcknowledged:true` means only that a valid WB32 two-byte reset acknowledgement
+arrived. It stays false for STM32 because upstream leave handling permits a disconnect
+without an acknowledgement, even with exit code 0. Neither result proves normal firmware
+startup. The coordinator must separately verify normal enumeration at the same port,
+the expected model, firmware version and configuration. The original recovery identity
+is already checked against the complete flashed image. A missing ACK,
+disconnect or rejected reset leaves the already verified firmware result intact and must
+lead to normal-reconnect guidance, never an automatic reflash or reset retry. Restart
+attempt/result evidence is recorded separately.
+
+Source evidence: vendored `wb32-dfu-updater` commit
+`656f6a56354de86a8213b0d2dc8349b0aeb4b67e`, `src_common/dfufwdevice.c:fn_reset`;
+official dfu-util 0.11, `src/main.c` command-only MODE_DOWNLOAD selection and
+`src/dfuse.c:dfuse_do_dnload` / `dfuse_do_leave`. These source archives are included
+in the release build inputs; native binaries remain pinned by the tool catalog.
 
 ## Transport boundaries and recovery limits
 
@@ -137,14 +183,16 @@ physically reconnect; there is no reset, jump or leave command.
   revision4, 256KiB flash and 36KiB SRAM in both normal and engineering modes. There is no Numpad-only complete type-code comparison.
   Only INFO0, bounded READ, one aligned 256-byte page erase and full-page programming exist in
   the packet allowlist. A protected/error response stops immediately; no unlock, retry, mass
-  erase, option writes, reset or jump is available. Installation writes the checked identity
+  erase, option writes or jump is available. The single post-verification WB32 reset above
+  uses a separate one-use grant, not the ordinary packet allowlist. Installation writes the checked identity
   page first; restore preserves it until last. Each page is read back, followed by two complete
   reads. A failure during the identity page itself remains an uncertain result.
 * STM32: pinned dfu-util0.11, exact serial and bus/port, configuration1/interface0/alternate0.
   The internal-flash map must be 128 writable/erasable/readable sectors of 2KiB at0x08000000.
-  Only `-l`, bounded `-U` and one exact complete `-D` are generated. No `leave`, `force`,
-  `unprotect`, option-byte operation or reset is generated. STM32's full-image download does
-  not promise identity-page-first ordering.
+  The ordinary command builder generates only `-l`, bounded `-U` and one exact complete
+  `-D`. The separate verified-update continuation may issue the fixed command-only `leave`
+  described above. No `force`, `unprotect`, option-byte operation or USB reset is generated.
+  STM32's full-image download does not promise identity-page-first ordering.
 * Operations have a 300-second device deadline; raw failures are preserved without automatic
   retry. A partial write before the recovery identity is intact cannot be claimed recoverable
   by the generic marker-based path after process loss. The archived original remains intact.

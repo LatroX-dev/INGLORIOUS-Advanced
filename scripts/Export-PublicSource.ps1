@@ -47,6 +47,7 @@ $app += @('OnboardTransportPool.cs')
 $app += @('OnboardTransferDiscovery.cs','OnboardDiscoveryDiagnostics.cs','OnboardMetadata.cs')
 $app += @('OnboardHardwareProfiles.cs','ProfileBankLayout.cs','TransferWindow.HardwareProfiles.cs','MainWindow.HardwareProfiles.cs','MainWindow.HardwareProfileChecks.cs')
 $app += @('MainWindow.DeviceReadErrors.cs')
+$app += @('OnboardBootloader.cs','DeviceSetupWindow.AutomaticUpdate.cs')
 $allow = [Collections.Generic.List[string]]::new()
 $app += @('DeviceFeedback.cs','SupportContact.cs','DeviceFeedbackWindow.cs','MainWindow.Feedback.cs','CoreSettingsImport.cs','CoreImportWindow.cs','MainWindow.CoreImport.cs')
 foreach ($name in $app) { $allow.Add('src/InGlorious.Core/'+$name) }
@@ -69,6 +70,7 @@ $allow.Add('src/InGlorious.Core/SetupToolCatalog.json')
 $allow.Add('src/InGlorious.Core/Locales/device-setup-ui.json')
 $allow.Add('src/InGlorious.Core/Locales/device-setup-service.json')
 $allow.Add('src/InGlorious.Core/Locales/device-update.json')
+$allow.Add('src/InGlorious.Core/Locales/automatic-update.json')
 $allow.Add('src/InGlorious.Core/Locales/startup-settings.json')
 $allow.Add('src/InGlorious.Core/Locales/software-updates.json')
 $allow.Add('src/InGlorious.Core/Locales/layers-guidance.json')
@@ -92,6 +94,7 @@ $allow.Add('tests/InGlorious.SetupChecks/LegacyMigrationChecks.cs')
 $adapterFiles=@('AdapterEngine.cs','EngineeringPolicy.cs','Contracts.cs','Files.cs','InGlorious.FirmwareAdapter.csproj','NativeUsb.cs','NativeToolCatalog.cs','Program.cs','README.md','SelfTests.cs','SelfTests.Legacy.cs','SelfTests.Engineering.cs','Stm32Device.cs','WbProtocol.cs',
  'Licenses/dfu-util-binary-provenance.txt','Licenses/dfu-util-GPL-2.0.txt','Licenses/dotnet-MIT.txt','Licenses/dotnet-THIRD-PARTY-NOTICES.txt','Licenses/libusb-LGPL-2.1.txt','Licenses/README.txt','Licenses/Westberry-Apache-2.0.txt','Licenses/Windows-runtime-notices.txt')
 $adapterFiles += @('RetainedLoaderWriteGrant.cs','SelfTests.RetainedLoader.cs')
+$adapterFiles += @('VerifiedRestartGrant.cs','SelfTests.Restart.cs')
 foreach($name in $adapterFiles){$allow.Add('tools/InGlorious.FirmwareAdapter/'+$name)}
 $deviceCliFiles = @('InGlorious.Device.csproj','Program.cs','DeviceArguments.cs','TimedTransport.cs')
 foreach($name in $deviceCliFiles){$allow.Add('tools/InGlorious.Device/'+$name)}
@@ -106,6 +109,7 @@ $desktop += @('DeviceFeedbackWindow.cs','MainWindow.Feedback.cs','CoreImportWind
 $desktop += @('DeviceTestWindow.cs','MainWindow.DeviceTest.cs','DeviceSetupWindow.Options.cs')
 $desktop += @('MainWindow.KnobPresets.cs','MainWindow.KnobStatus.cs')
 $desktop += @('MainWindow.HardwareProfiles.cs')
+$desktop += @('DeviceSetupWindow.AutomaticUpdate.cs')
 foreach ($name in $desktop) { $allow.Add('src/InGlorious.Desktop/'+$name) }
 foreach ($name in @('inglorious-mark.png','inglorious.ico')) { $allow.Add('src/InGlorious.Core/Assets/'+$name) }
 foreach ($name in @('INGLORIOUS-Oxanium-SemiBold.ttf','Oxanium-OFL.txt','Oxanium-source.json')) { $allow.Add('src/InGlorious.Core/Assets/Fonts/'+$name) }
@@ -125,6 +129,10 @@ foreach ($suite in @('InGlorious.Checks','InGlorious.OnboardChecks','InGlorious.
 }
 $allow.Add('tests/InGlorious.Checks/ColorPaletteChecks.cs')
 $allow.Add('tests/InGlorious.OnboardChecks/FirmwareVersionChecks.cs')
+$allow.Add('tests/InGlorious.OnboardChecks/BootloaderEntryChecks.cs')
+$allow.Add('tests/InGlorious.SetupChecks/AutomaticUpdateChecks.cs')
+$allow.Add('firmware/inglorious/ig_app_bootloader.inc')
+$allow.Add('firmware/tests/app_bootloader_checks.h')
 $allow.Add('tests/InGlorious.OnboardChecks/BrightnessBindingChecks.cs')
 foreach ($name in @('KnobPresetChecks.cs','KnobTransferChecks.cs','KnobFixtureExport.cs','KnobStatusChecks.cs','HardwareControlChecks.cs','OnboardTransportPoolChecks.cs','KnobPressFixtureExport.cs','KnobPressChecks.cs')) { $allow.Add('tests/InGlorious.OnboardChecks/'+$name) }
 foreach ($name in @('HardwareProfileChecks.cs','ProfileBankLayoutChecks.cs')) { $allow.Add('tests/InGlorious.OnboardChecks/'+$name) }

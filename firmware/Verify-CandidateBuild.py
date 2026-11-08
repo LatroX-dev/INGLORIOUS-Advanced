@@ -99,6 +99,7 @@ for entry in manifest['sourceSnapshot']:
     verify(sha(safe_file(ROOT, entry['path'])) == entry['sha256'], f'Input snapshot changed: {entry["path"]}')
 for key, relative in {
     'commonSourceSha256': 'inglorious/inglorious.c', 'versionHeaderSha256': 'inglorious/ig_version.h',
+    'appBootloaderSourceSha256': 'inglorious/ig_app_bootloader.inc',
     'effectsSourceSha256': 'inglorious/ig_effects.h', 'colorOutputHeaderSha256': 'inglorious/ig_color.h',
     'timingSourceSha256': 'inglorious/ig_timing.c', 'timingHeaderSha256': 'inglorious/ig_timing.h',
     'wb32BulkSourceSha256': 'inglorious/wb32_bulk.c', 'storageHeaderSha256': 'inglorious/ig_storage.h',
@@ -110,6 +111,20 @@ for key, relative in {
     verify(manifest[key] == sha(ROOT / relative), f'Build/source mismatch: {relative}')
 
 results = []
+bootloader_pins = {
+    'platforms/chibios/bootloaders/stm32_dfu.c': 'D5098D7767F5089664D63B098FB3866C6964CDCD3ED584DD24418932E3B5F459',
+    'platforms/chibios/bootloaders/wb32_dfu.c': '1A297EB8BDC70868834BB91BE144867B4ABB9933E2919B7C0A8A6A456DB1AA1A',
+    'platforms/chibios/bootloader.mk': '2A14E44C683D2F8DA3844377A785ABE142A70656864BB6C01A564CA38356462E',
+    'platforms/chibios/mcu_selection.mk': 'B9D30547B9A0B67DCF21D1102B758510DE60D11D880748E7730D9358500AB373',
+    'tmk_core/protocol/chibios/chibios.c': 'ACCA06B2192304B4163E17FA0BE955E1C471A5A66332D30F92FDCAD291061AEA',
+    'platforms/chibios/boards/GENERIC_STM32_F303XC/configs/config.h': '8920093C4A35659B54A9D6311BEA97D2EB5B5C3BD9CB44E0F3C8D4808D317D61',
+    'platforms/chibios/boards/GENERIC_WB32_F3G71XX/configs/config.h': '24E8571018776615C4A94ABC178D9CCA38A81CE1DBC6D3F4201916A64E6E1A11',
+    'platforms/chibios/boards/GENERIC_WB32_FQ95XX/configs/config.h': 'B6B2F1C8CB18A30078C3D0092480F1D178384BE34AAE84E2B282A6658BB08C32',
+}
+for path, expected in bootloader_pins.items():
+    verify(sha(ROOT/'qmk_firmware'/path) == expected, 'Bootloader/startup source differs from reviewed QMK: ' + path)
+    verify(any(item['path'] == 'qmk_firmware/' + path and item['sha256'] == expected for item in manifest['sourceSnapshot']),
+           'Bootloader/startup source missing from build snapshot: ' + path)
 for target in selected:
     name = target['name']
     retained = target['boardId'] == 16
@@ -129,8 +144,13 @@ for target in selected:
     build_ids = re.findall(r'^#define IG_FW_BUILD_ID 0x([0-9A-Fa-f]{8})UL$', identity_text, re.M)
     verify(len(build_ids) == 1 and identity['firmwareVersion'] == '.'.join(map(str,version_parts)) and
            identity['firmwareBuildId'] == build_ids[0].upper(), f'{name}: manifest version differs from selected header')
-    expected_version = ('0.11.11','000B0B01') if retained else ('0.11.9','000B0901')
+    expected_version = ('0.11.14','000B0E01')
     verify((identity['firmwareVersion'],identity['firmwareBuildId']) == expected_version, f'{name}: release version changed')
+    app_entry = target['boardId'] in (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)
+    verify(identity.get('appBootloaderEntry') is app_entry, f'{name}: app bootloader capability is not bound to the selected board')
+    config_text = (ROOT/'keymaps'/name/'config.h').read_text()
+    entry_flags = re.findall(r'^#define IG_APP_BOOTLOADER_ENABLE ([01])$', config_text, re.M)
+    verify(entry_flags == (['1'] if app_entry else []), f'{name}: generated app bootloader gate differs')
     expected_bank = dict(id='profile-pairs-v1', offset=172032, length=49152, recordBytes=8192, recordCount=6, profileCount=3)
     verify(identity.get('profileBankLayout') == (expected_bank if profile_banks else None),
            f'{name}: per-target profile bank geometry differs')
@@ -141,6 +161,15 @@ for target in selected:
     map_text = (build / (name + '.map')).read_text(encoding='utf-8-sig')
     log = (build / (name + '-build.log')).read_text(encoding='utf-8-sig')
     stack_text = (build / (name + '-stack-usage.txt')).read_text(encoding='utf-8-sig')
+    verify(('.bss.app_bootloader_state' in map_text) is app_entry and ('.bss.app_bootloader_nonce' in map_text) is app_entry,
+           f'{name}: linked app bootloader state differs from its compile gate')
+    verify(target['mcu'] in ('STM32F303','WB32F3G71','WB32FQ95'), f'{name}: unreviewed bootloader MCU family')
+    bootloader_object = 'stm32_dfu' if target['mcu'] == 'STM32F303' else 'wb32_dfu'
+    for symbol in ('bootloader_jump','enter_bootloader_mode_if_requested'):
+        verify(re.search(r'^' + symbol + r'\s+\S*/platforms/chibios/bootloaders/' + bootloader_object + r'\.o$', map_text, re.M) is not None,
+               f'{name}: {symbol} is not supplied by its reviewed ROM-bootloader implementation')
+    verify(re.search(r'^early_hardware_init_pre\s+\S*/protocol/chibios/chibios\.o$', map_text, re.M) is not None,
+           f'{name}: bootloader-marker startup hook was overridden')
     application_offset = target.get('applicationOffsetBytes',0)
     application_base = 0x08000000 + application_offset
     storage_base = 0x08000000 + target['flashBytes'] - targets['storageBytes']
@@ -156,6 +185,11 @@ for target in selected:
     sp, pc = struct.unpack_from('<II', binary)
     verify(0x20000000 <= sp <= 0x20000000 + target['ramBytes'] and sp % 4 == 0, f'{name}: stack vector')
     verify(pc & 1 and application_base <= (pc & ~1) < application_base + len(binary), f'{name}: reset vector')
+    for symbol in ('bootloader_jump','enter_bootloader_mode_if_requested','early_hardware_init_pre'):
+        verify(application_base <= symbol_address(map_text, symbol) < application_base + len(binary),
+               f'{name}: bootloader/startup symbol is not in the linked application: {symbol}')
+    verify(symbol_address(map_text, '__ram0_end__') == 0x20000000 + target['ramBytes'],
+           f'{name}: bootloader RAM marker is not bound to the target RAM extent')
     flash = re.search(r'^flash0\s+(0x[0-9a-f]+)\s+(0x[0-9a-f]+)', map_text, re.M)
     verify(flash is not None and int(flash[1], 16) == application_base and int(flash[2],16) == limit, f'{name}: linker prefix/storage reservations')
     verify(not re.search(r'\b(?:warning|error):', log, re.I), f'{name}: compiler warning/error')
@@ -201,7 +235,7 @@ for target in selected:
         verify(0 <= offset <= len(binary)-count, f'{name}: runtime-local constant range {section}')
         return binary[offset:offset+count]
     expected_identity = struct.pack('<HBB4HI', 1, target['boardId'], 0, *version_parts, 0, int(build_ids[0],16))
-    if retained:
+    if retained or app_entry:
         verify(flash_constant('ig_fw_identity') == expected_identity, f'{name}: linked RAW13 identity differs from selected version')
     else:
         # GCC folds the 16-byte RAW13 copy into an anonymous constant in the

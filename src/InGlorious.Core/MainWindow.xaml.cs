@@ -1955,7 +1955,7 @@ public partial class MainWindow : Window
     private void DeleteMacro_Click(object sender, RoutedEventArgs e)
     {
         var macro = CurrentMacro; if (macro is null) return;
-        if (MessageBox.Show(this, L.F($"„{macro.Name}“ löschen?") + "\n\n" + L.T("Zugewiesene Tasten und Drehregler-Aktionen werden deaktiviert."), L.T("Makro löschen"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (!UnsavedChangesWindow.ConfirmDelete(this, L.T("Makro löschen"), L.F($"„{macro.Name}“ löschen?") + "\n\n" + L.T("Zugewiesene Tasten und Drehregler-Aktionen werden deaktiviert."))) return;
         BeginChange();
         _project = SharedMacroLibrary.RemoveFromProfile(_project, macro.Id);
         RefreshMacros(); FinishChange(L.T("Makro gelöscht · Rückgängig mit Strg+Z."));

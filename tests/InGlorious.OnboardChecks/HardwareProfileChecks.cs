@@ -96,7 +96,7 @@ static class HardwareProfileChecks
         { var invalid = boundPacket.ToArray(); invalid[reserved] = 1; try { OnboardProtocol.Packet(8, 1, invalid); throw new Exception("reserved accepted"); } catch (ArgumentOutOfRangeException) { check(true, "bound reconnect reserved rejected"); } }
     }
 
-    sealed class Fake : IOnboardTransport
+    internal sealed class Fake : IOnboardTransport
     {
         public List<byte> Commands = [];
         public byte[][] Payload = Enumerable.Range(0, 3).Select(_ => OnboardSerializer.Prepare(ProjectService.Create(Id)).Payload).ToArray();

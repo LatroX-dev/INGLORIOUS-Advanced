@@ -22,7 +22,7 @@ public sealed class DeviceTestWindow : Window
     private readonly TextBlock _lastKey = Label(L.T("Noch keine Taste gedrückt."));
     private readonly StackPanel _hardwareControls = new() { Name = "DeviceHardwareControls", MaxWidth = 340, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _osSwitch = Label("");
-    private readonly Button _start = new() { Name = "StartDeviceTest", Content = L.T("Test starten"), Focusable = false };
+    private readonly Button _start = new() { Name = "StartDeviceTest", Content = L.T("Test starten"), Focusable = false, IsVisible = false };
     private readonly List<Control> _lightControls = [];
     private readonly Dictionary<string, Action<IBrush>> _keyColors = [];
     private readonly HashSet<string> _typingKeys = [];
@@ -32,7 +32,7 @@ public sealed class DeviceTestWindow : Window
     private DeviceDiagnosticSession? _session;
     private HardwareControlTestSession? _hardwareSession;
     private Task _starting = Task.CompletedTask, _pollTask = Task.CompletedTask;
-    private bool _polling, _closing, _closed;
+    private bool _polling, _closing, _closed, _opened;
     private static IBrush ColorBrush(string color) => new SolidColorBrush(Color.Parse(color));
 
     public DeviceTestWindow(string deviceId, OnboardDevice? connection, bool preview = false)
@@ -123,7 +123,7 @@ public sealed class DeviceTestWindow : Window
             if (_closing) return;
             RecordTypingText(e.Text); e.Handled = true;
         }, RoutingStrategies.Tunnel);
-        Opened += (_, _) =>
+        Opened += async (_, _) =>
         {
             if (Screens.ScreenFromWindow(this) is { } screen)
             {
@@ -133,6 +133,7 @@ public sealed class DeviceTestWindow : Window
                 Width = Math.Min(Width, availableWidth); Height = Math.Min(Height, availableHeight);
             }
             layout.Focus();
+            await StartOnOpenAsync();
         };
         if (preview) ShowTypingTest(capabilityKnown: true);
         Closing += OnClosing;
@@ -215,10 +216,21 @@ public sealed class DeviceTestWindow : Window
         { _typingKeys.Add(id); _keyColors[id](ColorBrush("#89661E")); }
     }
 
+    private async Task StartOnOpenAsync()
+    {
+        if (_opened || _closing) return;
+        _opened = true;
+        // Preview constructors discard their connection; opening them never probes USB.
+        if (_connection is null) return;
+        _starting = StartAsync();
+        await _starting;
+    }
     private async Task StartAsync()
     {
         if (_connection is null || _session is not null || _hardwareSession is not null || _closing || !_start.IsEnabled) return;
         _start.IsEnabled = false;
+        _start.IsVisible = false;
+        _status.Text = L.T("Bitte warten …");
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token); timeout.CancelAfter(TimeSpan.FromSeconds(8));
@@ -333,7 +345,16 @@ public sealed class DeviceTestWindow : Window
         // A native template is required for child-to-window event routes; this fixture never activates or reads hardware.
         ShowActivated = false; ShowInTaskbar = false; Opacity = 0; Show();
         await Dispatcher.Yield(DispatcherPriority.Background);
-        try { RunOfflineInputAndLayoutChecks(check); await RunOfflineCloseChecksAsync(check); }
+        try
+        {
+            check(_opened && _starting.IsCompletedSuccessfully && !_timer.IsEnabled && _session is null && _hardwareSession is null,
+                "Device test: opening an offline preview completes without USB sessions or polling");
+            var firstStart = _starting;
+            await StartOnOpenAsync();
+            check(ReferenceEquals(firstStart, _starting) && _session is null && _hardwareSession is null && !_start.IsVisible,
+                "Device test: repeated opening does not restart an offline preview or expose an extra start step");
+            RunOfflineInputAndLayoutChecks(check); await RunOfflineCloseChecksAsync(check);
+        }
         finally { Close(); await Dispatcher.Yield(DispatcherPriority.Background); }
     }
 
@@ -415,6 +436,9 @@ public sealed class DeviceTestWindow : Window
         var stop = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var stopStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         fixture._starting = start.Task; fixture._pollTask = poll.Task; fixture._closing = true;
+        await fixture.StartOnOpenAsync();
+        check(!fixture._opened && ReferenceEquals(fixture._starting, start.Task),
+            "Device test: opening after close begins cannot replace startup tracking or start a session");
         bool stopEntered = false, stopFinished = false;
         var closing = fixture.DrainAndStopAsync(async () =>
         {

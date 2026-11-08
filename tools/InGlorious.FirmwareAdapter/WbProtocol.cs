@@ -75,6 +75,16 @@ internal static class WbProtocol
     }
     internal static void CheckWrite(byte[] response, byte command)
     { Check(response, command); if (response.Length != 2) throw new IOException("WB_WRITE_ACK_LENGTH"); }
+    internal static byte[] VerifiedRestartPacket(Model model)
+    {
+        ValidateModel(model);
+        VerifiedRestartGrant.ValidateModel(model);
+        // Westberry fn_reset: CMD_RESET, three reserved zeros, LE delay_ms.
+        // Fixed one-second delay gives the ROM time to acknowledge before reset.
+        return [0x83, 0, 0, 0, 0xE8, 0x03, 0, 0];
+    }
+    internal static void CheckRestart(byte[] response)
+    { Check(response, 0x83); if (response.Length != 2) throw new IOException("WB_RESTART_ACK_LENGTH"); }
     internal static IEnumerable<int> PageOrder(byte[] image, Model model)
     {
         ValidateModel(model);

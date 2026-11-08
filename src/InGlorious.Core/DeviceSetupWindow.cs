@@ -26,6 +26,7 @@ public sealed partial class DeviceSetupWindow : Window
     private int _revision, _versionRevision;
     private bool _readingVersion;
     private OnboardFirmwareVersion? _runtimeVersion;
+    private bool _automaticUpdateAvailable;
     private DeviceSetupFirmwareSequence _firmwareSequence = new();
     private readonly List<Window> _owners = [];
     private readonly ComboBox _devices = new() { Name = "SetupDevices", MinHeight = 36, Margin = new(0, 10, 0, 12) };
@@ -47,7 +48,7 @@ public sealed partial class DeviceSetupWindow : Window
     public string? DeviceId => _session?.DeviceId;
     public bool Completed => _progress?.Stage == SetupStage.Complete && _writeAttempted;
     public OnboardFirmwareVersion? ReportedVersion => Completed ? _runtimeVersion : null;
-    public bool DeviceStateMayHaveChanged => _writeAttempted || _outcomeUncertain;
+    public bool DeviceStateMayHaveChanged => _writeAttempted || _outcomeUncertain || _session?.BootloaderEntryAttempted == true;
 
     public DeviceSetupWindow(string? preferredDeviceId = null, SetupOperation operation = SetupOperation.Install, bool offlinePreview = false, string? preferredInstanceId = null)
     {
@@ -130,7 +131,7 @@ public sealed partial class DeviceSetupWindow : Window
         AutomationProperties.SetName(_devices, L.T("Gerät auswählen"));
         _devices.SelectionChanged += async (_, _) =>
         {
-            _error = false; _status.Text = ""; _runtimeVersion = null; _versionRevision++;
+            _error = false; _status.Text = ""; _runtimeVersion = null; _automaticUpdateAvailable = false; _versionRevision++;
             Render(); await ReadSelectedVersionAsync();
         };
         _modelConfirmation.Checked += (_, _) => Render(); _modelConfirmation.Unchecked += (_, _) => Render();
@@ -211,14 +212,22 @@ public sealed partial class DeviceSetupWindow : Window
                 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                 await using var client = OnboardClient.Open(matches[0]);
                 var info = await client.GetInfoAsync(timeout.Token);
-                if (!info.Persistent || (info.Flags & 4) != 0 || info.StagingBytes != 0)
-                    throw new SetupException(L.T("Die Firmware-Version konnte nicht geprüft werden."));
-                return await client.GetFirmwareVersionAsync(timeout.Token)
+                var version = await client.GetFirmwareVersionAsync(timeout.Token)
                     ?? throw new SetupException(L.T("Die Firmware-Version konnte nicht geprüft werden."));
+                bool profileUpdate = _operation == SetupOperation.Update && version.DeviceId == "gmmk3-pro-100-iso" &&
+                    version.Version >= OnboardClient.AppBootloaderMinimumVersion &&
+                    (await client.GetExtensionsAsync(timeout.Token)).SupportsHardwareProfiles;
+                if ((!info.Persistent && !profileUpdate) || (info.Flags & 4) != 0 || info.StagingBytes != 0)
+                    throw new SetupException(L.T("Die Firmware-Version konnte nicht geprüft werden."));
+                var automatic = _operation == SetupOperation.Update && DeviceSetupService.SupportsAutomaticUpdateDevice(version.DeviceId) &&
+                    version.Version >= OnboardClient.AppBootloaderMinimumVersion &&
+                    await client.CanEnterBootloaderAsync(version, timeout.Token);
+                return (Version: version, Automatic: automatic);
             });
             if (!_closed && revision == _versionRevision && ReferenceEquals(selected, SelectedDevice))
             {
-                _runtimeVersion = report;
+                _runtimeVersion = report.Version;
+                _automaticUpdateAvailable = report.Automatic;
                 if (_operation == SetupOperation.Update && !UpdateVersionReady) _status.Text = L.T("Die Firmware ist bereits aktuell oder neuer als die angebotene Version.");
             }
         }
@@ -259,6 +268,11 @@ public sealed partial class DeviceSetupWindow : Window
                 catch (Exception exception)
                 {
                     if (_closed || revision != _revision || !ReferenceEquals(session, _session)) return;
+                    if (session.Stage == SetupStage.Blocked)
+                    {
+                        ApplyProgress(new(SetupStage.Blocked, DeviceSetupService.ForUser(exception), session.DeviceId));
+                        return;
+                    }
                     // A normal USB descriptor is not confirmation of the flashed runtime.
                     session.Stage = SetupStage.Reconnect;
                     ApplyProgress(new(SetupStage.Reconnect, exception is SetupException ? exception.Message
@@ -282,6 +296,11 @@ public sealed partial class DeviceSetupWindow : Window
             if (_session is null)
             {
                 _session = await _service.BeginAsync(SelectedDevice!, _operation); _revision++;
+                if (_automaticUpdateAvailable && _runtimeVersion is { } expectedVersion && _operation == SetupOperation.Update)
+                {
+                    await RunAutomaticUpdateAsync(_session, expectedVersion);
+                    return;
+                }
                 await CaptureCoreImportAsync();
                 _devices.IsEnabled = false;
                 ApplyProgress(new(_session.Stage, L.T("Trenne das Gerät vom USB-Kabel."), _session.DeviceId));
@@ -474,6 +493,7 @@ public sealed partial class DeviceSetupWindow : Window
             _version.Text = "";
             _version.Visibility = _step.Visibility = _stepProgress.Visibility = _summary.Visibility = _backup.Visibility = _keepOpen.Visibility = Visibility.Collapsed;
         }
+        RenderAutomaticUpdate();
         UpdateStatusVisibility();
         _status.Foreground = (Brush)FindResource(_error ? "Accent" : "Muted");
         RenderCompletion();

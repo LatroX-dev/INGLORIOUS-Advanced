@@ -26,6 +26,8 @@ public partial class AppSettingsWindow : Window
         ContactEmailButton.Visibility = SupportContact.EmailUri is null ? Visibility.Collapsed : Visibility.Visible;
         ContactEmailButton.IsEnabled = !offlinePreview;
         ContactEmailButton.ToolTip = SupportContact.Email;
+        WebsiteButton.IsEnabled = !offlinePreview;
+        WebsiteButton.ToolTip = SupportContact.WebsiteUrl;
         LanguageChoice.ItemsSource = L.LanguageChoices;
         LanguageChoice.SelectedValue = current.Language;
         StartDeviceChoice.Items.Add(new System.Windows.Controls.ComboBoxItem { Content = L.T("Zuletzt benutztes Gerät"), Tag = "last" });
@@ -120,6 +122,14 @@ public partial class AppSettingsWindow : Window
     private void ContactEmail_Click(object sender, RoutedEventArgs e)
     {
         if (_offlinePreview || SupportContact.EmailUri is not { } uri) return;
+        OpenContactLink(uri);
+    }
+
+    private void Website_Click(object sender, RoutedEventArgs e) => OpenContactLink(new Uri(SupportContact.WebsiteUrl));
+
+    private void OpenContactLink(Uri uri)
+    {
+        if (_offlinePreview) return;
         try { Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true }); }
         catch { StatusText.Text = L.T("Der Link konnte nicht geöffnet werden. Prüfe deine Standard-App für Browser oder E-Mail."); }
     }

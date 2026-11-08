@@ -3,5 +3,6 @@
   <ItemGroup>
     <Compile Include="../../tools/InGlorious.FirmwareAdapter/Files.cs" Link="Files.cs" />
     <Compile Include="../../tools/InGlorious.FirmwareAdapter/Contracts.cs" Link="Contracts.cs" />
+    <Compile Include="../../tools/InGlorious.FirmwareAdapter/VerifiedRestartGrant.cs" Link="VerifiedRestartGrant.cs" />
   </ItemGroup>
 </Project>

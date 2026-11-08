@@ -110,8 +110,10 @@ internal static class FirmwareVersionChecks
             var knobCycle = new FirmwareSemanticVersion(0, 11, 6);
             var knobOrder = new FirmwareSemanticVersion(0, 11, 7);
             var knobFeedback = new FirmwareSemanticVersion(0, 11, 8);
-            check(FirmwareChangelog.Between(deviceId, v07, new(65535, 65535, 65535)).All(n => n.Version <= knobFeedback)
-                && FirmwareChangelog.Between(deviceId, v07, new(65535, 65535, 65535)).Select(n => n.Version).SequenceEqual(new[] { knobFeedback, knobOrder, knobCycle, brightnessBindings, lightingFix, redDefaults }.Concat(expectedVersions)), "A future target cannot expose notes beyond the current documented firmware");
+            var latestDocumented = new FirmwareSemanticVersion(0, 11, 12);
+            var allExpectedVersions = new[] { latestDocumented, knobFeedback, knobOrder, knobCycle, brightnessBindings, lightingFix, redDefaults }.Concat(expectedVersions);
+            check(FirmwareChangelog.Between(deviceId, v07, new(65535, 65535, 65535)).All(n => n.Version <= latestDocumented)
+                && FirmwareChangelog.Between(deviceId, v07, new(65535, 65535, 65535)).Select(n => n.Version).SequenceEqual(allExpectedVersions), "A future target cannot expose notes beyond the current documented firmware for that device");
             check(FirmwareChangelog.Between(deviceId, current, redDefaults).Single().Changes.SequenceEqual(new[] { "Red default lighting when no saved colors are available." }), "New default-color note does not invent per-key diagnostics for other boards");
             foreach (var installed in new FirmwareSemanticVersion?[] { null, default(FirmwareSemanticVersion), current, new(0, 11, 2), new(1, 0, 0) })
                 check(FirmwareChangelog.Between(deviceId, installed, current).Count == 0, "Missing/default/current/newer firmware has no proposed update changelog");
@@ -146,6 +148,7 @@ internal static class FirmwareVersionChecks
                 expectedFuture = new[] { new FirmwareSemanticVersion(0, 11, 9) }.Concat(expectedFuture).ToArray();
             if (board.DeviceId == "gmmk3-pro-100-iso")
                 expectedFuture = new[] { new FirmwareSemanticVersion(0, 11, 11) }.Concat(expectedFuture).ToArray();
+            expectedFuture = new[] { new FirmwareSemanticVersion(0, 11, 12) }.Concat(expectedFuture).ToArray();
             check(FirmwareChangelog.Between(board.DeviceId, previousRelease, new(99, 0, 0)).Select(note => note.Version).SequenceEqual(expectedFuture),
                 board.DeviceId + ": future target cannot invent changes after the documented device features");
             check(FirmwareChangelog.Between(board.DeviceId, latestRelease, brightnessRelease).Single().Changes.SequenceEqual(new[] { "Adjust keyboard brightness with the knob or assigned keys." }),
@@ -156,7 +159,7 @@ internal static class FirmwareVersionChecks
                 : cycleNotes.Count == 0,
                 board.DeviceId + ": only a board with an encoder receives the long-press feature note");
             check(FirmwareChangelog.Between(board.DeviceId, brightnessRelease, brightnessRelease).Count == 0 &&
-                FirmwareChangelog.Between(board.DeviceId, new(0, 11, 11), new(99, 0, 0)).Count == 0,
+                FirmwareChangelog.Between(board.DeviceId, new(0, 11, 12), new(99, 0, 0)).Count == 0,
                 board.DeviceId + ": current or undocumented future updates have no guessed notes");
             var orderNotes = FirmwareChangelog.Between(board.DeviceId, knobCycleRelease, knobOrderRelease);
             check(board.HasEncoder ? orderNotes.Count == 1 && orderNotes[0].Version == knobOrderRelease &&
@@ -208,6 +211,7 @@ internal static class FirmwareVersionChecks
             check(hasProfiles ? notes.Count == 1 && notes[0].Version == profiles && notes[0].Changes.SequenceEqual([profileText]) : notes.Count == 0,
                 board.DeviceId + ": three profile-switch configurations are offered only for GMMK3 PRO100 ISO");
             var expected = hasProfiles ? new[] { profiles, osSwitch } : hasOs ? new[] { osSwitch } : Array.Empty<FirmwareSemanticVersion>();
+            expected = new[] { new FirmwareSemanticVersion(0, 11, 12) }.Concat(expected).ToArray();
             notes = FirmwareChangelog.Between(board.DeviceId, beforeSwitches, future);
             check(notes.Select(note => note.Version).SequenceEqual(expected),
                 board.DeviceId + ": skipped switch releases remain descending and future versions invent no changes");
