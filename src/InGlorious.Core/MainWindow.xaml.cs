@@ -429,6 +429,8 @@ public partial class MainWindow : Window
         ManageFirmwareButton.IsEnabled = RestoreOriginalFirmwareButton.IsEnabled = !offline && IsActiveDeviceConnected;
         ManageFirmwareButton.Visibility = offline ? Visibility.Collapsed : Visibility.Visible;
         DeviceRecoveryOverview.Visibility = offline ? Visibility.Collapsed : Visibility.Visible;
+        OriginalFirmwareHint.Text = Device.Id == RetainedLoaderLayout.DeviceId ? FirmwareMessages.RestoreSource(Device.Id) : "";
+        OriginalFirmwareHint.Visibility = OriginalFirmwareHint.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         FirmwareInstallationNotice.Visibility = offline ? Visibility.Visible : Visibility.Collapsed;
         foreach (var action in new[] { ManageFirmwareButton, RestoreOriginalFirmwareButton })
             action.ToolTip = !IsActiveDeviceConnected ? L.T("Gerät nicht verbunden") : null;

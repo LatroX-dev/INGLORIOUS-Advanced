@@ -10,7 +10,7 @@ The wizard observes disconnection, then requires exactly one supported bootloade
 
 For first installation, **Back up and install** authorizes one combined operation for the displayed device. The adapter reads the entire internal flash twice before writing. Both files must be complete and byte-identical. A structured USB descriptor inside the original image must agree with the originally observed stock VID/PID and selected model. This is a consistency check, not cryptographic proof of a manufacturer's firmware or physical board identity. Only a successfully verified and saved backup allows the same operation to continue to installation. A failure stops the operation without an automatic retry.
 
-Updates and restoration use the same sequence through **Back up and update** and **Back up and restore**. The app checks the current firmware and matching original archive before continuing to the confirmed operation. The confirmation applies only to that device and attempt; an error cannot trigger a retry or another write.
+Updates and restoration start with **Back up and update** and **Back up and restore**. The app checks the current firmware before writing. The confirmation applies only to the displayed device and attempt.
 
 There are no user-specific identifiers in the distributed code or tool bundle. Each platform's app package includes the same reviewed firmware for 16 model/layout variants and a native adapter. Thirteen untested variants remain visibly experimental; offline tests do not establish physical compatibility for untested revisions.
 
@@ -38,13 +38,15 @@ The reviewed firmware binaries remain unchanged when composing installation imag
 
 Immediately before writing, two fresh reads must still match the captured original. After writing, two full reads must match the exact target image. The app independently checks the returned files and their content before asking for a normal reconnect. Neither the wizard nor adapter retries a write automatically.
 
-Restoration requires the installed identifier, matching local original archive and, for STM32, the original USB serial. The WB32 transport exposes no independently established immutable per-unit identifier. Physical substitution by an identical or cloned device cannot be ruled out by USB metadata. The cable/port observation and installation record reduce accidental mismatches; they are not hardware authentication.
+Restoration from the personal backup requires the installed identifier, the matching local archive and, for STM32, the original USB serial. For the wired, non-HE GMMK 3 PRO 100% ISO, the app can also download verified Glorious firmware when the personal backup is missing. This requires an internet connection. Previous CORE settings may be unavailable, and CORE cannot use INGLORIOUS settings. Other models require the matching original backup.
+
+The WB32 transport exposes no independently established immutable per-unit identifier. Physical substitution by an identical or cloned device cannot be ruled out by USB metadata. The cable/port observation and installation record reduce accidental mismatches; they are not hardware authentication.
 
 The backup covers internal flash. ROM, protection/option bytes, external profile storage and wireless-module data are excluded. A partial write, especially damage to the identity page, may require separate recovery; unconditional recoverability is not promised. The original archive is retained even after failure.
 
 ## Updating an existing installation
 
-The normal-mode RAW-HID handshake and explicit version query must identify the connected board before the app offers a newer included version. Missing, equal or newer version reports do not produce an update offer. The writer separately checks the captured code against `KnownFirmwareCatalog`, the existing installation identifier and the matching original archive. A reported version alone never authorizes a flash.
+The normal-mode RAW-HID handshake and explicit version query must identify the connected board before the app offers a newer included version. Missing, equal or newer version reports do not produce an update offer. The writer separately checks the captured code against `KnownFirmwareCatalog` and verifies the installation identifier. The wired GMMK 3 PRO 100% ISO can update with its verified resident loader when the original archive is missing. Other models still require the matching original archive.
 
 Two complete current reads must agree. The update keeps the installation identifier and the full 32-KiB configuration tail byte-for-byte, and binds the write to the freshly captured image hash. Two new before-reads must still agree immediately before writing; two full readbacks must match afterwards. There is no downgrade or fallback to an arbitrary raw image.
 

@@ -27,7 +27,7 @@ internal static class EngineeringPolicy
     {
         WbProtocol.ValidateModel(model);
         if (!model.EngineeringOnly || model.ProtectedPrefixBytes != ApplicationOffset || request.Operation is not ("install" or "restore") ||
-            !request.ConfirmWrite || request.MigrateLegacy || request.ExpectedCurrentSha256 != null)
+            !request.ConfirmWrite || request.MigrateLegacy || request.UsesInstalledCapture || request.ExpectedCurrentSha256 != null)
             throw new InvalidDataException("ENGINEERING_OPERATION_NOT_ALLOWED");
         if (authorization.Schema != 1 || authorization.Operation != request.Operation || authorization.DeviceId != model.DeviceId ||
             authorization.SessionDirectory != request.SessionDirectory || !Path.IsPathFullyQualified(authorization.SessionDirectory) ||

@@ -68,7 +68,12 @@ def stage(source: Path, destination: Path, version: str, repository: Path) -> li
             raise ValueError("Release copy verification failed.")
     migration_note = ("Windows 0.6.48 and earlier: download and run the installer once to switch to the new package names. "
                       "Your profiles and backups are kept.\n\n") if version == "0.6.49" else ""
-    notes = (section[1].strip() + "\n\n" +
+    recovery_note = ("A tester updated a wired, non-HE GMMK 3 PRO 100% ISO without importing the backup ZIP. "
+                     "If you return to CORE without the backup, the app needs an internet connection to download the matching Glorious firmware. "
+                     "Previous CORE settings may be missing. CORE cannot use INGLORIOUS settings. "
+                     "The download was verified and recovery was tested with a simulated keyboard. Recovery by download still awaits a physical keyboard test.\n\n"
+                     ) if version == "0.7.9" else ""
+    notes = (section[1].strip() + "\n\n" + recovery_note +
              f"[Full changelog](https://github.com/LatroX-dev/INGLORIOUS-Advanced/blob/v{version}/CHANGELOG.md)\n\n" + migration_note +
              f"Choose **INGLORIOUS-Advanced-{version}-win-x64-Setup.exe** for Windows, **osx-arm64** for Apple silicon, **osx-x64** for Intel Macs, "
              "or **linux-x64** for Linux. Each app package includes firmware and its USB tools.\n\n"

@@ -141,9 +141,11 @@ public sealed partial class DeviceSetupWindow : Window
 
     private string OperationTitle => L.T(_operation switch { SetupOperation.Install => "Gerät einrichten", SetupOperation.Update => "Firmware aktualisieren", _ => "Original-Firmware wiederherstellen" });
     private SetupDevice? SelectedDevice => _session?.Device ?? _devices.SelectedItem as SetupDevice;
-    private string? SelectedTargetVersion => (_session?.DeviceId ?? _runtimeVersion?.DeviceId ??
-        (SelectedDevice?.CandidateDeviceIds.Count == 1 ? SelectedDevice.CandidateDeviceIds[0] : null)) is { } id
-        ? SelectedDevice?.CandidateDeviceIds.Contains(id) == true && BoardDescriptorRegistry.TryGet(id, out _) ? DeviceSetupService.TargetFirmwareVersionFor(id) : null : null;
+    private string? SelectedModelId => (_session?.DeviceId ?? _runtimeVersion?.DeviceId ??
+        (SelectedDevice?.CandidateDeviceIds is [var candidate] ? candidate : null)) is { } id &&
+        SelectedDevice?.CandidateDeviceIds.Contains(id) == true ? id : null;
+    private string? SelectedTargetVersion => SelectedModelId is { } id && BoardDescriptorRegistry.TryGet(id, out _)
+        ? DeviceSetupService.TargetFirmwareVersionFor(id) : null;
     internal static bool MatchesSelectedRuntime(OnboardDevice candidate, SetupDevice selected) =>
         selected.IsRuntime && selected.CandidateDeviceIds.Contains(candidate.DeviceId) &&
         BoardDescriptorRegistry.TryGet(candidate.DeviceId, out var board) &&
@@ -373,8 +375,12 @@ public sealed partial class DeviceSetupWindow : Window
         SetupOperation.Update => "Sichern und aktualisieren",
         _ => "Sichern und wiederherstellen"
     });
-    private string BackupActivity => L.T(_operation == SetupOperation.Install
-        ? "Die Original-Firmware wird gesichert und geprüft …" : "Der aktuelle Zustand und die Original-Sicherung werden geprüft …");
+    private string BackupActivity => L.T(_operation switch
+    {
+        SetupOperation.Install => "Die Original-Firmware wird gesichert und geprüft …",
+        _ when SelectedModelId == RetainedLoaderLayout.DeviceId => "Die Firmware wird zweimal vollständig gelesen und als Sicherung geprüft.",
+        _ => "Der aktuelle Zustand und die Original-Sicherung werden geprüft …"
+    });
     private string WriteActivity => L.T(_operation switch
     {
         SetupOperation.Install => "Firmware wird installiert …",
@@ -423,6 +429,7 @@ public sealed partial class DeviceSetupWindow : Window
             {
                 SetupOperation.Install => L.T("Die App sichert zuerst deine Original-Firmware und installiert danach INGLORIOUS.") + "\n" + L.T("INGLORIOUS ersetzt die Original-Firmware und startet mit Standardwerten. Übertrage danach dein Profil."),
                 SetupOperation.Update => L.T("Die App sichert zuerst den aktuellen Zustand und aktualisiert danach die Firmware. Deine Einstellungen bleiben erhalten."),
+                SetupOperation.Restore when SelectedModelId == RetainedLoaderLayout.DeviceId => L.T("Die App sichert zuerst den aktuellen Zustand und stellt danach die Original-Firmware wieder her."),
                 _ => L.T("Die App sichert zuerst den aktuellen Zustand und stellt danach die Original-Firmware wieder her.") + "\n" + L.T("Die Original-Firmware ersetzt INGLORIOUS und seine Einstellungen.")
             },
             SetupStage.Reconnect => L.Format("Trenne \"{0}\" einmal vom USB-Kabel und stecke es ohne gedrückte Tasten wieder ein.", productName ?? L.T("Gerät")),
@@ -430,10 +437,15 @@ public sealed partial class DeviceSetupWindow : Window
             _ => L.T("Es wird nichts automatisch wiederholt.")
         };
         RenderKeyCombination(stage == SetupStage.ConnectBootloader ? device : null);
-        _backup.Text = _operation == SetupOperation.Install
-            ? L.T("Die Original-Firmware wird vor der Installation zweimal gesichert. Die geprüfte Sicherung bleibt auf diesem Computer und ermöglicht die Wiederherstellung.") + "\n" + L.T("Zusätzliche Profilspeicher und Bluetooth-Einstellungen sind nicht Teil dieser Sicherung.")
-            : _operation == SetupOperation.Update ? L.T("Deine Einstellungen und die Original-Sicherung bleiben erhalten.")
-            : L.T("Die Wiederherstellung verwendet ausschließlich die passende Original-Sicherung dieses Geräts.");
+        _backup.Text = _operation switch
+        {
+            SetupOperation.Install => L.T("Die Original-Firmware wird vor der Installation zweimal gesichert. Die geprüfte Sicherung bleibt auf diesem Computer und ermöglicht die Wiederherstellung.") + "\n" + L.T("Zusätzliche Profilspeicher und Bluetooth-Einstellungen sind nicht Teil dieser Sicherung."),
+            SetupOperation.Update when SelectedModelId == RetainedLoaderLayout.DeviceId => L.T("Für dieses Update brauchst du keine Original-Sicherung."),
+            SetupOperation.Update => L.T("Deine Einstellungen und die Original-Sicherung bleiben erhalten."),
+            SetupOperation.Restore when SelectedModelId == RetainedLoaderLayout.DeviceId => FirmwareMessages.RestoreSource(SelectedModelId) + "\n" +
+                L.T("Ohne die Sicherung können frühere CORE-Einstellungen fehlen. Deine INGLORIOUS-Einstellungen lassen sich in CORE nicht verwenden."),
+            _ => FirmwareMessages.RestoreSource(SelectedModelId)
+        };
         _backup.IsVisible = stage is null or SetupStage.ReadyToBackup or SetupStage.ReadyToInstall ? true : false;
         _version.IsVisible = string.IsNullOrEmpty(_version.Text) ? false : true;
         _summary.IsVisible = _backup.IsVisible;

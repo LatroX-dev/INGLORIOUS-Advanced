@@ -41,20 +41,36 @@ public sealed record InstallationIdentity(byte BoardId, Guid InstallationId, str
     public static byte[] CreateImage(ReadOnlySpan<byte> firmware, int flashBytes, InstallationIdentity identity, ReadOnlySpan<byte> original = default, string? storageLayout = null)
     {
         int applicationOffset = RetainedLoaderLayout.ApplicationOffset(identity.BoardId);
-        ProfileBankLayout.ValidateGeometry(identity.BoardId == 16 ? "gmmk3-pro-100-iso" : "", identity.BoardId,
-            flashBytes, applicationOffset, firmware.Length, storageLayout);
-        if (firmware.Length < 8 || firmware.Length > Offset(flashBytes) - applicationOffset)
-            throw new InvalidDataException("Firmware overlaps recovery identity or is empty.");
         if (applicationOffset != 0)
         {
             if (flashBytes != RetainedLoaderLayout.FlashBytes || original.Length != flashBytes || !identity.MatchesOriginal(original) || Read(original) is not null)
                 throw new InvalidDataException("RETAINED_LOADER_ORIGINAL_REQUIRED");
-            RetainedLoaderLayout.ValidatePrefix(original);
-            RetainedLoaderLayout.ValidateApplicationVectors(firmware);
         }
+        return ComposeImage(firmware, flashBytes, identity, original, storageLayout);
+    }
+
+    internal static byte[] CreateRetainedUpdate(ReadOnlySpan<byte> firmware, InstallationIdentity identity, ReadOnlySpan<byte> current, string? storageLayout)
+    {
+        if (identity.BoardId != RetainedLoaderLayout.BoardId || current.Length != RetainedLoaderLayout.FlashBytes || Read(current) != identity)
+            throw new InvalidDataException("RETAINED_UPDATE_IDENTITY_MISMATCH");
+        return ComposeImage(firmware, current.Length, identity, current, storageLayout);
+    }
+
+    private static byte[] ComposeImage(ReadOnlySpan<byte> firmware, int flashBytes, InstallationIdentity identity, ReadOnlySpan<byte> loaderSource, string? storageLayout)
+    {
+        int applicationOffset = RetainedLoaderLayout.ApplicationOffset(identity.BoardId);
+        ProfileBankLayout.ValidateGeometry(identity.BoardId == RetainedLoaderLayout.BoardId ? RetainedLoaderLayout.DeviceId : "", identity.BoardId,
+            flashBytes, applicationOffset, firmware.Length, storageLayout);
+        if (firmware.Length < 8 || firmware.Length > Offset(flashBytes) - applicationOffset)
+            throw new InvalidDataException("Firmware overlaps recovery identity or is empty.");
         var image = new byte[flashBytes];
         Array.Fill(image, (byte)0xFF);
-        if (applicationOffset != 0) original[..applicationOffset].CopyTo(image);
+        if (applicationOffset != 0)
+        {
+            RetainedLoaderLayout.ValidatePrefix(loaderSource);
+            RetainedLoaderLayout.ValidateApplicationVectors(firmware);
+            loaderSource[..applicationOffset].CopyTo(image);
+        }
         firmware.CopyTo(image.AsSpan(applicationOffset));
         identity.Encode().CopyTo(image, Offset(flashBytes));
         return image;

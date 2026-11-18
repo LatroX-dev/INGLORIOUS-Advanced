@@ -50,7 +50,8 @@ public sealed class SetupSession
     internal OnboardFirmwareVersion? ExpectedRuntimeVersion;
     internal SetupUsbNode? Bootloader;
     internal JsonElement Selection;
-    internal string? FingerprintSha256, BackupPath, OriginalSha256, BundlePath, CurrentSha256;
+    internal string? FingerprintSha256, BackupPath, OriginalSha256, BundlePath, CurrentSha256, ManufacturerTargetSha256;
+    internal bool UpdateFromCurrent => DeviceId == RetainedLoaderLayout.DeviceId && Operation == SetupOperation.Update;
     internal InstallationIdentity? Installation;
     internal bool Consumed;
     internal bool MigrateLegacy;
@@ -70,14 +71,22 @@ public sealed partial class DeviceSetupService
     private readonly string _archiveRoot, _packageRoot;
     private readonly IDeviceSetupEnvironment _environment;
     private readonly Func<string, string> _targetVersionFor;
+    private readonly Func<Task<byte[]>> _getManufacturerApplication;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private SetupSession? _active;
     public static string RecoveryDirectory => Path.Combine(Paths.UserDataRoot, "Firmware", "Devices");
     public DeviceSetupService() : this(OperatingSystem.IsWindows() ? new WindowsDeviceSetupEnvironment() : new PosixDeviceSetupEnvironment(),
         RecoveryDirectory,
         Path.Combine(AppContext.BaseDirectory, "Firmware")) { }
-    internal DeviceSetupService(IDeviceSetupEnvironment environment, string archiveRoot, string packageRoot, Func<string, string>? targetVersionFor = null)
-    { _environment = environment; _archiveRoot = Path.GetFullPath(archiveRoot); _packageRoot = Path.GetFullPath(packageRoot); _targetVersionFor = targetVersionFor ?? TargetFirmwareVersionFor; }
+    internal DeviceSetupService(IDeviceSetupEnvironment environment, string archiveRoot, string packageRoot, Func<string, string>? targetVersionFor = null,
+        Func<Task<byte[]>>? getManufacturerApplication = null)
+    {
+        _environment = environment;
+        _archiveRoot = Path.GetFullPath(archiveRoot);
+        _packageRoot = Path.GetFullPath(packageRoot);
+        _targetVersionFor = targetVersionFor ?? TargetFirmwareVersionFor;
+        _getManufacturerApplication = getManufacturerApplication ?? ManufacturerFirmwareDownload.GetApplicationAsync;
+    }
 
     public async Task<IReadOnlyList<SetupDevice>> ListDevicesAsync()
     {
@@ -422,8 +431,11 @@ public sealed partial class DeviceSetupService
             request["backupPath"] = session.BackupPath;
             request["expectedBackupSha256"] = session.OriginalSha256;
             request["expectedInstallationId"] = session.Installation!.InstallationId.ToString();
-            if (operation is "install" or "update") request["bundlePath"] = session.BundlePath;
-            if (operation == "update") request["expectedCurrentSha256"] = session.CurrentSha256;
+            bool manufacturerRestore = session.ManufacturerTargetSha256 is not null;
+            if (operation is "install" or "update" || manufacturerRestore) request["bundlePath"] = session.BundlePath;
+            if (operation == "update" || manufacturerRestore) request["expectedCurrentSha256"] = session.CurrentSha256;
+            if (session.UpdateFromCurrent) request["useCurrentCapture"] = true;
+            if (manufacturerRestore) request["useManufacturerFirmware"] = true;
             if (operation == "update" && session.AutomaticUpdate) request["restartAfterVerify"] = true;
             if (session.MigrateLegacy) request["migrateLegacy"] = true;
         }

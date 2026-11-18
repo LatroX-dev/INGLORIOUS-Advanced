@@ -1,4 +1,30 @@
 ﻿{
+  "Die Glorious-Firmware konnte nicht geladen werden. Prüfe die Internetverbindung und versuche es erneut.": {
+    "en": "Could not download the Glorious firmware. Check your internet connection and try again.",
+    "es": "No se pudo descargar el firmware de Glorious. Comprueba tu conexión a Internet y vuelve a intentarlo.",
+    "fr": "Impossible de télécharger le firmware Glorious. Vérifiez votre connexion Internet et réessayez.",
+    "it": "Impossibile scaricare il firmware Glorious. Controlla la connessione Internet e riprova.",
+    "pt-BR": "Não foi possível baixar o firmware da Glorious. Verifique sua conexão com a internet e tente novamente.",
+    "pl": "Nie udało się pobrać oprogramowania sprzętowego Glorious. Sprawdź połączenie z internetem i spróbuj ponownie.",
+    "tr": "Glorious aygıt yazılımı indirilemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.",
+    "ru": "Не удалось загрузить прошивку Glorious. Проверьте подключение к интернету и попробуйте ещё раз.",
+    "ja": "Glorious のファームウェアをダウンロードできませんでした。インターネット接続を確認して、もう一度お試しください。",
+    "ko": "Glorious 펌웨어를 다운로드할 수 없습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+    "zh-Hans": "无法下载 Glorious 固件。请检查网络连接后重试。"
+  },
+  "Die heruntergeladene Glorious-Firmware konnte nicht bestätigt werden. Versuche es später erneut.": {
+    "en": "Could not verify the downloaded Glorious firmware. Try again later.",
+    "es": "No se pudo verificar el firmware de Glorious descargado. Inténtalo de nuevo más tarde.",
+    "fr": "Impossible de vérifier le firmware Glorious téléchargé. Réessayez plus tard.",
+    "it": "Impossibile verificare il firmware Glorious scaricato. Riprova più tardi.",
+    "pt-BR": "Não foi possível verificar o firmware da Glorious baixado. Tente novamente mais tarde.",
+    "pl": "Nie udało się zweryfikować pobranego oprogramowania sprzętowego Glorious. Spróbuj ponownie później.",
+    "tr": "İndirilen Glorious aygıt yazılımı doğrulanamadı. Daha sonra tekrar deneyin.",
+    "ru": "Не удалось проверить загруженную прошивку Glorious. Попробуйте позже.",
+    "ja": "ダウンロードした Glorious のファームウェアを検証できませんでした。しばらくしてから、もう一度お試しください。",
+    "ko": "다운로드한 Glorious 펌웨어를 확인할 수 없습니다. 나중에 다시 시도하세요.",
+    "zh-Hans": "无法验证下载的 Glorious 固件。请稍后重试。"
+  },
   "Beide vollständigen Sicherungen stimmen überein.": {
     "en": "Both complete backups match.",
     "es": "Las dos copias de seguridad completas coinciden.",

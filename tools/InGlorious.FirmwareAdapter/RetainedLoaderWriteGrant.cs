@@ -3,15 +3,16 @@ using InGlorious.Core;
 namespace InGlorious.FirmwareAdapter;
 
 /// <summary>One operation on a known loader and reviewed application, bound to the
-/// current device and its own original backup. The CLI cannot construct this grant.</summary>
+/// current device and the verified capture for this operation. The CLI cannot construct this grant.</summary>
 internal sealed class RetainedLoaderWriteGrant : IRetainedLoaderWriteGrant
 {
     private readonly Model model;
     private readonly Fingerprint fingerprint;
     private readonly string imageSha256;
+    private readonly Dictionary<int, byte[]>? changedPages;
     private bool consumed;
-    private RetainedLoaderWriteGrant(Model model, Fingerprint fingerprint, byte[] image)
-    { this.model = model; this.fingerprint = fingerprint; imageSha256 = Files.Hash(image); }
+    private RetainedLoaderWriteGrant(Model model, Fingerprint fingerprint, byte[] image, Dictionary<int, byte[]>? changedPages = null)
+    { this.model = model; this.fingerprint = fingerprint; imageSha256 = Files.Hash(image); this.changedPages = changedPages; }
 
     internal static void ValidateBackupDevice(Fingerprint backup, Fingerprint current)
     {
@@ -22,28 +23,54 @@ internal sealed class RetainedLoaderWriteGrant : IRetainedLoaderWriteGrant
     }
 
     internal static RetainedLoaderWriteGrant Create(AdapterRequest request, Model model, Fingerprint fingerprint,
-        byte[] original, byte[] current, byte[] image)
+        byte[] captured, byte[] current, byte[] image)
     {
         WbProtocol.ValidateModel(model);
         if (model.EngineeringOnly || model.ProtectedPrefixBytes != RetainedLoaderLayout.PrefixBytes ||
             request.DeviceId != model.DeviceId || request.Operation is not ("install" or "update" or "restore") || !request.ConfirmWrite || request.MigrateLegacy ||
-            Files.Hash(Json.Bytes(fingerprint)) != request.ExpectedFingerprintSha256 || Files.Hash(original) != request.ExpectedBackupSha256)
+            Files.Hash(Json.Bytes(fingerprint)) != request.ExpectedFingerprintSha256)
             throw new InvalidDataException("RETAINED_WRITE_SCOPE_MISMATCH");
         ValidateFingerprint(fingerprint, model);
-        if (original.Length != model.FlashBytes || current.Length != model.FlashBytes || image.Length != model.FlashBytes ||
-            InstallationIdentity.Read(original) != null) throw new InvalidDataException("RETAINED_ORIGINAL_INVALID");
-        RetainedLoaderLayout.ValidatePrefix(original);
-        StockFirmwareInspector.Validate(original, 0x342D, 0xE3CE, model.DeviceId);
-        if (!original.AsSpan(0, model.ProtectedPrefixBytes).SequenceEqual(current.AsSpan(0, model.ProtectedPrefixBytes)) ||
-            !original.AsSpan(0, model.ProtectedPrefixBytes).SequenceEqual(image.AsSpan(0, model.ProtectedPrefixBytes)))
+        if (captured.Length != model.FlashBytes || current.Length != model.FlashBytes || image.Length != model.FlashBytes)
+            throw new InvalidDataException("RETAINED_IMAGE_LENGTH");
+        RetainedLoaderLayout.ValidatePrefix(captured);
+        if (!captured.AsSpan(0, model.ProtectedPrefixBytes).SequenceEqual(current.AsSpan(0, model.ProtectedPrefixBytes)) ||
+            !captured.AsSpan(0, model.ProtectedPrefixBytes).SequenceEqual(image.AsSpan(0, model.ProtectedPrefixBytes)))
             throw new InvalidDataException("RETAINED_LOADER_CHANGED");
         var identity = InstallationIdentity.Read(request.Operation == "install" ? image : current);
         if (identity is null || identity.BoardId != model.BoardId || identity.InstallationId != request.ExpectedInstallationId ||
-            identity.OriginalSha256 != request.ExpectedBackupSha256 || !identity.MatchesOriginal(original))
+            identity.OriginalSha256 != request.ExpectedBackupSha256)
             throw new InvalidDataException("RETAINED_RECOVERY_ID_MISMATCH");
+        if (request.UsesInstalledCapture)
+        {
+            if (model.DeviceId != RetainedLoaderLayout.DeviceId || request.UseCurrentCapture != (request.Operation == "update") ||
+                request.UseManufacturerFirmware != (request.Operation == "restore") || Files.Hash(current) != request.ExpectedCurrentSha256 ||
+                (request.UseManufacturerFirmware && request.RestartAfterVerify) || !captured.AsSpan().SequenceEqual(current))
+                throw new InvalidDataException("RETAINED_CURRENT_CAPTURE_MISMATCH");
+            if (request.UseManufacturerFirmware)
+            {
+                ManufacturerFirmware.ValidateImage(current, image);
+                var pages = new Dictionary<int, byte[]>();
+                foreach (int offset in WbProtocol.PageOrder(image, model))
+                {
+                    var targetPage = image.AsSpan(offset, WbProtocol.Page);
+                    if (current.AsSpan(offset, WbProtocol.Page).SequenceEqual(targetPage)) continue;
+                    if (offset >= model.ProtectedPrefixBytes + ManufacturerFirmware.ApplicationBytes && offset != InstallationIdentity.Offset(image.Length))
+                        throw new InvalidDataException("MANUFACTURER_WRITE_PAGE_NOT_AUTHORIZED");
+                    pages.Add(offset, targetPage.ToArray());
+                }
+                return new(model, fingerprint, image, pages);
+            }
+        }
+        else
+        {
+            if (InstallationIdentity.Read(captured) != null || !identity.MatchesOriginal(captured))
+                throw new InvalidDataException("RETAINED_ORIGINAL_INVALID");
+            StockFirmwareInspector.Validate(captured, 0x342D, 0xE3CE, model.DeviceId);
+        }
         if (request.Operation == "restore")
         {
-            if (!image.AsSpan().SequenceEqual(original)) throw new InvalidDataException("RETAINED_RESTORE_NOT_ORIGINAL");
+            if (!image.AsSpan().SequenceEqual(captured)) throw new InvalidDataException("RETAINED_RESTORE_NOT_ORIGINAL");
         }
         else
         {
@@ -52,7 +79,7 @@ internal sealed class RetainedLoaderWriteGrant : IRetainedLoaderWriteGrant
             if (request.Operation == "install")
             {
                 ProfileBankLayout.RequireInitialState(image, KnownFirmwareImages.GetStorageLayout(image, model.DeviceId, (byte)model.BoardId));
-                if (!current.AsSpan().SequenceEqual(original) || image.AsSpan(InstallationIdentity.Offset(model.FlashBytes) + InstallationIdentity.Size).ContainsAnyExcept((byte)0xFF))
+                if (!current.AsSpan().SequenceEqual(captured) || image.AsSpan(InstallationIdentity.Offset(model.FlashBytes) + InstallationIdentity.Size).ContainsAnyExcept((byte)0xFF))
                     throw new InvalidDataException("RETAINED_INSTALL_CHANGED");
             }
             else
@@ -66,6 +93,15 @@ internal sealed class RetainedLoaderWriteGrant : IRetainedLoaderWriteGrant
             }
         }
         return new(model, fingerprint, image);
+    }
+
+    internal bool ShouldWritePage(int offset) => changedPages is null || changedPages.ContainsKey(offset);
+
+    internal void CheckWritePage(int offset, ReadOnlySpan<byte> payload = default)
+    {
+        if (changedPages is null) return;
+        if (!consumed || !changedPages.TryGetValue(offset, out var expected) || (!payload.IsEmpty && !payload.SequenceEqual(expected)))
+            throw new InvalidDataException("MANUFACTURER_WRITE_PAGE_NOT_AUTHORIZED");
     }
 
     private static void ValidateFingerprint(Fingerprint value, Model model)

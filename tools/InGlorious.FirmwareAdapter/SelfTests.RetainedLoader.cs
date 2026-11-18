@@ -48,13 +48,13 @@ internal static partial class SelfTests
         Reject(() => RetainedLoaderWriteGrant.ValidateBackupDevice(fake.Fingerprint, fake.Fingerprint with { FlashBytes = 131072 }), "backup geometry cannot change");
     }
 
-    internal static int RunRetainedLoader(string candidatePath, string originalPath, string repeatPath, string? profileFixtures = null)
+    internal static int RunRetainedLoader(string candidatePath, string originalPath, string repeatPath, string? profileFixtures = null, string? manufacturerApp = null)
     {
         string root = CheckDirectory(); Directory.CreateDirectory(root);
         try
         {
             RetainedLoaderChecks(root);
-            RetainedLoaderFixtureChecks(root, candidatePath, originalPath, repeatPath, profileFixtures);
+            RetainedLoaderFixtureChecks(root, candidatePath, originalPath, repeatPath, profileFixtures, manufacturerApp);
             Console.WriteLine(System.Text.Encoding.UTF8.GetString(Json.Bytes(new { passed = checks, retainedLoaderEndToEnd = true,
                 hardwareAccess = false, nativeLibraryLoaded = false, toolProcessesStarted = false })));
             return 0;
@@ -63,7 +63,7 @@ internal static partial class SelfTests
         finally { CleanCheckDirectory(root); }
     }
 
-    private static void RetainedLoaderFixtureChecks(string root, string candidatePath, string originalPath, string repeatPath, string? profileFixtures = null)
+    private static void RetainedLoaderFixtureChecks(string root, string candidatePath, string originalPath, string repeatPath, string? profileFixtures = null, string? manufacturerApp = null)
     {
         var model = Model.Get(RetainedLoaderLayout.DeviceId);
         Check(!string.Equals(Path.GetFullPath(originalPath), Path.GetFullPath(repeatPath), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal), "original pair paths are distinct");
@@ -137,6 +137,34 @@ internal static partial class SelfTests
         Check(updated is { Status: "verified", WriteAttempted: true } && device.Image.AsSpan().SequenceEqual(updateImage) && InstallationIdentity.Read(device.Image) == identity,
             "normal update preserves all configuration, loader and installation identity");
         var restore = install with { Operation = "restore", SessionDirectory = Folder("restore"), BundlePath = null };
+        var ownCurrentUpdate = update with { UseCurrentCapture = true, SessionDirectory = Folder("no-original-update"),
+            BackupPath = Path.Combine(currentCapture.EvidenceDirectory, "capture.json") };
+        Block(ownCurrentUpdate with { BackupPath = Path.Combine(capture.EvidenceDirectory, "capture.json") }, "stock copy cannot prove current firmware");
+        Block(update with { BackupPath = ownCurrentUpdate.BackupPath }, "runtime copy cannot act as an original");
+        Block(ownCurrentUpdate with { ExpectedBackupSha256 = ownCurrentUpdate.ExpectedCurrentSha256 }, "current hash cannot replace original binding");
+        Block(ownCurrentUpdate with { ExpectedInstallationId = Guid.NewGuid() }, "unrelated installation in current-capture update");
+        Block(ownCurrentUpdate with { BundlePath = BundleFor(changedConfig) }, "current-capture update refuses changed settings");
+        Block(ownCurrentUpdate with { BundlePath = BundleFor(changedIdentity) }, "current-capture update refuses changed recovery identity");
+        var manifest = Json.Read<CaptureManifest>(ownCurrentUpdate.BackupPath!);
+        var aliasedPath = Path.Combine(currentCapture.EvidenceDirectory, "aliased-current.json");
+        File.WriteAllBytes(aliasedPath, Json.Bytes(manifest with { Artifacts = [manifest.Artifacts[0], manifest.Artifacts[0]] }));
+        Block(ownCurrentUpdate with { BackupPath = aliasedPath }, "single capture cannot replace two independent current reads");
+        var otherPort = manifest.Fingerprint with { PortPath = "3.9" };
+        string otherPortPath = Path.Combine(currentCapture.EvidenceDirectory, "different-port.json");
+        File.WriteAllBytes(otherPortPath, Json.Bytes(manifest with { Fingerprint = otherPort, FingerprintSha256 = Files.Hash(Json.Bytes(otherPort)) }));
+        Block(ownCurrentUpdate with { BackupPath = otherPortPath }, "fresh capture must belong to the same current port");
+        device.Image[^1] ^= 1;
+        Block(ownCurrentUpdate, "stale current capture on the same port");
+        device.Image = current.ToArray();
+        var archiveFreeUpdate = engine.Run(ownCurrentUpdate);
+        Check(archiveFreeUpdate is { Status: "verified", Verified: true, CanRestore: false } && device.Image.AsSpan().SequenceEqual(updateImage),
+            "update without the stock archive uses only its complete current captures and preserves the exact recovery identity");
+        using (var receipt = System.Text.Json.JsonDocument.Parse(File.ReadAllBytes(Path.Combine(archiveFreeUpdate.EvidenceDirectory, "installation.json"))))
+            Check(receipt.RootElement.GetProperty("originalCaptureManifest").ValueKind == System.Text.Json.JsonValueKind.Null &&
+                receipt.RootElement.GetProperty("currentCaptureManifest").GetString() == ownCurrentUpdate.BackupPath, "runtime capture is never recorded as the manufacturer original");
+        Reject(() => AdapterEngine.ValidateRequest(install with { UseCurrentCapture = true }), "install cannot use current-capture update");
+        Reject(() => AdapterEngine.ValidateRequest(restore with { UseCurrentCapture = true }), "restore cannot use current-capture update");
+        Reject(() => AdapterEngine.ValidateRequest(ownCurrentUpdate with { DeviceId = "gmmk3-100-iso" }), "generic model cannot request current-capture update");
         device.Image[InstallationIdentity.Offset(model.FlashBytes)] ^= 1;
         Block(restore, "missing marker recovery stays blocked");
         device.Image = updateImage.ToArray();
@@ -145,7 +173,7 @@ internal static partial class SelfTests
         device.Image.AsSpan(0x7000, 8).Clear();
         var restored = engine.Run(restore);
         Check(restored is { Status: "verified", WriteAttempted: true } && device.Image.AsSpan().SequenceEqual(original), "normal restore returns exact own original despite damaged application vectors");
-        Check(device.Writes == 3, "only install update and restore wrote through bounded fake packets");
+        Check(device.Writes == 4, "only install, both authorized updates and restore wrote through bounded fake packets");
         RestartModelChecks(root, model, original, application);
         if (profileFixtures is not null)
         {
@@ -168,6 +196,10 @@ internal static partial class SelfTests
                 var bankUpdated = engine.Run(bankRequest);
                 Check(bankUpdated is { Status: "verified", WriteAttempted: true } && device.Image.AsSpan().SequenceEqual(bankUpdate) &&
                     device.Image.AsSpan(ProfileBankLayout.Start, ProfileBankLayout.Length).SequenceEqual(bank), "bank update retains exact committed and torn bytes " + name);
+                var currentBankRequest = bankRequest with { UseCurrentCapture = true, BackupPath = Path.Combine(bankCapture.EvidenceDirectory, "capture.json"),
+                    SessionDirectory = Folder("bank-current-update-" + name) };
+                Block(currentBankRequest with { BundlePath = BundleFor(lostBankByte) }, "current-capture update detects changed bank byte " + name);
+                Check(engine.Run(currentBankRequest).Verified && device.Image.AsSpan().SequenceEqual(bankUpdate), "current-capture update preserves complete bank " + name);
                 byte[] bankBeforeRestore = device.Image.ToArray();
                 var bankRestore = engine.Run(restore with { SessionDirectory = Folder("bank-restore-" + name) });
                 Check(bankRestore is { Status: "verified", WriteAttempted: true } && device.Image.AsSpan().SequenceEqual(original),
@@ -175,7 +207,67 @@ internal static partial class SelfTests
                 var restoreReads = bankRestore.Artifacts.Where(a => a.Kind == "pre-write-read").ToArray();
                 Check(restoreReads.Length == 2 && restoreReads.All(a => Files.ReadBounded(Path.Combine(bankRestore.EvidenceDirectory, a.Path), model.FlashBytes).AsSpan().SequenceEqual(bankBeforeRestore)),
                     "restore evidence preserves both complete current bank images " + name);
+                if (manufacturerApp is not null && name == "torn-inactive")
+                {
+                    device.Image = bankBeforeRestore.ToArray();
+                    ManufacturerRestoreChecks(device, model, engine, currentBankRequest, manufacturerApp, Folder, Block);
+                }
             }
         }
+    }
+
+    private static void ManufacturerRestoreChecks(FakeDevice device, Model model, AdapterEngine engine, AdapterRequest currentCapture,
+        string manufacturerApp, Func<string, string> folder, Action<AdapterRequest, string> block)
+    {
+        var current = device.Image.ToArray();
+        var application = Files.ReadBounded(manufacturerApp, ManufacturerFirmware.ApplicationBytes);
+        var target = ManufacturerFirmware.CreateImage(current, application);
+        string TargetFile(byte[] bytes)
+        {
+            var path = folder("manufacturer-image") + ".bin";
+            File.WriteAllBytes(path, bytes);
+            return path;
+        }
+        var request = currentCapture with { Operation = "restore", UseCurrentCapture = false, UseManufacturerFirmware = true,
+            SessionDirectory = folder("manufacturer-restore"), BundlePath = TargetFile(target) };
+        Reject(() => AdapterEngine.ValidateRequest(request with { Operation = "install" }), "manufacturer restore flag cannot permit installation");
+        Reject(() => AdapterEngine.ValidateRequest(request with { Operation = "update" }), "manufacturer restore flag cannot permit update");
+        Reject(() => AdapterEngine.ValidateRequest(request with { DeviceId = "gmmk3-100-iso" }), "manufacturer package cannot serve a different model");
+        Reject(() => AdapterEngine.ValidateRequest(request with { UseCurrentCapture = true }), "update and restore capture options are mutually exclusive");
+        Reject(() => AdapterEngine.ValidateRequest(request with { ExpectedCurrentSha256 = null }), "manufacturer restore requires current capture hash");
+        Reject(() => AdapterEngine.ValidateRequest(request with { RestartAfterVerify = true }), "manufacturer restore cannot ask for update restart");
+        block(request with { ExpectedInstallationId = Guid.NewGuid() }, "manufacturer restore rejects foreign installation identity");
+        block(request with { ExpectedBackupSha256 = request.ExpectedCurrentSha256 }, "manufacturer restore preserves original marker binding");
+        device.Image[RetainedLoaderLayout.PrefixBytes + 256] ^= 1;
+        var unknown = engine.Run(new(1, "capture", folder("unknown-app-capture"), model.DeviceId, request.Selection));
+        Check(unknown.Status == "ok", "an unknown installed application can be read for diagnosis");
+        block(request with { BackupPath = Path.Combine(unknown.EvidenceDirectory, "capture.json"), ExpectedCurrentSha256 = Files.Hash(device.Image) },
+            "manufacturer restore cannot replace an unknown installed program");
+        device.Image = current.ToArray();
+        int end = RetainedLoaderLayout.PrefixBytes + ManufacturerFirmware.ApplicationBytes;
+        int marker = InstallationIdentity.Offset(current.Length);
+        foreach (int offset in new[] { 0, RetainedLoaderLayout.PrefixBytes + 120, end, ProfileBankLayout.Start, marker, marker + InstallationIdentity.Size, current.Length - 1 })
+        {
+            var changed = target.ToArray(); changed[offset] ^= 1;
+            block(request with { BundlePath = TargetFile(changed) }, "manufacturer restore refuses changed target byte " + offset);
+        }
+        device.Image[^1] ^= 1;
+        block(request, "manufacturer restore refuses changes since complete current capture");
+        device.Image = current.ToArray();
+        var grant = RetainedLoaderWriteGrant.Create(request, model, device.Fingerprint, current, current, target);
+        Reject(() => WbProtocol.ValidatePacket(WbProtocol.ErasePacket(Model.FlashBase + (uint)marker, model), true, model, grant), "manufacturer write permit must be consumed before commands");
+        grant.Consume(model, device.Fingerprint, target, current[..RetainedLoaderLayout.PrefixBytes]);
+        var touched = WbProtocol.PageOrder(target, model).Where(grant.ShouldWritePage).ToArray();
+        var expected = WbProtocol.PageOrder(target, model).Where(offset => !target.AsSpan(offset, WbProtocol.Page).SequenceEqual(current.AsSpan(offset, WbProtocol.Page))).ToArray();
+        Check(touched.SequenceEqual(expected) && touched[^1] == marker && touched.All(offset =>
+            offset == marker || offset >= RetainedLoaderLayout.PrefixBytes && offset < end), "only changed manufacturer payload pages and the final marker page can be programmed");
+        Reject(() => WbProtocol.ValidatePacket(WbProtocol.ErasePacket(Model.FlashBase + ProfileBankLayout.Start, model), true, model, grant), "manufacturer erase packet outside the payload and marker is rejected");
+        int partlyUsed = end / WbProtocol.Page * WbProtocol.Page;
+        var corruptedPage = target.AsSpan(partlyUsed, WbProtocol.Page).ToArray(); corruptedPage[end - partlyUsed] ^= 1;
+        Reject(() => WbProtocol.ValidatePacket(WbProtocol.WritePacket(Model.FlashBase + (uint)partlyUsed, corruptedPage, model), true, model, grant), "manufacturer partial-page packet cannot damage its captured tail");
+        var result = engine.Run(request);
+        Check(result is { Verified: true, WriteAttempted: true, CanRestore: false } && device.Image.AsSpan().SequenceEqual(target) &&
+            InstallationIdentity.Read(device.Image) is null && result.Artifacts.Count(a => a.Kind == "verified-read" && a.Sha256 == Files.Hash(target)) == 2,
+            "manufacturer restore returns two complete matching target reads and only replaces the approved application and marker");
     }
 }

@@ -45,7 +45,9 @@ The separate response path must also be new. Ordinary operations use `confirmWri
 | `capture` | previous fields, `expectedFingerprintSha256` | Two full internal-flash reads only |
 | `install` | previous fields, `backupPath`, `bundlePath`, `expectedBackupSha256`, `expectedInstallationId`, `confirmWrite:true` | Two new before-reads, explicit full-image write, two full readbacks |
 | `restore` | same as install except no bundle | Two new before-reads, exact own original, two full readbacks |
+| `restore` with `useManufacturerFirmware:true` | board16 only, `backupPath` to the current capture, `expectedCurrentSha256`, and `bundlePath` to the prepared full image | Restores the pinned manufacturer application and clears the installation marker. Two complete readbacks verify the result. |
 | `update` | same as install plus `expectedCurrentSha256` | Two fresh reads bound to the captured running image; preserves all 32KiB configuration bytes and the original recovery identity; two full readbacks |
+| `update` with `useCurrentCapture:true` | board16 only, same update fields with `backupPath` pointing to the current capture | Updates a recognized installation and preserves its settings and recovery identity. |
 
 Selection returned by `list.devices[]`:
 
@@ -73,8 +75,8 @@ not certify that the bytes are manufacturer firmware. Initial installation must 
 pass the coordinator's stock descriptor/model check. The adapter rejects an IGIDENT1-bearing
 image when it is supplied as the archived *original* for a write.
 
-`backupPath` identifies the existing original `capture.json`; `expectedBackupSha256` is the
-uppercase SHA-256 of **both identical original flash images**, not of that JSON file.
+In an archive-based operation, `backupPath` identifies the original `capture.json` and
+`expectedBackupSha256` is the uppercase SHA-256 of both identical original flash images.
 Both originals, the manifest, the bundle and the exact write image are rechecked and held with
 file locks for the write (Windows read sharing; POSIX exclusive advisory locks). Fresh
 before-images are also locked. On POSIX the verified STM32 image is streamed to dfu-util's
@@ -116,9 +118,9 @@ For update, the fresh pair must additionally match `expectedCurrentSha256`, the 
 hash captured by the coordinator. Both current and target application bytes must match an
 approved same-model release in `KnownFirmwareCatalog.json`; the unused application gap and
 identity-page padding must remain erased. Downgrades are rejected. The exact final 32KiB
-configuration range and installation identity must be equal before and after. The original
-capture manifest and its two original reads are still mandatory and locked; an update never
-creates a manufacturer-original record from INGLORIOUS bytes. Existing installations without
+configuration range and installation identity must be equal before and after. The default
+update path locks the original capture manifest and its two original reads. Board16 also
+supports the current-capture mode below. Existing installations without
 the recovery identity are deliberately not eligible for this path. Recovery after an interrupted
 full-image update is subject to the same transport and identity limits below; retaining bytes
 in the target image does not make writes power-loss atomic.
@@ -210,12 +212,12 @@ Private device-bound updater wrappers are not part of this public workflow.
 
 The normal `gmmk3-pro-100-iso` profile requires a reviewed resident-loader revision. Its
 code digest is fixed in `RetainedLoaderLayout.cs`; no vendor loader bytes are distributed.
-The application-only catalog entry must declare `applicationOffset:28672`. Image creation
+The application-only catalog entry must declare `applicationOffset:28672`. Initial installation
 requires this device's own checked, matching original pair: its first `0x7000` bytes are
 retained and the approved application begins at `0x08007000`. The recovery identity remains
 at `0x37F00`, with the 32KiB configuration area at `0x38000`.
 
-Normal install, update and restore retain all existing consent, identity, original-pair,
+Archive-based install, update and restore retain all existing consent, identity, original-pair,
 fingerprint and catalog checks. An update preserves the complete configuration and marker.
 A later USB port change is permitted only when every other capture fingerprint field matches
 and the fresh device image has the original backup's installation identity. The current
@@ -224,14 +226,30 @@ full original capture fingerprint and byte-for-byte equality with both fresh bef
 
 Only a validated, single-use retained-loader grant reaches the native writer. The writer
 rereads and checks the live prefix before consuming it; model-bound packet validation rejects
-every erase/program request in the protected prefix. All 912 writable pages are verified,
-then both complete readbacks include the untouched prefix. Restore can recover a damaged
+every erase/program request in the protected prefix. Each programmed page is verified,
+then both complete readbacks include the untouched prefix. Archive-based restore can recover a damaged
 application with its matching marker; there is no exception for a lost marker.
+
+For `useCurrentCapture` updates and `useManufacturerFirmware` restores, `backupPath` points
+to two complete reads of the installed, cataloged application and its capture manifest.
+`expectedCurrentSha256` binds the reads to the pre-write image. The exact current USB
+fingerprint, including its port, must match. The existing installation marker supplies the
+expected original hash and installation GUID. These modes preserve both original archive
+files and identify their current-firmware capture separately in the operation receipt.
+
+The manufacturer restore accepts the fixed Glorious V0003 application for the wired
+100% ISO model. The adapter derives its expected target from the fresh image. It programs
+only changed application pages and clears the installation marker last. The final
+partial application page retains its untouched suffix. The grant checks each programmed
+page against the approved bytes. The full readbacks cover the loader and saved profile
+regions as well as the changed pages.
 
 `--self-test-retained-loader` takes explicit local paths to a catalog-approved application and
 two original reads. It exercises normal capture/install/update/restore through the actual
 engine with a fake transport, including configuration preservation, wrong images, marker
-loss and one-use grants. Private fixtures stay under `workspace/checks` and are removed.
+loss and one-use grants. Add `--profile-bank-fixtures DIRECTORY --manufacturer-app FILE`
+to exercise manufacturer recovery with the official application and independent bank fixtures.
+Temporary test data stay under `workspace/checks` and are removed.
 The test never opens hardware, loads native USB libraries or starts a hardware tool.
 
 ## Scoped engineering profile

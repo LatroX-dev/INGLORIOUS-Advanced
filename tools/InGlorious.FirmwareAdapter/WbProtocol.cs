@@ -56,15 +56,24 @@ internal static class WbProtocol
         BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(4), address);
         BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(8), Page); page.CopyTo(packet.AsSpan(12)); return packet;
     }
-    internal static void ValidatePacket(byte[] packet, bool writes, Model model)
+    internal static void ValidatePacket(byte[] packet, bool writes, Model model, RetainedLoaderWriteGrant? pageGrant = null)
     {
         ValidateModel(model);
         if (packet.AsSpan().SequenceEqual(new byte[] { 1, 0 })) return;
         if (packet.Length < 10 || packet[1] != 0 || packet[2] != 0 || packet[3] != 0) throw new InvalidDataException("WB_COMMAND_REJECTED");
         uint address = U32(packet, 4);
         if (packet[0] == 0x72 && packet.Length == 10 && packet.AsSpan().SequenceEqual(ReadPacket(address, BinaryPrimitives.ReadUInt16LittleEndian(packet.AsSpan(8)), model))) return;
-        if (writes && packet[0] == 0x5E && packet.Length == 12 && packet.AsSpan().SequenceEqual(ErasePacket(address, model))) return;
-        if (writes && packet[0] == 0x6A && packet.Length == 268 && U32(packet, 8) == Page) { PageRange(address, model); return; }
+        if (writes && packet[0] == 0x5E && packet.Length == 12 && packet.AsSpan().SequenceEqual(ErasePacket(address, model)))
+        {
+            pageGrant?.CheckWritePage(checked((int)(address - Model.FlashBase)));
+            return;
+        }
+        if (writes && packet[0] == 0x6A && packet.Length == 268 && U32(packet, 8) == Page)
+        {
+            PageRange(address, model);
+            pageGrant?.CheckWritePage(checked((int)(address - Model.FlashBase)), packet.AsSpan(12));
+            return;
+        }
         throw new InvalidDataException("WB_COMMAND_REJECTED");
     }
     internal static void Check(byte[] response, byte command)
@@ -98,10 +107,11 @@ internal static class WbProtocol
             if (offset != identityPage) yield return offset;
         if (!hasIdentity) yield return identityPage;
     }
-    internal static void WriteImage(IWbExchange connection, byte[] image, Model model)
+    internal static void WriteImage(IWbExchange connection, byte[] image, Model model, RetainedLoaderWriteGrant? pageGrant = null)
     {
         foreach (int offset in PageOrder(image, model))
         {
+            if (pageGrant is not null && !pageGrant.ShouldWritePage(offset)) continue;
             uint address = Model.FlashBase + (uint)offset;
             CheckWrite(connection.Exchange(ErasePacket(address, model)), 0x5E);
             CheckWrite(connection.Exchange(WritePacket(address, image.AsSpan(offset, Page), model)), 0x6A);

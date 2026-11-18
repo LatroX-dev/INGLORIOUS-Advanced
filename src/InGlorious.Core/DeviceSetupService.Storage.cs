@@ -65,26 +65,22 @@ public sealed partial class DeviceSetupService
             else
             {
                 var identity = InstallationIdentity.Read(current);
-                if (identity is null && session.Operation == SetupOperation.Update)
+                if (identity is null && session.Operation == SetupOperation.Update && !session.UpdateFromCurrent)
                 {
                     PrepareLegacyMigration(session, current);
                     session.BundlePath = PrepareBundle(session, current);
                 }
                 else
                 {
-                    if (identity is null || identity.BoardId != BoardDescriptorRegistry.Get(session.DeviceId!).BoardId)
-                        throw Error("Für diese Installation wurde keine passende Original-Sicherung gefunden.");
-                    var recordPath = FindRecovery(identity, session.DeviceId!);
-                    var record = ReadRecovery(recordPath);
-                    var archiveDirectory = Path.GetDirectoryName(recordPath)!;
-                    var originalManifest = ContainedFile(archiveDirectory, record.BackupManifest);
-                    if (!HashEquals(File.ReadAllBytes(originalManifest), record.BackupManifestSha256))
-                        throw Error("Die Original-Sicherung wurde verändert. Die Wiederherstellung wurde angehalten.");
+                    if (identity is null || identity.BoardId != BoardDescriptorRegistry.Get(session.DeviceId!).BoardId ||
+                        (session.ExpectedHardwareProfile is { } profile && profile.InstallationId != identity.InstallationId))
+                        throw Error("Gerät nicht eindeutig erkannt.");
                     session.Installation = identity;
-                    session.OriginalSha256 = record.OriginalSha256;
-                    session.BackupPath = originalManifest;
-                    session.OriginalVendor = record.OriginalVendor;
-                    session.OriginalProduct = record.OriginalProduct;
+                    session.OriginalSha256 = identity.OriginalSha256;
+                    if (session.UpdateFromCurrent)
+                        session.BackupPath = capturePath;
+                    else if (!TryUseArchivedOriginal(session, identity))
+                        await PrepareManufacturerRestore(session, current, capturePath);
                     ExportCurrentHardwareProfiles(session, current);
                     if (session.Operation == SetupOperation.Update)
                     {
@@ -165,7 +161,7 @@ public sealed partial class DeviceSetupService
             var readbacks = response.GetProperty("artifacts").EnumerateArray().Where(item => item.GetProperty("kind").GetString() == "verified-read").ToArray();
             if (readbacks.Length != 2) throw Error("Die vollständige Rückprüfung der Firmware fehlt.");
             RequireDistinctReads(evidence, readbacks);
-            if (operation == SetupOperation.Update)
+            if (operation == SetupOperation.Update || session.ManufacturerTargetSha256 is not null)
             {
                 var before = response.GetProperty("artifacts").EnumerateArray().Where(item => item.GetProperty("kind").GetString() == "pre-write-read").ToArray();
                 if (before.Length != 2) throw Error("Die vollständige Rückprüfung der Firmware fehlt.");
@@ -176,7 +172,7 @@ public sealed partial class DeviceSetupService
             }
             var expectedHash = operation != SetupOperation.Restore
                 ? Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(session.Directory, "installation.bin"))))
-                : session.OriginalSha256!;
+                : session.ManufacturerTargetSha256 ?? session.OriginalSha256!;
             foreach (var artifact in readbacks)
             {
                 var bytes = ReadCheckedArtifact(evidence, artifact, FlashBytesFor(session.DeviceId!));
@@ -241,8 +237,10 @@ public sealed partial class DeviceSetupService
         var source = ContainedFile(_packageRoot, target.File);
         var bytes = File.ReadAllBytes(source);
         if (bytes.Length != target.Bytes || !HashEquals(bytes, target.Sha256)) throw Error("Das Firmware-Paket ist beschädigt oder unvollständig.");
-        var original = target.ApplicationOffset == 0 ? Array.Empty<byte>() : ReadOriginalForBundle(session);
-        var full = InstallationIdentity.CreateImage(bytes, target.FlashBytes, session.Installation!, original, target.StorageLayout);
+        var full = session.UpdateFromCurrent
+            ? InstallationIdentity.CreateRetainedUpdate(bytes, session.Installation!, current, target.StorageLayout)
+            : InstallationIdentity.CreateImage(bytes, target.FlashBytes, session.Installation!,
+                target.ApplicationOffset == 0 ? Array.Empty<byte>() : ReadOriginalForBundle(session), target.StorageLayout);
         if (current is not null)
         {
             if (session.MigrateLegacy) LegacyFirmwareMigration.ValidateImage(current, target.DeviceId);
@@ -320,9 +318,32 @@ public sealed partial class DeviceSetupService
         return first;
     }
 
-    private string FindRecovery(InstallationIdentity identity, string deviceId)
+    private async Task PrepareManufacturerRestore(SetupSession session, byte[] current, string capturePath)
     {
-        var matching = new List<string>();
+        if (session.Operation != SetupOperation.Restore || session.DeviceId != RetainedLoaderLayout.DeviceId)
+            throw Error("Für diese Installation wurde keine passende Original-Sicherung gefunden.");
+        try { KnownFirmwareImages.Validate(current, session.DeviceId, RetainedLoaderLayout.BoardId); }
+        catch (InvalidDataException) { throw Error("Gerät nicht eindeutig erkannt."); }
+
+        byte[] target;
+        try { target = ManufacturerFirmware.CreateImage(current, await _getManufacturerApplication()); }
+        catch (InvalidDataException)
+        { throw Error("Die heruntergeladene Glorious-Firmware konnte nicht bestätigt werden. Versuche es später erneut."); }
+        catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or IOException or OperationCanceledException)
+        { throw Error("Die Glorious-Firmware konnte nicht geladen werden. Prüfe die Internetverbindung und versuche es erneut."); }
+
+        session.BundlePath = Path.Combine(session.Directory, "manufacturer.bin");
+        WriteNew(session.BundlePath, target);
+        session.ManufacturerTargetSha256 = Convert.ToHexString(SHA256.HashData(target));
+        session.BackupPath = capturePath;
+        session.OriginalVendor = 0x342D;
+        session.OriginalProduct = 0xE3CE;
+    }
+
+    private bool TryUseArchivedOriginal(SetupSession session, InstallationIdentity identity)
+    {
+        RecoveryRecord? original = null;
+        string? originalDirectory = null;
         AssertNoLinks(_archiveRoot);
         foreach (var directory in System.IO.Directory.EnumerateDirectories(_archiveRoot))
         {
@@ -332,13 +353,31 @@ public sealed partial class DeviceSetupService
             var record = ReadRecovery(path);
             if (record.InstallationId == identity.InstallationId)
             {
-                if (record.DeviceId != deviceId || record.OriginalSha256 != identity.OriginalSha256)
+                if (record.DeviceId != session.DeviceId || record.OriginalSha256 != identity.OriginalSha256)
                     throw Error("Die Original-Sicherung passt nicht zu dieser Installation.");
-                matching.Add(path);
+                if (original is not null) throw Error("Für diese Installation wurde keine eindeutige Original-Sicherung gefunden.");
+                original = record;
+                originalDirectory = directory;
             }
         }
-        if (matching.Count != 1) throw Error("Für diese Installation wurde keine eindeutige Original-Sicherung gefunden.");
-        return matching[0];
+        if (original is null) return false;
+        var manifest = ContainedFile(originalDirectory!, original.BackupManifest);
+        bool canUseManufacturer = session.Operation == SetupOperation.Restore && session.DeviceId == RetainedLoaderLayout.DeviceId;
+        try
+        {
+            if (new FileInfo(manifest).Length > 65536 || !HashEquals(File.ReadAllBytes(manifest), original.BackupManifestSha256))
+                throw Error("Die Original-Sicherung wurde verändert. Die Wiederherstellung wurde angehalten.");
+            session.BackupPath = manifest;
+            if (canUseManufacturer) ReadOriginalForBundle(session);
+        }
+        catch (Exception ex) when (canUseManufacturer && ex is (FileNotFoundException or DirectoryNotFoundException))
+        {
+            session.BackupPath = null;
+            return false;
+        }
+        session.OriginalVendor = original.OriginalVendor;
+        session.OriginalProduct = original.OriginalProduct;
+        return true;
     }
     private static RecoveryRecord ReadRecovery(string path)
     {

@@ -546,7 +546,7 @@ public sealed partial class MainWindow
         var folder = AsyncButton("Sicherungsordner öffnen", () => OpenRecoveryFolderAsync(Status)); folder.Name = "OpenDeviceRecoveryFolder";
         var recovery = Column(Heading("Sicherungen"),
             Text(L.T("Deine Original-Firmware wird bei der Einrichtung auf diesem Computer gesichert."), true, 11),
-            Text(L.T("Die Wiederherstellung verwendet ausschließlich die passende Original-Sicherung dieses Geräts."), true, 11),
+            Text(FirmwareMessages.RestoreSource(_state.Device.Id), true, 11),
             folder, restore); recovery.Name = "DeviceRecoverySection";
         var maintenance = new Grid { Name = "DeviceMaintenance", ColumnDefinitions = new("*,*"), ColumnSpacing = 36 };
         maintenance.Children.Add(firmware); Grid.SetColumn(recovery, 1); maintenance.Children.Add(recovery); body.Children.Add(maintenance);

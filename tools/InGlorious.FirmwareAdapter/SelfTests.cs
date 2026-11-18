@@ -315,14 +315,14 @@ internal static partial class SelfTests
             BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4), Chip); BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(8), FlashBytes); BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(12), SramBytes); return bytes;
         }
     }
-    private sealed class MemoryWb(byte[] initial, Model? model = null) : IWbExchange
+    private sealed class MemoryWb(byte[] initial, Model? model = null, RetainedLoaderWriteGrant? pageGrant = null) : IWbExchange
     {
         private readonly Model selectedModel = model ?? Model.Get("numpad");
         internal readonly byte[] Data = initial.ToArray(); internal int Erases, Writes, Reads;
         internal int FailPage = -1; internal bool CorruptRead;
         public byte[] Exchange(byte[] request)
         {
-            WbProtocol.ValidatePacket(request, true, selectedModel);
+            WbProtocol.ValidatePacket(request, true, selectedModel, pageGrant);
             int offset = checked((int)(BinaryPrimitives.ReadUInt32LittleEndian(request.AsSpan(4)) - Model.FlashBase));
             if (request[0] == 0x5E)
             {
@@ -364,8 +364,12 @@ internal static partial class SelfTests
             if (WriteFault) throw new IOException("FAKE_PARTIAL_WRITE");
             if (model.ProtectedPrefixBytes != 0)
             {
-                var memory = new MemoryWb(Image, model); WbProtocol.WriteImage(memory, image, model); Image = memory.Data;
-                Check(memory.Erases == 912 && memory.Writes == 912 && memory.Reads == 912, "engineering fake transport uses exact writable pages");
+                var pageGrant = engineeringGrant as RetainedLoaderWriteGrant;
+                int firstPage = model.ProtectedPrefixBytes / WbProtocol.Page;
+                int writablePages = (model.FlashBytes - model.ProtectedPrefixBytes) / WbProtocol.Page;
+                int expectedPages = Enumerable.Range(firstPage, writablePages).Count(page => pageGrant?.ShouldWritePage(page * WbProtocol.Page) != false);
+                var memory = new MemoryWb(Image, model, pageGrant); WbProtocol.WriteImage(memory, image, model, pageGrant); Image = memory.Data;
+                Check(memory.Erases == expectedPages && memory.Writes == expectedPages && memory.Reads == expectedPages, "fake transport uses only granted pages");
             }
             else Image = image.ToArray();
         }

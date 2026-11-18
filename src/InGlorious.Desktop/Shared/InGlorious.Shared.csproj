@@ -44,6 +44,8 @@
     <Compile Include="../../InGlorious.Core/ProfileBankLayout.cs" Link="ProfileBankLayout.cs" />
     <Compile Include="../../InGlorious.Core/RetainedLoaderLayout.cs" Link="RetainedLoaderLayout.cs" />
     <Compile Include="../../InGlorious.Core/KnownFirmwareImages.cs" Link="KnownFirmwareImages.cs" />
+    <Compile Include="../../InGlorious.Core/ManufacturerFirmware.cs" Link="ManufacturerFirmware.cs" />
+    <Compile Include="../../InGlorious.Core/ManufacturerFirmwareDownload.cs" Link="ManufacturerFirmwareDownload.cs" />
     <Compile Include="../../InGlorious.Core/LegacyFirmwareMigration.cs" Link="LegacyFirmwareMigration.cs" />
     <Compile Include="../../InGlorious.Core/DeviceSetupService.Legacy.cs" Link="DeviceSetupService.Legacy.cs" />
     <Compile Include="../../InGlorious.Core/DeviceSetupService.cs" Link="DeviceSetupService.cs" />

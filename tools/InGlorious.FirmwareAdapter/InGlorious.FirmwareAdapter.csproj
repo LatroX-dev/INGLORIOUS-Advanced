@@ -10,6 +10,7 @@
     <Compile Include="..\..\src\InGlorious.Core\ProfileBankLayout.cs" Link="ProfileBankLayout.cs" />
     <Compile Include="..\..\src\InGlorious.Core\RetainedLoaderLayout.cs" Link="RetainedLoaderLayout.cs" />
     <Compile Include="..\..\src\InGlorious.Core\KnownFirmwareImages.cs" Link="KnownFirmwareImages.cs" />
+    <Compile Include="..\..\src\InGlorious.Core\ManufacturerFirmware.cs" Link="ManufacturerFirmware.cs" />
     <Compile Include="..\..\src\InGlorious.Core\LegacyFirmwareMigration.cs" Link="LegacyFirmwareMigration.cs" />
     <Compile Include="..\..\src\InGlorious.Core\StockDeviceCatalog.cs" Link="StockDeviceCatalog.cs" />
     <Compile Include="..\..\src\InGlorious.Core\StockFirmwareInspector.cs" Link="StockFirmwareInspector.cs" />

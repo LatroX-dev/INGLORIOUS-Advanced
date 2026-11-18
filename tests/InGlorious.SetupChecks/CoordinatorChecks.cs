@@ -15,6 +15,7 @@ internal static partial class Program
             "Discovery never assigns reserved PowerShell process/home variables.");
         await CheckSuccessfulRoundTrips();
         await CheckUpdates();
+        await CheckRetainedBoardOnAnotherComputer();
         await CheckAutomaticUpdates();
         await CheckDiscoveryAndTransitions();
         await CheckIdentifiedModelWithoutFirmware();
@@ -92,6 +93,75 @@ internal static partial class Program
             Check((await service.ListDevicesAsync()).All(item => !item.CandidateDeviceIds.Contains(RetainedLoaderLayout.DeviceId)), "Other PRO layouts and wireless variants never alias wired ISO.");
         }
     }
+    private static async Task CheckRetainedBoardOnAnotherComputer()
+    {
+        if (RetainedOriginalPair() is null) return;
+        int downloads = 0;
+        byte[] application = [];
+        using var f = new SetupFixture(RetainedLoaderLayout.DeviceId, getManufacturerApplication: () =>
+        {
+            downloads++;
+            return Task.FromResult(application);
+        });
+        var install = await f.ReadyToCapture();
+        await f.Service.CaptureAsync(install);
+        await f.Service.InstallAsync(install, true);
+        File.Move(Path.Combine(install.Directory, "recovery.json"), Path.Combine(f.Root, "original-pc-record.json"));
+
+        byte[] installed = f.Environment.Current.ToArray();
+        var update = await f.ReadyToCapture(SetupOperation.Update);
+        await f.Service.CaptureAsync(update);
+        Check((await f.Service.UpdateAsync(update, true)).Stage == SetupStage.Reconnect &&
+            f.Environment.Requests.Last().GetProperty("useCurrentCapture").GetBoolean() &&
+            f.Environment.Current.SequenceEqual(installed) && downloads == 0, "A second computer can update the retained board from its current reads offline.");
+        Check(!File.Exists(Path.Combine(update.Directory, "recovery.json")), "Current firmware must never be archived as the manufacturer's original.");
+        f.Environment.Nodes = [f.Environment.Runtime];
+        await f.Service.ObserveAsync(update);
+
+        var swapped = await f.ReadyToCapture(SetupOperation.Update);
+        swapped.AutomaticUpdate = true;
+        Check(FirmwareSemanticVersion.TryParse(update.InstalledFirmwareVersion, out var installedVersion), "The captured update has a valid version.");
+        swapped.ExpectedRuntimeVersion = new(RetainedLoaderLayout.DeviceId, installedVersion, 1);
+        swapped.ExpectedHardwareProfile = AutomaticSnapshot(RetainedLoaderLayout.DeviceId).HardwareProfile;
+        await RejectAsync(() => f.Service.CaptureAsync(swapped), "Automatic update rejects a different installation at the same USB port.");
+        Check(swapped.Stage == SetupStage.Blocked && f.Environment.Writes == 2 && !File.Exists(Path.Combine(swapped.Directory, "bundle.json")),
+            "An installation swapped after runtime identification cannot prepare a firmware write.");
+
+        var bad = await f.ReadyToCapture(SetupOperation.Restore);
+        await RejectAsync(() => f.Service.CaptureAsync(bad), "A second computer must reject unverified manufacturer data.");
+        Check(downloads == 1 && f.Environment.Writes == 2 && bad.Stage == SetupStage.Blocked && !bad.WriteAttempted,
+            "An unusable manufacturer download stops before a write.");
+
+        var manufacturerPath = System.Environment.GetEnvironmentVariable("INGLORIOUS_TEST_MANUFACTURER_APP");
+        if (!string.IsNullOrEmpty(manufacturerPath))
+        {
+            application = File.ReadAllBytes(manufacturerPath);
+            var restore = await f.ReadyToCapture(SetupOperation.Restore);
+            await f.Service.CaptureAsync(restore);
+            Check((await f.Service.RestoreAsync(restore, true)).Stage == SetupStage.Reconnect &&
+                f.Environment.Requests.Last().GetProperty("useManufacturerFirmware").GetBoolean() && downloads == 2,
+                "Without an archive the coordinator verifies the downloaded manufacturer target and both complete readbacks.");
+            ManufacturerFirmware.ValidateImage(installed, f.Environment.Current);
+            f.Environment.Nodes = [f.Environment.Runtime];
+            Check((await f.Service.ObserveAsync(restore)).Stage == SetupStage.Reconnect, "Manufacturer recovery waits for the stock USB identity.");
+            f.Environment.Nodes = [f.Environment.Normal];
+            Check((await f.Service.ObserveAsync(restore)).Stage == SetupStage.Complete, "Returning in stock mode completes manufacturer recovery.");
+
+            f.Environment.Current = installed.ToArray();
+            File.Move(Path.Combine(f.Root, "original-pc-record.json"), Path.Combine(install.Directory, "recovery.json"));
+            var secondRead = Path.Combine(install.BackupDirectory!, "original-2.bin");
+            File.Delete(secondRead);
+            var incomplete = await f.ReadyToCapture(SetupOperation.Restore);
+            await f.Service.CaptureAsync(incomplete);
+            Check(downloads == 3 && incomplete.ManufacturerTargetSha256 is not null && f.Environment.Writes == 3,
+                "A missing original file in a partial archive can also use the manufacturer download.");
+            File.WriteAllBytes(secondRead, installed);
+            var altered = await f.ReadyToCapture(SetupOperation.Restore);
+            await RejectAsync(() => f.Service.CaptureAsync(altered), "A changed original file is reported instead of being silently replaced.");
+            Check(downloads == 3 && f.Environment.Writes == 3, "Corrupt existing evidence never authorizes a write or a download.");
+        }
+    }
+
     private static async Task CheckUpdates()
     {
         Check(Version.TryParse(DeviceSetupService.TargetFirmwareVersion, out _), "Update target comes from a valid embedded catalog version.");
@@ -377,7 +447,7 @@ internal static partial class Program
         internal string Archive => Path.Combine(Root,"archives");
         internal FakeSetupEnvironment Environment { get; }
         internal DeviceSetupService Service { get; }
-        internal SetupFixture(string id,bool forceSharedProPid=false, bool automaticUpdateTarget=false)
+        internal SetupFixture(string id,bool forceSharedProPid=false, bool automaticUpdateTarget=false, Func<Task<byte[]>>? getManufacturerApplication = null)
         {
             Directory.CreateDirectory(Root);Directory.CreateDirectory(Archive);
             var packages=Path.Combine(Root,"Firmware");Directory.CreateDirectory(packages);
@@ -387,7 +457,8 @@ internal static partial class Program
             foreach(var file in Directory.EnumerateFiles(firmwareDirectory,"*.bin"))
                 File.Copy(file,Path.Combine(packages,Path.GetFileName(file)));
             Environment=new(id,forceSharedProPid);
-            Service=new(Environment,Archive,packages,automaticUpdateTarget ? _ => "0.11.13" : null);
+            Service=new(Environment,Archive,packages,automaticUpdateTarget ? _ => "0.11.13" : null,
+                getManufacturerApplication ?? (() => throw new InvalidOperationException("Unexpected manufacturer download in offline fixture.")));
         }
         internal async Task<SetupSession> BeginAndDisconnect(SetupOperation operation=SetupOperation.Install)
         {
@@ -517,6 +588,13 @@ internal static partial class Program
                     var bundlePath=req.GetProperty("bundlePath").GetString()!;
                     using var bundle=JsonDocument.Parse(File.ReadAllBytes(bundlePath));
                     target=File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(bundlePath)!,bundle.RootElement.GetProperty("image").GetProperty("path").GetString()!));
+                }
+                else if (req.TryGetProperty("useManufacturerFirmware", out var manufacturer) && manufacturer.GetBoolean())
+                {
+                    Check(op == "restore" && DeviceId == RetainedLoaderLayout.DeviceId &&
+                        req.GetProperty("expectedCurrentSha256").GetString() == Hash(Current), "Manufacturer restore binds the freshly read board.");
+                    target = File.ReadAllBytes(req.GetProperty("bundlePath").GetString()!);
+                    ManufacturerFirmware.ValidateImage(Current, target);
                 }
                 else
                 {

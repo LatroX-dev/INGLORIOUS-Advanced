@@ -116,6 +116,7 @@ internal sealed class NativeUsb : IDisposable
         private nint handle;
         private bool claimed;
         private bool writesEnabled;
+        private RetainedLoaderWriteGrant? pageGrant;
         private WbInfo? initialInfo;
         private readonly Model selectedModel;
         private readonly Stopwatch elapsed = Stopwatch.StartNew();
@@ -154,7 +155,7 @@ internal sealed class NativeUsb : IDisposable
 
         public byte[] Exchange(byte[] request)
         {
-            WbProtocol.ValidatePacket(request, writesEnabled, selectedModel);
+            WbProtocol.ValidatePacket(request, writesEnabled, selectedModel, pageGrant);
             return ExchangePacket(request);
         }
 
@@ -218,13 +219,13 @@ internal sealed class NativeUsb : IDisposable
                 engineeringGrant.Consume(selectedModel, Probe(model), image, prefix);
             }
             completedWriteHash = null;
-            beforeFirstWrite(); writesEnabled = true;
+            beforeFirstWrite(); pageGrant = engineeringGrant as RetainedLoaderWriteGrant; writesEnabled = true;
             try
             {
-                WbProtocol.WriteImage(this, image, selectedModel);
+                WbProtocol.WriteImage(this, image, selectedModel, pageGrant);
                 completedWriteHash = Files.Hash(image);
             }
-            finally { writesEnabled = false; }
+            finally { writesEnabled = false; pageGrant = null; }
         }
 
         private string? completedWriteHash;

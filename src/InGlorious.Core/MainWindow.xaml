@@ -280,6 +280,7 @@
                                             <Grid>
                                                 <Grid.RowDefinitions><RowDefinition Height="Auto" SharedSizeGroup="DeviceActionTitle" /><RowDefinition Height="Auto" SharedSizeGroup="DeviceActionInfo" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                                 <TextBlock Text="{local:Tr Key='Original-Firmware wiederherstellen'}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,12" />
+                                                <TextBlock x:Name="OriginalFirmwareHint" Grid.Row="1" Style="{StaticResource HelpText}" Margin="0,0,0,14" />
                                                 <Button x:Name="RestoreOriginalFirmwareButton" Grid.Row="2" local:UiIcons.Kind="restore" Content="{local:Tr Key='Wiederherstellung öffnen'}" Click="RestoreFirmware_Click" HorizontalAlignment="Left" MinHeight="37" Padding="12,9" />
                                             </Grid>
                                         </Border>

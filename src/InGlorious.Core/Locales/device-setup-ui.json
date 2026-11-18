@@ -1,4 +1,43 @@
 {
+  "Für dieses Update brauchst du keine Original-Sicherung.": {
+    "en": "This update does not require your original firmware backup.",
+    "es": "Para esta actualización no necesitas la copia de seguridad del firmware original.",
+    "fr": "Cette mise à jour ne nécessite pas de sauvegarde du firmware d’origine.",
+    "it": "Per questo aggiornamento non serve il backup del firmware originale.",
+    "pt-BR": "Esta atualização não exige o backup do firmware original.",
+    "pl": "Do tej aktualizacji nie potrzebujesz kopii zapasowej oryginalnego oprogramowania sprzętowego.",
+    "tr": "Bu güncelleme için orijinal aygıt yazılımının yedeği gerekmez.",
+    "ru": "Для этого обновления не нужна резервная копия исходной прошивки.",
+    "ja": "このアップデートには元のファームウェアのバックアップは不要です。",
+    "ko": "이 업데이트에는 원래 펌웨어의 백업이 필요하지 않습니다.",
+    "zh-Hans": "此次更新无需原厂固件备份。"
+  },
+  "Die App verwendet deine Original-Sicherung. Fehlt sie, lädt die App die Firmware von Glorious über das Internet herunter.": {
+    "en": "The app uses your original firmware backup. If it is missing, the app downloads the firmware from Glorious over the internet.",
+    "es": "La aplicación usa tu copia de seguridad del firmware original. Si falta, descarga el firmware de Glorious a través de Internet.",
+    "fr": "L’application utilise votre sauvegarde du firmware d’origine. Si elle est introuvable, l’application télécharge le firmware auprès de Glorious via Internet.",
+    "it": "L’app usa la tua copia di backup del firmware originale. Se manca, scarica il firmware da Glorious tramite Internet.",
+    "pt-BR": "O aplicativo usa seu backup do firmware original. Se ele estiver ausente, baixa o firmware da Glorious pela internet.",
+    "pl": "Aplikacja używa kopii zapasowej oryginalnego oprogramowania sprzętowego. Jeśli jej brakuje, pobiera oprogramowanie od Glorious przez internet.",
+    "tr": "Uygulama orijinal aygıt yazılımı yedeğinizi kullanır. Yedek yoksa yazılımı internet üzerinden Glorious’tan indirir.",
+    "ru": "Приложение использует резервную копию исходной прошивки. Если её нет, приложение загружает прошивку от Glorious через интернет.",
+    "ja": "元のファームウェアのバックアップを使用します。バックアップがない場合はインターネット経由で Glorious からファームウェアをダウンロードします。",
+    "ko": "앱은 원래 펌웨어 백업을 사용합니다. 백업이 없으면 인터넷을 통해 Glorious에서 펌웨어를 다운로드합니다.",
+    "zh-Hans": "应用会使用原厂固件备份。如果找不到备份，应用会通过互联网从 Glorious 下载固件。"
+  },
+  "Ohne die Sicherung können frühere CORE-Einstellungen fehlen. Deine INGLORIOUS-Einstellungen lassen sich in CORE nicht verwenden.": {
+    "en": "Without the backup, previous CORE settings may be missing. CORE cannot use your INGLORIOUS settings.",
+    "es": "Sin la copia de seguridad, es posible que falten ajustes anteriores de CORE. CORE no puede usar tus ajustes de INGLORIOUS.",
+    "fr": "Sans la sauvegarde, certains anciens réglages CORE peuvent manquer. CORE ne peut pas utiliser vos réglages INGLORIOUS.",
+    "it": "Senza il backup potrebbero mancare alcune delle precedenti impostazioni di CORE. CORE non può usare le impostazioni di INGLORIOUS.",
+    "pt-BR": "Sem o backup, algumas configurações anteriores do CORE podem ficar indisponíveis. O CORE não pode usar suas configurações do INGLORIOUS.",
+    "pl": "Bez kopii zapasowej może zabraknąć wcześniejszych ustawień CORE. W CORE nie można używać ustawień INGLORIOUS.",
+    "tr": "Yedek olmadan önceki CORE ayarlarınız eksik olabilir. INGLORIOUS ayarlarınız CORE’da kullanılamaz.",
+    "ru": "Без резервной копии прежние настройки CORE могут быть недоступны. CORE не поддерживает настройки INGLORIOUS.",
+    "ja": "バックアップがない場合、以前の CORE 設定が復元されないことがあります。INGLORIOUS の設定は CORE では使用できません。",
+    "ko": "백업이 없으면 이전 CORE 설정이 복원되지 않을 수 있습니다. CORE에서는 INGLORIOUS 설정을 사용할 수 없습니다.",
+    "zh-Hans": "没有备份时，之前的 CORE 设置可能无法恢复。CORE 无法使用 INGLORIOUS 设置。"
+  },
   "Für dieses Modell ist noch keine INGLORIOUS-Firmware verfügbar.": {
     "en": "INGLORIOUS firmware is not yet available for this model.",
     "es": "Todavía no hay firmware INGLORIOUS disponible para este modelo.",

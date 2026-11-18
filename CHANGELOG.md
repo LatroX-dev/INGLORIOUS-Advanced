@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.9
+
+- Update the wired GMMK 3 PRO 100% ISO without the original firmware backup.
+- Return the same keyboard to Glorious CORE by downloading its manufacturer firmware if the backup is missing.
+
 ## 0.7.8
 
 - Update supported keyboards without unplugging, after installing compatible firmware.

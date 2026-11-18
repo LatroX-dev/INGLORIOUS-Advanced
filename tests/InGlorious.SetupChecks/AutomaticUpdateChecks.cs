@@ -103,8 +103,8 @@ internal static partial class Program
         foreach (var restartFault in new[] { "acknowledged", "restart-unacknowledged" })
         {
             using var f = new SetupFixture(board.DeviceId, automaticUpdateTarget: true);
-            var modelSnapshot = AutomaticSnapshot(board.DeviceId);
             var install = await f.ReadyToCapture(); await f.Service.CaptureAsync(install); await f.Service.InstallAsync(install, true);
+            var modelSnapshot = AutomaticSnapshot(board.DeviceId, installationId: install.Installation!.InstallationId);
             // Entry command safety is tested above. This fixture exercises update/restart against the current reviewed catalog,
             // including catalogs containing an older manual-only firmware during the first migration release.
             var session = await f.ReadyToCapture(SetupOperation.Update);
@@ -170,13 +170,13 @@ internal static partial class Program
         }
     }
 
-    private static SetupRuntimeConfiguration AutomaticSnapshot(string deviceId, ulong generation = 0x100000007)
+    private static SetupRuntimeConfiguration AutomaticSnapshot(string deviceId, ulong generation = 0x100000007, Guid? installationId = null)
     {
         var payload = OnboardSerializer.Prepare(ProjectService.Create(deviceId)).Payload;
         if (deviceId != "gmmk3-pro-100-iso") return new(payload);
         var status = new OnboardHardwareProfileStatus(deviceId, 2, 2, (byte)(generation == 0 ? 3 : 1), 2, generation,
             OnboardProtocol.Crc32(payload), payload.Length, payload[4] | (payload[5] << 8));
-        return new(payload, status.Bind(Guid.NewGuid()), status);
+        return new(payload, status.Bind(installationId ?? Guid.NewGuid()), status);
     }
 
     private static void CheckAutomaticUpdateMessages()

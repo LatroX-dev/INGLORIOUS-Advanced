@@ -53,6 +53,7 @@ internal static partial class Program
         if (RetainedOriginal.Value is null) Console.WriteLine("Retained-loader positive round trips need explicit INGLORIOUS_TEST_ORIGINAL_READ1/READ2 fixtures; public synthetic rejection checks remain active.");
         CheckIdentity();
         CheckStockFirmwareInspector();
+        await CheckManufacturerFirmware();
         await CheckLegacyMigration();
         await CheckCoordinator();
         await CheckFirmwareSequence();

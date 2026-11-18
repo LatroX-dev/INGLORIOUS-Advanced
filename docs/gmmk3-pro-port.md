@@ -27,11 +27,13 @@ The normal app supports first installation, update and original-firmware recover
 
 First installation requires two matching full reads of that device's original firmware, exact model/geometry checks and the reviewed resident loader. A recovery record binds the original backup to the installation. The original prefix is copied into the prepared image but is excluded from every erase/program command at the adapter and packet boundaries. The live prefix is read and checked again immediately before a one-use write grant is consumed.
 
-Updates accept only cataloged application images and preserve the installation marker, loader and complete settings area. Restore uses the matching original backup. Both paths require verified full readbacks; a version string or USB product name alone is not firmware provenance. Changed or unknown loaders, ambiguous identities and missing recovery records stop the operation.
+Updates accept only cataloged application images and preserve the installation marker, resident loader and settings. An update can proceed when the personal original backup is missing. To return to CORE, the app prefers the keyboard's matching original backup. If it is missing, the app downloads the manufacturer's firmware for the wired GMMK 3 PRO 100% ISO and verifies it before writing. Previous CORE settings may be unavailable after this download. CORE cannot use INGLORIOUS settings. Both operations require an identified installation and verified full readbacks.
 
 The first separately authorized engineering installation was followed by normal startup, basic typing and lighting. Space+B then returned the installed device to update mode. Original-firmware restoration produced two full readbacks matching the original backup; stock typing and lighting worked again. This verifies the normal round trip on that device, not recovery after interrupted writes or a lost installation marker. External storage is outside the internal-flash backup.
 
 Subsequent installation through the app and an update to firmware 0.11.4 with app 0.6.54 completed. The tester confirmed the full lighting sequence and return to normal lighting. The experimental label is removed only for this exact variant; identity, backup and recovery checks are unchanged.
+
+During testing for app 0.7.9, the tester updated the physical keyboard successfully without importing the backup ZIP. The tester did not attempt a return to Glorious CORE. Retention of all three profiles after this update remains unconfirmed.
 
 ## Device test and settings
 
@@ -46,6 +48,7 @@ Windows-side tests confirmed independent saved colors, a key-binding change isol
 ## Remaining acceptance
 
 - Exercise original-firmware restoration through the integrated app guide on this variant; the earlier verified restoration used the separate engineering flow.
+- Check the return to CORE using the manufacturer download on hardware, including typing and recognition in Glorious CORE.
 - Test every physical key, Fn action, knob direction and knob press.
 - Compare every key, side and logo LED with the preview.
 - Transfer a harmless macro, layer and lighting profile; verify it after reconnecting with the app closed.

@@ -65,25 +65,33 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
             byte[] captureBytes = Files.ReadBounded(request.BackupPath!, 1024 * 1024);
             var captureLock = Files.Lock(request.BackupPath!, captureBytes.Length, Files.Hash(captureBytes)); locks.Add(captureLock.Stream);
             var capture = JsonSerializer.Deserialize<CaptureManifest>(captureLock.Bytes, Json.Options) ?? throw new InvalidDataException("BACKUP_MANIFEST_NULL");
+            string captureHash = request.UsesInstalledCapture ? request.ExpectedCurrentSha256! : request.ExpectedBackupSha256;
             if (capture.Schema != 1 || capture.DeviceId != model.DeviceId || capture.Artifacts.Length != 2 ||
-                capture.Artifacts.Any(a => a.Kind != "original-read" || a.Bytes != model.FlashBytes || a.Sha256 != request.ExpectedBackupSha256) ||
+                capture.Artifacts.Any(a => a.Kind != "original-read" || a.Bytes != model.FlashBytes || a.Sha256 != captureHash) ||
                 capture.Artifacts[0].Path == capture.Artifacts[1].Path || capture.FingerprintSha256 != Files.Hash(Json.Bytes(capture.Fingerprint)) ||
                 capture.Fingerprint.Transport != model.Transport || capture.Fingerprint.FlashBytes != model.FlashBytes || capture.Fingerprint.SramBytes != model.SramBytes)
                 throw new InvalidDataException("BACKUP_MANIFEST_MISMATCH");
             if (model.EngineeringOnly && capture.Fingerprint != fingerprint) throw new InvalidDataException("ENGINEERING_CAPTURE_DEVICE_CHANGED");
+            if (request.UsesInstalledCapture && capture.Fingerprint != fingerprint) throw new InvalidDataException("CAPTURE_DEVICE_CHANGED");
             if (!model.EngineeringOnly && model.ProtectedPrefixBytes != 0) RetainedLoaderWriteGrant.ValidateBackupDevice(capture.Fingerprint, fingerprint);
             string backupRoot = Path.GetDirectoryName(Path.GetFullPath(request.BackupPath!))!;
             if (capture.Artifacts.Select(a => Files.Child(backupRoot, a.Path)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != 2)
                 throw new InvalidDataException("BACKUP_PAIR_ALIASES");
-            byte[]? originalBytes = null;
+            byte[]? capturedBytes = null;
             foreach (var artifact in capture.Artifacts)
             {
                 var item = Files.Lock(Files.Child(backupRoot, artifact.Path), artifact.Bytes, artifact.Sha256); locks.Add(item.Stream);
-                if (originalBytes != null && !originalBytes.AsSpan().SequenceEqual(item.Bytes)) throw new InvalidDataException("BACKUP_PAIR_MISMATCH");
-                originalBytes = item.Bytes;
+                if (capturedBytes != null && !capturedBytes.AsSpan().SequenceEqual(item.Bytes)) throw new InvalidDataException("BACKUP_PAIR_MISMATCH");
+                capturedBytes = item.Bytes;
             }
-            ValidateVectors(originalBytes!, model);
-            if (InstallationIdentity.Read(originalBytes!) != null) throw new InvalidDataException("BACKUP_NOT_ORIGINAL");
+            ValidateVectors(capturedBytes!, model);
+            var capturedIdentity = InstallationIdentity.Read(capturedBytes!);
+            if (request.UsesInstalledCapture)
+            {
+                ValidateInstallationIdentity(capturedIdentity ?? throw new InvalidDataException("DEVICE_RECOVERY_ID_MISSING"), request, model);
+                KnownFirmwareImages.Validate(capturedBytes!, model.DeviceId, (byte)model.BoardId);
+            }
+            else if (capturedIdentity != null) throw new InvalidDataException("BACKUP_NOT_ORIGINAL");
             byte[] image;
             InstallationIdentity identity;
             string? targetVersion = null;
@@ -105,14 +113,21 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
                 if (request.Operation == "install" && !model.EngineeringOnly)
                     ProfileBankLayout.RequireInitialState(image, KnownFirmwareImages.GetStorageLayout(image, model.DeviceId, (byte)model.BoardId));
             }
-            else image = originalBytes!;
+            else if (request.UseManufacturerFirmware)
+            {
+                byte[] target = Files.ReadBounded(request.BundlePath!, model.FlashBytes);
+                var imageLock = Files.Lock(request.BundlePath!, model.FlashBytes, Files.Hash(target)); locks.Add(imageLock.Stream);
+                image = imageLock.Bytes;
+                ManufacturerFirmware.ValidateImage(capturedBytes!, image);
+            }
+            else image = capturedBytes!;
 
             // A new pair is always persisted again immediately before a write. Restore tolerates a
             // damaged application vector, but still needs the exact installation recovery identity.
             byte[] before = CapturePair("before", "pre-write-read");
             if (request.Operation == "install")
             {
-                if (!before.AsSpan().SequenceEqual(originalBytes)) throw new InvalidDataException("ORIGINAL_CHANGED_SINCE_CAPTURE");
+                if (!before.AsSpan().SequenceEqual(capturedBytes)) throw new InvalidDataException("ORIGINAL_CHANGED_SINCE_CAPTURE");
                 identity = InstallationIdentity.Read(image)!;
             }
             else
@@ -122,7 +137,7 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
                     LegacyFirmwareMigration.ValidateImage(before, model.DeviceId);
                     LegacyFirmwareMigration.ValidateFingerprint(JsonSerializer.SerializeToElement(capture.Fingerprint, Json.Options), fingerprint.Serial);
                     LegacyFirmwareMigration.ValidateFingerprint(JsonSerializer.SerializeToElement(fingerprint, Json.Options), fingerprint.Serial);
-                    LegacyFirmwareMigration.ValidateOriginal(originalBytes!, model.DeviceId);
+                    LegacyFirmwareMigration.ValidateOriginal(capturedBytes!, model.DeviceId);
                     identity = InstallationIdentity.Read(image)!;
                 }
                 else identity = InstallationIdentity.Read(before) ?? throw new InvalidDataException("DEVICE_RECOVERY_ID_MISSING");
@@ -142,8 +157,8 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
             }
             installationId = identity.InstallationId;
             IRetainedLoaderWriteGrant? engineeringGrant = model.EngineeringOnly
-                ? EngineeringPolicy.Authorize(engineeringAuthorization!, request, model, fingerprint, originalBytes!, before, image)
-                : model.ProtectedPrefixBytes != 0 ? RetainedLoaderWriteGrant.Create(request, model, fingerprint, originalBytes!, before, image) : null;
+                ? EngineeringPolicy.Authorize(engineeringAuthorization!, request, model, fingerprint, capturedBytes!, before, image)
+                : model.ProtectedPrefixBytes != 0 ? RetainedLoaderWriteGrant.Create(request, model, fingerprint, capturedBytes!, before, image) : null;
             var fresh = artifacts.ToArray();
             foreach (var artifact in fresh)
                 locks.Add(Files.Lock(Files.Child(directory, artifact.Path), artifact.Bytes, artifact.Sha256).Stream);
@@ -205,9 +220,12 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
             }
             // Transport disposal and audit output are part of completion, never reported early.
             FlushDeviceLog(); device.Dispose(); device = null;
-            Files.New(directory, "installation.json", Json.Bytes(new { schema = 1, operation = request.Operation, model.DeviceId, installationId, originalSha256 = request.ExpectedBackupSha256, originalCaptureManifest = Path.GetFullPath(request.BackupPath!), fingerprint, verified = true }), "installation-receipt");
+            string capturePath = Path.GetFullPath(request.BackupPath!);
+            Files.New(directory, "installation.json", Json.Bytes(new { schema = 1, operation = request.Operation, model.DeviceId, installationId,
+                originalSha256 = request.ExpectedBackupSha256, originalCaptureManifest = request.UsesInstalledCapture ? null : capturePath,
+                currentCaptureManifest = request.UsesInstalledCapture ? capturePath : null, fingerprint, verified = true }), "installation-receipt");
             verified = true;
-            return Save(new(1, request.Operation, sessionId, "verified", null, model.DeviceId, fingerprint, fingerprintHash, true, true, request.Operation != "restore", attempted, true, directory, artifacts.ToArray(), InstallationId: installationId,
+            return Save(new(1, request.Operation, sessionId, "verified", null, model.DeviceId, fingerprint, fingerprintHash, true, true, request.Operation != "restore" && !request.UseCurrentCapture, attempted, true, directory, artifacts.ToArray(), InstallationId: installationId,
                 RestartAttempted: restartAttempted, RestartAcknowledged: restartAcknowledged, RestartErrorCode: restartErrorCode));
 
             byte[] CapturePair(string prefix, string kind, Action<byte[]>? completedPair = null)
@@ -268,8 +286,13 @@ internal sealed class AdapterEngine(Func<IBackend> createBackend)
         if (request.ConfirmWrite != write) throw new InvalidDataException("EXPLICIT_WRITE_CONFIRMATION_REQUIRED");
         if (request.Operation != "list" && (request.Selection == null || request.DeviceId == null)) throw new InvalidDataException("SELECTION_REQUIRED");
         if (write && (request.BackupPath == null || request.ExpectedBackupSha256 == null || request.ExpectedFingerprintSha256 == null || request.ExpectedInstallationId is null || request.ExpectedInstallationId == Guid.Empty)) throw new InvalidDataException("WRITE_BINDING_REQUIRED");
-        if (request.Operation is "install" or "update" && request.BundlePath == null) throw new InvalidDataException("BUNDLE_REQUIRED");
-        if ((request.Operation == "update") != (request.ExpectedCurrentSha256 is not null)) throw new InvalidDataException("CURRENT_IMAGE_BINDING_REQUIRED");
+        if ((request.Operation is "install" or "update" || request.UseManufacturerFirmware) && request.BundlePath == null) throw new InvalidDataException("BUNDLE_REQUIRED");
+        if ((request.Operation == "update" || request.UseManufacturerFirmware) != (request.ExpectedCurrentSha256 is not null)) throw new InvalidDataException("CURRENT_IMAGE_BINDING_REQUIRED");
+        if (request.UseCurrentCapture && (request.Operation != "update" || request.DeviceId != RetainedLoaderLayout.DeviceId || request.MigrateLegacy))
+            throw new InvalidDataException("CURRENT_CAPTURE_UPDATE_NOT_SUPPORTED");
+        if (request.UseManufacturerFirmware && (request.Operation != "restore" || request.DeviceId != RetainedLoaderLayout.DeviceId ||
+            request.UseCurrentCapture || request.MigrateLegacy || request.RestartAfterVerify))
+            throw new InvalidDataException("MANUFACTURER_RESTORE_NOT_SUPPORTED");
         if (request.MigrateLegacy && (request.Operation != "update" || request.DeviceId != "pro-iso")) throw new InvalidDataException("LEGACY_OPERATION_NOT_APPROVED");
         if (request.RestartAfterVerify)
         {
