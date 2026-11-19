@@ -102,7 +102,7 @@ Every app package includes the matching firmware for all supported models. The a
 
 With compatible INGLORIOUS firmware, the app enters update mode and reconnects the keyboard automatically: leave USB connected throughout. An older firmware version may first need the displayed key combination and reconnect steps. Follow the guide shown for your device.
 
-An ordinary update preserves the stored INGLORIOUS configuration. Save a profile copy before updating. Do not disconnect the keyboard or close INGLORIOUS Advanced while the write is running. An unknown version is not treated as outdated.
+Firmware updates work offline on every supported model, even on a computer without the original backup. The app checks the firmware on the connected keyboard and preserves its stored INGLORIOUS configuration. Leave the USB cable connected and the app open until the guide finishes.
 
 When the update is complete, use **Test lighting** and the typing test described above, or select **Done**.
 
@@ -137,7 +137,7 @@ For a saved brightness setting on specific keys or side LEDs, select them under 
 3. Follow the reconnect instructions. Confirm the displayed device and select **Back up and restore**. The app checks the current firmware and matching original backup, then restores it without another confirmation.
 4. Reconnect normally when asked, then test typing and lighting.
 
-Restoring replaces INGLORIOUS and its stored configuration. It requires that keyboard's matching original backup. Keep a separate copy of the complete backup folder before replacing or reinstalling your system. The [backup locations](device-setup.md#backup-locations) are listed for each platform.
+Restoring replaces INGLORIOUS and its stored configuration. Most keyboards require their matching original backup. The wired, non-HE GMMK 3 PRO 100% ISO can also download its manufacturer firmware when the backup is missing. Previous CORE settings may be unavailable in that case. Keep a separate copy of the backup folder when changing computers. See the [backup locations for each platform](device-setup.md#backup-locations).
 
 The backup covers internal firmware. External profile storage and wireless-module settings are not included, so original settings are not guaranteed to be restored completely. An interrupted firmware write can require separate recovery. If the app reports an uncertain result, leave the device connected and keep the diagnostic report; do not repeatedly retry.
 

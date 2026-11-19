@@ -120,7 +120,7 @@ internal static partial class SelfTests
         // Arbitrary persisted configuration must survive every update byte for byte.
         for (int i = model.FlashBytes - InstallationIdentity.StorageBytes; i < model.FlashBytes; i++) device.Image[i] = (byte)(i * 37 + 11);
         byte[] current = device.Image.ToArray();
-        var currentCapture = engine.Run(new(1, "capture", Folder("current-capture"), model.DeviceId, selection));
+        var currentCapture = engine.Run(new(1, "capture", Folder("current-capture"), model.DeviceId, selection, CaptureInstalled: true));
         Check(currentCapture.Status == "ok", "normal installed capture retains full configuration");
         byte[] updateImage = InstallationIdentity.CreateImage(application, model.FlashBytes, identity, original);
         current.AsSpan(model.FlashBytes - InstallationIdentity.StorageBytes).CopyTo(updateImage.AsSpan(model.FlashBytes - InstallationIdentity.StorageBytes));
@@ -164,7 +164,7 @@ internal static partial class SelfTests
                 receipt.RootElement.GetProperty("currentCaptureManifest").GetString() == ownCurrentUpdate.BackupPath, "runtime capture is never recorded as the manufacturer original");
         Reject(() => AdapterEngine.ValidateRequest(install with { UseCurrentCapture = true }), "install cannot use current-capture update");
         Reject(() => AdapterEngine.ValidateRequest(restore with { UseCurrentCapture = true }), "restore cannot use current-capture update");
-        Reject(() => AdapterEngine.ValidateRequest(ownCurrentUpdate with { DeviceId = "gmmk3-100-iso" }), "generic model cannot request current-capture update");
+        Block(ownCurrentUpdate with { DeviceId = "gmmk3-100-iso" }, "generic model cannot use a retained-loader board capture");
         device.Image[InstallationIdentity.Offset(model.FlashBytes)] ^= 1;
         Block(restore, "missing marker recovery stays blocked");
         device.Image = updateImage.ToArray();
@@ -174,6 +174,23 @@ internal static partial class SelfTests
         var restored = engine.Run(restore);
         Check(restored is { Status: "verified", WriteAttempted: true } && device.Image.AsSpan().SequenceEqual(original), "normal restore returns exact own original despite damaged application vectors");
         Check(device.Writes == 4, "only install, both authorized updates and restore wrote through bounded fake packets");
+        string? previousDirectory = Environment.GetEnvironmentVariable("INGLORIOUS_TEST_PREVIOUS_FIRMWARE_DIRECTORY");
+        if (!string.IsNullOrEmpty(previousDirectory))
+        {
+            byte[] previous = Files.ReadBounded(Path.Combine(previousDirectory, model.DeviceId + ".bin"), model.FlashBytes);
+            byte[] olderImage = InstallationIdentity.CreateImage(previous, model.FlashBytes, identity, original);
+            string previousVersion = KnownFirmwareImages.Validate(olderImage, model.DeviceId, identity.BoardId);
+            Check(Version.Parse(previousVersion) < Version.Parse(version), "retained-loader fixture exercises a real upgrade");
+            current.AsSpan(^InstallationIdentity.StorageBytes).CopyTo(olderImage.AsSpan(^InstallationIdentity.StorageBytes));
+            device.Image = olderImage.ToArray();
+            var olderCapture = engine.Run(new(1, "capture", Folder("older-installed"), model.DeviceId, selection, CaptureInstalled: true));
+            Check(olderCapture.Status == "ok", "prior release is captured without access to original files");
+            var upgrade = engine.Run(ownCurrentUpdate with { SessionDirectory = Folder("upgrade-from-prior-release"),
+                BackupPath = Path.Combine(olderCapture.EvidenceDirectory, "capture.json"), ExpectedCurrentSha256 = Files.Hash(olderImage) });
+            Check(upgrade is { Verified: true, WriteAttempted: true, CanRestore: false } &&
+                device.Image.AsSpan().SequenceEqual(updateImage) && InstallationIdentity.Read(device.Image) == identity,
+                $"retained-loader upgrade preserves loader and settings and applies the reviewed new code, got {upgrade.Status}/{upgrade.ErrorCode}");
+        }
         RestartModelChecks(root, model, original, application);
         if (profileFixtures is not null)
         {
@@ -185,7 +202,7 @@ internal static partial class SelfTests
                 device.Image = image.ToArray(); bank.CopyTo(device.Image, ProfileBankLayout.Start);
                 for (int i = model.FlashBytes - InstallationIdentity.StorageBytes; i < model.FlashBytes; i++) device.Image[i] = (byte)(i * 31 + 17);
                 byte[] bankCurrent = device.Image.ToArray();
-                var bankCapture = engine.Run(new(1, "capture", Folder("bank-capture-" + name), model.DeviceId, selection));
+                var bankCapture = engine.Run(new(1, "capture", Folder("bank-capture-" + name), model.DeviceId, selection, CaptureInstalled: true));
                 Check(bankCapture.Status == "ok" && bankCapture.Artifacts.Any(a => a.Path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)),
                     "bank source has full readback evidence " + name);
                 byte[] bankUpdate = image.ToArray();

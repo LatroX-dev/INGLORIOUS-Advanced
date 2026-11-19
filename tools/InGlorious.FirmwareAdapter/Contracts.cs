@@ -20,7 +20,7 @@ internal sealed record AdapterRequest(int Schema, string Operation, string Sessi
     string? BundlePath = null, string? BackupPath = null, bool ConfirmWrite = false,
     string? ExpectedBackupSha256 = null, Guid? ExpectedInstallationId = null,
     string? ExpectedCurrentSha256 = null, bool MigrateLegacy = false, bool RestartAfterVerify = false,
-    bool UseCurrentCapture = false, bool UseManufacturerFirmware = false)
+    bool UseCurrentCapture = false, bool UseManufacturerFirmware = false, bool CaptureInstalled = false)
 {
     internal bool UsesInstalledCapture => UseCurrentCapture || UseManufacturerFirmware;
 }

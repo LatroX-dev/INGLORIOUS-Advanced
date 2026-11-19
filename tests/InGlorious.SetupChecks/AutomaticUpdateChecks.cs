@@ -104,6 +104,7 @@ internal static partial class Program
         {
             using var f = new SetupFixture(board.DeviceId, automaticUpdateTarget: true);
             var install = await f.ReadyToCapture(); await f.Service.CaptureAsync(install); await f.Service.InstallAsync(install, true);
+            Directory.Move(install.Directory, Path.Combine(f.Root, "original-computer"));
             var modelSnapshot = AutomaticSnapshot(board.DeviceId, installationId: install.Installation!.InstallationId);
             // Entry command safety is tested above. This fixture exercises update/restart against the current reviewed catalog,
             // including catalogs containing an older manual-only firmware during the first migration release.
@@ -118,7 +119,9 @@ internal static partial class Program
                 session.AutomaticRestartRequested && !session.OutcomeUncertain && f.Environment.Writes == writes + 1,
                 "A verified automatic update waits for runtime return even if restart acknowledgement is missing.");
             Check(session.AutomaticRestartAcknowledged == (restartFault == "acknowledged"), "Restart acknowledgement is separate from verified firmware bytes.");
-            Check(f.Environment.Requests.Last().GetProperty("restartAfterVerify").GetBoolean(), "Only the confirmed automatic update requests a post-verification restart.");
+            var request = f.Environment.Requests.Last();
+            Check(request.GetProperty("restartAfterVerify").GetBoolean() && request.GetProperty("useCurrentCapture").GetBoolean(),
+                "The confirmed automatic update requests a verified restart using only the installed capture.");
             session.RuntimeReturnDeadline = DateTimeOffset.UtcNow.AddSeconds(-1);
             Check((await f.Service.ObserveAsync(session)).Stage == SetupStage.Reconnect && !session.AutomaticRestartRequested &&
                 f.Environment.Writes == writes + 1, "A restart timeout offers a manual reconnect without repeating the flash.");

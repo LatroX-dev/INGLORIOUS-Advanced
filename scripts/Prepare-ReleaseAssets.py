@@ -73,6 +73,11 @@ def stage(source: Path, destination: Path, version: str, repository: Path) -> li
                      "Previous CORE settings may be missing. CORE cannot use INGLORIOUS settings. "
                      "The download was verified and recovery was tested with a simulated keyboard. Recovery by download still awaits a physical keyboard test.\n\n"
                      ) if version == "0.7.9" else ""
+    if version == "0.7.10":
+        recovery_note = ("Firmware updates work offline on all 16 supported variants. You can use a different computer. "
+                         "The app reads the installed firmware from the keyboard and preserves its stored configuration. "
+                         "Keep the original backup for a return to Glorious CORE. Only the wired, non-HE GMMK 3 PRO 100% ISO "
+                         "can download its manufacturer firmware if the backup is missing.\n\n")
     notes = (section[1].strip() + "\n\n" + recovery_note +
              f"[Full changelog](https://github.com/LatroX-dev/INGLORIOUS-Advanced/blob/v{version}/CHANGELOG.md)\n\n" + migration_note +
              f"Choose **INGLORIOUS-Advanced-{version}-win-x64-Setup.exe** for Windows, **osx-arm64** for Apple silicon, **osx-x64** for Intel Macs, "

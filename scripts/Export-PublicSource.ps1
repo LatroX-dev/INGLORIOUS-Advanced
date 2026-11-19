@@ -94,7 +94,7 @@ $allow.Add('tests/ReleaseAssetsChecks/check_release_assets.py')
 $allow.Add('tests/InGlorious.SetupChecks/LegacyMigrationChecks.cs')
 $adapterFiles=@('AdapterEngine.cs','EngineeringPolicy.cs','Contracts.cs','Files.cs','InGlorious.FirmwareAdapter.csproj','NativeUsb.cs','NativeToolCatalog.cs','Program.cs','README.md','SelfTests.cs','SelfTests.Legacy.cs','SelfTests.Engineering.cs','Stm32Device.cs','WbProtocol.cs',
  'Licenses/dfu-util-binary-provenance.txt','Licenses/dfu-util-GPL-2.0.txt','Licenses/dotnet-MIT.txt','Licenses/dotnet-THIRD-PARTY-NOTICES.txt','Licenses/libusb-LGPL-2.1.txt','Licenses/README.txt','Licenses/Westberry-Apache-2.0.txt','Licenses/Windows-runtime-notices.txt')
-$adapterFiles += @('RetainedLoaderWriteGrant.cs','SelfTests.RetainedLoader.cs')
+$adapterFiles += @('RetainedLoaderWriteGrant.cs','SelfTests.RetainedLoader.cs','SelfTests.InstalledUpdate.cs')
 $adapterFiles += @('VerifiedRestartGrant.cs','SelfTests.Restart.cs')
 foreach($name in $adapterFiles){$allow.Add('tools/InGlorious.FirmwareAdapter/'+$name)}
 $deviceCliFiles = @('InGlorious.Device.csproj','Program.cs','DeviceArguments.cs','TimedTransport.cs')

@@ -13,7 +13,7 @@ Configure Glorious keyboards with per-key lighting, effects, key assignments, ma
 
 I love Glorious hardware. I built INGLORIOUS Advanced to help everyone get the most out of it, as easily as possible.
 
-**App 0.7.9 · Firmware 0.11.14**
+**App 0.7.10 · Firmware 0.11.14**
 
 Get installers and packages from the [Releases page](https://github.com/LatroX-dev/INGLORIOUS-Advanced/releases). macOS and Linux builds are Early Alpha; physical-device testing is still limited.
 
@@ -101,6 +101,8 @@ Open **Settings → Updates** to check for a new version or turn automatic check
 
 New firmware comes with app updates when available. Updating the app does not flash a keyboard; the device guide handles firmware changes separately.
 
+You can update an existing INGLORIOUS installation on any supported keyboard, including the USB Numpad, from a different computer. The guide reads and checks the installed firmware. You can update offline without importing the original backup.
+
 With compatible INGLORIOUS firmware installed, the firmware guide can update the keyboard without unplugging it. First installation and older firmware still use the guided key combination. This update flow has been tested on Windows with the GMMK PRO ISO and GMMK Numpad; other models still need hardware testing.
 
 ## Custom firmware built on QMK
@@ -117,7 +119,7 @@ The desktop app is developed as part of INGLORIOUS Advanced. See the [firmware d
 
 **Use this software and its firmware at your own risk.** Firmware changes can cause data loss or leave a device unusable. Keep a separate copy of your original-firmware backups.
 
-Before first installation, the app creates and checks two copies of the keyboard's internal original firmware. Keep the backup folder: it is needed to return to the original firmware through **Settings → Devices & data → Restore original firmware**.
+Before first installation, the app creates and checks two copies of the keyboard's original internal firmware. Keep the backup folder for **Restore original firmware**. Most models need it to return to Glorious CORE. The wired, non-HE GMMK 3 PRO 100% ISO can also download its manufacturer firmware if the backup is missing.
 
 This backup does not include external profile memory, wireless modules or protection settings. Original application settings are therefore not guaranteed to return exactly as before. A disconnected cable or loss of power during a firmware write can require separate recovery. The app stops if it cannot identify the device or verify a backup.
 

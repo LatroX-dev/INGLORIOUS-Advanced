@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$PublishDirectory,[Parameter(Mandatory)][string]$Destination,[string]$ExpectedVersion='0.7.9',[string]$ToolCatalogPath=(Join-Path $PSScriptRoot '../src/InGlorious.Core/SetupToolCatalog.json'),[switch]$Create)
+param([Parameter(Mandatory)][string]$PublishDirectory,[Parameter(Mandatory)][string]$Destination,[string]$ExpectedVersion='0.7.10',[string]$ToolCatalogPath=(Join-Path $PSScriptRoot '../src/InGlorious.Core/SetupToolCatalog.json'),[switch]$Create)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 function Assert-NoLink([string]$Path) {

@@ -42,12 +42,12 @@ The separate response path must also be new. Ordinary operations use `confirmWri
 |---|---|---|
 | `list` | none; `deviceId` is optional and ignored | USB enumeration and serial string reads only |
 | `probe` | `deviceId`, `selection` | USB descriptors and WB `GET_INFO` only |
-| `capture` | previous fields, `expectedFingerprintSha256` | Two full internal-flash reads only |
+| `capture` | previous fields, `expectedFingerprintSha256`, optional `captureInstalled:true` for an existing installation | Two full internal-flash reads only |
 | `install` | previous fields, `backupPath`, `bundlePath`, `expectedBackupSha256`, `expectedInstallationId`, `confirmWrite:true` | Two new before-reads, explicit full-image write, two full readbacks |
 | `restore` | same as install except no bundle | Two new before-reads, exact own original, two full readbacks |
 | `restore` with `useManufacturerFirmware:true` | board16 only, `backupPath` to the current capture, `expectedCurrentSha256`, and `bundlePath` to the prepared full image | Restores the pinned manufacturer application and clears the installation marker. Two complete readbacks verify the result. |
 | `update` | same as install plus `expectedCurrentSha256` | Two fresh reads bound to the captured running image; preserves all 32KiB configuration bytes and the original recovery identity; two full readbacks |
-| `update` with `useCurrentCapture:true` | board16 only, same update fields with `backupPath` pointing to the current capture | Updates a recognized installation and preserves its settings and recovery identity. |
+| `update` with `useCurrentCapture:true` | All supported models, with `backupPath` pointing to the installed firmware capture | Updates a recognized installation and preserves its settings and recovery identity. |
 
 Selection returned by `list.devices[]`:
 
@@ -67,11 +67,10 @@ revision, WB type code/protocol revision if present, and the exact MCU memory ge
 a unique specimen identifier. STM32 strength is `usb-serial-and-port`, without claiming that
 the twelve-character bootloader serial is the full MCU UID.
 
-Capture emits `original-1.bin`, `original-2.bin` and `capture.json`. The response artifacts have
-`path` relative to `evidenceDirectory`, `bytes`, `sha256`, `kind`; the two images have kind
-`original-read`. The manifest's artifacts contain **only** these two entries. The capture can
-also read already-installed firmware for selecting a restore record; its filename/kind does
-not certify that the bytes are manufacturer firmware. Initial installation must additionally
+First installation captures `original-1.bin` and `original-2.bin` with kind `original-read`.
+Update and restore set `captureInstalled:true` to capture `current-1.bin` and `current-2.bin`
+with kind `current-read`. In both cases `capture.json` records the two paths relative to
+`evidenceDirectory`, byte lengths, hashes and kinds. Initial installation must additionally
 pass the coordinator's stock descriptor/model check. The adapter rejects an IGIDENT1-bearing
 image when it is supplied as the archived *original* for a write.
 
@@ -109,6 +108,10 @@ area must be FF on initial installation. This modifies the composed installation
 the frozen firmware binary or any original backup. It is a recovery association, **not** an
 immutable MCU UID. Flashing unrelated software or copying the record can remove/clone it.
 
+Schema 2 is specific to the GMMK PRO ISO 0.9.2 migration without a verified original.
+It stores six STM32 ROM serial bytes and 26 reserved zero bytes in the original-hash field.
+Later updates preserve that record. Restoring requires a matching original pair tied to the same ROM serial.
+
 For install, the new pair must equal the archived original byte-for-byte. For restore, the
 new pair must contain the expected GUID, board ID and original checksum; the archived STM32
 serial must also match. Original vector plausibility is checked before restore. The adapter
@@ -118,10 +121,11 @@ For update, the fresh pair must additionally match `expectedCurrentSha256`, the 
 hash captured by the coordinator. Both current and target application bytes must match an
 approved same-model release in `KnownFirmwareCatalog.json`; the unused application gap and
 identity-page padding must remain erased. Downgrades are rejected. The exact final 32KiB
-configuration range and installation identity must be equal before and after. The default
-update path locks the original capture manifest and its two original reads. Board16 also
-supports the current-capture mode below. Existing installations without
-the recovery identity are deliberately not eligible for this path. Recovery after an interrupted
+configuration range and installation identity must be equal before and after. Both manual and
+automatic updates lock the current capture manifest and both installed firmware reads. The adapter
+also accepts earlier clients that provide the original archive. The GMMK PRO ISO 0.9.2 migration
+checks its exact earlier application and the STM32 ROM serial. When the matching original is
+unavailable it creates a serial-bound identity with no original hash. Recovery after an interrupted
 full-image update is subject to the same transport and identity limits below; retaining bytes
 in the target image does not make writes power-loss atomic.
 

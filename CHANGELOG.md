@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.10
+
+- Update INGLORIOUS firmware on any supported keyboard without importing the original backup.
+
 ## 0.7.9
 
 - Update the wired GMMK 3 PRO 100% ISO without the original firmware backup.

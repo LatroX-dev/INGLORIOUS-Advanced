@@ -200,6 +200,14 @@ public sealed partial class DeviceSetupWindow
         check(_driverHelp.Visibility == Visibility.Collapsed, "Setup: driver instructions disappear after the condition changes");
         foreach (var model in DeviceCatalog.All.Where(model => !model.IsOfflineOnly))
         {
+            if (_operation == SetupOperation.Update)
+            {
+                ShowOfflineStep("backup", model.Id);
+                check(BackupActivity == L.T("Die installierte Firmware wird gesichert …") &&
+                    _backup.Visibility == Visibility.Visible && _backup.Text == L.T("Für dieses Update brauchst du keine Original-Sicherung.") &&
+                    _description.Text == L.T("Die App sichert zuerst den aktuellen Zustand und aktualisiert danach die Firmware. Deine Einstellungen bleiben erhalten."),
+                    "Update: " + model.Id + " explains that the current state is saved and no original archive is needed");
+            }
             ShowOfflineStep("reconnect", model.Id);
             check(_heading.Text == L.T("Jetzt normal neu verbinden") && _deviceName.Text == "\"" + model.Name + "\"" &&
                 _description.Text == L.Format("Trenne \"{0}\" einmal vom USB-Kabel und stecke es ohne gedrückte Tasten wieder ein.", model.Name) &&
@@ -286,6 +294,9 @@ public sealed partial class DeviceSetupWindow
                         foreach (var step in new[] { "select", "connect", "backup", "reconnect", "complete", "blocked" }.Concat(_operation == SetupOperation.Update && DeviceSetupService.SupportsAutomaticUpdateDevice(id) ? new[] { "auto-select", "auto-connect", "auto-backup", "auto-reconnect", "auto-complete" } : Array.Empty<string>()))
                         {
                             window.ShowOfflineStep(step, id);
+                            if (_operation == SetupOperation.Update && step is "select" or "auto-select")
+                                check(window._summary.Visibility == Visibility.Visible && window._backup.Text == L.T("Für dieses Update brauchst du keine Original-Sicherung."),
+                                    $"Update: {step} explains the backup requirement before confirmation: {supported.Code}/{id}");
                             if (step == "complete")
                             {
                                 window._coreImportPreview = new(id, 0, 100, new() { [DeviceCatalog.Get(id).Keys[0].Id] = "#FF0000" }, new(), 0, 0);

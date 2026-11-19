@@ -30,8 +30,9 @@ public static class LegacyFirmwareMigration
 
     public static void ValidateFingerprint(JsonElement fingerprint, string currentSerial)
     {
+        InstallationIdentity.ValidateLegacyStmSerial(currentSerial);
         var serial = fingerprint.GetProperty("serial").GetString();
-        if (!Regex.IsMatch(currentSerial, "\\A[0-9A-Fa-f]{12}\\z", RegexOptions.CultureInvariant) || serial != currentSerial ||
+        if (!string.Equals(serial, currentSerial, StringComparison.OrdinalIgnoreCase) ||
             fingerprint.GetProperty("transport").GetString() != "stm32-dfuse" ||
             fingerprint.GetProperty("vid").GetUInt16() != 0x0483 || fingerprint.GetProperty("pid").GetUInt16() != 0xDF11 ||
             fingerprint.GetProperty("configuration").GetByte() != 1 || fingerprint.GetProperty("interface").GetByte() != 0 ||

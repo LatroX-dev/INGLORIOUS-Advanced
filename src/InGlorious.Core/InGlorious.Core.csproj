@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>INGLORIOUS Advanced</AssemblyName>
     <RootNamespace>InGlorious.Core</RootNamespace>
-    <Version>0.7.9</Version>
+    <Version>0.7.10</Version>
     <Product>INGLORIOUS Advanced</Product>
     <Title>INGLORIOUS Advanced</Title>
     <ApplicationIcon>Assets\inglorious.ico</ApplicationIcon>

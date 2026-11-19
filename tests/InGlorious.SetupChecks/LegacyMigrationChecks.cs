@@ -91,7 +91,7 @@ internal static partial class Program
             if (fault == "nonempty-marker") legacy[InstallationIdentity.Offset(legacy.Length)] = 0;
             f.Environment.Current = legacy.ToArray();
             var update = await f.ReadyToCapture(SetupOperation.Update);
-            if (fault != "none")
+            if (fault is "unknown-code" or "nonempty-marker")
             {
                 await RejectAsync(async () => await f.Service.CaptureAsync(update), "legacy coordinator blocks " + fault);
                 Check(f.Environment.Writes == 0 && update.Stage == SetupStage.Blocked, "unsafe migration never writes");
@@ -101,8 +101,27 @@ internal static partial class Program
             Check(update.MigrateLegacy && update.InstalledFirmwareVersion == "0.9.2" && f.Environment.Writes == 0, "legacy preparation is read-only");
             var target = File.ReadAllBytes(Path.Combine(update.Directory, "installation.bin"));
             Check(target.AsSpan(262144 - InstallationIdentity.StorageBytes).SequenceEqual(legacy.AsSpan(262144 - InstallationIdentity.StorageBytes)), "legacy preparation preserves complete configuration");
-            Check(InstallationIdentity.Read(target)!.MatchesOriginal(original) && File.Exists(Path.Combine(update.Directory, "recovery.json")), "new identity binds archived manufacturer bytes before update");
+            var marker = InstallationIdentity.Read(target)!;
+            if (fault == "none")
+                Check(marker.MatchesOriginal(original) && File.Exists(Path.Combine(update.Directory, "recovery.json")), "new identity binds archived manufacturer bytes before update");
+            else
+                Check(marker.OriginalSha256 is null && !File.Exists(Path.Combine(update.Directory, "recovery.json")),
+                    "An unavailable or unusable original is never recorded as verified stock.");
             await f.Service.UpdateAsync(update, true);
+            if (fault != "none")
+            {
+                var request = f.Environment.Requests.Last();
+                Check(request.GetProperty("useCurrentCapture").GetBoolean() && request.GetProperty("migrateLegacy").GetBoolean(),
+                    "The legacy update uses the verified live code and STM32 serial when no unique original is available.");
+                var next = await f.ReadyToCapture(SetupOperation.Update);
+                await f.Service.CaptureAsync(next);
+                await f.Service.UpdateAsync(next, true);
+                Check(InstallationIdentity.Read(f.Environment.Current) == marker, "Later updates retain the serial-bound identity.");
+                var unavailable = await f.ReadyToCapture(SetupOperation.Restore);
+                await RejectAsync(() => f.Service.CaptureAsync(unavailable), "Restore rejects unavailable or unusable legacy stock: " + fault);
+                if (fault != "missing-original") continue;
+                File.WriteAllBytes(Path.Combine(first.Directory, "legacy-recovery.json"), JsonSerializer.SerializeToUtf8Bytes(record));
+            }
             var restore = await f.ReadyToCapture(SetupOperation.Restore); await f.Service.CaptureAsync(restore); await f.Service.RestoreAsync(restore, true);
             Check(f.Environment.Current.SequenceEqual(original), "migrated coordinator restores exact original through normal path");
         }

@@ -46,11 +46,11 @@ The backup covers internal flash. ROM, protection/option bytes, external profile
 
 ## Updating an existing installation
 
-The normal-mode RAW-HID handshake and explicit version query must identify the connected board before the app offers a newer included version. Missing, equal or newer version reports do not produce an update offer. The writer separately checks the captured code against `KnownFirmwareCatalog` and verifies the installation identifier. The wired GMMK 3 PRO 100% ISO can update with its verified resident loader when the original archive is missing. Other models still require the matching original archive.
+The normal-mode RAW-HID handshake and explicit version query must identify the connected board before the app offers a newer included version. Missing, equal or newer version reports do not produce an update offer. All 16 supported variants can update offline using two matching reads from the connected keyboard. The writer independently verifies the board, captured code and installation identity. On the wired GMMK 3 PRO 100% ISO it also verifies and preserves the resident loader.
 
 Two complete current reads must agree. The update keeps the installation identifier and the full 32-KiB configuration tail byte-for-byte, and binds the write to the freshly captured image hash. Two new before-reads must still agree immediately before writing; two full readbacks must match afterwards. There is no downgrade or fallback to an arbitrary raw image.
 
-The first public catalog starts with 0.11.0. One earlier GMMK PRO ISO release, 0.9.2, has a separate migration check: its exact reviewed code and erased gap must match, and two original-firmware copies must belong to the same STM32 ROM serial and stock model. A matching recovery archive must already exist locally. The installation identifier is added only as part of the fully checked update image; the configuration tail is preserved. No other unmarked or unknown code is accepted. Private development update scripts and device bindings are not part of the public repository.
+The first public catalog starts with 0.11.0. The GMMK PRO ISO also has a migration from its earlier 0.9.2 release, which has no installation marker. This migration checks the exact code, erased gap and STM32 ROM serial. With a verified original archive for that serial and model, the new marker records the original firmware hash. Otherwise it records the serial so a matching original can still be used for recovery later. Both paths preserve the stored configuration. Other unmarked firmware is rejected.
 
 ## Build and package
 

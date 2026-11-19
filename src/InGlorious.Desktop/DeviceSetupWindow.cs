@@ -378,6 +378,7 @@ public sealed partial class DeviceSetupWindow : Window
     private string BackupActivity => L.T(_operation switch
     {
         SetupOperation.Install => "Die Original-Firmware wird gesichert und geprüft …",
+        SetupOperation.Update => "Die installierte Firmware wird gesichert …",
         _ when SelectedModelId == RetainedLoaderLayout.DeviceId => "Die Firmware wird zweimal vollständig gelesen und als Sicherung geprüft.",
         _ => "Der aktuelle Zustand und die Original-Sicherung werden geprüft …"
     });
@@ -440,8 +441,7 @@ public sealed partial class DeviceSetupWindow : Window
         _backup.Text = _operation switch
         {
             SetupOperation.Install => L.T("Die Original-Firmware wird vor der Installation zweimal gesichert. Die geprüfte Sicherung bleibt auf diesem Computer und ermöglicht die Wiederherstellung.") + "\n" + L.T("Zusätzliche Profilspeicher und Bluetooth-Einstellungen sind nicht Teil dieser Sicherung."),
-            SetupOperation.Update when SelectedModelId == RetainedLoaderLayout.DeviceId => L.T("Für dieses Update brauchst du keine Original-Sicherung."),
-            SetupOperation.Update => L.T("Deine Einstellungen und die Original-Sicherung bleiben erhalten."),
+            SetupOperation.Update => L.T("Für dieses Update brauchst du keine Original-Sicherung."),
             SetupOperation.Restore when SelectedModelId == RetainedLoaderLayout.DeviceId => FirmwareMessages.RestoreSource(SelectedModelId) + "\n" +
                 L.T("Ohne die Sicherung können frühere CORE-Einstellungen fehlen. Deine INGLORIOUS-Einstellungen lassen sich in CORE nicht verwenden."),
             _ => FirmwareMessages.RestoreSource(SelectedModelId)

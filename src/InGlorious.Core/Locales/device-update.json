@@ -133,18 +133,18 @@
     "it": "Aggiornamento del firmware …", "pt-BR": "Atualizando o firmware …", "pl": "Aktualizowanie oprogramowania sprzętowego …",
     "tr": "Aygıt yazılımı güncelleniyor …", "ru": "Обновление прошивки …", "ja": "ファームウェアを更新中 …", "ko": "펌웨어 업데이트 중 …", "zh-Hans": "正在更新固件 …"
   },
-  "Deine Einstellungen und die Original-Sicherung bleiben erhalten.": {
-    "en": "Your settings and original firmware backup will be kept.",
-    "es": "Se conservarán tu configuración y la copia del firmware original.",
-    "fr": "Vos réglages et la sauvegarde du firmware d’origine seront conservés.",
-    "it": "Le impostazioni e il backup del firmware originale verranno conservati.",
-    "pt-BR": "Suas configurações e o backup do firmware original serão mantidos.",
-    "pl": "Twoje ustawienia i kopia oryginalnego oprogramowania sprzętowego zostaną zachowane.",
-    "tr": "Ayarlarınız ve orijinal aygıt yazılımı yedeği korunacak.",
-    "ru": "Ваши настройки и резервная копия оригинальной прошивки будут сохранены.",
-    "ja": "設定とオリジナルファームウェアのバックアップは保持されます。",
-    "ko": "설정과 원본 펌웨어 백업이 유지됩니다.",
-    "zh-Hans": "你的设置和原厂固件备份将保留。"
+  "Die installierte Firmware wird gesichert …": {
+    "en": "Backing up the installed firmware …",
+    "es": "Guardando una copia del firmware instalado …",
+    "fr": "Sauvegarde du micrologiciel installé …",
+    "it": "Backup del firmware installato in corso …",
+    "pt-BR": "Fazendo backup do firmware instalado …",
+    "pl": "Tworzenie kopii zapasowej zainstalowanego oprogramowania sprzętowego …",
+    "tr": "Yüklü aygıt yazılımı yedekleniyor …",
+    "ru": "Создаётся резервная копия установленной прошивки …",
+    "ja": "インストール済みのファームウェアをバックアップしています …",
+    "ko": "설치된 펌웨어를 백업하는 중 …",
+    "zh-Hans": "正在备份已安装的固件 …"
   },
   "Die Firmware-Version hat sich geändert. Starte das Update erneut.": {
     "en": "The firmware version has changed. Start the update again.",

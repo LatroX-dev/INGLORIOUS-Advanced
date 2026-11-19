@@ -30,12 +30,14 @@ public sealed partial class DeviceSetupService
             AssertSession(session);
             if (session.Stage != SetupStage.ReadyToBackup || session.Consumed) throw Error("Starte die Einrichtung erneut.");
             await CheckBoundBootloader(session);
-            log?.Report(L.T("Die Firmware wird zweimal vollständig gelesen und als Sicherung geprüft."));
+            log?.Report(L.T(session.Operation == SetupOperation.Update ? "Die installierte Firmware wird gesichert …" :
+                "Die Firmware wird zweimal vollständig gelesen und als Sicherung geprüft."));
             var response = await Adapter(session, "capture");
             RequireSuccess(response);
             ValidateAdapterIdentity(response, session, "capture");
             var evidence = RequiredEvidenceDirectory(response, session.Directory);
-            var reads = response.GetProperty("artifacts").EnumerateArray().Where(item => item.GetProperty("kind").GetString() == "original-read").ToArray();
+            var readKind = session.Operation == SetupOperation.Install ? "original-read" : "current-read";
+            var reads = response.GetProperty("artifacts").EnumerateArray().Where(item => item.GetProperty("kind").GetString() == readKind).ToArray();
             if (reads.Length != 2) throw Error("Die Sicherungen stimmen nicht überein. Es wird nichts installiert.");
             RequireDistinctReads(evidence, reads);
             var images = reads.Select(item => ReadCheckedArtifact(evidence, item, FlashBytesFor(session.DeviceId!))).ToArray();
@@ -65,9 +67,9 @@ public sealed partial class DeviceSetupService
             else
             {
                 var identity = InstallationIdentity.Read(current);
-                if (identity is null && session.Operation == SetupOperation.Update && !session.UpdateFromCurrent)
+                if (identity is null && session.Operation == SetupOperation.Update && session.DeviceId == "pro-iso")
                 {
-                    PrepareLegacyMigration(session, current);
+                    PrepareLegacyMigration(session, current, capturePath, response.GetProperty("fingerprint"));
                     session.BundlePath = PrepareBundle(session, current);
                 }
                 else
@@ -77,8 +79,12 @@ public sealed partial class DeviceSetupService
                         throw Error("Gerät nicht eindeutig erkannt.");
                     session.Installation = identity;
                     session.OriginalSha256 = identity.OriginalSha256;
+                    if (identity.LegacyStmSerial is { } legacySerial)
+                        ValidateLegacyDevice(session, response.GetProperty("fingerprint"), legacySerial);
                     if (session.UpdateFromCurrent)
                         session.BackupPath = capturePath;
+                    else if (identity.LegacyStmSerial is { } restoreSerial)
+                        UseLegacyOriginalForRestore(session, restoreSerial);
                     else if (!TryUseArchivedOriginal(session, identity))
                         await PrepareManufacturerRestore(session, current, capturePath);
                     ExportCurrentHardwareProfiles(session, current);
@@ -237,7 +243,7 @@ public sealed partial class DeviceSetupService
         var source = ContainedFile(_packageRoot, target.File);
         var bytes = File.ReadAllBytes(source);
         if (bytes.Length != target.Bytes || !HashEquals(bytes, target.Sha256)) throw Error("Das Firmware-Paket ist beschädigt oder unvollständig.");
-        var full = session.UpdateFromCurrent
+        var full = session.UpdateFromCurrent && target.ApplicationOffset != 0
             ? InstallationIdentity.CreateRetainedUpdate(bytes, session.Installation!, current, target.StorageLayout)
             : InstallationIdentity.CreateImage(bytes, target.FlashBytes, session.Installation!,
                 target.ApplicationOffset == 0 ? Array.Empty<byte>() : ReadOriginalForBundle(session), target.StorageLayout);
@@ -418,8 +424,8 @@ public sealed partial class DeviceSetupService
             throw Error("Ungültiger Pfad im Firmware-Paket.");
         AssertNoLinks(path); return path;
     }
-    private static bool HashEquals(ReadOnlySpan<byte> bytes, string expected) =>
-        expected.Length == 64 && CryptographicOperations.FixedTimeEquals(SHA256.HashData(bytes), Convert.FromHexString(expected));
+    private static bool HashEquals(ReadOnlySpan<byte> bytes, string? expected) =>
+        expected is { Length: 64 } && CryptographicOperations.FixedTimeEquals(SHA256.HashData(bytes), Convert.FromHexString(expected));
     private static void WriteNew(string path, byte[] bytes)
     {
         AssertNoLinks(path);

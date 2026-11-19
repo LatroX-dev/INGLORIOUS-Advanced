@@ -51,7 +51,7 @@ public sealed class SetupSession
     internal SetupUsbNode? Bootloader;
     internal JsonElement Selection;
     internal string? FingerprintSha256, BackupPath, OriginalSha256, BundlePath, CurrentSha256, ManufacturerTargetSha256;
-    internal bool UpdateFromCurrent => DeviceId == RetainedLoaderLayout.DeviceId && Operation == SetupOperation.Update;
+    internal bool UpdateFromCurrent => Operation == SetupOperation.Update && (!MigrateLegacy || Installation?.LegacyStmSerial is not null);
     internal InstallationIdentity? Installation;
     internal bool Consumed;
     internal bool MigrateLegacy;
@@ -426,6 +426,7 @@ public sealed partial class DeviceSetupService
         if (session.DeviceId is not null) request["deviceId"] = session.DeviceId;
         if (session.Selection.ValueKind == JsonValueKind.Object) request["selection"] = session.Selection;
         if (session.FingerprintSha256 is not null) request["expectedFingerprintSha256"] = session.FingerprintSha256;
+        if (operation == "capture" && session.Operation != SetupOperation.Install) request["captureInstalled"] = true;
         if (operation is "install" or "restore" or "update")
         {
             request["backupPath"] = session.BackupPath;

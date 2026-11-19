@@ -172,6 +172,8 @@ internal static partial class Program
             var install = await f.ReadyToCapture(); await f.Service.CaptureAsync(install); await f.Service.InstallAsync(install, true);
             var recoveryPath = Path.Combine(install.Directory, "recovery.json");
             var recoveryBefore = File.ReadAllBytes(recoveryPath);
+            var originalComputer = Path.Combine(f.Root, "original-computer");
+            Directory.Move(install.Directory, originalComputer);
             for (int i = f.Environment.Current.Length - InstallationIdentity.StorageBytes; i < f.Environment.Current.Length; i++)
                 f.Environment.Current[i] = (byte)(i * 29 + 101);
             var before = f.Environment.Current.ToArray();
@@ -186,15 +188,18 @@ internal static partial class Program
             Check((await f.Service.UpdateAsync(update, true)).Stage == SetupStage.Reconnect && f.Environment.Writes == 2,
                 "Explicit update proceeds only with matching prewrite and postwrite evidence.");
             Check(f.Environment.Current.SequenceEqual(before) && InstallationIdentity.Read(f.Environment.Current) == identity &&
-                File.ReadAllBytes(recoveryPath).SequenceEqual(recoveryBefore), "Update retains configuration, recovery identity and original archive.");
+                f.Environment.Requests.Last().GetProperty("useCurrentCapture").GetBoolean(),
+                "A computer without the original archive updates from the connected keyboard and preserves its configuration and recovery identity.");
             f.Environment.Nodes = [f.Environment.Normal];
             Check((await f.Service.ObserveAsync(update)).Stage == SetupStage.Reconnect, "Original firmware is not an update success.");
             f.Environment.Nodes = [f.Environment.Runtime];
             Check((await f.Service.ObserveAsync(update)).Stage == SetupStage.Complete, "Update completes only when runtime returns on its port.");
+            Directory.Move(originalComputer, install.Directory);
+            Check(File.ReadAllBytes(recoveryPath).SequenceEqual(recoveryBefore), "The original computer's recovery record still applies after the update.");
             var restore = await f.ReadyToCapture(SetupOperation.Restore); await f.Service.CaptureAsync(restore); await f.Service.RestoreAsync(restore, true);
             Check(f.Environment.Current.SequenceEqual(original), "Original restoration still works after a generic update.");
         }
-        foreach (var fault in new[] { "unknown-code", "missing-identity", "different-board", "changed-gap", "missing-original" })
+        foreach (var fault in new[] { "unknown-code", "missing-identity", "different-board", "changed-gap" })
         {
             using var f = new SetupFixture("numpad");
             var install = await f.ReadyToCapture(); await f.Service.CaptureAsync(install); await f.Service.InstallAsync(install, true);
@@ -206,7 +211,6 @@ internal static partial class Program
                 identity.Encode().CopyTo(f.Environment.Current, InstallationIdentity.Offset(f.Environment.Current.Length));
             }
             if (fault == "changed-gap") f.Environment.Current[InstallationIdentity.Offset(f.Environment.Current.Length) - 1] = 0;
-            if (fault == "missing-original") File.Delete(Path.Combine(install.Directory, "recovery.json"));
             var update = await f.ReadyToCapture(SetupOperation.Update);
             await RejectAsync(async () => await f.Service.CaptureAsync(update), "Unsafe update is rejected: " + fault);
             Check(update.Stage == SetupStage.Blocked && f.Environment.Writes == 1, "Unrecognized/unrecoverable runtime never becomes a write target.");
@@ -555,11 +559,12 @@ internal static partial class Program
                 if(CaptureFault=="short")first=first[..^1];
                 if(CaptureFault=="conflicting-model") {UsbDescriptor(0x342D,0xE3D3).CopyTo(first,211);first.CopyTo(second,0);}
                 if(CaptureFault=="missing-stock") {first.AsSpan(113,18).Clear();first.CopyTo(second,0);}
-                var items=new List<Dictionary<string,object?>> {Artifact(path,"original-1.bin",first,"original-read"),Artifact(path,"original-2.bin",second,"original-read")};
+                var prefix = req.TryGetProperty("captureInstalled", out var installed) && installed.GetBoolean() ? "current" : "original";
+                var items=new List<Dictionary<string,object?>> {Artifact(path,prefix+"-1.bin",first,prefix+"-read"),Artifact(path,prefix+"-2.bin",second,prefix+"-read")};
                 if(CaptureFault=="wrong-hash")items[0]["sha256"]=new string('0',64);
                 if(CaptureFault=="missing")items.RemoveAt(1);
-                if(CaptureFault=="duplicate-path")items[1]["path"]="original-1.bin";
-                if(CaptureFault=="traversal")items[0]["path"]="../original-1.bin";
+                if(CaptureFault=="duplicate-path")items[1]["path"]=items[0]["path"];
+                if(CaptureFault=="traversal")items[0]["path"]="../"+prefix+"-1.bin";
                 if(CaptureFault=="wrong-identity")response["fingerprintSha256"]=new string('0',64);
                 if(CaptureFault=="wrong-operation")response["operation"]="probe";
                 var capture=new{schema=1,deviceId=DeviceId,fingerprint=_fingerprint,fingerprintSha256=_fingerprintHash,artifacts=items.ToArray(),scope="Synthetic internal flash only",excludedRegions=new[]{"external SPI","option bytes"},restoreTested=false};

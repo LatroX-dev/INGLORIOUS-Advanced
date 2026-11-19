@@ -22,7 +22,11 @@ internal static partial class SelfTests
             NativeCatalogChecks();
             PacketChecks(); PageWriteChecks(); FileChecks(root); RequestChecks(root); EngineeringChecks(root); RetainedLoaderChecks(root); OperationLockChecks(root); StmChecks(); RestartChecks(root);
             string[] ids = ["pro-iso", "numpad", "pro-ansi", "pro-rev2-ansi", "pro-rev2-iso", "gmmk2-65-ansi", "gmmk2-65-iso", "gmmk2-96-ansi", "gmmk2-96-iso", "gmmk3-65-ansi", "gmmk3-65-iso", "gmmk3-75-ansi", "gmmk3-75-iso", "gmmk3-100-ansi", "gmmk3-100-iso"];
-            foreach (string id in ids) EngineChecks(root, id);
+            foreach (string id in ids)
+            {
+                EngineChecks(root, id);
+                InstalledUpdateChecks(root, Model.Get(id));
+            }
             LegacyChecks(root);
             Console.WriteLine(System.Text.Encoding.UTF8.GetString(Json.Bytes(new { passed = checks, hardwareAccess = false, nativeLibraryLoaded = false, toolProcessesStarted = false })));
             return 0;
@@ -343,11 +347,11 @@ internal static partial class SelfTests
         internal readonly Fingerprint Fingerprint; internal byte[] Image; internal int Writes, Reads, BeforeWriteReads;
         internal bool ReadFault, WriteFault, AfterFault, AfterPairFault, AfterIdentityFault, RestartFault;
         internal int Restarts; private bool wroteThisCall;
-        internal FakeDevice(Model model)
+        internal FakeDevice(Model model, string stmSerial = "0123456789AB")
         {
             Image = new byte[model.FlashBytes]; Array.Fill(Image, (byte)0xFF); BinaryPrimitives.WriteUInt32LittleEndian(Image, 0x20001000); BinaryPrimitives.WriteUInt32LittleEndian(Image.AsSpan(4), Model.FlashBase + 0x101);
             bool stm = model.Transport == "stm32-dfuse";
-            Fingerprint = new(model.Transport, (ushort)(stm ? 0x0483 : 0x342D), (ushort)(stm ? 0xDF11 : 0xDFA0), 1, "6.7", stm ? "0123456789AB" : "", 1, 0, 0, 0x100, stm ? null : 0x3A502980, model.BootVersion, Model.FlashBase, model.FlashBytes, model.SramBytes, stm ? "@Internal Flash /0x08000000/128*0002Kg" : null, null, stm ? "usb-serial-and-port" : "transport-session");
+            Fingerprint = new(model.Transport, (ushort)(stm ? 0x0483 : 0x342D), (ushort)(stm ? 0xDF11 : 0xDFA0), 1, "6.7", stm ? stmSerial : "", 1, 0, 0, 0x100, stm ? null : 0x3A502980, model.BootVersion, Model.FlashBase, model.FlashBytes, model.SramBytes, stm ? "@Internal Flash /0x08000000/128*0002Kg" : null, null, stm ? "usb-serial-and-port" : "transport-session");
         }
         public Fingerprint Probe(Model model) => AfterIdentityFault && wroteThisCall ? Fingerprint with { PortPath = "9.9" } : Fingerprint;
         public byte[] ReadAll(Model model) { Reads++; var bytes = Image.ToArray(); if ((ReadFault && Reads % 2 == 0) || (AfterFault && wroteThisCall) || (AfterPairFault && wroteThisCall && Reads % 2 == 0)) bytes[100] ^= 1; return bytes; }
